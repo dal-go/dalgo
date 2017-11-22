@@ -63,8 +63,8 @@ type Database interface {
 }
 
 var (
-	CrossGroupTransaction     = RunOptions{"XG": true}
-	SingleGroupTransaction    = RunOptions{}
+	CrossGroupTransaction  = RunOptions{"XG": true}
+	SingleGroupTransaction = RunOptions{}
 )
 
 const idChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" // Removed 1, I and 0, O as can be messed with l/1 and 0.
@@ -79,4 +79,3 @@ func RandomStringID(n uint8) string {
 	}
 	return string(b)
 }
-

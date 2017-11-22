@@ -1,18 +1,7 @@
 package gaedb
 
 import (
-	"bytes"
-	"fmt"
-	//"github.com/strongo/nds"
-	"github.com/strongo/log"
-	"golang.org/x/net/context"
-	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
-	"os"
-	"github.com/strongo/db"
-	"strconv"
-	"strings"
-	"github.com/pkg/errors"
 	"github.com/strongo/nds"
 )
 
