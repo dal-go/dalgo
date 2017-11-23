@@ -34,17 +34,10 @@ func (_ gaeDatabase) Get(c context.Context, entityHolder db.EntityHolder) (err e
 	if isIncomplete {
 		panic("can't get entity by incomplete key")
 	}
-	entity := entityHolder.Entity()
-	isNewEntity := entity == nil
-	if isNewEntity {
-		entity = entityHolder.NewEntity()
-	}
+	entity := entityHolder.NewEntity()
 	if err = Get(c, key, entity); err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			err = newErrNotFound(err, key)
-		}
-		if isNewEntity {
-			entityHolder.SetEntity(nil)
 		}
 	} else {
 		entityHolder.SetEntity(entity)
@@ -160,7 +153,6 @@ func (_ gaeDatabase) GetMulti(c context.Context, entityHolders []db.EntityHolder
 	count := len(entityHolders)
 	keys := make([]*datastore.Key, count)
 	vals := make([]interface{}, count)
-	isNewEntity := make([]bool, count)
 	for i := range entityHolders {
 		entityHolder := entityHolders[i]
 		intID := entityHolder.IntID()
@@ -171,18 +163,13 @@ func (_ gaeDatabase) GetMulti(c context.Context, entityHolders []db.EntityHolder
 			return errors.New("intID == 0 && strID is empty string")
 		}
 		keys[i] = NewKey(c, entityHolder.Kind(), strID, intID, nil)
-		vals[i] = entityHolder.Entity();
-		if isNewEntity[i] = vals[i] == nil; isNewEntity[i] {
-			vals[i] = entityHolder.NewEntity()
-		}
+		vals[i] = entityHolder.NewEntity()
 	}
 	if err := GetMulti(c, keys, vals); err != nil {
 		return err
 	}
-	for i := range isNewEntity {
-		if isNewEntity[i] {
-			entityHolders[i].SetEntity(vals[i])
-		}
+	for i := range vals {
+		entityHolders[i].SetEntity(vals[i])
 	}
 	return nil
 }

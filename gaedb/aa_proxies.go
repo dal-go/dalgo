@@ -21,7 +21,7 @@ var (
 
 	dbRunInTransaction = nds.RunInTransaction
 	dbGet              = nds.Get
-	dbGetMulti         = datastore.GetMulti
+	dbGetMulti         = nds.GetMulti
 	dbPut              = nds.Put
 	dbPutMulti         = nds.PutMulti
 	dbDelete           = nds.Delete
