@@ -20,6 +20,9 @@ var (
 )
 
 func IsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
 	_, ok := err.(ErrNotFoundByID)
 	return ok || errors.Cause(err) == ErrRecordNotFound
 }

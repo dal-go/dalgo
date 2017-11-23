@@ -18,6 +18,7 @@ type EntityHolder interface {
 	TypeOfID() TypeOfID
 	Kind() string
 	Entity() interface{}
+	NewEntity() interface{}
 	SetEntity(entity interface{})
 	IntID() int64
 	StrID() string
