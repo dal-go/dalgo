@@ -88,7 +88,7 @@ func CleanProperties(properties []datastore.Property, filters map[string]IsOkToR
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("Failed to process property %v=%T(%v), recovered: %v", p.Name, p.Value, p.Value, r)
+			err = fmt.Errorf("failed to process property %v=%T(%v), recovered: %v", p.Name, p.Value, p.Value, r)
 		}
 		filtered = properties[:i]
 	}()

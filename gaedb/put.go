@@ -17,20 +17,7 @@ var Put = func(c context.Context, key *datastore.Key, val interface{}) (*datasto
 	isPartialKey := key.Incomplete()
 	if LoggingEnabled {
 		buf := new(bytes.Buffer)
-		fmt.Fprintf(buf, "dbPut(%v) => properties:", key2str(key))
-		if props, err := datastore.SaveStruct(val); err != nil {
-			return nil, errors.WithMessage(err, fmt.Sprintf("failed to SaveStruct(%v) to properties", val))
-		} else {
-			var prevPropName string
-			for _, prop := range props {
-				if prop.Name == prevPropName {
-					fmt.Fprintf(buf, ", %v", prop.Value)
-				} else {
-					fmt.Fprintf(buf, "\n\t%v: %v", prop.Name, prop.Value)
-				}
-				prevPropName = prop.Name
-			}
-		}
+		logEntityProperties(buf, fmt.Sprintf("dbPut(%v) => properties:", key2str(key)), val)
 		log.Debugf(c, buf.String())
 	}
 	if key, err = dbPut(c, key, val); err != nil {
@@ -41,15 +28,37 @@ var Put = func(c context.Context, key *datastore.Key, val interface{}) (*datasto
 	return key, err
 }
 
+func logEntityProperties(buf *bytes.Buffer, prefix string, val interface{}) (err error) {
+	var props []datastore.Property
+	if propertyLoadSaver, ok := val.(datastore.PropertyLoadSaver); ok {
+		if props, err = propertyLoadSaver.Save(); err != nil {
+			return errors.WithMessage(err, "failed to call val.(datastore.PropertyLoadSaver).Save()")
+		}
+	} else if props, err = datastore.SaveStruct(val); err != nil {
+		return errors.WithMessage(err, fmt.Sprintf("failed to call datastore.SaveStruct()"))
+	}
+	fmt.Fprint(buf, prefix)
+	var prevPropName string
+	for _, prop := range props {
+		if prop.Name == prevPropName {
+			fmt.Fprintf(buf, ", %v", prop.Value)
+		} else {
+			fmt.Fprintf(buf, "\n\t%v: %v", prop.Name, prop.Value)
+		}
+		prevPropName = prop.Name
+	}
+	return
+}
+
 var PutMulti = func(c context.Context, keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 	if LoggingEnabled {
 		//buf := new(bytes.Buffer)
-		//buf.WriteString("dbPutMulti(")
+		//buf.WriteString(" => \n")
 		//for i, key := range keys {
-		// Need to use reflection...
+		//	logEntityProperties(buf, key2str(key) + ": ", vals[i]) // TODO: Needs use of reflection
 		//}
-		//buf.WriteString(")")
-		logKeys(c, "dbPutMulti", keys)
+		//logKeys(c, "dbPutMulti", buf.String(), keys)
+		logKeys(c, "dbPutMulti", "", keys)
 	}
 	return dbPutMulti(c, keys, vals)
 }

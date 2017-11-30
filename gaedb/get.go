@@ -18,7 +18,7 @@ var Get = func(c context.Context, key *datastore.Key, val interface{}) error {
 
 var GetMulti = func(c context.Context, keys []*datastore.Key, vals interface{}) error {
 	if LoggingEnabled {
-		logKeys(c, "dbGetMulti", keys)
+		logKeys(c, "dbGetMulti", "", keys)
 	}
 	return dbGetMulti(c, keys, vals)
 }

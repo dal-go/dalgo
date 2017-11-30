@@ -23,7 +23,7 @@ func key2str(key *datastore.Key) string {
 	}
 }
 
-func logKeys(c context.Context, f string, keys []*datastore.Key) {
+func logKeys(c context.Context, f, suffix string, keys []*datastore.Key) {
 	var buffer bytes.Buffer
 	buffer.WriteString(f + "(\n")
 	prevKey := "-"
