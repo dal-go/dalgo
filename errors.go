@@ -5,6 +5,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Return this if db driver does not support requested operation.
+// (for example no support for transactios)
+var ErrNotSupported = errors.New("not supported")
+
 type ErrDuplicateUser struct {
 	// TODO: Should it be moved out of this package to strongo/app/user?
 	SearchCriteria   string
