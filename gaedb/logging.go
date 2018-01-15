@@ -1,12 +1,12 @@
 package gaedb
 
 import (
-	"strconv"
 	"bytes"
 	"fmt"
-	"google.golang.org/appengine/datastore"
-	"golang.org/x/net/context"
 	"github.com/strongo/log"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine/datastore"
+	"strconv"
 )
 
 func key2str(key *datastore.Key) string {
@@ -38,5 +38,3 @@ func logKeys(c context.Context, f, suffix string, keys []*datastore.Key) {
 	buffer.WriteString(")")
 	log.Debugf(c, buffer.String())
 }
-
-

@@ -1,9 +1,9 @@
 package gaedb
 
 import (
+	"github.com/strongo/log"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
-	"github.com/strongo/log"
 )
 
 var Delete = func(c context.Context, key *datastore.Key) error {
@@ -18,5 +18,3 @@ var DeleteMulti = func(c context.Context, keys []*datastore.Key) error {
 	logKeys(c, "gaedb.DeleteMulti", "", keys)
 	return dbDeleteMulti(c, keys)
 }
-
-

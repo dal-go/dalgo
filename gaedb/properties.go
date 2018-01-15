@@ -1,10 +1,10 @@
 package gaedb
 
 import (
-	"google.golang.org/appengine/datastore"
-	"time"
 	"fmt"
 	"github.com/pkg/errors"
+	"google.golang.org/appengine/datastore"
+	"time"
 )
 
 type IsOkToRemove func(p datastore.Property) bool // TODO: Open source + article?
@@ -38,7 +38,7 @@ func IsZeroTime(p datastore.Property) bool {
 }
 
 func IsEmptyString(p datastore.Property) bool {
-	return p.Value == nil || p.Value.(string) == ""  // TODO: Do we need to check for nil?
+	return p.Value == nil || p.Value.(string) == "" // TODO: Do we need to check for nil?
 }
 
 func IsEmptyJson(p datastore.Property) bool {
@@ -54,7 +54,7 @@ func IsEmptyByteArray(p datastore.Property) bool {
 		return true
 	}
 	v := p.Value.([]uint8)
-	return  v == nil || len(v) == 0
+	return v == nil || len(v) == 0
 }
 
 func IsEmptyStringOrSpecificValue(v string) func(p datastore.Property) bool {

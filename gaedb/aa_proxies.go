@@ -1,13 +1,14 @@
 package gaedb
 
 import (
-	"google.golang.org/appengine/datastore"
 	"github.com/strongo/nds"
+	"google.golang.org/appengine/datastore"
+	"github.com/strongo/db/mockdb"
 )
 
 var (
 	LoggingEnabled   = true // TODO: move to Context.WithValue()
-	mockDB           MockDB
+	mockDB           *mockdb.MockDB
 	NewIncompleteKey = datastore.NewIncompleteKey
 	NewKey           = datastore.NewKey
 

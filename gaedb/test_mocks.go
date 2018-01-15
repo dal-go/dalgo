@@ -1,28 +1,18 @@
 package gaedb
 
 import (
-	"google.golang.org/appengine/datastore"
 	"github.com/strongo/db"
-	"os"
+	//"github.com/strongo/log"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
-	"github.com/strongo/log"
+	"google.golang.org/appengine/datastore"
+	"os"
+	"github.com/strongo/db/mockdb"
 )
 
-type MockKey struct {
-	Kind     string
-	IntID    int64
-	StringID string
-}
 
-type EntitiesStorage map[string]map[MockKey][]datastore.Property
-
-type MockDB struct {
-	EntitiesByKind EntitiesStorage
-}
-
-func NewMockKeyFromDatastoreKey(key *datastore.Key) MockKey {
-	return MockKey{Kind: key.Kind(), IntID: key.IntID(), StringID: key.StringID()}
+func NewMockKeyFromDatastoreKey(key *datastore.Key) mockdb.MockKey {
+	return mockdb.MockKey{Kind: key.Kind(), IntID: key.IntID(), StrID: key.StringID()}
 }
 
 func SetupNdsMock() {
@@ -32,66 +22,68 @@ func SetupNdsMock() {
 	if err := os.Setenv("GAE_PARTITION", "DEVTEST"); err != nil {
 		panic(err)
 	}
-	mockDB = MockDB{EntitiesByKind: make(EntitiesStorage)}
+	mockDB = mockdb.NewMockDB(onSave, onLoad)
 
 	Get = func(c context.Context, key *datastore.Key, val interface{}) error {
-		if c == nil {
-			panic("c == nil")
-		}
-		if key == nil {
-			panic("key == nil")
-		}
-		log.Debugf(c, "gaedb.Get(key=%v:%v)", key.Kind(), key.IntID())
-		kind := key.Kind()
-
-		if entitiesByKey, ok := mockDB.EntitiesByKind[kind]; !ok {
-			return datastore.ErrNoSuchEntity
-		} else {
-			mockKey := NewMockKeyFromDatastoreKey(key)
-			if p, ok := entitiesByKey[mockKey]; !ok {
-				return datastore.ErrNoSuchEntity
-			} else {
-				if e, ok := val.(datastore.PropertyLoadSaver); ok {
-					return e.Load(p)
-				} else {
-					return datastore.LoadStruct(e, p)
-				}
-			}
-		}
+		panic("not implemented")
+		//if c == nil {
+		//	panic("c == nil")
+		//}
+		//if key == nil {
+		//	panic("key == nil")
+		//}
+		//log.Debugf(c, "gaedb.Get(key=%v:%v)", key.Kind(), key.IntID())
+		//kind := key.Kind()
+		//
+		//if entitiesByKey, ok := mockDB.EntitiesByKind[kind]; !ok {
+		//	return datastore.ErrNoSuchEntity
+		//} else {
+		//	mockKey := NewMockKeyFromDatastoreKey(key)
+		//	if p, ok := entitiesByKey[mockKey]; !ok {
+		//		return datastore.ErrNoSuchEntity
+		//	} else {
+		//		if e, ok := val.(datastore.PropertyLoadSaver); ok {
+		//			return e.Load(p)
+		//		} else {
+		//			return datastore.LoadStruct(e, p)
+		//		}
+		//	}
+		//}
 	}
 
 	Put = func(c context.Context, key *datastore.Key, val interface{}) (*datastore.Key, error) {
 		if c == nil {
 			panic("c == nil")
 		}
-		kind := key.Kind()
-		entitiesByKey, ok := mockDB.EntitiesByKind[kind]
-		if !ok {
-			entitiesByKey = make(map[MockKey][]datastore.Property)
-			mockDB.EntitiesByKind[kind] = entitiesByKey
-		}
-		mockKey := NewMockKeyFromDatastoreKey(key)
-		if key.StringID() == "" {
-			for k, _ := range entitiesByKey {
-				if k.Kind == key.Kind() && k.IntID > mockKey.IntID {
-					mockKey.IntID = k.IntID + 1
-				}
-			}
-		}
-
-		var p []datastore.Property
-		var err error
-		if e, ok := val.(datastore.PropertyLoadSaver); ok {
-			if p, err = e.Save(); err != nil {
-				return key, err
-			}
-		} else {
-			if p, err = datastore.SaveStruct(val); err != nil {
-				return key, err
-			}
-		}
-		entitiesByKey[mockKey] = p
-		return NewKey(c, mockKey.Kind, mockKey.StringID, mockKey.IntID, nil), nil
+		panic("not implemented")
+		//kind := key.Kind()
+		//entitiesByKey, ok := mockDB.EntitiesByKind[kind]
+		//if !ok {
+		//	//entitiesByKey = make(map[mockdb.MockKey][]datastore.Property)
+		//	//mockDB.EntitiesByKind[kind] = entitiesByKey
+		//}
+		//mockKey := NewMockKeyFromDatastoreKey(key)
+		//if key.StringID() == "" {
+		//	for k, _ := range entitiesByKey {
+		//		if k.Kind == key.Kind() && k.IntID > mockKey.IntID {
+		//			mockKey.IntID = k.IntID + 1
+		//		}
+		//	}
+		//}
+		//
+		//var p []datastore.Property
+		//var err error
+		//if e, ok := val.(datastore.PropertyLoadSaver); ok {
+		//	if p, err = e.Save(); err != nil {
+		//		return key, err
+		//	}
+		//} else {
+		//	if p, err = datastore.SaveStruct(val); err != nil {
+		//		return key, err
+		//	}
+		//}
+		//entitiesByKey[mockKey] = p
+		//return NewKey(c, mockKey.Kind, mockKey.StrID, mockKey.IntID, nil), nil
 	}
 
 	PutMulti = func(c context.Context, keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
@@ -109,4 +101,12 @@ func SetupNdsMock() {
 		}
 		return keys, nil
 	}
+}
+
+func onSave(entityHolder db.EntityHolder) (db.EntityHolder, error) {
+	return entityHolder, nil
+}
+
+func onLoad(entityHolder db.EntityHolder) (db.EntityHolder, error) {
+	return entityHolder, nil
 }

@@ -4,7 +4,6 @@ import "fmt"
 
 type Changes struct {
 	entityHolders []EntityHolder
-
 }
 
 func (changes Changes) IsChanged(entityHolder EntityHolder) bool {
@@ -40,7 +39,6 @@ func (changes Changes) EntityHolders() (entityHolders []EntityHolder) {
 func (changes Changes) HasChanges() bool {
 	return len(changes.entityHolders) > 0
 }
-
 
 func equalKeys(eh1, eh2 EntityHolder) bool {
 	if eh1.Kind() == eh2.Kind() {

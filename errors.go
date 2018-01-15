@@ -27,14 +27,6 @@ func IsNotFound(err error) bool {
 	return ok || errors.Cause(err) == ErrRecordNotFound
 }
 
-type IntIdentifier interface {
-	IntID() int64
-}
-
-type StrIdentifier interface {
-	StrID() string
-}
-
 type ErrNotFoundByID interface {
 	error
 	IntIdentifier
@@ -74,6 +66,16 @@ func (e errNotFoundByID) Cause() error {
 
 func (e errNotFoundByID) Error() string {
 	return fmt.Sprintf("'%v' not found by id=%v: %v", e.kind, e.ID(), e.cause)
+}
+
+func NewErrNotFoundID(holder EntityHolder, cause error) error {
+	kind := holder.Kind()
+	switch {
+	case holder.IntID() != 0: return NewErrNotFoundByIntID(kind, holder.IntID(), cause)
+	case holder.StrID() != "": return NewErrNotFoundByStrID(kind, holder.StrID(), cause)
+	default:
+		panic("no ID")
+	}
 }
 
 func NewErrNotFoundByIntID(kind string, id int64, cause error) error {

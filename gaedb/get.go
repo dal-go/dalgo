@@ -1,9 +1,9 @@
 package gaedb
 
 import (
+	"github.com/strongo/log"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
-	"github.com/strongo/log"
 )
 
 var Get = func(c context.Context, key *datastore.Key, val interface{}) error {
@@ -22,5 +22,3 @@ var GetMulti = func(c context.Context, keys []*datastore.Key, vals interface{}) 
 	}
 	return dbGetMulti(c, keys, vals)
 }
-
-

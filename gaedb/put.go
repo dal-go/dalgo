@@ -3,10 +3,10 @@ package gaedb
 import (
 	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/strongo/log"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
-	"github.com/strongo/log"
-	"github.com/pkg/errors"
 )
 
 var Put = func(c context.Context, key *datastore.Key, val interface{}) (*datastore.Key, error) {
@@ -21,7 +21,7 @@ var Put = func(c context.Context, key *datastore.Key, val interface{}) (*datasto
 		log.Debugf(c, buf.String())
 	}
 	if key, err = dbPut(c, key, val); err != nil {
-		return key, errors.WithMessage(err, "failed to put to db "+key2str(key))
+		return key, errors.WithMessage(err, fmt.Sprintf("failed to put to db (key=%v)", key2str(key)))
 	} else if LoggingEnabled && isPartialKey {
 		log.Debugf(c, "dbPut() inserted new record with key: "+key2str(key))
 	}
@@ -62,4 +62,3 @@ var PutMulti = func(c context.Context, keys []*datastore.Key, vals interface{}) 
 	}
 	return dbPutMulti(c, keys, vals)
 }
-

@@ -2,11 +2,11 @@ package gaedb
 
 import (
 	"fmt"
-	"strings"
+	"github.com/pkg/errors"
+	"github.com/strongo/log"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
-	"github.com/strongo/log"
-	"github.com/pkg/errors"
+	"strings"
 )
 
 var RunInTransaction = func(c context.Context, f func(tc context.Context) error, opts *datastore.TransactionOptions) error {

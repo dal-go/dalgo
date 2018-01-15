@@ -2,8 +2,8 @@ package db
 
 import (
 	"golang.org/x/net/context"
-	"time"
 	"math/rand"
+	"time"
 )
 
 type TypeOfID int
@@ -15,13 +15,12 @@ const (
 )
 
 type EntityHolder interface {
-	TypeOfID() TypeOfID
 	Kind() string
+	TypeOfID() TypeOfID
+	IntOrStrIdentifier
 	Entity() interface{}
 	NewEntity() interface{}
 	SetEntity(entity interface{})
-	IntID() int64
-	StrID() string
 	SetIntID(id int64)
 	SetStrID(id string)
 }
@@ -40,10 +39,15 @@ type Getter interface {
 
 type Inserter interface {
 	InsertWithRandomIntID(c context.Context, entityHolder EntityHolder) error
+	InsertWithRandomStrID(c context.Context, entityHolder EntityHolder, idLength uint8, attempts int) error
 }
 
 type Updater interface {
 	Update(c context.Context, entityHolder EntityHolder) error
+}
+
+type Deleter interface {
+	Delete(c context.Context, entityHolder EntityHolder) error
 }
 
 type RunOptions map[string]interface{}
@@ -61,6 +65,20 @@ type Database interface {
 	Updater
 	MultiGetter
 	MultiUpdater
+	Deleter
+}
+
+type IntIdentifier interface {
+	IntID() int64
+}
+
+type StrIdentifier interface {
+	StrID() string
+}
+
+type IntOrStrIdentifier interface {
+	IntIdentifier
+	StrIdentifier
 }
 
 var (

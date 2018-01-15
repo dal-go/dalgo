@@ -1,15 +1,15 @@
 package gaedb
 
 import (
-	"testing"
-	"golang.org/x/net/context"
-	"google.golang.org/appengine/datastore"
 	"github.com/pkg/errors"
 	"github.com/strongo/db"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine/datastore"
+	"testing"
 )
 
 func TestDatabase_RunInTransaction(t *testing.T) {
-	dbInstance := database{}
+	dbInstance := gaeDatabase{}
 	i, j := 0, 0
 
 	var xg bool

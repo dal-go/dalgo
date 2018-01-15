@@ -1,24 +1,50 @@
 package gaedb
 
 import (
-	"testing"
+	"github.com/matryer/is"
 	"google.golang.org/appengine/datastore"
-	isLib "github.com/matryer/is"
+	"testing"
+	"time"
 )
 
-func TestIsEmptyString(t *testing.T) {
-	is := isLib.New(t)
+func TestIsEmptyJson(t *testing.T) {
+	t.Parallel()
+	is := is.New(t)
 
 	p := datastore.Property{
-		Name: "TestProp1",
-		Value: nil,
+		Name:    "TestProp1",
+		Value:   nil,
 		NoIndex: true,
 	}
-	is.True(IsEmptyString(p)) // nil should be treated as empty string
+	is.True(IsEmptyJson(p)) // nil should be treated as empty string
 
 	p.Value = ""
-	is.True(IsEmptyString(p)) // Empty string should return true"
+	is.True(IsEmptyJson(p)) // Empty string should return true"
+
+	p.Value = "[]"
+	is.True(IsEmptyJson(p)) // Empty string should return true"
+
+	p.Value = "{}"
+	is.True(IsEmptyJson(p)) // Empty string should return true"
 
 	p.Value = "0"
-	is.True(!IsEmptyString(p))  // '0' string should return false"
+	is.True(!IsEmptyJson(p)) // '0' string should return false"
+}
+
+func TestIsZeroTime(t *testing.T) {
+	t.Parallel()
+	is := is.New(t)
+
+	p := datastore.Property{
+		Name:    "TestProp1",
+		Value:   nil,
+		NoIndex: true,
+	}
+	is.True(IsZeroTime(p)) // nil should be treated as zero value
+
+	p.Value = time.Time{}
+	is.True(IsZeroTime(p)) // should return true for zero value
+
+	p.Value = time.Now()
+	is.True(!IsZeroTime(p)) //  string should return false for time.Now()
 }

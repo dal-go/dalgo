@@ -3,10 +3,10 @@ package gaedb
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
-	"google.golang.org/appengine/datastore"
 	"github.com/strongo/db"
 	"github.com/strongo/log"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine/datastore"
 )
 
 type gaeDatabase struct {
@@ -27,8 +27,11 @@ func newErrNotFound(err error, key *datastore.Key) error {
 }
 
 func (_ gaeDatabase) Get(c context.Context, entityHolder db.EntityHolder) (err error) {
+	if entityHolder == nil {
+		panic("entityHolder == nil")
+	}
 	key, isIncomplete, err := getEntityHolderKey(c, entityHolder)
-	if err != nil  {
+	if err != nil {
 		return
 	}
 	if isIncomplete {
@@ -39,8 +42,28 @@ func (_ gaeDatabase) Get(c context.Context, entityHolder db.EntityHolder) (err e
 		if err == datastore.ErrNoSuchEntity {
 			err = newErrNotFound(err, key)
 		}
-	} else {
-		entityHolder.SetEntity(entity)
+		return
+	}
+	entityHolder.SetEntity(entity)
+	if entityHolder.Entity() != entity {
+		panic("entityHolder.Entity() != entity")
+	}
+	return
+}
+
+func (_ gaeDatabase) Delete(c context.Context, entityHolder db.EntityHolder) (err error) {
+	if entityHolder == nil {
+		panic("entityHolder == nil")
+	}
+	key, isIncomplete, err := getEntityHolderKey(c, entityHolder)
+	if err != nil {
+		return
+	}
+	if isIncomplete {
+		panic("can't delete entity by incomplete key")
+	}
+	if err = Delete(c, key); err != nil {
+		return
 	}
 	return
 }
@@ -56,11 +79,11 @@ func (_ gaeDatabase) InsertWithRandomIntID(c context.Context, entityHolder db.En
 	}
 
 	wrapErr := func(err error) error {
-		return errors.WithMessage(err, "failed to create record with random int ID for: " + entityHolder.Kind())
+		return errors.WithMessage(err, "failed to create record with random int ID for: "+entityHolder.Kind())
 	}
 
 	key, isIncomplete, err := getEntityHolderKey(c, entityHolder)
-	if err != nil  {
+	if err != nil {
 		return wrapErr(err)
 	} else if !isIncomplete {
 		panic(fmt.Sprintf("gaeDatabase.InsertWithRandomIntID() called for key with ID: %v", key))
@@ -73,18 +96,58 @@ func (_ gaeDatabase) InsertWithRandomIntID(c context.Context, entityHolder db.En
 	return
 }
 
-func (db gaeDatabase) Update(c context.Context, entityHolder db.EntityHolder) (error) {
+func (gaeDb gaeDatabase) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int) (err error) {
+	if entityHolder == nil {
+		panic("entityHolder == nil")
+	}
+	log.Debugf(c, "InsertWithRandomIntID(kind=%v)", entityHolder.Kind())
+	entity := entityHolder.Entity()
+	if entity == nil {
+		panic("entity == nil")
+	}
+
+	wrapErr := func(err error) error {
+		return errors.WithMessage(err, "failed to create record with random str ID for: "+entityHolder.Kind())
+	}
+
+	if key, isIncomplete, err := getEntityHolderKey(c, entityHolder); err != nil {
+		return wrapErr(err)
+	} else if !isIncomplete {
+		panic(fmt.Sprintf("gaeDatabase.InsertWithRandomStrID() called for key with ID: %v", key))
+	}
+
+	for i := 0; i < attempts; i++ {
+		entityHolder.SetStrID(db.RandomStringID(idLength))
+		var key *datastore.Key
+		if key, _, err = getEntityHolderKey(c, entityHolder); err != nil {
+			return wrapErr(err)
+		} else if err = gaeDb.Get(c, entityHolder); err != nil {
+			if db.IsNotFound(err) {
+				if key, err = Put(c, key, entity); err != nil {
+					return wrapErr(err)
+				}
+				setEntityHolderID(key, entityHolder)
+				return
+			} else {
+				return
+			}
+		}
+	}
+	return errors.Errorf("too many attempts to create a new %v record with unique ID of length %v", entityHolder.Kind(), idLength)
+}
+
+func (gaeDb gaeDatabase) Update(c context.Context, entityHolder db.EntityHolder) error {
 	entity := entityHolder.Entity()
 	log.Debugf(c, "entity: %v", entity)
 	if entity == nil {
 		panic("entityHolder.Entity() == nil")
-	} else if key, isIncomplete, err := getEntityHolderKey(c, entityHolder); err != nil  {
+	} else if key, isIncomplete, err := getEntityHolderKey(c, entityHolder); err != nil {
 		return err
 	} else if isIncomplete {
 		log.Errorf(c, "gaeDatabase.Update() called for incomplete key, will insert.")
-		return db.InsertWithRandomIntID(c, entityHolder)
+		return gaeDb.InsertWithRandomIntID(c, entityHolder)
 	} else if _, err = Put(c, key, entity); err != nil {
-		return errors.WithMessage(err, "failed to update " + key2str(key))
+		return errors.WithMessage(err, "failed to update "+key2str(key))
 	}
 	return nil
 }
@@ -92,7 +155,6 @@ func (db gaeDatabase) Update(c context.Context, entityHolder db.EntityHolder) (e
 func setEntityHolderID(key *datastore.Key, entityHolder db.EntityHolder) {
 	entityHolder.SetIntID(key.IntID())
 }
-
 
 var ErrKeyHasBothIds = errors.New("entity has both string and int ids")
 var ErrEmptyKind = errors.New("entity holder returned empty kind")
@@ -195,7 +257,7 @@ func (_ gaeDatabase) IsInTransaction(c context.Context) bool {
 	return false
 }
 
-func (_ gaeDatabase) NonTransactionalContext(tc context.Context) (context.Context) {
+func (_ gaeDatabase) NonTransactionalContext(tc context.Context) context.Context {
 	if c := tc.Value(&nonTransactionalContextKey); c != nil {
 		return c.(context.Context)
 	}
