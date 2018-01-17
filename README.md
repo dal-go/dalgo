@@ -1,28 +1,33 @@
 # Go package `strongo/db`
 Database abstraction layer (DAL) in Go language
 
-There are 2 purposes of the package:
+There are 3 main purposes for the package:
 
 1. To abstract work with data storage so underlying storage engine can be changed.
-2. To allow write less code that is more readable
+
+2. To allow write less code that is more readable.
+
+3. To allow easialy add logging & hooks for `tx/insert/get/query/update/delete` operations across app. _Think about preventing updates made outside of transaction or logging automatically what properties have changed._
 
 The main abstraction is done though interface `EntityHolder`:
 
 	type EntityHolder interface {
-		TypeOfID() TypeOfID
-		Kind() string
-		Entity() interface{}
-		SetEntity(entity interface{})
-		IntID() int64
-		StrID() string
-		SetIntID(id int64)
-		SetStrID(id string)
+		TypeOfID() TypeOfID            // Either `string`, `int`, or `complex`
+		Kind() string                  // Defines `table` name of the entity
+		NewEntity() interface{}        // Used for `get` operations to create emtity to fill with values.
+		Entity() interface{}           // Entity with fields to be stored to DB (without ID)
+		SetEntity(entity interface{})  //
+		IntID() int64                  // Returns ID for entities identified by integer value
+		StrID() string                 // Returns ID for entities identified by string value
+		SetIntID(id int64)             // Sets integer ID for entities identified by integer value
+		SetStrID(id string)            // Sets string ID for entities identified by string value
 	}
 
-Almost all other interfaces/methods are working with the `EntityHolder`.
+All methods are working with the `EntityHolder`.
 
 The `Database` interface defines an interface to a storage that should be implemented by a specific driver.
 This repo contains implementation for Google AppEngine Datastore. Contributions for other engines are welcome.
+If the db driver does not support some of the operations it must return `ErrNotSupported`.
 
 	type Database interface {
 		TransactionCoordinator
@@ -33,7 +38,7 @@ This repo contains implementation for Google AppEngine Datastore. Contributions 
 		MultiUpdater
 	}
 
-where for example the  `Getter` interface is defined as:
+where for example the  `Getter` & `MultiGetter` interfaces are defined as:
 
 
 	type Getter interface {
@@ -48,5 +53,9 @@ Note that getters are populating entities in place through calling `SetEntity(en
 
 Originally developed to support work with Google AppEngine Datastore it takes into account its specifics. This should work well for other key-value storages as well.
 
+## Used by
 This package is used in production by:
 * https://debtstracker.io/ - an app and [Telegram bot](https://t.me/DebtsTrackerBot) to track your personal debts
+
+## Frameworks that utilise this `strongo/db` package
+* <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a> - framework to build chat bots in Go language.
