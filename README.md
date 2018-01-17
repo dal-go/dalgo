@@ -1,13 +1,15 @@
 # Go package `strongo/db`
 Database abstraction layer (DAL) in Go language
 
-There are 3 main purposes for the package:
+There are 4 main purposes for the package:
 
 1. To abstract work with data storage so underlying storage engine can be changed.
 
 2. To allow write less code that is more readable.
 
 3. To allow easialy add logging & hooks for `tx/insert/get/query/update/delete` operations across app. _Think about preventing updates made outside of transaction or logging automatically what properties have changed._
+
+4. Allow to write unit tests without dependency on specific implementation. (_do no compile AppEngine packages for examples_)
 
 The main abstraction is done though interface `EntityHolder`:
 
