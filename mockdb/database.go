@@ -90,11 +90,21 @@ func (mdb MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.Entit
 }
 
 func (mdb MockDB) UpdateMulti(c context.Context, entityHolders []db.EntityHolder) error {
-	panic("not implemented")
+	for _, eh := range entityHolders {
+		if err := mdb.Update(c, eh); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (mdb MockDB) GetMulti(c context.Context, entityHolders []db.EntityHolder) error {
-	panic("not implemented")
+	for _, eh := range entityHolders {
+		if err := mdb.Get(c, eh); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (mdb MockDB) Get(c context.Context, entityHolder db.EntityHolder) error {
