@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/strongo/db"
 	"github.com/strongo/log"
-	"golang.org/x/net/context"
+	"context"
 	"google.golang.org/appengine/datastore"
 )
 
@@ -153,7 +153,11 @@ func (gaeDb gaeDatabase) Update(c context.Context, entityHolder db.EntityHolder)
 }
 
 func setEntityHolderID(key *datastore.Key, entityHolder db.EntityHolder) {
-	entityHolder.SetIntID(key.IntID())
+	if intID := key.IntID(); intID != 0 {
+		entityHolder.SetIntID(key.IntID())
+	} else {
+		entityHolder.SetStrID(key.StringID())
+	}
 }
 
 var ErrKeyHasBothIds = errors.New("entity has both string and int ids")

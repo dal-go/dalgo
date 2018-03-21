@@ -2,7 +2,7 @@ package mockdb
 
 import (
 	"github.com/strongo/db"
-	"golang.org/x/net/context"
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 )
@@ -24,38 +24,41 @@ func newMockKey(holder db.EntityHolder) MockKey {
 type EntitiesStorage map[string]map[MockKey]db.EntityHolder
 
 type MockDB struct {
+	UpdatesCount   int
+	GetsCount      int
+	DeletesCount   int
 	EntitiesByKind EntitiesStorage
-	onSave trigger
-	onLoad trigger
+	onSave         trigger
+	onLoad         trigger
 }
 
 type trigger func(holder db.EntityHolder) (db.EntityHolder, error)
 
 func NewMockDB(onSave, onLoad trigger) *MockDB {
 	return &MockDB{
-		onSave: onSave,
-		onLoad: onLoad,
+		onSave:         onSave,
+		onLoad:         onLoad,
 		EntitiesByKind: make(EntitiesStorage),
 	}
 }
 
-func (mdb MockDB) RunInTransaction(c context.Context, f func(c context.Context) error, options db.RunOptions) (err error) {
+func (mdb *MockDB) RunInTransaction(c context.Context, f func(c context.Context) error, options db.RunOptions) (err error) {
 	return f(c)
 }
 
-func (mdb MockDB) IsInTransaction(c context.Context) bool {
+func (mdb *MockDB) IsInTransaction(c context.Context) bool {
 	panic("not implemented")
 }
 
-func (mdb MockDB) NonTransactionalContext(tc context.Context) (c context.Context) {
+func (mdb *MockDB) NonTransactionalContext(tc context.Context) (c context.Context) {
 	panic("not implemented")
 }
 
-func (mdb MockDB) InsertWithRandomIntID(c context.Context, entityHolder db.EntityHolder) error {
+func (mdb *MockDB) InsertWithRandomIntID(c context.Context, entityHolder db.EntityHolder) error {
 	panic("not implemented")
 }
 
-func (mdb MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int) error {
+func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int) error {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
 	}
@@ -89,7 +92,7 @@ func (mdb MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.Entit
 	return errors.Errorf("too many attempts to create a new %v record with unique ID of length %v", entityHolder.Kind(), idLength)
 }
 
-func (mdb MockDB) UpdateMulti(c context.Context, entityHolders []db.EntityHolder) error {
+func (mdb *MockDB) UpdateMulti(c context.Context, entityHolders []db.EntityHolder) error {
 	for _, eh := range entityHolders {
 		if err := mdb.Update(c, eh); err != nil {
 			return err
@@ -98,7 +101,7 @@ func (mdb MockDB) UpdateMulti(c context.Context, entityHolders []db.EntityHolder
 	return nil
 }
 
-func (mdb MockDB) GetMulti(c context.Context, entityHolders []db.EntityHolder) error {
+func (mdb *MockDB) GetMulti(c context.Context, entityHolders []db.EntityHolder) error {
 	for _, eh := range entityHolders {
 		if err := mdb.Get(c, eh); err != nil {
 			return err
@@ -107,7 +110,8 @@ func (mdb MockDB) GetMulti(c context.Context, entityHolders []db.EntityHolder) e
 	return nil
 }
 
-func (mdb MockDB) Get(c context.Context, entityHolder db.EntityHolder) error {
+func (mdb *MockDB) Get(c context.Context, entityHolder db.EntityHolder) error {
+	mdb.GetsCount += 1
 	kind := entityHolder.Kind()
 	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {
@@ -121,7 +125,7 @@ func (mdb MockDB) Get(c context.Context, entityHolder db.EntityHolder) error {
 	return nil
 }
 
-func (mdb MockDB) Update(c context.Context, entityHolder db.EntityHolder) error {
+func (mdb *MockDB) Update(c context.Context, entityHolder db.EntityHolder) error {
 	kind := entityHolder.Kind()
 	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {
@@ -129,10 +133,12 @@ func (mdb MockDB) Update(c context.Context, entityHolder db.EntityHolder) error 
 		mdb.EntitiesByKind[kind] = entities
 	}
 	entities[newMockKey(entityHolder)] = entityHolder
+	mdb.UpdatesCount += 1
 	return nil
 }
 
-func (mdb MockDB) Delete(c context.Context, entityHolder db.EntityHolder) error {
+func (mdb *MockDB) Delete(c context.Context, entityHolder db.EntityHolder) error {
+	mdb.DeletesCount += 1
 	kind := entityHolder.Kind()
 	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {

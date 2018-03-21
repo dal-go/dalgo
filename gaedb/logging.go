@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/strongo/log"
-	"golang.org/x/net/context"
+	"context"
 	"google.golang.org/appengine/datastore"
 	"strconv"
 )
@@ -25,7 +25,12 @@ func key2str(key *datastore.Key) string {
 
 func logKeys(c context.Context, f, suffix string, keys []*datastore.Key) {
 	var buffer bytes.Buffer
-	buffer.WriteString(f + "(\n")
+	buffer.WriteString(f)
+	if len(keys) == 0 {
+		buffer.WriteString(")")
+		return
+	}
+	buffer.WriteString("(\n")
 	prevKey := "-"
 	for _, key := range keys {
 		ks := key2str(key)
