@@ -26,7 +26,7 @@ func newErrNotFound(err error, key *datastore.Key) error {
 	}
 }
 
-func (_ gaeDatabase) Get(c context.Context, entityHolder db.EntityHolder) (err error) {
+func (gaeDatabase) Get(c context.Context, entityHolder db.EntityHolder) (err error) {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
 	}
@@ -51,7 +51,7 @@ func (_ gaeDatabase) Get(c context.Context, entityHolder db.EntityHolder) (err e
 	return
 }
 
-func (_ gaeDatabase) Delete(c context.Context, entityHolder db.EntityHolder) (err error) {
+func (gaeDatabase) Delete(c context.Context, entityHolder db.EntityHolder) (err error) {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
 	}
@@ -68,7 +68,7 @@ func (_ gaeDatabase) Delete(c context.Context, entityHolder db.EntityHolder) (er
 	return
 }
 
-func (_ gaeDatabase) InsertWithRandomIntID(c context.Context, entityHolder db.EntityHolder) (err error) {
+func (gaeDatabase) InsertWithRandomIntID(c context.Context, entityHolder db.EntityHolder) (err error) {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
 	}
@@ -180,7 +180,7 @@ func getEntityHolderKey(c context.Context, entityHolder db.EntityHolder) (key *d
 	return
 }
 
-func (_ gaeDatabase) UpdateMulti(c context.Context, entityHolders []db.EntityHolder) (err error) { // TODO: Rename to PutMulti?
+func (gaeDatabase) UpdateMulti(c context.Context, entityHolders []db.EntityHolder) (err error) { // TODO: Rename to PutMulti?
 
 	keys := make([]*datastore.Key, len(entityHolders))
 	vals := make([]interface{}, len(entityHolders))
@@ -215,7 +215,7 @@ func (_ gaeDatabase) UpdateMulti(c context.Context, entityHolders []db.EntityHol
 	return
 }
 
-func (_ gaeDatabase) GetMulti(c context.Context, entityHolders []db.EntityHolder) error {
+func (gaeDatabase) GetMulti(c context.Context, entityHolders []db.EntityHolder) error {
 	count := len(entityHolders)
 	keys := make([]*datastore.Key, count)
 	vals := make([]interface{}, count)
@@ -245,7 +245,7 @@ var xgTransaction = &datastore.TransactionOptions{XG: true}
 var isInTransactionFlag = "is in transaction"
 var nonTransactionalContextKey = "non transactional context"
 
-func (_ gaeDatabase) RunInTransaction(c context.Context, f func(c context.Context) error, options db.RunOptions) error {
+func (gaeDatabase) RunInTransaction(c context.Context, f func(c context.Context) error, options db.RunOptions) error {
 	var to *datastore.TransactionOptions
 	if xg, ok := options["XG"]; ok && xg.(bool) == true {
 		to = xgTransaction
@@ -254,14 +254,14 @@ func (_ gaeDatabase) RunInTransaction(c context.Context, f func(c context.Contex
 	return RunInTransaction(tc, f, to)
 }
 
-func (_ gaeDatabase) IsInTransaction(c context.Context) bool {
+func (gaeDatabase) IsInTransaction(c context.Context) bool {
 	if v := c.Value(&isInTransactionFlag); v != nil && v.(bool) {
 		return true
 	}
 	return false
 }
 
-func (_ gaeDatabase) NonTransactionalContext(tc context.Context) context.Context {
+func (gaeDatabase) NonTransactionalContext(tc context.Context) context.Context {
 	if c := tc.Value(&nonTransactionalContextKey); c != nil {
 		return c.(context.Context)
 	}
