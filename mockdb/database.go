@@ -1,12 +1,13 @@
 package mockdb
 
 import (
-	"github.com/strongo/db"
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/strongo/db"
 )
 
+// MockKey is mock key
 type MockKey struct {
 	Kind  string
 	IntID int64
@@ -21,8 +22,10 @@ func newMockKey(holder db.EntityHolder) MockKey {
 	}
 }
 
+// EntitiesStorage emulates datastore persistent storage
 type EntitiesStorage map[string]map[MockKey]db.EntityHolder
 
+// MockDB emulates gae DAL
 type MockDB struct {
 	UpdatesCount   int
 	GetsCount      int
@@ -34,6 +37,7 @@ type MockDB struct {
 
 type trigger func(holder db.EntityHolder) (db.EntityHolder, error)
 
+// NewMockDB creates new mock DB
 func NewMockDB(onSave, onLoad trigger) *MockDB {
 	return &MockDB{
 		onSave:         onSave,
@@ -42,22 +46,27 @@ func NewMockDB(onSave, onLoad trigger) *MockDB {
 	}
 }
 
+// RunInTransaction starts transaction
 func (mdb *MockDB) RunInTransaction(c context.Context, f func(c context.Context) error, options db.RunOptions) (err error) {
 	return f(c)
 }
 
+// IsInTransaction checks if we are in transaction
 func (mdb *MockDB) IsInTransaction(c context.Context) bool {
 	panic("not implemented")
 }
 
+// NonTransactionalContext not implemented
 func (mdb *MockDB) NonTransactionalContext(tc context.Context) (c context.Context) {
 	panic("not implemented")
 }
 
+// InsertWithRandomIntID not implemented
 func (mdb *MockDB) InsertWithRandomIntID(c context.Context, entityHolder db.EntityHolder) error {
 	panic("not implemented")
 }
 
+// InsertWithRandomStrID inserts with random string ID
 func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int) error {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
@@ -92,6 +101,7 @@ func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.Enti
 	return errors.Errorf("too many attempts to create a new %v record with unique ID of length %v", entityHolder.Kind(), idLength)
 }
 
+// UpdateMulti updates multiple entities
 func (mdb *MockDB) UpdateMulti(c context.Context, entityHolders []db.EntityHolder) error {
 	for _, eh := range entityHolders {
 		if err := mdb.Update(c, eh); err != nil {
@@ -101,6 +111,7 @@ func (mdb *MockDB) UpdateMulti(c context.Context, entityHolders []db.EntityHolde
 	return nil
 }
 
+// GetMulti gets multiple entities
 func (mdb *MockDB) GetMulti(c context.Context, entityHolders []db.EntityHolder) error {
 	for _, eh := range entityHolders {
 		if err := mdb.Get(c, eh); err != nil {
@@ -110,8 +121,9 @@ func (mdb *MockDB) GetMulti(c context.Context, entityHolders []db.EntityHolder) 
 	return nil
 }
 
+// Get get entity
 func (mdb *MockDB) Get(c context.Context, entityHolder db.EntityHolder) error {
-	mdb.GetsCount += 1
+	mdb.GetsCount++
 	kind := entityHolder.Kind()
 	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {
@@ -125,6 +137,7 @@ func (mdb *MockDB) Get(c context.Context, entityHolder db.EntityHolder) error {
 	return nil
 }
 
+// Update entity
 func (mdb *MockDB) Update(c context.Context, entityHolder db.EntityHolder) error {
 	kind := entityHolder.Kind()
 	entities, ok := mdb.EntitiesByKind[kind]
@@ -133,12 +146,13 @@ func (mdb *MockDB) Update(c context.Context, entityHolder db.EntityHolder) error
 		mdb.EntitiesByKind[kind] = entities
 	}
 	entities[newMockKey(entityHolder)] = entityHolder
-	mdb.UpdatesCount += 1
+	mdb.UpdatesCount++
 	return nil
 }
 
+// Delete entity
 func (mdb *MockDB) Delete(c context.Context, entityHolder db.EntityHolder) error {
-	mdb.DeletesCount += 1
+	mdb.DeletesCount++
 	kind := entityHolder.Kind()
 	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {

@@ -1,9 +1,9 @@
 package gaedb
 
 import (
+	"context"
 	"github.com/pkg/errors"
 	"github.com/strongo/db"
-	"context"
 	"google.golang.org/appengine/datastore"
 	"testing"
 )
@@ -22,13 +22,13 @@ func TestDatabase_RunInTransaction(t *testing.T) {
 		} else if opts.XG != xg {
 			t.Errorf("Expected XG==%v", xg)
 		}
-		j += 1
+		j++
 		return f(c)
 	}
 
 	xg = true
 	err := dbInstance.RunInTransaction(context.Background(), func(c context.Context) error {
-		i += 1
+		i++
 		return nil
 	}, db.CrossGroupTransaction)
 
@@ -46,7 +46,7 @@ func TestDatabase_RunInTransaction(t *testing.T) {
 	i, j = 0, 0
 	xg = false
 	err = dbInstance.RunInTransaction(context.Background(), func(c context.Context) error {
-		i += 1
+		i++
 		return errors.New("Test1")
 	}, db.SingleGroupTransaction)
 

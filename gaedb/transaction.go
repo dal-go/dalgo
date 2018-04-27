@@ -1,14 +1,15 @@
 package gaedb
 
 import (
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/strongo/log"
-	"context"
 	"google.golang.org/appengine/datastore"
 	"strings"
 )
 
+// RunInTransaction starts new transaction
 var RunInTransaction = func(c context.Context, f func(tc context.Context) error, opts *datastore.TransactionOptions) error {
 	if LoggingEnabled {
 		if opts == nil {
@@ -19,7 +20,7 @@ var RunInTransaction = func(c context.Context, f func(tc context.Context) error,
 	}
 	attempt := 0
 	fWrapped := func(c context.Context) (err error) {
-		attempt += 1
+		attempt++
 		log.Debugf(c, "tx attempt #%d", attempt)
 		if err = f(c); err != nil {
 			m := fmt.Sprintf("tx attempt #%d failed: ", attempt)

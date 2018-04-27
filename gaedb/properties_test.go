@@ -16,19 +16,19 @@ func TestIsEmptyJson(t *testing.T) {
 		Value:   nil,
 		NoIndex: true,
 	}
-	is.True(IsEmptyJson(p)) // nil should be treated as empty string
+	is.True(IsEmptyJSON(p)) // nil should be treated as empty string
 
 	p.Value = ""
-	is.True(IsEmptyJson(p)) // Empty string should return true"
+	is.True(IsEmptyJSON(p)) // Empty string should return true"
 
 	p.Value = "[]"
-	is.True(IsEmptyJson(p)) // Empty string should return true"
+	is.True(IsEmptyJSON(p)) // Empty string should return true"
 
 	p.Value = "{}"
-	is.True(IsEmptyJson(p)) // Empty string should return true"
+	is.True(IsEmptyJSON(p)) // Empty string should return true"
 
 	p.Value = "0"
-	is.True(!IsEmptyJson(p)) // '0' string should return false"
+	is.True(!IsEmptyJSON(p)) // '0' string should return false"
 }
 
 func TestIsZeroTime(t *testing.T) {

@@ -2,13 +2,14 @@ package gaedb
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/strongo/log"
-	"context"
 	"google.golang.org/appengine/datastore"
 )
 
+// Put saves entity to datastore
 var Put = func(c context.Context, key *datastore.Key, val interface{}) (*datastore.Key, error) {
 	if val == nil {
 		panic("val == nil")
@@ -50,6 +51,7 @@ func logEntityProperties(buf *bytes.Buffer, prefix string, val interface{}) (err
 	return
 }
 
+// PutMulti saves multipe entities to datastore
 var PutMulti = func(c context.Context, keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 	if LoggingEnabled {
 		//buf := new(bytes.Buffer)

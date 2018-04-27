@@ -2,9 +2,9 @@ package gaedb
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/strongo/log"
-	"context"
 	"google.golang.org/appengine/datastore"
 	"strconv"
 )

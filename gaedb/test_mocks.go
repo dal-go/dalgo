@@ -4,17 +4,18 @@ import (
 	"github.com/strongo/db"
 	//"github.com/strongo/log"
 	"context"
+	"github.com/strongo/db/mockdb"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"os"
-	"github.com/strongo/db/mockdb"
 )
 
-
+// NewMockKeyFromDatastoreKey create new mock key
 func NewMockKeyFromDatastoreKey(key *datastore.Key) mockdb.MockKey {
 	return mockdb.MockKey{Kind: key.Kind(), IntID: key.IntID(), StrID: key.StringID()}
 }
 
+// SetupNdsMock sets NDS mock
 func SetupNdsMock() {
 	if err := os.Setenv("GAE_LONG_APP_ID", "debtstracker"); err != nil {
 		panic(err)

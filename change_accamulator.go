@@ -2,10 +2,12 @@ package db
 
 import "fmt"
 
+// Changes accumulates DB changes
 type Changes struct {
 	entityHolders []EntityHolder
 }
 
+// IsChanged returns true if entity changed
 func (changes Changes) IsChanged(entityHolder EntityHolder) bool {
 	for i := range changes.entityHolders {
 		if changes.entityHolders[i] == entityHolder {
@@ -15,6 +17,7 @@ func (changes Changes) IsChanged(entityHolder EntityHolder) bool {
 	return false
 }
 
+// FlagAsChanged falgs entity as changed
 func (changes *Changes) FlagAsChanged(entityHolder EntityHolder) {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
@@ -30,12 +33,14 @@ func (changes *Changes) FlagAsChanged(entityHolder EntityHolder) {
 	changes.entityHolders = append(changes.entityHolders, entityHolder)
 }
 
+// EntityHolders returns list of entity holders
 func (changes Changes) EntityHolders() (entityHolders []EntityHolder) {
 	entityHolders = make([]EntityHolder, len(changes.entityHolders))
 	copy(entityHolders, changes.entityHolders)
 	return
 }
 
+// HasChanges returns true if there are changes
 func (changes Changes) HasChanges() bool {
 	return len(changes.entityHolders) > 0
 }

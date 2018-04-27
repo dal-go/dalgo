@@ -1,17 +1,18 @@
 package gaedb
 
 import (
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/strongo/db"
 	"github.com/strongo/log"
-	"context"
 	"google.golang.org/appengine/datastore"
 )
 
 type gaeDatabase struct {
 }
 
+// NewDatabase create database provider to Google Datastore
 func NewDatabase() db.Database {
 	return gaeDatabase{}
 }
@@ -128,9 +129,8 @@ func (gaeDb gaeDatabase) InsertWithRandomStrID(c context.Context, entityHolder d
 				}
 				setEntityHolderID(key, entityHolder)
 				return
-			} else {
-				return
 			}
+			return
 		}
 	}
 	return errors.Errorf("too many attempts to create a new %v record with unique ID of length %v", entityHolder.Kind(), idLength)
@@ -160,7 +160,10 @@ func setEntityHolderID(key *datastore.Key, entityHolder db.EntityHolder) {
 	}
 }
 
+// ErrKeyHasBothIds indicates entity has both string and int ids
 var ErrKeyHasBothIds = errors.New("entity has both string and int ids")
+
+// ErrEmptyKind indicates entity holder returned empty kind
 var ErrEmptyKind = errors.New("entity holder returned empty kind")
 
 func getEntityHolderKey(c context.Context, entityHolder db.EntityHolder) (key *datastore.Key, isIncomplete bool, err error) {
