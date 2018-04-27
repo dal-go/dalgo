@@ -1,6 +1,10 @@
 # Go package `strongo/db`
 Database abstraction layer (DAL) in Go language
 
+[![Build Status](https://travis-ci.org/strongo/db.svg?branch=master)](https://travis-ci.org/strongo/db)
+[![Go Report Card](https://goreportcard.com/badge/github.com/strongo/db)](https://goreportcard.com/report/github.com/strongo/db)
+[![GoDoc](https://godoc.org/github.com/strongo/db?status.svg)](https://godoc.org/github.com/strongo/db)
+
 There are 4 main purposes for the package:
 
 1. To abstract work with data storage so underlying storage engine can be changed.
