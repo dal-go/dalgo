@@ -35,6 +35,8 @@ type MockDB struct {
 	onLoad         trigger
 }
 
+var _ db.Database = (*MockDB)(nil)
+
 type trigger func(holder db.EntityHolder) (db.EntityHolder, error)
 
 // NewMockDB creates new mock DB
