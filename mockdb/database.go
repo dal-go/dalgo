@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/strongo/db"
+	"math/rand"
 )
 
 // MockKey is mock key
@@ -48,14 +49,21 @@ func NewMockDB(onSave, onLoad trigger) *MockDB {
 	}
 }
 
+var isInTransactionFlag = "is in transaction"
+var nonTransactionalContextKey = "non transactional context"
+
 // RunInTransaction starts transaction
 func (mdb *MockDB) RunInTransaction(c context.Context, f func(c context.Context) error, options db.RunOptions) (err error) {
-	return f(c)
+	tc := context.WithValue(context.WithValue(c, &isInTransactionFlag, true), &nonTransactionalContextKey, c)
+	return f(tc)
 }
 
 // IsInTransaction checks if we are in transaction
 func (mdb *MockDB) IsInTransaction(c context.Context) bool {
-	panic("not implemented")
+	if v := c.Value(&isInTransactionFlag); v != nil && v.(bool) {
+		return true
+	}
+	return false
 }
 
 // NonTransactionalContext not implemented
@@ -65,11 +73,12 @@ func (mdb *MockDB) NonTransactionalContext(tc context.Context) (c context.Contex
 
 // InsertWithRandomIntID not implemented
 func (mdb *MockDB) InsertWithRandomIntID(c context.Context, entityHolder db.EntityHolder) error {
-	panic("not implemented")
+	return mdb.insertWithRandomID(c, entityHolder, 10, func() {
+		entityHolder.SetIntID(rand.Int63())
+	})
 }
 
-// InsertWithRandomStrID inserts with random string ID
-func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int) error {
+func (mdb *MockDB) insertWithRandomID(c context.Context, entityHolder db.EntityHolder, attempts int, newRandomID func()) error {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
 	}
@@ -92,15 +101,38 @@ func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.Enti
 		mdb.EntitiesByKind[entityHolder.Kind()] = entities
 	}
 	for i := 0; i < attempts; i++ {
-		entityHolder.SetStrID(db.RandomStringID(idLength))
+		newRandomID()
 		key := newMockKey(entityHolder)
 		if _, ok = entities[key]; !ok {
+			if err := beforeSave(entityHolder); err != nil {
+				return err
+			}
 			entities[key] = entityHolder
 			return nil
 		}
 	}
 
-	return errors.Errorf("too many attempts to create a new %v record with unique ID of length %v", entityHolder.Kind(), idLength)
+	return errors.Errorf("too many attempts to create a new %v record with unique ID", entityHolder.Kind())
+}
+
+func beforeSave(entityHolder db.EntityHolder) error {
+	if bs, ok := entityHolder.(beforeSaver); ok {
+		if err := bs.BeforeSave(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type beforeSaver interface {
+	BeforeSave() error
+}
+
+// InsertWithRandomStrID inserts with random string ID
+func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int) error {
+	return mdb.insertWithRandomID(c, entityHolder, attempts, func() {
+		entityHolder.SetStrID(db.RandomStringID(idLength))
+	})
 }
 
 // UpdateMulti updates multiple entities
@@ -146,6 +178,9 @@ func (mdb *MockDB) Update(c context.Context, entityHolder db.EntityHolder) error
 	if !ok {
 		entities = make(map[MockKey]db.EntityHolder)
 		mdb.EntitiesByKind[kind] = entities
+	}
+	if err := beforeSave(entityHolder); err != nil {
+		return err
 	}
 	entities[newMockKey(entityHolder)] = entityHolder
 	mdb.UpdatesCount++

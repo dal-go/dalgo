@@ -86,7 +86,7 @@ func NewErrNotFoundID(holder EntityHolder, cause error) error {
 	case holder.StrID() != "":
 		return NewErrNotFoundByStrID(kind, holder.StrID(), cause)
 	default:
-		panic("no ID")
+		panic(fmt.Sprintf("entity Holder has no ID: %+v", holder))
 	}
 }
 

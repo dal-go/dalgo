@@ -22,9 +22,8 @@ func (changes *Changes) FlagAsChanged(entityHolder EntityHolder) {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
 	}
-	entityHolders := changes.entityHolders
-	for i := range entityHolders {
-		if eh := entityHolders[i]; eh == entityHolder {
+	for _, eh := range changes.entityHolders {
+		if eh == entityHolder {
 			return
 		} else if equalKeys(entityHolder, eh) {
 			return
