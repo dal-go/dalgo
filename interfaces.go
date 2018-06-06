@@ -50,7 +50,7 @@ type Getter interface {
 // Inserter is an interface that describe DB provider that can insert a single entity with a specific or random ID
 type Inserter interface {
 	InsertWithRandomIntID(c context.Context, entityHolder EntityHolder) error
-	InsertWithRandomStrID(c context.Context, entityHolder EntityHolder, idLength uint8, attempts int) error
+	InsertWithRandomStrID(c context.Context, entityHolder EntityHolder, idLength uint8, attempts int, prefix string) error
 }
 
 // Updater is an interface that describe DB provider that can update a single entity by key

@@ -129,9 +129,9 @@ type beforeSaver interface {
 }
 
 // InsertWithRandomStrID inserts with random string ID
-func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int) error {
+func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int, prefix string) error {
 	return mdb.insertWithRandomID(c, entityHolder, attempts, func() {
-		entityHolder.SetStrID(db.RandomStringID(idLength))
+		entityHolder.SetStrID(prefix + db.RandomStringID(idLength))
 	})
 }
 

@@ -97,7 +97,7 @@ func (gaeDatabase) InsertWithRandomIntID(c context.Context, entityHolder db.Enti
 	return
 }
 
-func (gaeDb gaeDatabase) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int) (err error) {
+func (gaeDb gaeDatabase) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int, prefix string) (err error) {
 	if entityHolder == nil {
 		panic("entityHolder == nil")
 	}
@@ -118,7 +118,7 @@ func (gaeDb gaeDatabase) InsertWithRandomStrID(c context.Context, entityHolder d
 	}
 
 	for i := 0; i < attempts; i++ {
-		entityHolder.SetStrID(db.RandomStringID(idLength))
+		entityHolder.SetStrID(prefix + db.RandomStringID(idLength))
 		var key *datastore.Key
 		if key, _, err = getEntityHolderKey(c, entityHolder); err != nil {
 			return wrapErr(err)
