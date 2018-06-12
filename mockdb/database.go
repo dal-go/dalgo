@@ -116,7 +116,7 @@ func (mdb *MockDB) insertWithRandomID(c context.Context, entityHolder db.EntityH
 }
 
 func beforeSave(entityHolder db.EntityHolder) error {
-	if bs, ok := entityHolder.(beforeSaver); ok {
+	if bs, ok := entityHolder.(BeforeSaver); ok {
 		if err := bs.BeforeSave(); err != nil {
 			return err
 		}
@@ -124,7 +124,8 @@ func beforeSave(entityHolder db.EntityHolder) error {
 	return nil
 }
 
-type beforeSaver interface {
+// BeforeSaver defines BeforeSave method that is called to verify entity before saving
+type BeforeSaver interface {
 	BeforeSave() error
 }
 
