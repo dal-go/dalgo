@@ -7,6 +7,7 @@ import (
 	"github.com/strongo/db"
 	"github.com/strongo/log"
 	"google.golang.org/appengine/datastore"
+	"strconv"
 )
 
 type gaeDatabase struct {
@@ -64,6 +65,27 @@ func (gaeDatabase) Delete(c context.Context, entityHolder db.EntityHolder) (err 
 		panic("can't delete entity by incomplete key")
 	}
 	if err = Delete(c, key); err != nil {
+		return
+	}
+	return
+}
+
+func (gaeDatabase) DeleteMulti(c context.Context, entityHolders []db.EntityHolder) (err error) {
+	if len(entityHolders) == 0 {
+		return
+	}
+	keys := make([]*datastore.Key, len(entityHolders))
+	for i, entityHolder := range entityHolders {
+		key, isIncomplete, err := getEntityHolderKey(c, entityHolder)
+		if err != nil {
+			return errors.WithMessage(err, "i="+strconv.Itoa(i))
+		}
+		if isIncomplete {
+			panic("can't delete entity by incomplete key, i=" + strconv.Itoa(i))
+		}
+		keys[i] = key
+	}
+	if err = DeleteMulti(c, keys); err != nil {
 		return
 	}
 	return
@@ -205,7 +227,7 @@ func (gaeDatabase) UpdateMulti(c context.Context, entityHolders []db.EntityHolde
 		}
 	}
 
-	//logKeys(c, "gaeDatabase.UpdateMulti", keys)
+	// logKeys(c, "gaeDatabase.UpdateMulti", keys)
 
 	if keys, err = PutMulti(c, keys, vals); err != nil {
 		return

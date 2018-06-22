@@ -199,3 +199,12 @@ func (mdb *MockDB) Delete(c context.Context, entityHolder db.EntityHolder) error
 	delete(entities, newMockKey(entityHolder))
 	return nil
 }
+
+func (mdb *MockDB) DeleteMulti(c context.Context, entityHolders []db.EntityHolder) error {
+	for _, entityHolder := range entityHolders {
+		if err := mdb.Delete(c, entityHolder); err != nil {
+			return nil
+		}
+	}
+	return nil
+}

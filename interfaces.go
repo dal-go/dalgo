@@ -63,6 +63,10 @@ type Deleter interface {
 	Delete(c context.Context, entityHolder EntityHolder) error
 }
 
+type MultiDeleter interface {
+	DeleteMulti(c context.Context, entityHolders []EntityHolder) error
+}
+
 // RunOptions hold arbitrary parameters to be passed throw DAL
 type RunOptions map[string]interface{}
 
@@ -79,9 +83,10 @@ type Database interface {
 	Inserter
 	Getter
 	Updater
+	Deleter
 	MultiGetter
 	MultiUpdater
-	Deleter
+	MultiDeleter
 }
 
 // IntIdentifier is satisfied by entities with integer ID
