@@ -160,7 +160,7 @@ func (gaeDb gaeDatabase) InsertWithRandomStrID(c context.Context, entityHolder d
 
 func (gaeDb gaeDatabase) Update(c context.Context, entityHolder db.EntityHolder) error {
 	entity := entityHolder.Entity()
-	log.Debugf(c, "entity: %v", entity)
+	log.Debugf(c, "entity: %+v", entity)
 	if entity == nil {
 		panic("entityHolder.Entity() == nil")
 	} else if key, isIncomplete, err := getEntityHolderKey(c, entityHolder); err != nil {
