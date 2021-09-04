@@ -2,7 +2,7 @@ package db
 
 import "fmt"
 
-func CreateEntityHoldersWithIntIDs(ids []int64, newEntityHolder func() EntityHolder) (entityHolders []EntityHolder){
+func CreateEntityHoldersWithIntIDs(ids []int64, newEntityHolder func() EntityHolder) (entityHolders []EntityHolder) {
 	entityHolders = make([]EntityHolder, len(ids))
 	for i := range entityHolders {
 		eh := newEntityHolder()
