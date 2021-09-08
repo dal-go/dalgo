@@ -7,7 +7,7 @@ require (
 	github.com/matryer/is v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/strongo/log v0.0.0-20180427205522-8c4c66a45d20
-	github.com/strongo/nds v0.0.0-20180424162513-fa96c62eb788
+	github.com/strongo/nds b0e0bc7676aa
 	google.golang.org/appengine v1.6.7
 )
 
