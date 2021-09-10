@@ -2,8 +2,7 @@ package db
 
 import (
 	"context"
-	"math/rand"
-	"time"
+	"github.com/pkg/errors"
 )
 
 // TypeOfID represents type of ID: IsComplexID, IsStringID, IsIntID
@@ -20,51 +19,111 @@ const (
 	IsIntID
 )
 
-// EntityHolder is an interface a struct should satisfy to comply with "strongo/db" library
-type EntityHolder interface {
-	Kind() string
-	TypeOfID() TypeOfID
-	IntOrStrIdentifier
-	Entity() interface{}
-	NewEntity() interface{}
-	SetEntity(entity interface{})
+type Validatable interface {
+	Validate() error
+}
+
+// RecordRef hold a reference to a single record within a root or nested recordset.
+type RecordRef struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+// RecordKey represents a full path to a given record (1 item in case of root recordset)
+type RecordKey = []RecordRef
+
+func validateRecordKey(key RecordKey) error {
+	return nil
+}
+
+// NewRecordKey creates a new record key from a sequence of record's references
+func NewRecordKey(refs ...RecordRef) RecordKey {
+	return refs
+}
+
+// Record is an interface a struct should satisfy to comply with "strongo/db" library
+type Record interface {
+	Key() RecordKey
+	Data() Validatable
+	SetData(data Validatable)
+	Validate() error
+}
+
+type record struct {
+	key  RecordKey
+	data Validatable
+}
+
+func (v record) Key() RecordKey {
+	return v.key
+}
+
+func (v record) Data() Validatable {
+	return v.data
+}
+
+func (v record) SetData(data Validatable) {
+	v.data = data
+}
+
+func (v record) Validate() error {
+	if err := validateRecordKey(v.key); err != nil {
+		return errors.Wrap(err, "invalid record key")
+	}
+	if err := v.data.Validate(); err != nil {
+		return errors.Wrap(err, "invalid record data")
+	}
+	return nil
+}
+
+func NewRecord(key RecordKey, data Validatable) Record {
+	return record{key: key, data: data}
+}
+
+type RecordWithIntID interface {
+	Record
+	GetID() int64
 	SetIntID(id int64)
+}
+
+type RecordWithStrID interface {
+	Record
+	GetID() string
 	SetStrID(id string)
 }
 
 // MultiUpdater is an interface that describe DB provider that can update multiple entities at once (batch mode)
 type MultiUpdater interface {
-	UpdateMulti(c context.Context, entityHolders []EntityHolder) error
+	UpdateMulti(c context.Context, records []Record) error
 }
 
 // MultiGetter is an interface that describe DB provider that can get multiple entities at once (batch mode)
 type MultiGetter interface {
-	GetMulti(c context.Context, entityHolders []EntityHolder) error
+	GetMulti(c context.Context, records []Record) error
 }
 
-// Getter is an interface that describe DB provider that can get a single entity by key
+// Getter is an interface that describe DB provider that can get a single record by key
 type Getter interface {
-	Get(c context.Context, entityHolder EntityHolder) error
+	Get(c context.Context, record Record) error
 }
 
-// Inserter is an interface that describe DB provider that can insert a single entity with a specific or random ID
-type Inserter interface {
-	InsertWithRandomIntID(c context.Context, entityHolder EntityHolder) error
-	InsertWithRandomStrID(c context.Context, entityHolder EntityHolder, idLength uint8, attempts int, prefix string) error
+// Upserter is an interface that describe DB provider that can upsert a single record by key
+type Upserter interface {
+	Upsert(c context.Context, record Record) error
 }
 
-// Updater is an interface that describe DB provider that can update a single entity by key
+// Updater is an interface that describe DB provider that can update a single EXISTING record by a key
 type Updater interface {
-	Update(c context.Context, entityHolder EntityHolder) error
+	Update(c context.Context, record Record) error
 }
 
-// Deleter is an interface that describe DB provider that can delete a single entity by key
+// Deleter is an interface that describe DB provider that can delete a single record by key
 type Deleter interface {
-	Delete(c context.Context, entityHolder EntityHolder) error
+	Delete(c context.Context, key RecordKey) error
 }
 
 type MultiDeleter interface {
-	DeleteMulti(c context.Context, entityHolders []EntityHolder) error
+	DeleteMulti(c context.Context, keys []RecordKey) error
 }
 
 // RunOptions hold arbitrary parameters to be passed throw DAL
@@ -81,6 +140,7 @@ type TransactionCoordinator interface {
 type Database interface {
 	TransactionCoordinator
 	Inserter
+	Upserter
 	Getter
 	Updater
 	Deleter
@@ -106,23 +166,9 @@ type IntOrStrIdentifier interface {
 }
 
 var (
-	// CrossGroupTransaction is an options that tells DB that multiple entity groups are affected, see Google Datastore
+	// CrossGroupTransaction is an options that tells DB that multiple record groups are affected, see Google Datastore
 	CrossGroupTransaction = RunOptions{"XG": true}
 
-	// SingleGroupTransaction specifies that only single entity group is affected, see Google Datastore
+	// SingleGroupTransaction specifies that only single record group is affected, see Google Datastore
 	SingleGroupTransaction = RunOptions{}
 )
-
-const idChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" // Removed 1, I and 0, O as can be messed with l/1 and 0.
-
-var random = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-// RandomStringID creates a random string ID of requested length
-var RandomStringID = func(n uint8) string {
-	b := make([]byte, n)
-	lettersCount := len(idChars)
-	for i := range b {
-		b[i] = idChars[random.Intn(lettersCount)]
-	}
-	return string(b)
-}

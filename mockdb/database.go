@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/strongo/db"
-	"math/rand"
 )
 
 // MockKey is mock key
@@ -15,16 +14,15 @@ type MockKey struct {
 	StrID string
 }
 
-func newMockKey(holder db.EntityHolder) MockKey {
+func newMockKey(key db.RecordKey) MockKey {
 	return MockKey{
-		Kind:  holder.Kind(),
-		IntID: holder.IntID(),
-		StrID: holder.StrID(),
+		Kind:  db.GetRecordKind(key),
+		StrID: db.GetRecordKeyPath(key),
 	}
 }
 
 // EntitiesStorage emulates datastore persistent storage
-type EntitiesStorage map[string]map[MockKey]db.EntityHolder
+type EntitiesStorage map[string]map[MockKey]db.Record
 
 // MockDB emulates gae DAL
 type MockDB struct {
@@ -36,9 +34,37 @@ type MockDB struct {
 	onLoad         trigger
 }
 
+func (mdb *MockDB) Insert(c context.Context, record db.Record, options db.InsertOptions) error {
+	return mdb.insert(c, record, options, 5)
+}
+
+func (mdb *MockDB) Upsert(c context.Context, record db.Record) error {
+	panic("implement me")
+}
+
+func (mdb *MockDB) Delete(c context.Context, key db.RecordKey) error {
+	mdb.DeletesCount++
+	kind := db.GetRecordKind(key)
+	entities, ok := mdb.EntitiesByKind[kind]
+	if !ok {
+		return nil
+	}
+	delete(entities, newMockKey(key))
+	return nil
+}
+
+func (mdb *MockDB) DeleteMulti(c context.Context, keys []db.RecordKey) error {
+	for _, key := range keys {
+		if err := mdb.Delete(c, key); err != nil {
+			return nil
+		}
+	}
+	return nil
+}
+
 var _ db.Database = (*MockDB)(nil)
 
-type trigger func(holder db.EntityHolder) (db.EntityHolder, error)
+type trigger func(holder db.Record) (db.Record, error)
 
 // NewMockDB creates new mock DB
 func NewMockDB(onSave, onLoad trigger) *MockDB {
@@ -71,51 +97,59 @@ func (mdb *MockDB) NonTransactionalContext(tc context.Context) (c context.Contex
 	panic("not implemented")
 }
 
-// InsertWithRandomIntID not implemented
-func (mdb *MockDB) InsertWithRandomIntID(c context.Context, entityHolder db.EntityHolder) error {
-	return mdb.insertWithRandomID(c, entityHolder, 10, func() {
-		entityHolder.SetIntID(rand.Int63())
-	})
-}
-
-func (mdb *MockDB) insertWithRandomID(c context.Context, entityHolder db.EntityHolder, attempts int, newRandomID func()) error {
-	if entityHolder == nil {
-		panic("entityHolder == nil")
+func (mdb *MockDB) insert(c context.Context, record db.Record, options db.InsertOptions, attempts int) error {
+	if record == nil {
+		panic("record == nil")
 	}
-	entity := entityHolder.Entity()
-	if entity == nil {
-		panic("entity == nil")
+	data := record.Data()
+	if data == nil {
+		panic("data == nil")
+	}
+	if err := data.Validate(); err != nil {
+		return errors.Wrap(err, "invalid record data")
 	}
 
-	if entityHolder.StrID() != "" {
-		panic("entityHolder.StrID(): " + entityHolder.StrID())
+	key := record.Key()
+	if key == nil {
+		return errors.New("record.Key() returned nil")
 	}
 
-	if entityHolder.IntID() != 0 {
-		panic(fmt.Sprintf("entityHolder.IntID(): %v", entityHolder.IntID()))
+	switch len(key) {
+	case 0:
+		return errors.New("len(record.Key()) == 0")
+	case 1:
+		break
+	default:
+		return errors.New("composite keys are not supported by mock yet")
 	}
 
-	entities, ok := mdb.EntitiesByKind[entityHolder.Kind()]
+	kind := key[0].Kind
+
+	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {
-		entities = make(map[MockKey]db.EntityHolder, 1)
-		mdb.EntitiesByKind[entityHolder.Kind()] = entities
+		entities = make(map[MockKey]db.Record, 1)
+		mdb.EntitiesByKind[kind] = entities
 	}
+	generateID := options.IDGenerator()
+
 	for i := 0; i < attempts; i++ {
-		newRandomID()
-		key := newMockKey(entityHolder)
+		if err := generateID(c, record); err != nil {
+			return errors.Wrap(err, "failed to generate ID")
+		}
+		key := newMockKey(key)
 		if _, ok = entities[key]; !ok {
-			if err := beforeSave(entityHolder); err != nil {
+			if err := beforeSave(record); err != nil {
 				return err
 			}
-			entities[key] = entityHolder
+			entities[key] = record
 			return nil
 		}
 	}
 
-	return errors.Errorf("too many attempts to create a new %v record with unique ID", entityHolder.Kind())
+	return errors.Errorf("too many attempts to create a new %v record with unique ID", kind)
 }
 
-func beforeSave(entityHolder db.EntityHolder) error {
+func beforeSave(entityHolder db.Record) error {
 	if bs, ok := entityHolder.(BeforeSaver); ok {
 		if err := bs.BeforeSave(); err != nil {
 			return err
@@ -129,17 +163,10 @@ type BeforeSaver interface {
 	BeforeSave() error
 }
 
-// InsertWithRandomStrID inserts with random string ID
-func (mdb *MockDB) InsertWithRandomStrID(c context.Context, entityHolder db.EntityHolder, idLength uint8, attempts int, prefix string) error {
-	return mdb.insertWithRandomID(c, entityHolder, attempts, func() {
-		entityHolder.SetStrID(prefix + db.RandomStringID(idLength))
-	})
-}
-
 // UpdateMulti updates multiple entities
-func (mdb *MockDB) UpdateMulti(c context.Context, entityHolders []db.EntityHolder) error {
-	for _, eh := range entityHolders {
-		if err := mdb.Update(c, eh); err != nil {
+func (mdb *MockDB) UpdateMulti(c context.Context, records []db.Record) error {
+	for _, r := range records {
+		if err := mdb.Update(c, r); err != nil {
 			return err
 		}
 	}
@@ -147,9 +174,9 @@ func (mdb *MockDB) UpdateMulti(c context.Context, entityHolders []db.EntityHolde
 }
 
 // GetMulti gets multiple entities
-func (mdb *MockDB) GetMulti(c context.Context, entityHolders []db.EntityHolder) error {
-	for _, eh := range entityHolders {
-		if err := mdb.Get(c, eh); err != nil {
+func (mdb *MockDB) GetMulti(c context.Context, records []db.Record) error {
+	for _, r := range records {
+		if err := mdb.Get(c, r); err != nil {
 			return err
 		}
 	}
@@ -157,54 +184,35 @@ func (mdb *MockDB) GetMulti(c context.Context, entityHolders []db.EntityHolder) 
 }
 
 // Get get entity
-func (mdb *MockDB) Get(c context.Context, entityHolder db.EntityHolder) error {
+func (mdb *MockDB) Get(c context.Context, record db.Record) error {
 	mdb.GetsCount++
-	kind := entityHolder.Kind()
+	key := record.Key()
+	kind := db.GetRecordKind(key)
 	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {
-		return db.NewErrNotFoundID(entityHolder, fmt.Errorf("kind %v has no entities", kind))
+		return db.NewErrNotFoundID(record, fmt.Errorf("kind %v has no entities", kind))
 	}
-	var entityHolder2 db.EntityHolder
-	if entityHolder2, ok = entities[newMockKey(entityHolder)]; !ok {
-		return db.NewErrNotFoundID(entityHolder, nil)
+	var entityHolder2 db.Record
+	if entityHolder2, ok = entities[newMockKey(key)]; !ok {
+		return db.NewErrNotFoundID(record, nil)
 	}
-	entityHolder.SetEntity(entityHolder2.Entity())
+	record.SetData(entityHolder2.Data())
 	return nil
 }
 
 // Update entity
-func (mdb *MockDB) Update(c context.Context, entityHolder db.EntityHolder) error {
-	kind := entityHolder.Kind()
+func (mdb *MockDB) Update(c context.Context, record db.Record) error {
+	key := record.Key()
+	kind := db.GetRecordKind(key)
 	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {
-		entities = make(map[MockKey]db.EntityHolder)
+		entities = make(map[MockKey]db.Record)
 		mdb.EntitiesByKind[kind] = entities
 	}
-	if err := beforeSave(entityHolder); err != nil {
+	if err := beforeSave(record); err != nil {
 		return err
 	}
-	entities[newMockKey(entityHolder)] = entityHolder
+	entities[newMockKey(key)] = record
 	mdb.UpdatesCount++
-	return nil
-}
-
-// Delete entity
-func (mdb *MockDB) Delete(c context.Context, entityHolder db.EntityHolder) error {
-	mdb.DeletesCount++
-	kind := entityHolder.Kind()
-	entities, ok := mdb.EntitiesByKind[kind]
-	if !ok {
-		return nil
-	}
-	delete(entities, newMockKey(entityHolder))
-	return nil
-}
-
-func (mdb *MockDB) DeleteMulti(c context.Context, entityHolders []db.EntityHolder) error {
-	for _, entityHolder := range entityHolders {
-		if err := mdb.Delete(c, entityHolder); err != nil {
-			return nil
-		}
-	}
 	return nil
 }

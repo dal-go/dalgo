@@ -78,15 +78,15 @@ func (e errNotFoundByID) Error() string {
 }
 
 // NewErrNotFoundID creates an error that indicates that entity was not found by ID
-func NewErrNotFoundID(holder EntityHolder, cause error) error {
-	kind := holder.Kind()
-	switch {
-	case holder.IntID() != 0:
-		return NewErrNotFoundByIntID(kind, holder.IntID(), cause)
-	case holder.StrID() != "":
-		return NewErrNotFoundByStrID(kind, holder.StrID(), cause)
+func NewErrNotFoundID(record Record, cause error) error {
+	kind := GetRecordKind(record.Key())
+	switch record.(type) {
+	case RecordWithIntID:
+		return NewErrNotFoundByIntID(kind, record.(RecordWithIntID).GetID(), cause)
+	case RecordWithStrID:
+		return NewErrNotFoundByStrID(kind, record.(RecordWithStrID).GetID(), cause)
 	default:
-		panic(fmt.Sprintf("entity Holder has no ID: %+v", holder))
+		panic(fmt.Sprintf("entity Holder has no ID: %+v", record))
 	}
 }
 
