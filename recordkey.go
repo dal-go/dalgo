@@ -1,6 +1,9 @@
 package db
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 func GetRecordKind(key RecordKey) string {
 	var kinds []string
@@ -13,7 +16,7 @@ func GetRecordKind(key RecordKey) string {
 func GetRecordKeyPath(key RecordKey) string {
 	var p []string
 	for _, ref := range key {
-		p = append(p, ref.Kind, ref.ID)
+		p = append(p, ref.Kind, fmt.Sprintf("%v", ref.ID))
 	}
 	return strings.Join(p, "/")
 }

@@ -50,7 +50,7 @@ func TestInserter(t *testing.T) {
 	if len(recordKey) != len(suppliedKey) {
 		t.Errorf("len(recordKey) != (suppliedKey): %v != %v", recordKey, suppliedKey)
 	}
-	if id := recordKey[0].ID; len(id) != 5 {
-		t.Errorf("len(recordKey[0].ID) expected to be 5, got: %v: %v", len(id), id)
+	if id := recordKey[0].ID; len(id.(string)) != 5 {
+		t.Errorf("len(recordKey[0].ID) expected to be 5, got: %v: %v", len(id.(string)), id)
 	}
 }

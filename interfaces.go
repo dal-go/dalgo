@@ -25,8 +25,8 @@ type Validatable interface {
 
 // RecordRef hold a reference to a single record within a root or nested recordset.
 type RecordRef struct {
-	Kind string `json:"kind"`
-	ID   string `json:"id"`
+	Kind string      `json:"kind"`
+	ID   interface{} `json:"id"` // Usually string or int
 }
 
 // RecordKey represents a full path to a given record (1 item in case of root recordset)
