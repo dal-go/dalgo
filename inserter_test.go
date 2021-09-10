@@ -54,3 +54,37 @@ func TestInserter(t *testing.T) {
 		t.Errorf("len(recordKey[0].ID) expected to be 5, got: %v: %v", len(id.(string)), id)
 	}
 }
+
+func TestInsertWithRandomID(t *testing.T) {
+	t.Run("should_pass", func(t *testing.T) {
+		data := new(o)
+
+		generatesCount := 0
+		var generateID IDGenerator
+		generateID = func(ctx context.Context, record Record) error {
+			generatesCount++
+			return nil
+		}
+
+		exists := func(key RecordKey) error {
+			if generatesCount < 3 {
+				return nil
+			}
+			return ErrRecordNotFound
+		}
+		insertsCount := 0
+		insert := func(r Record) error {
+			insertsCount++
+			return nil
+		}
+		err := InsertWithRandomID(nil, record{data: data}, generateID,
+			5,
+			exists, insert)
+		if err != nil {
+			t.Errorf("failed to insert: %v", err)
+		}
+		if generatesCount != 3 {
+			t.Errorf("ID generator expected to be called 3 times, actual: %v", generatesCount)
+		}
+	})
+}
