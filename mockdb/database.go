@@ -190,11 +190,11 @@ func (mdb *MockDB) Get(c context.Context, record db.Record) error {
 	kind := db.GetRecordKind(key)
 	entities, ok := mdb.EntitiesByKind[kind]
 	if !ok {
-		return db.NewErrNotFoundID(record, fmt.Errorf("kind %v has no entities", kind))
+		return db.NewErrNotFoundByKey(record, fmt.Errorf("kind %v has no entities", kind))
 	}
 	var entityHolder2 db.Record
 	if entityHolder2, ok = entities[newMockKey(key)]; !ok {
-		return db.NewErrNotFoundID(record, nil)
+		return db.NewErrNotFoundByKey(record, nil)
 	}
 	record.SetData(entityHolder2.Data())
 	return nil

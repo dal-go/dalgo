@@ -149,22 +149,6 @@ type Database interface {
 	MultiDeleter
 }
 
-// IntIdentifier is satisfied by entities with integer ID
-type IntIdentifier interface {
-	IntID() int64
-}
-
-// StrIdentifier is satisfied by entities with string ID
-type StrIdentifier interface {
-	StrID() string
-}
-
-// IntOrStrIdentifier is satisfied by entities with both integer and string ID TODO: why we need this?
-type IntOrStrIdentifier interface {
-	IntIdentifier
-	StrIdentifier
-}
-
 var (
 	// CrossGroupTransaction is an options that tells DB that multiple record groups are affected, see Google Datastore
 	CrossGroupTransaction = RunOptions{"XG": true}

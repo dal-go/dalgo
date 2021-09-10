@@ -31,73 +31,40 @@ func IsNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	_, ok := err.(ErrNotFoundByID)
+	_, ok := err.(ErrNotFoundByKey)
 	return ok || errors.Cause(err) == ErrRecordNotFound
 }
 
-// ErrNotFoundByID indicates error was not found by ID
-type ErrNotFoundByID interface {
+// ErrNotFoundByKey indicates error was not found by ID
+type ErrNotFoundByKey interface {
+	Key() RecordKey
+	Cause() error
 	error
-	IntIdentifier
-	StrIdentifier
 }
 
-type errNotFoundByID struct {
-	intID int64
-	strID string
-	kind  string
+type errNotFoundByKey struct {
+	key   RecordKey
 	cause error
 }
 
-func (e errNotFoundByID) IntID() int64 {
-	return e.intID
+func (e errNotFoundByKey) Key() RecordKey {
+	return e.key
 }
 
-func (e errNotFoundByID) StrID() string {
-	return e.strID
-}
-
-func (e errNotFoundByID) ID() interface{} {
-	if e.intID == 0 {
-		if e.strID == "" {
-			return nil
-		}
-		return e.strID
-	} else if e.strID == "" {
-		return e.intID
-	}
-	panic("intID != 0 && strID is not empty string")
-}
-
-func (e errNotFoundByID) Cause() error {
+func (e errNotFoundByKey) Cause() error {
 	return e.cause
 }
 
-func (e errNotFoundByID) Error() string {
-	return fmt.Sprintf("'%v' not found by id=%v: %v", e.kind, e.ID(), e.cause)
-}
-
-// NewErrNotFoundID creates an error that indicates that entity was not found by ID
-func NewErrNotFoundID(record Record, cause error) error {
-	kind := GetRecordKind(record.Key())
-	switch record.(type) {
-	case RecordWithIntID:
-		return NewErrNotFoundByIntID(kind, record.(RecordWithIntID).GetID(), cause)
-	case RecordWithStrID:
-		return NewErrNotFoundByStrID(kind, record.(RecordWithStrID).GetID(), cause)
-	default:
-		panic(fmt.Sprintf("entity Holder has no ID: %+v", record))
+func (e errNotFoundByKey) Error() string {
+	if e.cause == nil {
+		return fmt.Sprintf("record not found by key=%v", GetRecordKeyPath(e.key))
 	}
+	return fmt.Sprintf("record not found by key=%v: %v", GetRecordKeyPath(e.key), e.cause)
 }
 
-// NewErrNotFoundByIntID creates an error that indicates that entity was not found by integer ID
-func NewErrNotFoundByIntID(kind string, id int64, cause error) error {
-	return errNotFoundByID{kind: kind, intID: id, cause: errNotFoundCause(cause)}
-}
-
-// NewErrNotFoundByStrID creates an error that indicates that entity was not found by string ID
-func NewErrNotFoundByStrID(kind string, id string, cause error) error {
-	return errNotFoundByID{kind: kind, strID: id, cause: errNotFoundCause(cause)}
+// NewErrNotFoundByKey creates an error that indicates that entity was not found by ID
+func NewErrNotFoundByKey(record Record, cause error) error {
+	return errNotFoundByKey{key: record.Key(), cause: errNotFoundCause(cause)}
 }
 
 func errNotFoundCause(cause error) error {
