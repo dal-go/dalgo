@@ -82,6 +82,10 @@ func (o) Validate() error {
 	return nil
 }
 
+func VoidData() Validatable {
+	return new(o)
+}
+
 func InsertWithRandomID(
 	c context.Context,
 	r Record,
