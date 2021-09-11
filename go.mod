@@ -1,4 +1,4 @@
-module github.com/strongo/db
+module github.com/strongo/dalgo
 
 go 1.17
 
