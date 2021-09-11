@@ -2,22 +2,13 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
+	"strings"
 )
 
 // TypeOfID represents type of ID: IsComplexID, IsStringID, IsIntID
 type TypeOfID int
-
-const (
-	// IsComplexID is not implemented yet
-	IsComplexID = iota
-
-	// IsStringID for strings IDs
-	IsStringID
-
-	// IsIntID for integer IDs
-	IsIntID
-)
 
 type Validatable interface {
 	Validate() error
@@ -33,6 +24,15 @@ type RecordRef struct {
 type RecordKey = []RecordRef
 
 func validateRecordKey(key RecordKey) error {
+	for i, ref := range key {
+		const prefix = "db record key is invalid at record reference #%v: "
+		if strings.TrimSpace(ref.Kind) == "" {
+			return errors.New(fmt.Sprintf(prefix, i+1) + "kind is a required property")
+		}
+		if i < len(key)-1 && ref.ID == nil {
+			return errors.New(fmt.Sprintf(prefix, i+1) + "ID is a required property")
+		}
+	}
 	return nil
 }
 
@@ -92,67 +92,79 @@ type RecordWithStrID interface {
 	SetStrID(id string)
 }
 
-// MultiUpdater is an interface that describe DB provider that can update multiple entities at once (batch mode)
+// MultiUpdater is an interface that describe DB provider that can update multiple records at once (batch mode)
 type MultiUpdater interface {
 	UpdateMulti(c context.Context, records []Record) error
 }
 
-// MultiGetter is an interface that describe DB provider that can get multiple entities at once (batch mode)
+// MultiGetter is an interface that describe DB provider that can get multiple records at once (batch mode)
 type MultiGetter interface {
-	GetMulti(c context.Context, records []Record) error
+	GetMulti(ctx context.Context, records []Record) error
+}
+
+// MultiSetter is an interface that describe DB provider that can set multiple records at once (batch mode)
+type MultiSetter interface {
+	SetMulti(ctx context.Context, records []Record) error
 }
 
 // Getter is an interface that describe DB provider that can get a single record by key
 type Getter interface {
-	Get(c context.Context, record Record) error
+	Get(ctx context.Context, record Record) error
+}
+
+// Setter is an interface that describe DB provider that can set a single record by key
+type Setter interface {
+	Set(ctx context.Context, record Record) error
 }
 
 // Upserter is an interface that describe DB provider that can upsert a single record by key
 type Upserter interface {
-	Upsert(c context.Context, record Record) error
+	Upsert(ctx context.Context, record Record) error
 }
 
 // Updater is an interface that describe DB provider that can update a single EXISTING record by a key
 type Updater interface {
-	Update(c context.Context, record Record) error
+	Update(ctx context.Context, record Record) error
 }
 
 // Deleter is an interface that describe DB provider that can delete a single record by key
 type Deleter interface {
-	Delete(c context.Context, key RecordKey) error
+	Delete(ctx context.Context, key RecordKey) error
 }
 
 type MultiDeleter interface {
-	DeleteMulti(c context.Context, keys []RecordKey) error
+	DeleteMulti(ctx context.Context, keys []RecordKey) error
 }
-
-// RunOptions hold arbitrary parameters to be passed throw DAL
-type RunOptions map[string]interface{}
 
 // TransactionCoordinator provides methods to work with transactions
 type TransactionCoordinator interface {
-	RunInTransaction(c context.Context, f func(c context.Context) error, options RunOptions) (err error)
-	IsInTransaction(c context.Context) bool
-	NonTransactionalContext(tc context.Context) (c context.Context)
+	RunInTransaction(
+		ctx context.Context,
+		f func(ctx context.Context, tx Transaction) error,
+		options ...TransactionOption,
+	) error
+}
+
+// Session defines interface
+type Session interface {
+	Inserter
+	Upserter
+	Getter
+	Setter
+	Updater
+	Deleter
+	MultiGetter
+	MultiSetter
+	MultiUpdater
+	MultiDeleter
+}
+
+type Transaction interface {
+	Session
 }
 
 // Database is an interface that define a DB provider
 type Database interface {
 	TransactionCoordinator
-	Inserter
-	Upserter
-	Getter
-	Updater
-	Deleter
-	MultiGetter
-	MultiUpdater
-	MultiDeleter
+	Session
 }
-
-var (
-	// CrossGroupTransaction is an options that tells DB that multiple record groups are affected, see Google Datastore
-	CrossGroupTransaction = RunOptions{"XG": true}
-
-	// SingleGroupTransaction specifies that only single record group is affected, see Google Datastore
-	SingleGroupTransaction = RunOptions{}
-)

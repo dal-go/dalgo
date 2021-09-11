@@ -34,15 +34,23 @@ type MockDB struct {
 	onLoad         trigger
 }
 
-func (mdb *MockDB) Insert(c context.Context, record db.Record, options db.InsertOptions) error {
-	return mdb.insert(c, record, options, 5)
-}
-
-func (mdb *MockDB) Upsert(c context.Context, record db.Record) error {
+func (mdb *MockDB) Set(_ context.Context, _ db.Record) error {
 	panic("implement me")
 }
 
-func (mdb *MockDB) Delete(c context.Context, key db.RecordKey) error {
+func (mdb *MockDB) SetMulti(_ context.Context, _ []db.Record) error {
+	panic("implement me")
+}
+
+func (mdb *MockDB) Insert(ctx context.Context, record db.Record, options db.InsertOptions) error {
+	return mdb.insert(ctx, record, options, 5)
+}
+
+func (mdb *MockDB) Upsert(_ context.Context, _ db.Record) error {
+	panic("implement me")
+}
+
+func (mdb *MockDB) Delete(_ context.Context, key db.RecordKey) error {
 	mdb.DeletesCount++
 	kind := db.GetRecordKind(key)
 	entities, ok := mdb.EntitiesByKind[kind]
@@ -53,9 +61,9 @@ func (mdb *MockDB) Delete(c context.Context, key db.RecordKey) error {
 	return nil
 }
 
-func (mdb *MockDB) DeleteMulti(c context.Context, keys []db.RecordKey) error {
+func (mdb *MockDB) DeleteMulti(ctx context.Context, keys []db.RecordKey) error {
 	for _, key := range keys {
-		if err := mdb.Delete(c, key); err != nil {
+		if err := mdb.Delete(ctx, key); err != nil {
 			return nil
 		}
 	}
@@ -75,26 +83,11 @@ func NewMockDB(onSave, onLoad trigger) *MockDB {
 	}
 }
 
-var isInTransactionFlag = "is in transaction"
-var nonTransactionalContextKey = "non transactional context"
-
 // RunInTransaction starts transaction
-func (mdb *MockDB) RunInTransaction(c context.Context, f func(c context.Context) error, options db.RunOptions) (err error) {
-	tc := context.WithValue(context.WithValue(c, &isInTransactionFlag, true), &nonTransactionalContextKey, c)
-	return f(tc)
-}
-
-// IsInTransaction checks if we are in transaction
-func (mdb *MockDB) IsInTransaction(c context.Context) bool {
-	if v := c.Value(&isInTransactionFlag); v != nil && v.(bool) {
-		return true
-	}
-	return false
-}
-
-// NonTransactionalContext not implemented
-func (mdb *MockDB) NonTransactionalContext(tc context.Context) (c context.Context) {
-	panic("not implemented")
+func (mdb *MockDB) RunInTransaction(ctx context.Context, f func(c context.Context, tx db.Transaction) error, options ...db.TransactionOption) (err error) {
+	_ = db.NewTransactionOptions(options...)
+	ctx = db.NewContextWithTransaction(ctx, nil)
+	return f(ctx, mdb)
 }
 
 func (mdb *MockDB) insert(c context.Context, record db.Record, options db.InsertOptions, attempts int) error {
@@ -184,7 +177,7 @@ func (mdb *MockDB) GetMulti(c context.Context, records []db.Record) error {
 }
 
 // Get get entity
-func (mdb *MockDB) Get(c context.Context, record db.Record) error {
+func (mdb *MockDB) Get(_ context.Context, record db.Record) error {
 	mdb.GetsCount++
 	key := record.Key()
 	kind := db.GetRecordKind(key)
@@ -201,7 +194,7 @@ func (mdb *MockDB) Get(c context.Context, record db.Record) error {
 }
 
 // Update entity
-func (mdb *MockDB) Update(c context.Context, record db.Record) error {
+func (mdb *MockDB) Update(_ context.Context, record db.Record) error {
 	key := record.Key()
 	kind := db.GetRecordKind(key)
 	entities, ok := mdb.EntitiesByKind[kind]

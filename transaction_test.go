@@ -1,6 +1,9 @@
 package db
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestWithPassword(t *testing.T) {
 	const password = "test-pwd"
@@ -21,6 +24,21 @@ func TestWithReadonly(t *testing.T) {
 		txOptions := NewTransactionOptions()
 		if txOptions.IsReadonly() {
 			t.Errorf("expected to be readonly")
+		}
+	})
+}
+
+func TestWithCrossGroup(t *testing.T) {
+	t.Run("true", func(t *testing.T) {
+		txOptions := NewTransactionOptions(WithCrossGroup())
+		if !txOptions.IsCrossGroup() {
+			t.Errorf("expected to be true")
+		}
+	})
+	t.Run("false", func(t *testing.T) {
+		txOptions := NewTransactionOptions()
+		if txOptions.IsCrossGroup() {
+			t.Errorf("expected to be false")
 		}
 	})
 }
@@ -54,4 +72,24 @@ func TestNewTransactionOptions(t *testing.T) {
 			t.Errorf("expected not to have a password equal to %v, got: %v", expectedPassword, password)
 		}
 	})
+}
+
+func TestGetTransaction(t *testing.T) {
+	expected := "transaction"
+	ctx := context.Background()
+	txCtx := NewContextWithTransaction(ctx, expected)
+	actual := GetTransaction(txCtx)
+	if actual != expected {
+		t.Errorf("transactional context does not provide transaction's value")
+	}
+}
+
+func TestGetNonTransactionalContext(t *testing.T) {
+	expected := "transaction"
+	ctx := context.Background()
+	txCtx := NewContextWithTransaction(ctx, expected)
+	actual := GetNonTransactionalContext(txCtx)
+	if actual != ctx {
+		t.Errorf("transactional context does not provide original context")
+	}
 }
