@@ -15,6 +15,19 @@ Using this module allows you:
 
 4. Write unit tests for your business logic without dependency on specific API.
 
+## Implementations for specific APIs
+
+DALgo defines abstract interfaces and helpers methods to work with databases in abstract manner.
+
+Here is modules that bridge DALgo to specific API:
+
+- [`github.com/strongo/dalgo-firestore`](https://github.com/strongo/dalgo-firestore)
+  for [Firestore API client](https://pkg.go.dev/cloud.google.com/go/firestore)
+- [`github.com/strongo/dalgo-gae-datastore`](https://github.com/strongo/dalgo-gae-datastore)
+  for [Google Cloud Datastore](https://pkg.go.dev/cloud.google.com/go/datastore)
+
+## DALgo interfaces
+
 The main abstraction is though `dalgo.Record` interface :
 
 	type Record interface {
