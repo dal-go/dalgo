@@ -1,4 +1,4 @@
-package db
+package dalgo
 
 import (
 	"context"
@@ -39,7 +39,9 @@ func TestVoidData(t *testing.T) {
 
 func (v inserterMock) Insert(c context.Context, record Record, options InsertOptions) error {
 	if idGenerator := options.IDGenerator(); idGenerator != nil {
-		idGenerator(c, record)
+		if err := idGenerator(c, record); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -1,4 +1,4 @@
-package db
+package dalgo
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 
 // ErrNotSupported - return this if db driver does not support requested operation.
 // (for example no support for transactions)
+//goland:noinspection GoUnusedGlobalVariable
 var ErrNotSupported = errors.New("not supported")
 
 // ErrDuplicateUser indicates there is a duplicate user // TODO: move to strongo/app?

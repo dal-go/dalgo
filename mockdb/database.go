@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/strongo/db"
+	"github.com/strongo/dalgo"
 )
 
 // MockKey is mock key
@@ -14,46 +14,46 @@ type MockKey struct {
 	StrID string
 }
 
-func newMockKey(key db.RecordKey) MockKey {
+func newMockKey(key dalgo.RecordKey) MockKey {
 	return MockKey{
-		Kind:  db.GetRecordKind(key),
-		StrID: db.GetRecordKeyPath(key),
+		Kind:  dalgo.GetRecordKind(key),
+		StrID: dalgo.GetRecordKeyPath(key),
 	}
 }
 
-// EntitiesStorage emulates datastore persistent storage
-type EntitiesStorage map[string]map[MockKey]db.Record
+// RecordsStorage emulates datastore persistent storage
+type RecordsStorage map[string]map[MockKey]dalgo.Record
 
 // MockDB emulates gae DAL
 type MockDB struct {
-	UpdatesCount   int
-	GetsCount      int
-	DeletesCount   int
-	EntitiesByKind EntitiesStorage
-	onSave         trigger
-	onLoad         trigger
+	UpdatesCount  int
+	GetsCount     int
+	DeletesCount  int
+	RecordsByKind RecordsStorage
+	onSave        trigger
+	onLoad        trigger
 }
 
-func (mdb *MockDB) Set(_ context.Context, _ db.Record) error {
+func (mdb *MockDB) Set(_ context.Context, _ dalgo.Record) error {
 	panic("implement me")
 }
 
-func (mdb *MockDB) SetMulti(_ context.Context, _ []db.Record) error {
+func (mdb *MockDB) SetMulti(_ context.Context, _ []dalgo.Record) error {
 	panic("implement me")
 }
 
-func (mdb *MockDB) Insert(ctx context.Context, record db.Record, options db.InsertOptions) error {
+func (mdb *MockDB) Insert(ctx context.Context, record dalgo.Record, options dalgo.InsertOptions) error {
 	return mdb.insert(ctx, record, options, 5)
 }
 
-func (mdb *MockDB) Upsert(_ context.Context, _ db.Record) error {
+func (mdb *MockDB) Upsert(_ context.Context, _ dalgo.Record) error {
 	panic("implement me")
 }
 
-func (mdb *MockDB) Delete(_ context.Context, key db.RecordKey) error {
+func (mdb *MockDB) Delete(_ context.Context, key dalgo.RecordKey) error {
 	mdb.DeletesCount++
-	kind := db.GetRecordKind(key)
-	entities, ok := mdb.EntitiesByKind[kind]
+	kind := dalgo.GetRecordKind(key)
+	entities, ok := mdb.RecordsByKind[kind]
 	if !ok {
 		return nil
 	}
@@ -61,7 +61,7 @@ func (mdb *MockDB) Delete(_ context.Context, key db.RecordKey) error {
 	return nil
 }
 
-func (mdb *MockDB) DeleteMulti(ctx context.Context, keys []db.RecordKey) error {
+func (mdb *MockDB) DeleteMulti(ctx context.Context, keys []dalgo.RecordKey) error {
 	for _, key := range keys {
 		if err := mdb.Delete(ctx, key); err != nil {
 			return nil
@@ -70,27 +70,27 @@ func (mdb *MockDB) DeleteMulti(ctx context.Context, keys []db.RecordKey) error {
 	return nil
 }
 
-var _ db.Database = (*MockDB)(nil)
+var _ dalgo.Database = (*MockDB)(nil)
 
-type trigger func(holder db.Record) (db.Record, error)
+type trigger func(holder dalgo.Record) (dalgo.Record, error)
 
 // NewMockDB creates new mock DB
 func NewMockDB(onSave, onLoad trigger) *MockDB {
 	return &MockDB{
-		onSave:         onSave,
-		onLoad:         onLoad,
-		EntitiesByKind: make(EntitiesStorage),
+		onSave:        onSave,
+		onLoad:        onLoad,
+		RecordsByKind: make(RecordsStorage),
 	}
 }
 
 // RunInTransaction starts transaction
-func (mdb *MockDB) RunInTransaction(ctx context.Context, f func(c context.Context, tx db.Transaction) error, options ...db.TransactionOption) (err error) {
-	_ = db.NewTransactionOptions(options...)
-	ctx = db.NewContextWithTransaction(ctx, nil)
+func (mdb *MockDB) RunInTransaction(ctx context.Context, f func(c context.Context, tx dalgo.Transaction) error, options ...dalgo.TransactionOption) (err error) {
+	_ = dalgo.NewTransactionOptions(options...)
+	ctx = dalgo.NewContextWithTransaction(ctx, nil)
 	return f(ctx, mdb)
 }
 
-func (mdb *MockDB) insert(c context.Context, record db.Record, options db.InsertOptions, attempts int) error {
+func (mdb *MockDB) insert(c context.Context, record dalgo.Record, options dalgo.InsertOptions, attempts int) error {
 	if record == nil {
 		panic("record == nil")
 	}
@@ -118,10 +118,10 @@ func (mdb *MockDB) insert(c context.Context, record db.Record, options db.Insert
 
 	kind := key[0].Kind
 
-	entities, ok := mdb.EntitiesByKind[kind]
+	entities, ok := mdb.RecordsByKind[kind]
 	if !ok {
-		entities = make(map[MockKey]db.Record, 1)
-		mdb.EntitiesByKind[kind] = entities
+		entities = make(map[MockKey]dalgo.Record, 1)
+		mdb.RecordsByKind[kind] = entities
 	}
 	generateID := options.IDGenerator()
 
@@ -142,8 +142,8 @@ func (mdb *MockDB) insert(c context.Context, record db.Record, options db.Insert
 	return errors.Errorf("too many attempts to create a new %v record with unique ID", kind)
 }
 
-func beforeSave(entityHolder db.Record) error {
-	if bs, ok := entityHolder.(BeforeSaver); ok {
+func beforeSave(record dalgo.Record) error {
+	if bs, ok := record.(BeforeSaver); ok {
 		if err := bs.BeforeSave(); err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ type BeforeSaver interface {
 }
 
 // UpdateMulti updates multiple entities
-func (mdb *MockDB) UpdateMulti(c context.Context, records []db.Record) error {
+func (mdb *MockDB) UpdateMulti(c context.Context, records []dalgo.Record) error {
 	for _, r := range records {
 		if err := mdb.Update(c, r); err != nil {
 			return err
@@ -167,7 +167,7 @@ func (mdb *MockDB) UpdateMulti(c context.Context, records []db.Record) error {
 }
 
 // GetMulti gets multiple entities
-func (mdb *MockDB) GetMulti(c context.Context, records []db.Record) error {
+func (mdb *MockDB) GetMulti(c context.Context, records []dalgo.Record) error {
 	for _, r := range records {
 		if err := mdb.Get(c, r); err != nil {
 			return err
@@ -177,35 +177,35 @@ func (mdb *MockDB) GetMulti(c context.Context, records []db.Record) error {
 }
 
 // Get get entity
-func (mdb *MockDB) Get(_ context.Context, record db.Record) error {
+func (mdb *MockDB) Get(_ context.Context, record dalgo.Record) error {
 	mdb.GetsCount++
 	key := record.Key()
-	kind := db.GetRecordKind(key)
-	entities, ok := mdb.EntitiesByKind[kind]
+	kind := dalgo.GetRecordKind(key)
+	records, ok := mdb.RecordsByKind[kind]
 	if !ok {
-		return db.NewErrNotFoundByKey(record, fmt.Errorf("kind %v has no entities", kind))
+		return dalgo.NewErrNotFoundByKey(record, fmt.Errorf("kind %v has no records", kind))
 	}
-	var entityHolder2 db.Record
-	if entityHolder2, ok = entities[newMockKey(key)]; !ok {
-		return db.NewErrNotFoundByKey(record, nil)
+	var record2 dalgo.Record
+	if record2, ok = records[newMockKey(key)]; !ok {
+		return dalgo.NewErrNotFoundByKey(record, nil)
 	}
-	record.SetData(entityHolder2.Data())
+	record.SetData(record2.Data())
 	return nil
 }
 
 // Update entity
-func (mdb *MockDB) Update(_ context.Context, record db.Record) error {
+func (mdb *MockDB) Update(_ context.Context, record dalgo.Record) error {
 	key := record.Key()
-	kind := db.GetRecordKind(key)
-	entities, ok := mdb.EntitiesByKind[kind]
+	kind := dalgo.GetRecordKind(key)
+	var records, ok = mdb.RecordsByKind[kind]
 	if !ok {
-		entities = make(map[MockKey]db.Record)
-		mdb.EntitiesByKind[kind] = entities
+		records = make(map[MockKey]dalgo.Record)
+		mdb.RecordsByKind[kind] = records
 	}
 	if err := beforeSave(record); err != nil {
 		return err
 	}
-	entities[newMockKey(key)] = record
+	records[newMockKey(key)] = record
 	mdb.UpdatesCount++
 	return nil
 }

@@ -1,4 +1,4 @@
-package db
+package dalgo
 
 // Property hold property name, value & flag to index
 type Property struct {
