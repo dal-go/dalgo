@@ -124,7 +124,7 @@ type Upserter interface {
 
 // Updater is an interface that describe DB provider that can update a single EXISTING record by a key
 type Updater interface {
-	Update(ctx context.Context, record Record) error
+	Update(ctx context.Context, key RecordKey, updates []Update, preconditions ...Precondition) error
 }
 
 // Deleter is an interface that describe DB provider that can delete a single record by key

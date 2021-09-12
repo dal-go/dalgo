@@ -64,8 +64,8 @@ func (e errNotFoundByKey) Error() string {
 }
 
 // NewErrNotFoundByKey creates an error that indicates that entity was not found by ID
-func NewErrNotFoundByKey(record Record, cause error) error {
-	return errNotFoundByKey{key: record.Key(), cause: errNotFoundCause(cause)}
+func NewErrNotFoundByKey(key RecordKey, cause error) error {
+	return errNotFoundByKey{key: key, cause: errNotFoundCause(cause)}
 }
 
 func errNotFoundCause(cause error) error {

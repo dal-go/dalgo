@@ -159,7 +159,7 @@ type BeforeSaver interface {
 // UpdateMulti updates multiple entities
 func (mdb *MockDB) UpdateMulti(c context.Context, records []dalgo.Record) error {
 	for _, r := range records {
-		if err := mdb.Update(c, r); err != nil {
+		if err := mdb.Update(c, r.Key(), nil); err != nil {
 			return err
 		}
 	}
@@ -183,29 +183,29 @@ func (mdb *MockDB) Get(_ context.Context, record dalgo.Record) error {
 	kind := dalgo.GetRecordKind(key)
 	records, ok := mdb.RecordsByKind[kind]
 	if !ok {
-		return dalgo.NewErrNotFoundByKey(record, fmt.Errorf("kind %v has no records", kind))
+		return dalgo.NewErrNotFoundByKey(key, fmt.Errorf("kind %v has no records", kind))
 	}
 	var record2 dalgo.Record
 	if record2, ok = records[newMockKey(key)]; !ok {
-		return dalgo.NewErrNotFoundByKey(record, nil)
+		return dalgo.NewErrNotFoundByKey(key, nil)
 	}
 	record.SetData(record2.Data())
 	return nil
 }
 
 // Update entity
-func (mdb *MockDB) Update(_ context.Context, record dalgo.Record) error {
-	key := record.Key()
+func (mdb *MockDB) Update(_ context.Context, key dalgo.RecordKey, _ []dalgo.Update, preconditions ...dalgo.Precondition) error {
 	kind := dalgo.GetRecordKind(key)
 	var records, ok = mdb.RecordsByKind[kind]
 	if !ok {
+		preConditions := dalgo.GetPreconditions(preconditions...)
+		if preConditions.Exists() {
+			return dalgo.NewErrNotFoundByKey(key, errors.New("update has exists precondition"))
+		}
 		records = make(map[MockKey]dalgo.Record)
 		mdb.RecordsByKind[kind] = records
 	}
-	if err := beforeSave(record); err != nil {
-		return err
-	}
-	records[newMockKey(key)] = record
+	//records[newMockKey(key)] = record
 	mdb.UpdatesCount++
-	return nil
+	return errors.New("func MockDB.Update() is not implemented yet")
 }
