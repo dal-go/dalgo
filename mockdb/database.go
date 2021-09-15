@@ -98,9 +98,6 @@ func (mdb *MockDB) insert(c context.Context, record dalgo.Record, options dalgo.
 	if data == nil {
 		panic("data == nil")
 	}
-	if err := data.Validate(); err != nil {
-		return errors.Wrap(err, "invalid record data")
-	}
 
 	key := record.Key()
 	if key == nil {

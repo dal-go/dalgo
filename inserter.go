@@ -75,17 +75,6 @@ func WithRandomStringID(length int) InsertOption {
 	}
 }
 
-type o struct {
-}
-
-func (o) Validate() error {
-	return nil
-}
-
-func VoidData() Validatable {
-	return new(o)
-}
-
 func InsertWithRandomID(
 	c context.Context,
 	r Record,
@@ -95,7 +84,7 @@ func InsertWithRandomID(
 	insert func(Record) error,
 ) error {
 	// We need a temp record to make sure we do not overwrite data during exists() check
-	tmp := record{key: r.Key(), data: new(o)}
+	tmp := record{key: r.Key(), data: nil}
 	for i := 1; i <= attempts; i++ {
 		if err := generateID(c, tmp); err != nil {
 			return errors.Wrap(err, "failed to generate random ID")

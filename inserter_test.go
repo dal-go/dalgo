@@ -24,19 +24,6 @@ func (foo foo) Validate() error {
 type inserterMock struct {
 }
 
-func TestVoidData(t *testing.T) {
-	v := VoidData()
-	if v == nil {
-		t.Error("expected to be not nil")
-	}
-	switch v.(type) {
-	case *o: // OK
-		break
-	default:
-		t.Errorf("unexpected type of void data: %T", v)
-	}
-}
-
 func (v inserterMock) Insert(c context.Context, record Record, options InsertOptions) error {
 	if idGenerator := options.IDGenerator(); idGenerator != nil {
 		if err := idGenerator(c, record); err != nil {
@@ -72,7 +59,7 @@ func TestInserter(t *testing.T) {
 
 func TestInsertWithRandomID(t *testing.T) {
 	t.Run("should_pass", func(t *testing.T) {
-		data := new(o)
+		data := new(map[string]interface{})
 
 		generatesCount := 0
 		var generateID IDGenerator

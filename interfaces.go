@@ -44,25 +44,25 @@ func NewRecordKey(refs ...RecordRef) RecordKey {
 // Record is an interface a struct should satisfy to comply with "strongo/db" library
 type Record interface {
 	Key() RecordKey
-	Data() Validatable
-	SetData(data Validatable)
+	Data() interface{}
+	SetData(data interface{})
 	Validate() error
 }
 
 type record struct {
 	key  RecordKey
-	data Validatable
+	data interface{}
 }
 
 func (v record) Key() RecordKey {
 	return v.key
 }
 
-func (v record) Data() Validatable {
+func (v record) Data() interface{} {
 	return v.data
 }
 
-func (v record) SetData(data Validatable) {
+func (v record) SetData(data interface{}) {
 	v.data = data
 }
 
@@ -70,13 +70,15 @@ func (v record) Validate() error {
 	if err := validateRecordKey(v.key); err != nil {
 		return errors.Wrap(err, "invalid record key")
 	}
-	if err := v.data.Validate(); err != nil {
-		return errors.Wrap(err, "invalid record data")
+	if data, ok := v.data.(Validatable); ok {
+		if err := data.Validate(); err != nil {
+			return errors.Wrap(err, "invalid record data")
+		}
 	}
 	return nil
 }
 
-func NewRecord(key RecordKey, data Validatable) Record {
+func NewRecord(key RecordKey, data interface{}) Record {
 	return record{key: key, data: data}
 }
 
