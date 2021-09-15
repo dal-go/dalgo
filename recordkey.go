@@ -5,18 +5,43 @@ import (
 	"strings"
 )
 
-func GetRecordKind(key RecordKey) string {
-	var kinds []string
-	for _, ref := range key {
-		kinds = append(kinds, ref.Kind)
+func GetRecordKind(key *Key) string {
+	s := make([]string, key.Level())
+	for {
+		s = append(s, key.kind)
+		if key.parent == nil {
+			break
+		} else {
+			key = key.parent
+		}
 	}
-	return strings.Join(kinds, "/")
+	return ReverseStringsJoin(s, "/")
 }
 
-func GetRecordKeyPath(key RecordKey) string {
-	var p []string
-	for _, ref := range key {
-		p = append(p, ref.Kind, fmt.Sprintf("%v", ref.ID))
+func GetRecordKeyPath(key *Key) string {
+	s := make([]string, key.Level()*2)
+	for {
+		s = append(s, fmt.Sprintf("%v", key.ID))
+		s = append(s, key.kind)
+		if key.parent == nil {
+			break
+		} else {
+			key = key.parent
+		}
 	}
-	return strings.Join(p, "/")
+	return ReverseStringsJoin(s, "/")
+}
+
+func ReverseStringsJoin(elems []string, sep string) string {
+	n := len(sep) * (len(elems) - 1)
+	for i := 0; i < len(elems); i++ {
+		n += len(elems[i])
+	}
+
+	var b strings.Builder
+	b.Grow(n)
+	for i := len(elems) - 1; i >= 0; i-- {
+		b.WriteString(elems[i])
+	}
+	return b.String()
 }

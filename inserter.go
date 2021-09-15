@@ -7,9 +7,9 @@ import (
 	"github.com/strongo/random"
 )
 
-// Inserter is an interface that describe DB provider that can insert a single entity with a specific or random ID
+// Inserter is an interface that describe DB provider that can insert a single entity with a specific or random Value
 type Inserter interface {
-	Insert(c context.Context, record Record, options InsertOptions) error
+	Insert(c context.Context, record Record, opts ...InsertOption) error
 }
 
 type IDGenerator = func(ctx context.Context, record Record) error
@@ -38,40 +38,45 @@ func NewInsertOptions(opts ...InsertOption) InsertOptions {
 
 type InsertOption func(options *insertOptions)
 
-func WithIDGenerator(idGenerator IDGenerator) InsertOption {
-	return func(options *insertOptions) {
-		if options.idGenerator != nil {
-			panic("an attempt to add an ID generator while insert options already have one")
-		}
-		options.idGenerator = idGenerator
-	}
-}
-
 type randomStringOptions struct {
-	length int
 	prefix string
 }
 
 type RandomStringOptions interface {
-	Length() int
+	Prefix() string
 }
 
-func (v randomStringOptions) Length() int {
-	return v.length
+func WithPrefix(prefix string) func(options *randomStringOptions) {
+	return func(options *randomStringOptions) {
+		options.prefix = prefix
+	}
 }
 
-type randomStringOption func(opts *randomStringOptions)
+func (v randomStringOptions) Prefix() string {
+	return v.prefix
+}
 
-func WithRandomStringID(length int) InsertOption {
-	return func(options *insertOptions) {
-		if options.idGenerator != nil {
-			panic("an attempt to add random string ID generator while insert options already have one")
+type RandomStringOption func(opts *randomStringOptions)
+
+func WithIDGenerator(g IDGenerator) KeyOption {
+	return func(key *Key) {
+		if key.ID != nil {
+			panic("an attempt to set ID generator for a key that already have an ID value")
 		}
-		options.idGenerator = func(ctx context.Context, record Record) error {
-			key := record.Key()
-			key[len(key)-1].ID = random.ID(length)
+		key.ID = g
+	}
+}
+
+func WithRandomStringID(length int, options ...RandomStringOption) KeyOption {
+	var rso randomStringOptions
+	for _, setOption := range options {
+		setOption(&rso)
+	}
+	return func(key *Key) {
+		key.ID = WithIDGenerator(func(ctx context.Context, record Record) error {
+			key.ID = random.ID(length)
 			return nil
-		}
+		})
 	}
 }
 
@@ -80,14 +85,14 @@ func InsertWithRandomID(
 	r Record,
 	generateID IDGenerator,
 	attempts int,
-	exists func(RecordKey) error,
+	exists func(*Key) error,
 	insert func(Record) error,
 ) error {
 	// We need a temp record to make sure we do not overwrite data during exists() check
 	tmp := record{key: r.Key(), data: nil}
 	for i := 1; i <= attempts; i++ {
 		if err := generateID(c, tmp); err != nil {
-			return errors.Wrap(err, "failed to generate random ID")
+			return errors.Wrap(err, "failed to generate random Value")
 		}
 		if err := exists(tmp.key); err == nil {
 			continue
@@ -97,5 +102,5 @@ func InsertWithRandomID(
 			return fmt.Errorf("failed to check if record exists: %w", err)
 		}
 	}
-	return fmt.Errorf("not able to generate unique ID in %v attempts", attempts)
+	return fmt.Errorf("not able to generate unique Value in %v attempts", attempts)
 }

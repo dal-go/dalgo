@@ -42,14 +42,22 @@ func (changes Changes) HasChanges() bool {
 	return len(changes.entityHolders) > 0
 }
 
-func equalKeys(k1, k2 RecordKey) bool {
-	if len(k1) != len(k2) {
+func equalKeys(k1, k2 *Key) bool {
+	if k1.Kind() != k2.Kind() {
 		return false
 	}
-	for i := range k1 {
-		if k1[i] != k2[i] {
+	p1 := k1.Parent()
+	p2 := k2.Parent()
+	if p1 != nil && p2 != nil {
+		if !equalKeys(p1, p2) {
 			return false
 		}
+	}
+	if k1.ID == nil && k2.ID != nil || k2.ID == nil && k1.ID != nil {
+		return false
+	}
+	if k1.ID != k2.ID {
+		return false
 	}
 	return true
 }

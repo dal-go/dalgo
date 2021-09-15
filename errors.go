@@ -36,19 +36,19 @@ func IsNotFound(err error) bool {
 	return ok || errors.Cause(err) == ErrRecordNotFound
 }
 
-// ErrNotFoundByKey indicates error was not found by ID
+// ErrNotFoundByKey indicates error was not found by Value
 type ErrNotFoundByKey interface {
-	Key() RecordKey
+	Key() Key
 	Cause() error
 	error
 }
 
 type errNotFoundByKey struct {
-	key   RecordKey
+	key   *Key
 	cause error
 }
 
-func (e errNotFoundByKey) Key() RecordKey {
+func (e errNotFoundByKey) Key() *Key {
 	return e.key
 }
 
@@ -63,8 +63,8 @@ func (e errNotFoundByKey) Error() string {
 	return fmt.Sprintf("record not found by key=%v: %v", GetRecordKeyPath(e.key), e.cause)
 }
 
-// NewErrNotFoundByKey creates an error that indicates that entity was not found by ID
-func NewErrNotFoundByKey(key RecordKey, cause error) error {
+// NewErrNotFoundByKey creates an error that indicates that entity was not found by Value
+func NewErrNotFoundByKey(key *Key, cause error) error {
 	return errNotFoundByKey{key: key, cause: errNotFoundCause(cause)}
 }
 

@@ -24,7 +24,8 @@ func (foo foo) Validate() error {
 type inserterMock struct {
 }
 
-func (v inserterMock) Insert(c context.Context, record Record, options InsertOptions) error {
+func (v inserterMock) Insert(c context.Context, record Record, opts ...InsertOption) error {
+	options := NewInsertOptions(opts...)
 	if idGenerator := options.IDGenerator(); idGenerator != nil {
 		if err := idGenerator(c, record); err != nil {
 			return err
@@ -38,22 +39,19 @@ func TestInserter(t *testing.T) {
 	ctx := context.Background()
 	var record Record
 
-	suppliedKey := NewRecordKey(RecordRef{Kind: "foo", ID: ""})
+	suppliedKey := NewKey("foo", WithRandomStringID(5))
 	record = NewRecord(suppliedKey, foo{title: ""})
 
 	defer func() {
 		_ = recover()
 	}()
-	err := inserter.Insert(ctx, record, NewInsertOptions(WithRandomStringID(5)))
+	err := inserter.Insert(ctx, record)
 	if err != nil {
 		t.Error(err)
 	}
 	recordKey := record.Key()
-	if len(recordKey) != len(suppliedKey) {
-		t.Errorf("len(recordKey) != (suppliedKey): %v != %v", recordKey, suppliedKey)
-	}
-	if id := recordKey[0].ID; len(id.(string)) != 5 {
-		t.Errorf("len(recordKey[0].ID) expected to be 5, got: %v: %v", len(id.(string)), id)
+	if id := recordKey.ID; len(id.(string)) != 5 {
+		t.Errorf("len(recordKey[0].Value) expected to be 5, got: %v: %v", len(id.(string)), id)
 	}
 }
 
@@ -68,7 +66,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			return nil
 		}
 
-		exists := func(key RecordKey) error {
+		exists := func(key *Key) error {
 			if generatesCount < 3 {
 				return nil
 			}
@@ -86,7 +84,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			t.Errorf("failed to insert: %v", err)
 		}
 		if generatesCount != 3 {
-			t.Errorf("ID generator expected to be called 3 times, actual: %v", generatesCount)
+			t.Errorf("Value generator expected to be called 3 times, actual: %v", generatesCount)
 		}
 	})
 }

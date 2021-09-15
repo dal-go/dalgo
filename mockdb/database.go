@@ -14,7 +14,7 @@ type MockKey struct {
 	StrID string
 }
 
-func newMockKey(key dalgo.RecordKey) MockKey {
+func newMockKey(key *dalgo.Key) MockKey {
 	return MockKey{
 		Kind:  dalgo.GetRecordKind(key),
 		StrID: dalgo.GetRecordKeyPath(key),
@@ -42,15 +42,15 @@ func (mdb *MockDB) SetMulti(_ context.Context, _ []dalgo.Record) error {
 	panic("implement me")
 }
 
-func (mdb *MockDB) Insert(ctx context.Context, record dalgo.Record, options dalgo.InsertOptions) error {
-	return mdb.insert(ctx, record, options, 5)
+func (mdb *MockDB) Insert(ctx context.Context, record dalgo.Record, options ...dalgo.InsertOption) error {
+	return mdb.insert(ctx, record, dalgo.NewInsertOptions(options...), 5)
 }
 
 func (mdb *MockDB) Upsert(_ context.Context, _ dalgo.Record) error {
 	panic("implement me")
 }
 
-func (mdb *MockDB) Delete(_ context.Context, key dalgo.RecordKey) error {
+func (mdb *MockDB) Delete(_ context.Context, key *dalgo.Key) error {
 	mdb.DeletesCount++
 	kind := dalgo.GetRecordKind(key)
 	entities, ok := mdb.RecordsByKind[kind]
@@ -61,7 +61,7 @@ func (mdb *MockDB) Delete(_ context.Context, key dalgo.RecordKey) error {
 	return nil
 }
 
-func (mdb *MockDB) DeleteMulti(ctx context.Context, keys []dalgo.RecordKey) error {
+func (mdb *MockDB) DeleteMulti(ctx context.Context, keys []*dalgo.Key) error {
 	for _, key := range keys {
 		if err := mdb.Delete(ctx, key); err != nil {
 			return nil
@@ -104,16 +104,11 @@ func (mdb *MockDB) insert(c context.Context, record dalgo.Record, options dalgo.
 		return errors.New("record.Key() returned nil")
 	}
 
-	switch len(key) {
-	case 0:
-		return errors.New("len(record.Key()) == 0")
-	case 1:
-		break
-	default:
+	if key.Parent() != nil {
 		return errors.New("composite keys are not supported by mock yet")
 	}
 
-	kind := key[0].Kind
+	kind := key.Kind()
 
 	entities, ok := mdb.RecordsByKind[kind]
 	if !ok {
@@ -124,7 +119,7 @@ func (mdb *MockDB) insert(c context.Context, record dalgo.Record, options dalgo.
 
 	for i := 0; i < attempts; i++ {
 		if err := generateID(c, record); err != nil {
-			return errors.Wrap(err, "failed to generate ID")
+			return errors.Wrap(err, "failed to generate Value")
 		}
 		key := newMockKey(key)
 		if _, ok = entities[key]; !ok {
@@ -136,7 +131,7 @@ func (mdb *MockDB) insert(c context.Context, record dalgo.Record, options dalgo.
 		}
 	}
 
-	return errors.Errorf("too many attempts to create a new %v record with unique ID", kind)
+	return errors.Errorf("too many attempts to create a new %v record with unique Value", kind)
 }
 
 func beforeSave(record dalgo.Record) error {
@@ -191,7 +186,7 @@ func (mdb *MockDB) Get(_ context.Context, record dalgo.Record) error {
 }
 
 // Update entity
-func (mdb *MockDB) Update(_ context.Context, key dalgo.RecordKey, _ []dalgo.Update, preconditions ...dalgo.Precondition) error {
+func (mdb *MockDB) Update(_ context.Context, key *dalgo.Key, _ []dalgo.Update, preconditions ...dalgo.Precondition) error {
 	kind := dalgo.GetRecordKind(key)
 	var records, ok = mdb.RecordsByKind[kind]
 	if !ok {

@@ -2,96 +2,13 @@ package dalgo
 
 import (
 	"context"
-	"fmt"
-	"github.com/pkg/errors"
-	"strings"
 )
 
-// TypeOfID represents type of ID: IsComplexID, IsStringID, IsIntID
+// TypeOfID represents type of Value: IsComplexID, IsStringID, IsIntID
 type TypeOfID int
 
 type Validatable interface {
 	Validate() error
-}
-
-// RecordRef hold a reference to a single record within a root or nested recordset.
-type RecordRef struct {
-	Kind string      `json:"kind"`
-	ID   interface{} `json:"id"` // Usually string or int
-}
-
-// RecordKey represents a full path to a given record (1 item in case of root recordset)
-type RecordKey = []RecordRef
-
-func validateRecordKey(key RecordKey) error {
-	for i, ref := range key {
-		const prefix = "db record key is invalid at record reference #%v: "
-		if strings.TrimSpace(ref.Kind) == "" {
-			return errors.New(fmt.Sprintf(prefix, i+1) + "kind is a required property")
-		}
-		if i < len(key)-1 && ref.ID == nil {
-			return errors.New(fmt.Sprintf(prefix, i+1) + "ID is a required property")
-		}
-	}
-	return nil
-}
-
-// NewRecordKey creates a new record key from a sequence of record's references
-func NewRecordKey(refs ...RecordRef) RecordKey {
-	return refs
-}
-
-// Record is an interface a struct should satisfy to comply with "strongo/db" library
-type Record interface {
-	Key() RecordKey
-	Data() interface{}
-	SetData(data interface{})
-	Validate() error
-}
-
-type record struct {
-	key  RecordKey
-	data interface{}
-}
-
-func (v record) Key() RecordKey {
-	return v.key
-}
-
-func (v record) Data() interface{} {
-	return v.data
-}
-
-func (v record) SetData(data interface{}) {
-	v.data = data
-}
-
-func (v record) Validate() error {
-	if err := validateRecordKey(v.key); err != nil {
-		return errors.Wrap(err, "invalid record key")
-	}
-	if data, ok := v.data.(Validatable); ok {
-		if err := data.Validate(); err != nil {
-			return errors.Wrap(err, "invalid record data")
-		}
-	}
-	return nil
-}
-
-func NewRecord(key RecordKey, data interface{}) Record {
-	return record{key: key, data: data}
-}
-
-type RecordWithIntID interface {
-	Record
-	GetID() int64
-	SetIntID(id int64)
-}
-
-type RecordWithStrID interface {
-	Record
-	GetID() string
-	SetStrID(id string)
 }
 
 // MultiUpdater is an interface that describe DB provider that can update multiple records at once (batch mode)
@@ -126,16 +43,16 @@ type Upserter interface {
 
 // Updater is an interface that describe DB provider that can update a single EXISTING record by a key
 type Updater interface {
-	Update(ctx context.Context, key RecordKey, updates []Update, preconditions ...Precondition) error
+	Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
 }
 
 // Deleter is an interface that describe DB provider that can delete a single record by key
 type Deleter interface {
-	Delete(ctx context.Context, key RecordKey) error
+	Delete(ctx context.Context, key *Key) error
 }
 
 type MultiDeleter interface {
-	DeleteMulti(ctx context.Context, keys []RecordKey) error
+	DeleteMulti(ctx context.Context, keys []*Key) error
 }
 
 // TransactionCoordinator provides methods to work with transactions
