@@ -94,16 +94,16 @@ func WithFields(fields []Field) KeyOption {
 }
 
 // NewKeyWithStrID create key with a single string ID
-func NewKeyWithStrID(kind string, id string) Key {
-	return Key{kind: kind, ID: id}
+func NewKeyWithStrID(kind string, id string) *Key {
+	return &Key{kind: kind, ID: id}
 }
 
 // NewKeyWithIntID create key with a single integer ID
-func NewKeyWithIntID(kind string, id int) Key {
-	return Key{kind: kind, ID: id}
+func NewKeyWithIntID(kind string, id int) *Key {
+	return &Key{kind: kind, ID: id}
 }
 
 // NewKeyWithFields creates a new record key from a sequence of record's references
-func NewKeyWithFields(kind string, fields ...Field) Key {
-	return Key{kind: kind, ID: fields}
+func NewKeyWithFields(kind string, fields ...Field) *Key {
+	return &Key{kind: kind, ID: fields}
 }
