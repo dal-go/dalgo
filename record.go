@@ -31,7 +31,7 @@ func (v record) SetData(data interface{}) {
 
 func (v record) Validate() error {
 	if err := v.key.Validate(); err != nil {
-		return fmt.Errorf("invalid record key: %w", err)
+		return fmt.Errorf("invalid record child: %w", err)
 	}
 	if data, ok := v.data.(Validatable); ok {
 		if err := data.Validate(); err != nil {

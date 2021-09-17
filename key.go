@@ -24,14 +24,21 @@ func (v Field) Validate() error {
 
 // Key represents a full path to a given record (no parent in case of root recordset)
 type Key struct {
-	level  int
 	parent *Key
 	kind   string
 	ID     interface{}
 }
 
+//func (v *Key) Child(key *Key) *Key {
+//	key.parent = v
+//	return key
+//}
+
 func (v Key) Level() int {
-	return v.level
+	if v.parent == nil {
+		return 0
+	}
+	return v.parent.Level() + 1
 }
 
 func (v Key) Parent() *Key {
@@ -43,16 +50,16 @@ func (v Key) Kind() string {
 }
 
 func (v Key) Validate() error {
+	if strings.TrimSpace(v.kind) == "" {
+		return errors.New("child must have 'kind'")
+	}
 	if v.parent != nil {
 		return v.parent.Validate()
-	}
-	if strings.TrimSpace(v.kind) == "" {
-		return errors.New("key must have 'kind'")
 	}
 	if fields, ok := v.ID.([]Field); ok {
 		for i, field := range fields {
 			if err := field.Validate(); err != nil {
-				return fmt.Errorf("key is referencing invalid field # %v: %w", i, err)
+				return fmt.Errorf("child is referencing invalid field # %v: %w", i, err)
 			}
 		}
 	}
@@ -70,14 +77,20 @@ func setKeyOptions(key *Key, options ...KeyOption) {
 	}
 }
 
+func NewKeyWithID(kind string, id interface{}, options ...KeyOption) (key *Key) {
+	key = &Key{kind: kind, ID: id}
+	setKeyOptions(key, options...)
+	return
+}
+
 func NewKey(kind string, options ...KeyOption) (key *Key) {
 	if len(options) == 0 {
-		panic("at least 1 key option should be specified")
+		panic("at least 1 child option should be specified")
 	}
 	key = &Key{
 		kind: kind,
 	}
-	setKeyOptions(key)
+	setKeyOptions(key, options...)
 	return
 }
 
@@ -93,17 +106,17 @@ func WithFields(fields []Field) KeyOption {
 	}
 }
 
-// NewKeyWithStrID create key with a single string ID
-func NewKeyWithStrID(kind string, id string) *Key {
-	return &Key{kind: kind, ID: id}
+// NewKeyWithStrID create child with a single string ID
+func NewKeyWithStrID(kind string, id string, options ...KeyOption) *Key {
+	return NewKeyWithID(kind, id, options...)
 }
 
-// NewKeyWithIntID create key with a single integer ID
-func NewKeyWithIntID(kind string, id int) *Key {
-	return &Key{kind: kind, ID: id}
+// NewKeyWithIntID create child with a single integer ID
+func NewKeyWithIntID(kind string, id int, options ...KeyOption) *Key {
+	return NewKeyWithID(kind, id, options...)
 }
 
-// NewKeyWithFields creates a new record key from a sequence of record's references
+// NewKeyWithFields creates a new record child from a sequence of record's references
 func NewKeyWithFields(kind string, fields ...Field) *Key {
 	return &Key{kind: kind, ID: fields}
 }

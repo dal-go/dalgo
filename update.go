@@ -35,11 +35,11 @@ type sentinel int
 
 const (
 	// DeleteField is used as a value in a call to Update or Set with merge to indicate
-	// that the corresponding key should be deleted.
+	// that the corresponding child should be deleted.
 	DeleteField sentinel = iota
 
 	// ServerTimestamp is used as a value in a call to Update to indicate that the
-	// key's value should be set to the time at which the server processed
+	// child's value should be set to the time at which the server processed
 	// the request.
 	//
 	// ServerTimestamp must be the value of a field directly; it cannot appear in

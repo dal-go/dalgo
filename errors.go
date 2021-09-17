@@ -58,9 +58,9 @@ func (e errNotFoundByKey) Cause() error {
 
 func (e errNotFoundByKey) Error() string {
 	if e.cause == nil {
-		return fmt.Sprintf("record not found by key=%v", GetRecordKeyPath(e.key))
+		return fmt.Sprintf("record not found by child=%v", GetRecordKeyPath(e.key))
 	}
-	return fmt.Sprintf("record not found by key=%v: %v", GetRecordKeyPath(e.key), e.cause)
+	return fmt.Sprintf("record not found by child=%v: %v", GetRecordKeyPath(e.key), e.cause)
 }
 
 // NewErrNotFoundByKey creates an error that indicates that entity was not found by Value

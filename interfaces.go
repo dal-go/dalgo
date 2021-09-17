@@ -26,27 +26,27 @@ type MultiSetter interface {
 	SetMulti(ctx context.Context, records []Record) error
 }
 
-// Getter is an interface that describe DB provider that can get a single record by key
+// Getter is an interface that describe DB provider that can get a single record by child
 type Getter interface {
 	Get(ctx context.Context, record Record) error
 }
 
-// Setter is an interface that describe DB provider that can set a single record by key
+// Setter is an interface that describe DB provider that can set a single record by child
 type Setter interface {
 	Set(ctx context.Context, record Record) error
 }
 
-// Upserter is an interface that describe DB provider that can upsert a single record by key
+// Upserter is an interface that describe DB provider that can upsert a single record by child
 type Upserter interface {
 	Upsert(ctx context.Context, record Record) error
 }
 
-// Updater is an interface that describe DB provider that can update a single EXISTING record by a key
+// Updater is an interface that describe DB provider that can update a single EXISTING record by a child
 type Updater interface {
 	Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
 }
 
-// Deleter is an interface that describe DB provider that can delete a single record by key
+// Deleter is an interface that describe DB provider that can delete a single record by child
 type Deleter interface {
 	Delete(ctx context.Context, key *Key) error
 }

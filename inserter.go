@@ -61,7 +61,7 @@ type RandomStringOption func(opts *randomStringOptions)
 func WithIDGenerator(g IDGenerator) KeyOption {
 	return func(key *Key) {
 		if key.ID != nil {
-			panic("an attempt to set ID generator for a key that already have an ID value")
+			panic("an attempt to set ID generator for a child that already have an ID value")
 		}
 		key.ID = g
 	}
@@ -77,6 +77,24 @@ func WithRandomStringID(length int, options ...RandomStringOption) KeyOption {
 			key.ID = random.ID(length)
 			return nil
 		})
+	}
+}
+
+func WithParent(kind string, id interface{}, options ...KeyOption) KeyOption {
+	return func(key *Key) {
+		key.parent = NewKeyWithID(kind, id, options...)
+	}
+}
+
+func WithParentKey(parent *Key) KeyOption {
+	return func(key *Key) {
+		key.parent = parent
+	}
+}
+
+func WithStringID(id string) KeyOption {
+	return func(key *Key) {
+		key.ID = id
 	}
 }
 
@@ -97,7 +115,7 @@ func InsertWithRandomID(
 		if err := exists(tmp.key); err == nil {
 			continue
 		} else if IsNotFound(err) {
-			return insert(r) // r shares key with tmp
+			return insert(r) // r shares child with tmp
 		} else {
 			return fmt.Errorf("failed to check if record exists: %w", err)
 		}
