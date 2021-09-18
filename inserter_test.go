@@ -77,7 +77,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			insertsCount++
 			return nil
 		}
-		err := InsertWithRandomID(nil, record{data: data}, generateID,
+		err := InsertWithRandomID(nil, &record{data: data}, generateID,
 			5,
 			exists, insert)
 		if err != nil {

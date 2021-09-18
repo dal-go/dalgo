@@ -10,11 +10,14 @@ type Record interface {
 	Data() interface{}
 	SetData(data interface{})
 	Validate() error
+	Error() error
+	SetError(err error)
 }
 
 type record struct {
 	key  *Key
 	data interface{}
+	err  error
 }
 
 func (v record) Key() *Key {
@@ -25,8 +28,16 @@ func (v record) Data() interface{} {
 	return v.data
 }
 
-func (v record) SetData(data interface{}) {
+func (v *record) SetData(data interface{}) {
 	v.data = data
+}
+
+func (v record) Error() error {
+	return v.err
+}
+
+func (v *record) SetError(err error) {
+	v.err = err
 }
 
 func (v record) Validate() error {
@@ -42,7 +53,16 @@ func (v record) Validate() error {
 }
 
 func NewRecord(key *Key, data interface{}) Record {
-	return record{key: key, data: data}
+	if key == nil {
+		panic("parameter 'key' is required for dalgo.NewRecord()")
+	}
+	if data == nil {
+		panic("parameter 'data' is required for dalgo.NewRecord()")
+	}
+	if err := key.Validate(); err != nil {
+		panic(fmt.Errorf("invalid key: %w", err))
+	}
+	return &record{key: key, data: data}
 }
 
 type RecordWithIntID interface {

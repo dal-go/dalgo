@@ -107,7 +107,7 @@ func InsertWithRandomID(
 	insert func(Record) error,
 ) error {
 	// We need a temp record to make sure we do not overwrite data during exists() check
-	tmp := record{key: r.Key(), data: nil}
+	tmp := &record{key: r.Key(), data: nil}
 	for i := 1; i <= attempts; i++ {
 		if err := generateID(c, tmp); err != nil {
 			return errors.Wrap(err, "failed to generate random Value")
