@@ -1,23 +1,45 @@
 package dalgo
 
 import (
+	"errors"
 	"fmt"
+	"time"
 )
+
+var doesNotExist = errors.New("does not exist")
+
+func DoesNotExist() error {
+	return doesNotExist
+}
 
 // Record is an interface a struct should satisfy to comply with "strongo/db" library
 type Record interface {
 	Key() *Key
 	Data() interface{}
-	SetData(data interface{})
 	Validate() error
 	Error() error
 	SetError(err error)
+	IsReceived() bool
+	Exists() bool
+	// SetData(data interface{})
 }
 
 type record struct {
-	key  *Key
-	data interface{}
-	err  error
+	key        *Key
+	data       interface{}
+	receivedAt time.Time
+	err        error
+}
+
+func (v record) IsReceived() bool {
+	return !v.receivedAt.IsZero()
+}
+
+func (v record) Exists() bool {
+	if v.receivedAt.IsZero() {
+		panic("tried to check exists before receiving the record data")
+	}
+	return v.err == nil
 }
 
 func (v record) Key() *Key {
@@ -28,9 +50,9 @@ func (v record) Data() interface{} {
 	return v.data
 }
 
-func (v *record) SetData(data interface{}) {
-	v.data = data
-}
+//func (v *record) SetData(data interface{}) {
+//	v.data = data
+//}
 
 func (v record) Error() error {
 	return v.err
@@ -38,6 +60,9 @@ func (v record) Error() error {
 
 func (v *record) SetError(err error) {
 	v.err = err
+	if err == nil {
+		v.receivedAt = time.Now()
+	}
 }
 
 func (v record) Validate() error {

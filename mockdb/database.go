@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/strongo/dalgo"
+	"reflect"
 )
 
 // MockKey is mock key
@@ -177,11 +178,17 @@ func (mdb *MockDB) Get(_ context.Context, record dalgo.Record) error {
 	if !ok {
 		return dalgo.NewErrNotFoundByKey(key, fmt.Errorf("kind %v has no records", kind))
 	}
-	var record2 dalgo.Record
-	if record2, ok = records[newMockKey(key)]; !ok {
+	if r, ok := records[newMockKey(key)]; !ok {
+		record.SetError(dalgo.DoesNotExist())
 		return dalgo.NewErrNotFoundByKey(key, nil)
+	} else {
+		rVal := reflect.ValueOf(r).Elem()
+		recordVal := reflect.ValueOf(record).Elem()
+		for i := 0; i < rVal.NumField(); i++ {
+			recordField := recordVal.Field(i)
+			recordField.Set(rVal.Field(i))
+		}
 	}
-	record.SetData(record2.Data())
 	return nil
 }
 
