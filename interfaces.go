@@ -13,7 +13,7 @@ type Validatable interface {
 
 // MultiUpdater is an interface that describe DB provider that can update multiple records at once (batch mode)
 type MultiUpdater interface {
-	UpdateMulti(c context.Context, records []Record, updates []Update, preconditions ...Precondition) error
+	UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
 }
 
 // MultiGetter is an interface that describe DB provider that can get multiple records at once (batch mode)
