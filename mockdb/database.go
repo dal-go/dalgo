@@ -150,9 +150,9 @@ type BeforeSaver interface {
 }
 
 // UpdateMulti updates multiple entities
-func (mdb *MockDB) UpdateMulti(c context.Context, records []dalgo.Record) error {
+func (mdb *MockDB) UpdateMulti(c context.Context, records []dalgo.Record, updates []dalgo.Update, preconditions ...dalgo.Precondition) error {
 	for _, r := range records {
-		if err := mdb.Update(c, r.Key(), nil); err != nil {
+		if err := mdb.Update(c, r.Key(), updates, preconditions...); err != nil {
 			return err
 		}
 	}
