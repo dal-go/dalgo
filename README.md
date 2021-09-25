@@ -27,7 +27,7 @@ Here is modules that bridge DALgo to specific API:
 
 - [`github.com/strongo/dalgo2buntdb`](https://github.com/strongo/dalgo2buntdb)
   for [BuntDB](https://github.com/tidwall/buntdb) - an embeddable, in-memory key/value database for Go with custom
-  indexing and geospatial support
+  indexing and geospatial support.
 
 ## DALgo interfaces
 
