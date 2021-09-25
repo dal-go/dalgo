@@ -19,7 +19,7 @@ Using this module allows you:
 
 DALgo defines abstract interfaces and helpers methods to work with databases in abstract manner.
 
-Here is modules that bridge DALgo to specific API:
+Here is modules that bridge DALgo to specific APIs:
 
 - [`github.com/strongo/dalgo2firestore`](https://github.com/strongo/dalgo2firestore)
   for [Firestore](https://pkg.go.dev/cloud.google.com/go/firestore) - a NoSQL document database that lets you easily
