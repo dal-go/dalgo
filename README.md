@@ -19,6 +19,7 @@ Using this module allows you:
 
 DALgo defines abstract interfaces and helpers methods to work with databases in abstract manner.
 
+
 Here is modules that bridge DALgo to specific API:
 
 - [`github.com/strongo/dalgo2firestore`](https://github.com/strongo/dalgo2firestore)
@@ -28,7 +29,10 @@ Here is modules that bridge DALgo to specific API:
 - [`github.com/strongo/dalgo2buntdb`](https://github.com/strongo/dalgo2buntdb)
   for [BuntDB](https://github.com/tidwall/buntdb) - an embeddable, in-memory key/value database for Go with custom
   indexing and geospatial support.
-  
+
+- [`github.com/strongo/dalgo2badger`](https://github.com/strongo/dalgo2badger)
+  for [BadgerDB](https://github.com/dgraph-io/badger) - is an embeddable, persistent and fast key-value (KV) database written in pure Go.
+
 ## Test coverage
 The CI process for this package and for officially supported bridges 
 runs unit tests and [end-to-end](https://github.com/strongo/dalgo-end2end-tests) integration tests.
