@@ -19,23 +19,24 @@ Using this module allows you:
 
 DALgo defines abstract interfaces and helpers methods to work with databases in abstract manner.
 
-
 Here is modules that bridge DALgo to specific API:
 
 - [`github.com/strongo/dalgo2firestore`](https://github.com/strongo/dalgo2firestore)
-  for [Firestore](https://pkg.go.dev/cloud.google.com/go/firestore) - a NoSQL document database that lets you
-  easily store, sync, and query data for your mobile and web apps - at global scale.
+  for [Firestore](https://pkg.go.dev/cloud.google.com/go/firestore) - a NoSQL document database that lets you easily
+  store, sync, and query data for your mobile and web apps - at global scale.
 
 - [`github.com/strongo/dalgo2buntdb`](https://github.com/strongo/dalgo2buntdb)
   for [BuntDB](https://github.com/tidwall/buntdb) - an embeddable, in-memory key/value database for Go with custom
   indexing and geospatial support.
 
 - [`github.com/strongo/dalgo2badger`](https://github.com/strongo/dalgo2badger)
-  for [BadgerDB](https://github.com/dgraph-io/badger) - is an embeddable, persistent and fast key-value (KV) database written in pure Go.
+  for [BadgerDB](https://github.com/dgraph-io/badger) - an embeddable, persistent and fast key-value (KV) database
+  written in pure Go.
 
 ## Test coverage
-The CI process for this package and for officially supported bridges 
-runs unit tests and [end-to-end](https://github.com/strongo/dalgo-end2end-tests) integration tests.
+
+The CI process for this package and for officially supported bridges runs unit tests
+and [end-to-end](https://github.com/strongo/dalgo-end2end-tests) integration tests.
 
 ## DALgo interfaces
 
@@ -79,8 +80,7 @@ where for example the  `Getter` & `MultiGetter` interfaces defined as:
 Note that getters are populating records in place using target instance obtained via `Record.GetData()`.
 
 Originally developed to support work with Google AppEngine Datastore and Firebase Firestore it takes into account its
-specifics. This works well with other key-value storages as well.
-Also `dalgo` supports SQL databases.
+specifics. This works well with other key-value storages as well. Also `dalgo` supports SQL databases.
 
 ## Used by
 
