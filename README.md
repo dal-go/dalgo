@@ -22,7 +22,7 @@ DALgo defines abstract interfaces and helpers methods to work with databases in 
 Here is modules that bridge DALgo to specific API:
 
 - [`github.com/strongo/dalgo2firestore`](https://github.com/strongo/dalgo2firestore)
-  for [Firestore API client](https://pkg.go.dev/cloud.google.com/go/firestore) - a NoSQL document database that lets you
+  for [Firestore](https://pkg.go.dev/cloud.google.com/go/firestore) - a NoSQL document database that lets you
   easily store, sync, and query data for your mobile and web apps - at global scale.
 
 - [`github.com/strongo/dalgo2buntdb`](https://github.com/strongo/dalgo2buntdb)
