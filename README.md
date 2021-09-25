@@ -21,19 +21,26 @@ DALgo defines abstract interfaces and helpers methods to work with databases in 
 
 Here is modules that bridge DALgo to specific API:
 
-- [`github.com/strongo/dalgo-firestore`](https://github.com/strongo/dalgo-firestore)
-  for [Firestore API client](https://pkg.go.dev/cloud.google.com/go/firestore)
-- [`github.com/strongo/dalgo-gae-datastore`](https://github.com/strongo/dalgo-gae-datastore)
-  for [Google Cloud Datastore](https://pkg.go.dev/cloud.google.com/go/datastore)
+- [`github.com/strongo/dalgo2firestore`](https://github.com/strongo/dalgo2firestore)
+  for [Firestore API client](https://pkg.go.dev/cloud.google.com/go/firestore) - a NoSQL document database that lets you
+  easily store, sync, and query data for your mobile and web apps - at global scale.
+
+- [`github.com/strongo/dalgo2buntdb`](https://github.com/strongo/dalgo2buntdb)
+  for [BuntDB](https://github.com/tidwall/buntdb) - an embeddable, in-memory key/value database for Go with custom
+  indexing and geospatial support
 
 ## DALgo interfaces
 
 The main abstraction is though `dalgo.Record` interface :
 
 	type Record interface {
-		Key() RecordKey             // Defines `table` name of the entity
-		Data() interface{}          // struct with fields to be stored to DB (without ID)
-		SetData(data Validatable)   // Resets/overwrites data
+      Key() *Key          // defines `table` name of the entity
+      Data() interface{}  // value to be stored/retrieved (without ID)
+      Validate() error    // validate record
+      Error() error       // holds error for the record
+      SetError(err error) // sets error relevant to specific record
+      IsReceived() bool   // indicates if an attempt to retrieve a record has been peformed
+      Exists() bool		// indicates if the record exists in DB
 	}
 
 All methods are working with the `Record` and use `context.Context`.
@@ -61,10 +68,11 @@ where for example the  `Getter` & `MultiGetter` interfaces defined as:
 		GetMulti(c context.Context, records []Record) error
 	}
 
-Note that getters are populating records in place passing `Record.GetData()`.
+Note that getters are populating records in place using target instance obtained via `Record.GetData()`.
 
 Originally developed to support work with Google AppEngine Datastore and Firebase Firestore it takes into account its
-specifics. This should work well for other key-value storages as well. But `dalgo` also supports SQL databases.
+specifics. This works well with other key-value storages as well.
+Also `dalgo` supports SQL databases.
 
 ## Used by
 

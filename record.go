@@ -14,14 +14,13 @@ func DoesNotExist() error {
 
 // Record is an interface a struct should satisfy to comply with "strongo/db" library
 type Record interface {
-	Key() *Key
-	Data() interface{}
-	Validate() error
-	Error() error
-	SetError(err error)
-	IsReceived() bool
-	Exists() bool
-	// SetData(data interface{})
+	Key() *Key          // defines `table` name of the entity
+	Data() interface{}  // value to be stored/retrieved (without ID)
+	Validate() error    // validate record
+	Error() error       // holds error for the record
+	SetError(err error) // sets error relevant to specific record
+	IsReceived() bool   // indicates if an attempt to retrieve a record has been peformed
+	Exists() bool       // indicates if the record exists in DB
 }
 
 type record struct {
