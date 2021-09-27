@@ -21,7 +21,7 @@ func GetRecordKind(key *Key) string {
 	return ReverseStringsJoin(s, "/")
 }
 
-func GetRecordKeyPath(key *Key) string {
+func getKeyPath(key Key) string {
 	if err := key.Validate(); err != nil {
 		panic(fmt.Sprintf("will not generate path for invalid child: %v", err))
 	}
@@ -32,7 +32,7 @@ func GetRecordKeyPath(key *Key) string {
 		if key.parent == nil {
 			break
 		} else {
-			key = key.parent
+			key = *key.parent
 		}
 	}
 	return ReverseStringsJoin(s, "/")

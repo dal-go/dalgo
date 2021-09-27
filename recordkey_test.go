@@ -43,8 +43,8 @@ func TestGetRecordKeyPath(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetRecordKeyPath(tt.args.key); got != tt.want {
-				t.Errorf("GetRecordKeyPath() = %v, want %v, child:%+v, parent: %+v", got, tt.want, tt.args.key, tt.args.key.parent)
+			if got := tt.args.key.String(); got != tt.want {
+				t.Errorf("getKeyPath() = %v, want %v, child:%+v, parent: %+v", got, tt.want, tt.args.key, tt.args.key.parent)
 			}
 		})
 	}

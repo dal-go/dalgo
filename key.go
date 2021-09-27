@@ -29,6 +29,10 @@ type Key struct {
 	ID     interface{}
 }
 
+func (v Key) String() string {
+	return getKeyPath(v)
+}
+
 //func (v *Key) Child(key *Key) *Key {
 //	key.parent = v
 //	return key
