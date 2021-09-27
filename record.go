@@ -35,10 +35,16 @@ func (v record) IsReceived() bool {
 }
 
 func (v record) Exists() bool {
+	if v.err != nil {
+		if IsNotFound(v.err) {
+			return false
+		}
+		panic("an attempt to check for existence a record with an error")
+	}
 	if v.receivedAt.IsZero() {
 		panic("tried to check exists before receiving the record data")
 	}
-	return v.err == nil
+	return true
 }
 
 func (v record) Key() *Key {
