@@ -24,7 +24,7 @@ func (err ErrDuplicateUser) Error() string {
 
 var (
 	// ErrRecordNotFound is returned when a DB record is not found
-	ErrRecordNotFound = errors.New("Record not found")
+	ErrRecordNotFound = errors.New("record not found")
 )
 
 // IsNotFound check if underlying error is ErrRecordNotFound
@@ -57,10 +57,11 @@ func (e errNotFoundByKey) Cause() error {
 }
 
 func (e errNotFoundByKey) Error() string {
+	s := fmt.Sprintf("record not found by key=%v", e.key)
 	if e.cause == nil {
-		return fmt.Sprintf("record not found by child=%v", e.key)
+		return s
 	}
-	return fmt.Sprintf("record not found by child=%v: %v", e.key, e.cause)
+	return s + fmt.Sprintf(": %T=%v", e.cause, e.cause)
 }
 
 // NewErrNotFoundByKey creates an error that indicates that entity was not found by Value
