@@ -40,7 +40,7 @@ func TestInserter(t *testing.T) {
 	var record Record
 
 	suppliedKey := NewKey("foo", WithRandomStringID(5))
-	record = NewRecord(suppliedKey, foo{title: ""})
+	record = NewRecord(suppliedKey)
 
 	defer func() {
 		_ = recover()
@@ -77,7 +77,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			insertsCount++
 			return nil
 		}
-		err := InsertWithRandomID(context.Background(), NewRecord(&Key{kind: "test_kind"}, data), generateID,
+		err := InsertWithRandomID(context.Background(), NewRecordWithData(&Key{kind: "test_kind"}, data), generateID,
 			5,
 			exists, insert)
 		if err != nil {

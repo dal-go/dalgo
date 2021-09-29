@@ -108,8 +108,7 @@ func InsertWithRandomID(
 ) error {
 	key := r.Key()
 	// We need a temp record to make sure we do not overwrite data during exists() check
-	data := struct{}{} // data is an empty struct as we don't need to populate it
-	tmp := &record{key: key, data: data}
+	tmp := &record{key: key}
 	for i := 1; i <= attempts; i++ {
 		if err := generateID(c, tmp); err != nil {
 			return errors.Wrap(err, "failed to generate random Value")

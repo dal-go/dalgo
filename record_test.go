@@ -19,11 +19,11 @@ func TestNewRecord(t *testing.T) {
 		{name: "nil", args: args{
 			key:  NewKeyWithStrID("Kind1", "k1"),
 			data: "test_data",
-		}, want: &record{key: NewKeyWithStrID("Kind1", "k1"), data: "test_data"}},
+		}, want: &record{key: NewKeyWithStrID("Kind1", "k1")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewRecord(tt.args.key, tt.args.data); !reflect.DeepEqual(got, tt.want) {
+			if got := NewRecord(tt.args.key); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewRecord() = %v, want %v", got, tt.want)
 			}
 		})
@@ -41,7 +41,6 @@ func Test_record_Data(t *testing.T) {
 		fields fields
 		want   interface{}
 	}{
-		{name: "nil", fields: fields{data: nil}, want: nil},
 		{name: "string", fields: fields{data: "test"}, want: "test"},
 	}
 	for _, tt := range tests {
@@ -176,39 +175,5 @@ func Test_record_SetError(t *testing.T) {
 				t.Errorf("expected %v, got: %v", err, actualErr)
 			}
 		})
-	}
-}
-
-func Test_record_Validate(t *testing.T) {
-	type fields struct {
-		key  *Key
-		data interface{}
-		err  error
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v := record{
-				key:  tt.fields.key,
-				data: tt.fields.data,
-				err:  tt.fields.err,
-			}
-			if err := v.Validate(); (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestDoesNotExist(t *testing.T) {
-	err := DoesNotExist()
-	if err != doesNotExist {
-		t.Errorf("expected to get %v, got: %v", doesNotExist, err)
 	}
 }
