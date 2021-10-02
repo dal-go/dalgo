@@ -49,7 +49,7 @@ func (v record) Exists() bool {
 		}
 		panic("an attempt to check for existence a record with an error")
 	}
-	if v.dataTo == nil {
+	if v.dataTo == nil && v.dataTo == nil {
 		panic("tried to check if record exists before receiving the record data")
 	}
 	return true
