@@ -70,7 +70,7 @@ func (v record) Data() interface{} {
 }
 
 // SetDataTo sets DataTo handler
-func (v record) SetDataTo(dataTo func(target interface{}) error) {
+func (v *record) SetDataTo(dataTo func(target interface{}) error) {
 	v.dataTo = dataTo
 }
 
