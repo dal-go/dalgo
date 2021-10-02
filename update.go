@@ -26,7 +26,7 @@ type Update struct {
 
 func (v Update) Validate() error {
 	if v.Field != "" && len(v.FieldPath) > 0 {
-		return fmt.Errorf("both Field and FieldPath are provided: %v, %+v", v.Field, v.FieldPath)
+		return fmt.Errorf("both FieldVal and FieldPath are provided: %v, %+v", v.Field, v.FieldPath)
 	}
 	return nil
 }

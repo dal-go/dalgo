@@ -7,6 +7,7 @@ import (
 // TypeOfID represents type of Value: IsComplexID, IsStringID, IsIntID
 type TypeOfID int
 
+// Validatable defines an object that can be validated
 type Validatable interface {
 	Validate() error
 }
@@ -64,6 +65,18 @@ type TransactionCoordinator interface {
 	) error
 }
 
+type RecordConstructor = func() Record
+
+// Reader reads records one by one
+type Reader interface {
+	Next() (Record, error)
+}
+
+// Selector queries records by condition
+type Selector interface {
+	Select(ctx context.Context, query Query) (Reader, error)
+}
+
 // Session defines interface
 type Session interface {
 	Inserter
@@ -76,8 +89,10 @@ type Session interface {
 	MultiSetter
 	MultiUpdater
 	MultiDeleter
+	Selector
 }
 
+// Transaction defines an interface for a transaction
 type Transaction interface {
 	Session
 }

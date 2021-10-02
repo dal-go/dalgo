@@ -26,7 +26,7 @@ func TestField_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := Field{
+			v := FieldVal{
 				Name:  tt.fields.Name,
 				Value: tt.fields.Value,
 			}

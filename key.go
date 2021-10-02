@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-// Field hold a reference to a single record within a root or nested recordset.
-type Field struct {
+// FieldVal hold a reference to a single record within a root or nested recordset.
+type FieldVal struct {
 	Name  string      `json:"name"`
 	Value interface{} `json:"value"`
 }
 
-func (v Field) Validate() error {
+func (v FieldVal) Validate() error {
 	if strings.TrimSpace(v.Name) == "" {
 		return errors.New("name is a required property")
 	}
@@ -60,7 +60,7 @@ func (v Key) Validate() error {
 	if v.parent != nil {
 		return v.parent.Validate()
 	}
-	if fields, ok := v.ID.([]Field); ok {
+	if fields, ok := v.ID.([]FieldVal); ok {
 		for i, field := range fields {
 			if err := field.Validate(); err != nil {
 				return fmt.Errorf("child is referencing invalid field # %v: %w", i, err)
@@ -104,7 +104,7 @@ func WithID(id interface{}) KeyOption {
 	}
 }
 
-func WithFields(fields []Field) KeyOption {
+func WithFields(fields []FieldVal) KeyOption {
 	return func(key *Key) {
 		key.ID = fields
 	}
@@ -121,6 +121,6 @@ func NewKeyWithIntID(kind string, id int, options ...KeyOption) *Key {
 }
 
 // NewKeyWithFields creates a new record child from a sequence of record's references
-func NewKeyWithFields(kind string, fields ...Field) *Key {
+func NewKeyWithFields(kind string, fields ...FieldVal) *Key {
 	return &Key{kind: kind, ID: fields}
 }
