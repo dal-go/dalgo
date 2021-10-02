@@ -66,10 +66,7 @@ func (v record) Data() interface{} {
 			panic("an attempt to retrieve data from a record with an error")
 		}
 	}
-	if v.data != nil {
-		return v.data
-	}
-	panic("an attempt to retrieve data before record got retrieved")
+	return v.data
 }
 
 // SetDataTo sets DataTo handler
