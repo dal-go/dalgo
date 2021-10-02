@@ -2,6 +2,7 @@ package dalgo
 
 import (
 	"context"
+	"errors"
 )
 
 // TypeOfID represents type of Value: IsComplexID, IsStringID, IsIntID
@@ -66,6 +67,8 @@ type TransactionCoordinator interface {
 }
 
 type RecordConstructor = func() Record
+
+var ErrNoMoreRecords = errors.New("no more errors")
 
 // Reader reads records one by one
 type Reader interface {
