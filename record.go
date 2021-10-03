@@ -95,7 +95,7 @@ func (v record) Data() interface{} {
 
 // Error returns error associated with a record
 func (v record) Error() error {
-	if IsNotFound(v.err) {
+	if v.err == noError || IsNotFound(v.err) {
 		return nil
 	}
 	return v.err
