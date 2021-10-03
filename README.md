@@ -79,13 +79,6 @@ Note that getters are populating records in place using target instance obtained
 Originally developed to support work with Google AppEngine Datastore and Firebase Firestore it takes into account its
 specifics. This works well with other key-value storages as well. Also `dalgo` supports SQL databases.
 
-## Used by
-
-Next applications are using `dalgo` in production:
-
-* https://sneat.app/
-* https://debtstracker.io/ - an app and [Telegram bot](https://t.me/DebtsTrackerBot) to track your personal debts
-
 ## Frameworks that utilise DALgo
 
 * <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a>
