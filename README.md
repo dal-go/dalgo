@@ -2,8 +2,13 @@
 
 **Import**: [`github.com/strongo/dalgo`](https://github.com/strongo/dalgo)
 
+## Status
+
+[![Vet, Test, Build](https://github.com/strongo/dalgo/actions/workflows/ci.yml/badge.svg)](https://github.com/strongo/dalgo/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/strongo/dalgo)](https://goreportcard.com/report/github.com/strongo/dalgo)
 [![GoDoc](https://godoc.org/github.com/strongo/dalgo?status.svg)](https://godoc.org/github.com/strongo/dalgo)
+
+### Summary
 
 Using this module allows you:
 
@@ -55,9 +60,9 @@ The main abstraction is though `dalgo.Record` interface :
 
 All methods are working with the `Record` and use `context.Context`.
 
-The [`Database`](./interfaces.go) interface defines an interface to a storage that should be implemented by a specific driver. This repo
-contains implementation for Google AppEngine Datastore. Contributions for other engines are welcome. If the db driver
-does not support some operations it must return `dalgo.ErrNotSupported`.
+The [`Database`](./interfaces.go) interface defines an interface to a storage that should be implemented by a specific
+driver. This repo contains implementation for Google AppEngine Datastore. Contributions for other engines are welcome.
+If the db driver does not support some operations it must return `dalgo.ErrNotSupported`.
 
 	type Database interface {
 		TransactionCoordinator
@@ -82,4 +87,5 @@ specifics. This works well with other key-value storages as well. Also `dalgo` s
 ## Frameworks that utilise DALgo
 
 * <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a>
+
 - framework to build chat-bots in Go language.
