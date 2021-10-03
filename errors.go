@@ -75,3 +75,27 @@ func errNotFoundCause(cause error) error {
 	}
 	return errors.WithMessage(ErrRecordNotFound, cause.Error())
 }
+
+type errRollbackFailed struct {
+	originalError error
+	rollbackError error
+}
+
+func (v errRollbackFailed) Error() string {
+	if v.originalError == nil {
+		return fmt.Sprintf("rollback failed: %v", v.rollbackError)
+	}
+	return fmt.Sprintf("rollback failed: %v: original error: %v", v.rollbackError, v.originalError)
+}
+
+func (v errRollbackFailed) OriginalError() error {
+	return v.originalError
+}
+
+func (v errRollbackFailed) RollbackError() error {
+	return v.rollbackError
+}
+
+func NewRollbackError(rollbackError, originalError error) error {
+	return errRollbackFailed{originalError: originalError, rollbackError: rollbackError}
+}
