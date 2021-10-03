@@ -26,19 +26,19 @@ type Record interface {
 	// or DataTo() to be called first, otherwise panics.
 	Data() interface{}
 
-	// SetDataTo sets DataTo handler
-	SetDataTo(dataTo func(target interface{}) error)
+	//// SetDataTo sets DataTo handler
+	//SetDataTo(dataTo func(target interface{}) error)
 
-	// DataTo deserializes record data into a struct. Throws panic if called before `Get`.
-	// Uses a handler set by SetDataTo.
-	DataTo(target interface{}) error
+	//// DataTo deserializes record data into a struct. Throws panic if called before `Get`.
+	//// Uses a handler set by SetDataTo.
+	//DataTo(target interface{}) error
 }
 
 type record struct {
-	key    *Key
-	err    error
-	data   interface{}
-	dataTo func(target interface{}) error
+	key  *Key
+	err  error
+	data interface{}
+	//dataTo func(target interface{}) error
 }
 
 // Exists returns if records exists. Panics if there was no a `get` operation on a record before.
@@ -47,12 +47,12 @@ func (v record) Exists() bool {
 		if IsNotFound(v.err) {
 			return false
 		}
+		if v.err == noError {
+			return true
+		}
 		panic("an attempt to check for existence a record with an error")
 	}
-	if v.data == nil && v.dataTo == nil {
-		panic("tried to check if record exists before receiving the record data")
-	}
-	return true
+	panic("tried to check if record exists before receiving the record data")
 }
 
 // Key returns key of a record
@@ -62,32 +62,35 @@ func (v record) Key() *Key {
 
 func (v record) Data() interface{} {
 	if v.err != nil {
+		if v.err == noError {
+			return v.data
+		}
 		if !IsNotFound(v.err) {
 			panic("an attempt to retrieve data from a record with an error")
 		}
 	}
-	return v.data
+	panic("an attempt to access record data before it was retrieved from database and SetError(error) called")
 }
 
-// SetDataTo sets DataTo handler
-func (v *record) SetDataTo(dataTo func(target interface{}) error) {
-	v.dataTo = dataTo
-}
-
-// DataTo marshals record data into target
-func (v record) DataTo(target interface{}) error {
-	if target == nil {
-		panic("not possible to marshall data into a nil value")
-	}
-	if v.dataTo == nil {
-		panic(fmt.Sprintf("method DataTo(%T) is called before data retrieval", target))
-	}
-	if err := v.dataTo(target); err != nil {
-		return fmt.Errorf("failed to marshal record data into %T: %w", target, err)
-	}
-	v.data = target
-	return nil
-}
+//// SetDataTo sets DataTo handler
+//func (v *record) SetDataTo(dataTo func(target interface{}) error) {
+//	v.dataTo = dataTo
+//}
+//
+//// DataTo marshals record data into target
+//func (v record) DataTo(target interface{}) error {
+//	if target == nil {
+//		panic("not possible to marshall data into a nil value")
+//	}
+//	if v.dataTo == nil {
+//		panic(fmt.Sprintf("method DataTo(%T) is called before data retrieval", target))
+//	}
+//	if err := v.dataTo(target); err != nil {
+//		return fmt.Errorf("failed to marshal record data into %T: %w", target, err)
+//	}
+//	v.data = target
+//	return nil
+//}
 
 // Error returns error associated with a record
 func (v record) Error() error {
@@ -99,7 +102,11 @@ func (v record) Error() error {
 
 // SetError sets error associated with a record
 func (v *record) SetError(err error) {
-	v.err = err
+	if err == nil {
+		v.err = noError
+	} else {
+		v.err = err
+	}
 }
 
 // NewRecord creates a new record

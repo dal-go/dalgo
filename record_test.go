@@ -50,6 +50,7 @@ func Test_record_Data(t *testing.T) {
 				data: tt.fields.data,
 				err:  tt.fields.err,
 			}
+			v.SetError(nil)
 			if got := v.Data(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Data() = %v, want %v", got, tt.want)
 			}

@@ -17,6 +17,8 @@ type ErrDuplicateUser struct {
 	DuplicateUserIDs []int64
 }
 
+var noError = errors.New("no error")
+
 // Error implements error interface
 func (err ErrDuplicateUser) Error() string {
 	return fmt.Sprintf("Multiple users by given search criteria[%v]: %v", err.SearchCriteria, err.DuplicateUserIDs)
