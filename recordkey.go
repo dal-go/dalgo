@@ -1,7 +1,6 @@
 package dalgo
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -16,23 +15,6 @@ func GetRecordKind(key *Key) string {
 			break
 		} else {
 			key = key.parent
-		}
-	}
-	return ReverseStringsJoin(s, "/")
-}
-
-func getKeyPath(key Key) string {
-	if err := key.Validate(); err != nil {
-		panic(fmt.Sprintf("will not generate path for invalid child: %v", err))
-	}
-	s := make([]string, 0, (key.Level())*2)
-	for {
-		s = append(s, fmt.Sprintf("%v", key.ID))
-		s = append(s, key.kind)
-		if key.parent == nil {
-			break
-		} else {
-			key = *key.parent
 		}
 	}
 	return ReverseStringsJoin(s, "/")

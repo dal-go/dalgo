@@ -30,7 +30,21 @@ type Key struct {
 }
 
 func (v Key) String() string {
-	return getKeyPath(v)
+	key := v
+	if err := key.Validate(); err != nil {
+		panic(fmt.Sprintf("will not generate path for invalid child: %v", err))
+	}
+	s := make([]string, 0, (key.Level())*2)
+	for {
+		s = append(s, fmt.Sprintf("%v", key.ID))
+		s = append(s, key.kind)
+		if key.parent == nil {
+			break
+		} else {
+			key = *key.parent
+		}
+	}
+	return ReverseStringsJoin(s, "/")
 }
 
 //func (v *Key) Child(key *Key) *Key {
