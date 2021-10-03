@@ -21,15 +21,18 @@ DALgo defines abstract interfaces and helpers methods to work with databases in 
 
 Here is modules that bridge DALgo to specific APIs:
 
-- [`github.com/strongo/dalgo2firestore`](https://github.com/strongo/dalgo2firestore)
+- [**github.com/strongo/dalgo2sql**](https://github.com/strongo/dalgo2sql)
+  for [database/sql](https://pkg.go.dev/database/sql) - a generic interface around SQL (or SQL-like) databases.
+
+- [**github.com/strongo/dalgo2firestore**](https://github.com/strongo/dalgo2firestore)
   for [Firestore](https://pkg.go.dev/cloud.google.com/go/firestore) - a NoSQL document database that lets you easily
   store, sync, and query data for your mobile and web apps - at global scale.
 
-- [`github.com/strongo/dalgo2buntdb`](https://github.com/strongo/dalgo2buntdb)
+- [**github.com/strongo/dalgo2buntdb**](https://github.com/strongo/dalgo2buntdb)
   for [BuntDB](https://github.com/tidwall/buntdb) - an embeddable, in-memory key/value database for Go with custom
   indexing and geospatial support.
 
-- [`github.com/strongo/dalgo2badger`](https://github.com/strongo/dalgo2badger)
+- [**github.com/strongo/dalgo2badger**](https://github.com/strongo/dalgo2badger)
   for [BadgerDB](https://github.com/dgraph-io/badger) - an embeddable, persistent and fast key-value (KV) database
   written in pure Go.
 
@@ -45,26 +48,20 @@ The main abstraction is though `dalgo.Record` interface :
 	type Record interface {
       Key() *Key          // defines `table` name of the entity
       Data() interface{}  // value to be stored/retrieved (without ID)
-      Validate() error    // validate record
       Error() error       // holds error for the record
       SetError(err error) // sets error relevant to specific record
-      IsReceived() bool   // indicates if an attempt to retrieve a record has been peformed
       Exists() bool		// indicates if the record exists in DB
 	}
 
 All methods are working with the `Record` and use `context.Context`.
 
-The `Database` interface defines an interface to a storage that should be implemented by a specific driver. This repo
+The [`Database`](./interfaces.go) interface defines an interface to a storage that should be implemented by a specific driver. This repo
 contains implementation for Google AppEngine Datastore. Contributions for other engines are welcome. If the db driver
-does not support some of the operations it must return `ErrNotSupported`.
+does not support some operations it must return `dalgo.ErrNotSupported`.
 
 	type Database interface {
 		TransactionCoordinator
-		Inserter
-		Getter
-		Updater
-		MultiGetter
-		MultiUpdater
+		Session
 	}
 
 where for example the  `Getter` & `MultiGetter` interfaces defined as:
