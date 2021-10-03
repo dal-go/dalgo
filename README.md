@@ -1,4 +1,4 @@
-# DALgo - Database Abstraction Layer (DAL) in Go language
+# DALgo - Database Abstraction Layer (DAL) in Go
 
 **Import**: [`github.com/strongo/dalgo`](https://github.com/strongo/dalgo)
 
