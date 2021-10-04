@@ -7,6 +7,8 @@
 [![Vet, Test, Build](https://github.com/strongo/dalgo/actions/workflows/ci.yml/badge.svg)](https://github.com/strongo/dalgo/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/strongo/dalgo)](https://goreportcard.com/report/github.com/strongo/dalgo)
 [![GoDoc](https://godoc.org/github.com/strongo/dalgo?status.svg)](https://godoc.org/github.com/strongo/dalgo)
+[![Sourcegraph](https://sourcegraph.com/github.com/strongo/dalgo/-/badge.svg)](https://sourcegraph.com/github.com/strongo/dalgo?badge)
+[![Coverage Status](https://coveralls.io/repos/github/strongo/dalgo/badge.svg?branch=main)](https://coveralls.io/github/strongo/dalgo?branch=main)
 
 ### Summary
 
@@ -38,7 +40,7 @@ Here is modules that bridge DALgo to specific APIs:
   indexing and geospatial support.
 
 - ### [**dalgo2badger**](https://github.com/strongo/dalgo2badger)
-  for [BadgerDB](https://github.com/dgraph-io/badger) - an embeddable, persistent and fast key-value (KV) database
+  for [BadgerDB](https://github.com/strongo/dalgo) - an embeddable, persistent and fast key-value (KV) database
   written in pure Go.
 
 ## Test coverage
