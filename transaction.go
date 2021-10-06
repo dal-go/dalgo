@@ -7,15 +7,14 @@ var (
 	nonTransactionalContextKey = "nonTransactionalContextKey"
 )
 
-
 // NewContextWithTransaction stores transaction and original context into a transactional context
-func NewContextWithTransaction(ctx context.Context, tx interface{}) context.Context {
-	ctx = context.WithValue(ctx, &nonTransactionalContextKey, ctx)
-	return context.WithValue(ctx, &transactionContextKey, tx)
+func NewContextWithTransaction(nonTransactionalContext context.Context, tx Transaction) context.Context {
+	nonTransactionalContext = context.WithValue(nonTransactionalContext, &nonTransactionalContextKey, nonTransactionalContext)
+	return context.WithValue(nonTransactionalContext, &transactionContextKey, tx)
 }
 
 // GetTransaction returns original transaction object
-func GetTransaction(ctx context.Context) interface{} {
+func GetTransaction(ctx context.Context) Transaction {
 	return ctx.Value(&transactionContextKey)
 }
 
@@ -25,57 +24,63 @@ func GetNonTransactionalContext(ctx context.Context) context.Context {
 	return ctx.Value(&nonTransactionalContextKey).(context.Context)
 }
 
+// TransactionOptions holds transaction settings
 type TransactionOptions interface {
+	// IsReadonly indicates if a readonly transaction required
 	IsReadonly() bool
+
+	// IsCrossGroup indicates if a cross-group transaction required
 	IsCrossGroup() bool
-	Password() string
+
+	// Password() string - TODO: document why it was added
 }
 
-type TransactionOption func(options *transactionOptions)
+type txOption func(options *txOptions)
 
-type transactionOptions struct {
+type txOptions struct {
 	isReadonly   bool
 	isCrossGroup bool
 	password     string
 }
 
-var _ TransactionOptions = (*transactionOptions)(nil)
+var _ TransactionOptions = (*txOptions)(nil)
 
-func (v transactionOptions) IsReadonly() bool {
+func (v txOptions) IsReadonly() bool {
 	return v.isReadonly
 }
 
-func (v transactionOptions) IsCrossGroup() bool {
+func (v txOptions) IsCrossGroup() bool {
 	return v.isCrossGroup
 }
 
 // Password // TODO: why we need it?
-func (v transactionOptions) Password() string {
+func (v txOptions) Password() string {
 	return v.password
 }
 
-func NewTransactionOptions(opts ...TransactionOption) TransactionOptions {
-	options := transactionOptions{}
+// NewTransactionOptions creates instance of TransactionOptions
+func NewTransactionOptions(opts ...txOption) TransactionOptions {
+	options := txOptions{}
 	for _, opt := range opts {
 		opt(&options)
 	}
 	return options
 }
 
-func WithReadonly() TransactionOption {
-	return func(options *transactionOptions) {
+func WithReadonly() txOption {
+	return func(options *txOptions) {
 		options.isReadonly = true
 	}
 }
 
-func WithCrossGroup() TransactionOption {
-	return func(options *transactionOptions) {
+func WithCrossGroup() txOption {
+	return func(options *txOptions) {
 		options.isCrossGroup = true
 	}
 }
 
-func WithPassword(password string) TransactionOption {
-	return func(options *transactionOptions) {
-		options.password = password
-	}
-}
+//func WithPassword(password string) txOption {
+//	return func(options *txOptions) {
+//		options.password = password
+//	}
+//}
