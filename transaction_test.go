@@ -50,7 +50,7 @@ func TestNewTransactionOptions(t *testing.T) {
 			t.Errorf("expected to be not readonly")
 		}
 		//if password := options.Password(); password != "" {
-		//	t.Errorf("expected not to have a password, got: %v", password)
+		//	t.Error("expected not to have a password, got: "+password)
 		//}
 	})
 	t.Run("readonly", func(t *testing.T) {
