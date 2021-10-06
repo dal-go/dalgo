@@ -23,7 +23,8 @@ func (v insertOptions) IDGenerator() IDGenerator {
 
 var _ InsertOptions = (*insertOptions)(nil)
 
-func NewInsertOptions(opts ...InsertOption) InsertOptions {
+// NewInsertOptions creates insert options
+func NewInsertOptions(opts ...insertOption) InsertOptions {
 	var options insertOptions
 	for _, o := range opts {
 		o(&options)
@@ -31,28 +32,32 @@ func NewInsertOptions(opts ...InsertOption) InsertOptions {
 	return options
 }
 
-type InsertOption func(options *insertOptions)
+type insertOption func(options *insertOptions)
 
 type randomStringOptions struct {
 	prefix string
 }
 
+// RandomStringOptions defines settings for random string
 type RandomStringOptions interface {
 	Prefix() string
 }
 
+// WithPrefix sets prefix for a random string
 func WithPrefix(prefix string) func(options *randomStringOptions) {
 	return func(options *randomStringOptions) {
 		options.prefix = prefix
 	}
 }
 
+// Prefix returns a predefined prefix for a random string
 func (v randomStringOptions) Prefix() string {
 	return v.prefix
 }
 
-type RandomStringOption func(opts *randomStringOptions)
+type randomStringOption func(opts *randomStringOptions)
 
+// WithIDGenerator sets ID generator for a random string (usually random)
 func WithIDGenerator(g IDGenerator) KeyOption {
 	return func(key *Key) {
 		if key.ID != nil {
@@ -62,7 +67,8 @@ func WithIDGenerator(g IDGenerator) KeyOption {
 	}
 }
 
-func WithRandomStringID(length int, options ...RandomStringOption) KeyOption {
+// WithRandomStringID sets ID generator to random string
+func WithRandomStringID(length int, options ...randomStringOption) KeyOption {
 	var rso randomStringOptions
 	for _, setOption := range options {
 		setOption(&rso)
@@ -75,24 +81,28 @@ func WithRandomStringID(length int, options ...RandomStringOption) KeyOption {
 	}
 }
 
+// WithParent sets parent
 func WithParent(kind string, id interface{}, options ...KeyOption) KeyOption {
 	return func(key *Key) {
 		key.parent = NewKeyWithID(kind, id, options...)
 	}
 }
 
+// WithParentKey sets parent key
 func WithParentKey(parent *Key) KeyOption {
 	return func(key *Key) {
 		key.parent = parent
 	}
 }
 
+// WithStringID sets ID as a predefined string
 func WithStringID(id string) KeyOption {
 	return func(key *Key) {
 		key.ID = id
 	}
 }
 
+// InsertWithRandomID inserts a record with a random ID
 func InsertWithRandomID(
 	c context.Context,
 	r Record,

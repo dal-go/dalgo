@@ -65,7 +65,7 @@ type ReadwriteSession interface {
 type writeOnlySession interface {
 
 	// Insert inserts a single record in database
-	Insert(c context.Context, record Record, opts ...InsertOption) error
+	Insert(c context.Context, record Record, opts ...insertOption) error
 
 	// Set sets a single record in database by key
 	Set(ctx context.Context, record Record) error
