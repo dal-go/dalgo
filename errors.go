@@ -10,6 +10,9 @@ import (
 //goland:noinspection GoUnusedGlobalVariable
 var ErrNotSupported = errors.New("not supported")
 
+// ErrNoMoreRecords indicates there is no more records
+var ErrNoMoreRecords = errors.New("no more errors")
+
 // ErrDuplicateUser indicates there is a duplicate user // TODO: move to strongo/app?
 type ErrDuplicateUser struct {
 	// TODO: Should it be moved out of this package to strongo/app/user?

@@ -27,6 +27,9 @@ type CollectionRef struct {
 	NewRecord RecordConstructor
 }
 
+// RecordConstructor creates a new instance of a Record
+type RecordConstructor = func() Record
+
 // Query holds definition of a query
 type Query struct {
 	Collection    CollectionRef
