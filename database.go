@@ -86,11 +86,6 @@ type writeOnlySession interface {
 	DeleteMulti(ctx context.Context, keys []*Key) error
 }
 
-// Validatable defines an object that can be validated
-type Validatable interface {
-	Validate() error
-}
-
 // Reader reads records one by one
 type Reader interface {
 	// Next returns next record for a query.

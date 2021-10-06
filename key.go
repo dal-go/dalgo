@@ -81,7 +81,7 @@ func (v Key) Validate() error {
 			}
 		}
 	}
-	if id, ok := v.ID.(Validatable); ok {
+	if id, ok := v.ID.(interface{ Validate() error }); ok {
 		return id.Validate()
 	}
 	return nil
