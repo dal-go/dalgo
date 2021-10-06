@@ -53,7 +53,7 @@ type ReadonlySession interface {
 	GetMulti(ctx context.Context, records []Record) error
 
 	// Select executes a data retrieval query
-	Select(ctx context.Context, query Query) (Reader, error)
+	Select(ctx context.Context, query Select) (Reader, error)
 }
 
 // ReadwriteSession defines methods that can modify database

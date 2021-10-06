@@ -14,8 +14,8 @@ type CollectionRef struct {
 	Parent *Key
 }
 
-// Query holds definition of a query
-type Query struct {
+// Select holds definition of a query
+type Select struct {
 
 	// Limit specifies maximum number of records to be returned
 	Limit int
@@ -29,13 +29,13 @@ type Query struct {
 	// GroupBy defines expressions to group by
 	GroupBy []query.Expression
 
-	// Select defines what columns to return
-	Select []query.Column
+	// Columns defines what columns to return
+	Columns []query.Column
 }
 
 // And creates a new query by adding a condition to a predefined query
-func (q Query) groupWithConditions(operator string, conditions ...query.Condition) Query {
-	qry := Query{From: q.From}
+func (q Select) groupWithConditions(operator string, conditions ...query.Condition) Select {
+	qry := Select{From: q.From}
 	and := groupCondition{operator: operator, Conditions: make([]query.Condition, len(conditions)+1)}
 	and.Conditions[0] = q.Where
 	for i, condition := range conditions {
@@ -46,12 +46,12 @@ func (q Query) groupWithConditions(operator string, conditions ...query.Conditio
 }
 
 // And creates an inherited query by adding AND conditions
-func (q Query) And(conditions ...query.Condition) Query {
+func (q Select) And(conditions ...query.Condition) Select {
 	return q.groupWithConditions(query.AndOperator, conditions...)
 }
 
 // Or creates an inherited query by adding OR conditions
-func (q Query) Or(conditions ...query.Condition) Query {
+func (q Select) Or(conditions ...query.Condition) Select {
 	return q.groupWithConditions(query.OrOperator, conditions...)
 }
 
