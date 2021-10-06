@@ -7,6 +7,41 @@ var (
 	nonTransactionalContextKey = "nonTransactionalContextKey"
 )
 
+// TxIsolationLevel defines an isolation level for a transaction
+type TxIsolationLevel int
+
+const (
+	// TxUnspecified indicates transaction level is not specified
+	TxUnspecified TxIsolationLevel = iota
+
+	// TxChaos - The pending changes from more highly isolated transactions cannot be overwritten.
+	TxChaos
+
+	// TxReadCommitted - Shared locks are held while the data is being read to avoid dirty reads,
+	// but the data can be changed before the end of the transaction,
+	// resulting in non-repeatable reads or phantom data.
+	TxReadCommitted
+
+	// TxReadUncommitted - A dirty read is possible, meaning that no shared locks are issued
+	// and no exclusive locks are honored.
+	TxReadUncommitted
+
+	// TxRepeatableRead - Locks are placed on all data that is used in a query,
+	// preventing other users from updating the data.
+	// Prevents non-repeatable reads but phantom rows are still possible.
+	TxRepeatableRead
+
+	// TxSerializable - A range lock is placed on the DataSet, preventing other users
+	// from updating or inserting rows into the dataset until the transaction is complete.
+	TxSerializable
+
+	// TxSnapshot - Reduces blocking by storing a version of data that one application can read
+	// while another is modifying the same data.
+	// Indicates that from one transaction you cannot see changes made in other transactions,
+	// even if you requery.
+	TxSnapshot
+)
+
 // NewContextWithTransaction stores transaction and original context into a transactional context
 func NewContextWithTransaction(nonTransactionalContext context.Context, tx Transaction) context.Context {
 	nonTransactionalContext = context.WithValue(nonTransactionalContext, &nonTransactionalContextKey, nonTransactionalContext)
@@ -15,7 +50,7 @@ func NewContextWithTransaction(nonTransactionalContext context.Context, tx Trans
 
 // GetTransaction returns original transaction object
 func GetTransaction(ctx context.Context) Transaction {
-	return ctx.Value(&transactionContextKey)
+	return ctx.Value(&transactionContextKey).(Transaction)
 }
 
 // GetNonTransactionalContext returns non transaction context (e.g. parent of transactional context)
@@ -26,6 +61,10 @@ func GetNonTransactionalContext(ctx context.Context) context.Context {
 
 // TransactionOptions holds transaction settings
 type TransactionOptions interface {
+
+	// IsolationLevel indicates requested isolation level
+	IsolationLevel() TxIsolationLevel
+
 	// IsReadonly indicates if a readonly transaction required
 	IsReadonly() bool
 
@@ -38,17 +77,25 @@ type TransactionOptions interface {
 type txOption func(options *txOptions)
 
 type txOptions struct {
-	isReadonly   bool
-	isCrossGroup bool
-	password     string
+	isolationLevel TxIsolationLevel
+	isReadonly     bool
+	isCrossGroup   bool
+	password       string
 }
 
 var _ TransactionOptions = (*txOptions)(nil)
 
+// IsReadonly indicates a readonly transaction was requested
 func (v txOptions) IsReadonly() bool {
 	return v.isReadonly
 }
 
+// IsolationLevel indicates what isolation level was requested for a transaction
+func (v txOptions) IsolationLevel() TxIsolationLevel {
+	return v.isolationLevel
+}
+
+// IsCrossGroup indicates a cross-group transaction was requested
 func (v txOptions) IsCrossGroup() bool {
 	return v.isCrossGroup
 }
@@ -67,12 +114,21 @@ func NewTransactionOptions(opts ...txOption) TransactionOptions {
 	return options
 }
 
+// WithIsolationLevel requests transaction with required isolation level
+func WithIsolationLevel(v TxIsolationLevel) txOption {
+	return func(options *txOptions) {
+		options.isolationLevel = v
+	}
+}
+
+// WithReadonly requests a readonly transaction
 func WithReadonly() txOption {
 	return func(options *txOptions) {
 		options.isReadonly = true
 	}
 }
 
+// WithCrossGroup requires transaction that spans multiple entity groups
 func WithCrossGroup() txOption {
 	return func(options *txOptions) {
 		options.isCrossGroup = true

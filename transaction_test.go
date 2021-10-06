@@ -75,7 +75,7 @@ func TestNewTransactionOptions(t *testing.T) {
 }
 
 func TestGetTransaction(t *testing.T) {
-	expected := "transaction"
+	expected := NewTransactionOptions()
 	ctx := context.Background()
 	txCtx := NewContextWithTransaction(ctx, expected)
 	actual := GetTransaction(txCtx)
@@ -85,7 +85,7 @@ func TestGetTransaction(t *testing.T) {
 }
 
 func TestGetNonTransactionalContext(t *testing.T) {
-	expected := "transaction"
+	expected := NewTransactionOptions()
 	ctx := context.Background()
 	txCtx := NewContextWithTransaction(ctx, expected)
 	actual := GetNonTransactionalContext(txCtx)
