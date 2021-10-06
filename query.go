@@ -23,6 +23,9 @@ type Query struct {
 	// Where defines filter condition
 	Where query.Condition
 
+	// GroupBy defines expressions to group by
+	GroupBy []query.Expression
+
 	// Select defines what columns to return
 	Select []query.Column
 }

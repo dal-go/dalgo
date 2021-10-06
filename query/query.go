@@ -3,6 +3,7 @@ package query
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -15,6 +16,13 @@ const (
 type Column struct {
 	Expression Expression
 	Alias      string
+}
+
+func (v Column) String() string {
+	if v.Alias == "" {
+		return v.Expression.String()
+	}
+	return fmt.Sprintf("%v AS %v", v.Expression, v.Alias)
 }
 
 type field struct {
@@ -85,4 +93,35 @@ func (v comparison) String() string {
 
 type equal struct {
 	comparison
+}
+
+type function struct {
+	name string
+	args []Expression
+}
+
+func (v function) String() string {
+	args := make([]string, len(v.args))
+	for i, arg := range v.args {
+		args[i] = arg.String()
+	}
+	return fmt.Sprintf("%v(%v)", v.name, strings.Join(args, ", "))
+}
+
+func sum(fieldName string) function {
+	return function{name: "SUM", args: []Expression{field{Name: fieldName}}}
+}
+
+// SumAs aggregate function (see SQL SUM())
+func SumAs(fieldName, alias string) Column {
+	return Column{Expression: sum(fieldName), Alias: alias}
+}
+
+func count(fieldName string) function {
+	return function{name: "COUNT", args: []Expression{field{Name: fieldName}}}
+}
+
+// CountAs aggregate function (see SQL COUNT())
+func CountAs(fieldName, alias string) Column {
+	return Column{Expression: count(fieldName), Alias: alias}
 }
