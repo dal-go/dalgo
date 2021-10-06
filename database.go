@@ -52,7 +52,7 @@ type ReadonlySession interface {
 	// GetMulti gets multiples records from database by keys
 	GetMulti(ctx context.Context, records []Record) error
 
-	// Select executes a query on database
+	// Select executes a data retrieval query
 	Select(ctx context.Context, query Query) (Reader, error)
 }
 

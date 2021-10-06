@@ -17,6 +17,9 @@ type CollectionRef struct {
 // Query holds definition of a query
 type Query struct {
 
+	// Limit specifies maximum number of records to be returned
+	Limit int
+
 	// From defines target table/collection
 	From CollectionRef
 
