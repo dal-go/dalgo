@@ -9,7 +9,6 @@ import (
 
 // Inserter is an interface that describe DB provider that can insert a single entity with a specific or random Value
 type Inserter interface {
-	Insert(c context.Context, record Record, opts ...InsertOption) error
 }
 
 type IDGenerator = func(ctx context.Context, record Record) error

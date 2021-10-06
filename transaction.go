@@ -7,6 +7,7 @@ var (
 	nonTransactionalContextKey = "nonTransactionalContextKey"
 )
 
+
 // NewContextWithTransaction stores transaction and original context into a transactional context
 func NewContextWithTransaction(ctx context.Context, tx interface{}) context.Context {
 	ctx = context.WithValue(ctx, &nonTransactionalContextKey, ctx)

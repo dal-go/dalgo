@@ -34,27 +34,6 @@ func (v inserterMock) Insert(c context.Context, record Record, opts ...InsertOpt
 	return nil
 }
 
-func TestInserter(t *testing.T) {
-	var inserter Inserter = inserterMock{}
-	ctx := context.Background()
-	var record Record
-
-	suppliedKey := NewKey("foo", WithRandomStringID(5))
-	record = NewRecord(suppliedKey)
-
-	defer func() {
-		_ = recover()
-	}()
-	err := inserter.Insert(ctx, record)
-	if err != nil {
-		t.Error(err)
-	}
-	recordKey := record.Key()
-	if id := recordKey.ID; len(id.(string)) != 5 {
-		t.Errorf("len(recordKey[0].Value) expected to be 5, got: %v: %v", len(id.(string)), id)
-	}
-}
-
 func TestInsertWithRandomID(t *testing.T) {
 	t.Run("should_pass", func(t *testing.T) {
 		data := new(map[string]interface{})
