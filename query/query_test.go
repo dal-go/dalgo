@@ -1,20 +1,9 @@
-package dalgo
+package query
 
 import (
 	"reflect"
 	"testing"
 )
-
-func TestField(t *testing.T) {
-	const fieldName = "test_field"
-	t.Run("new", func(t *testing.T) {
-		field := Field(fieldName)
-		var _ Expression = field
-		if field.Name != fieldName {
-			t.Errorf("expected fieldName to be '%v' for '%v'", fieldName, field.Name)
-		}
-	})
-}
 
 func Test_field_EqualTo(t *testing.T) {
 	const fieldName = "test_field"
