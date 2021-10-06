@@ -32,14 +32,13 @@ type RecordConstructor = func() Record
 
 // Query holds definition of a query
 type Query struct {
-	Collection    CollectionRef
-	Condition     Condition
-	ExecuteReader func() (Reader, error)
+	Collection CollectionRef
+	Condition  Condition
 }
 
 // And creates a new query by adding a condition to a predefined query
 func (q Query) groupWithConditions(operator string, conditions ...Condition) Query {
-	query := Query{Collection: q.Collection, ExecuteReader: q.ExecuteReader}
+	query := Query{Collection: q.Collection}
 	and := groupCondition{operator: operator, Conditions: make([]Condition, len(conditions)+1)}
 	and.Conditions[0] = q.Condition
 	for i, condition := range conditions {
