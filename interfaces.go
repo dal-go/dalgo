@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-// Database is an interface that define a DB provider
+// Database is an interface that defines a DB provider
 type Database interface {
 	TransactionCoordinator
 	Session
