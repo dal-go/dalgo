@@ -7,10 +7,6 @@ import (
 	"github.com/strongo/random"
 )
 
-// Inserter is an interface that describe DB provider that can insert a single entity with a specific or random Value
-type Inserter interface {
-}
-
 type IDGenerator = func(ctx context.Context, record Record) error
 
 type InsertOptions interface {
