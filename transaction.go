@@ -1,6 +1,9 @@
 package dalgo
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 var (
 	transactionContextKey      = "transactionContextKey"
@@ -114,22 +117,31 @@ func NewTransactionOptions(opts ...txOption) TransactionOptions {
 	return options
 }
 
-// WithIsolationLevel requests transaction with required isolation level
-func WithIsolationLevel(v TxIsolationLevel) txOption {
+// TxWithIsolationLevel requests transaction with required isolation level
+func TxWithIsolationLevel(isolationLevel TxIsolationLevel) txOption {
+	if isolationLevel == TxUnspecified {
+		panic("isolationLevel == TxUnspecified")
+	}
 	return func(options *txOptions) {
-		options.isolationLevel = v
+		if options.isolationLevel != TxUnspecified {
+			if options.isolationLevel == isolationLevel {
+				panic(fmt.Sprintf("an attempt to set same isolation level twice: %v", isolationLevel))
+			}
+			panic("an attempt to request more then 1 isolation level")
+		}
+		options.isolationLevel = isolationLevel
 	}
 }
 
-// WithReadonly requests a readonly transaction
-func WithReadonly() txOption {
+// TxWithReadonly requests a readonly transaction
+func TxWithReadonly() txOption {
 	return func(options *txOptions) {
 		options.isReadonly = true
 	}
 }
 
-// WithCrossGroup requires transaction that spans multiple entity groups
-func WithCrossGroup() txOption {
+// TxWithCrossGroup requires transaction that spans multiple entity groups
+func TxWithCrossGroup() txOption {
 	return func(options *txOptions) {
 		options.isCrossGroup = true
 	}

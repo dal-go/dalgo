@@ -15,7 +15,7 @@ import (
 
 func TestWithReadonly(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
-		txOptions := NewTransactionOptions(WithReadonly())
+		txOptions := NewTransactionOptions(TxWithReadonly())
 		if !txOptions.IsReadonly() {
 			t.Errorf("expected to be readonly")
 		}
@@ -30,7 +30,7 @@ func TestWithReadonly(t *testing.T) {
 
 func TestWithCrossGroup(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
-		txOptions := NewTransactionOptions(WithCrossGroup())
+		txOptions := NewTransactionOptions(TxWithCrossGroup())
 		if !txOptions.IsCrossGroup() {
 			t.Errorf("expected to be true")
 		}
@@ -54,7 +54,7 @@ func TestNewTransactionOptions(t *testing.T) {
 		//}
 	})
 	t.Run("readonly", func(t *testing.T) {
-		options := NewTransactionOptions(WithReadonly())
+		options := NewTransactionOptions(TxWithReadonly())
 		if !options.IsReadonly() {
 			t.Errorf("expected to be readonly")
 		}
