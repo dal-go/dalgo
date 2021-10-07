@@ -24,7 +24,7 @@ func (v insertOptions) IDGenerator() IDGenerator {
 var _ InsertOptions = (*insertOptions)(nil)
 
 // NewInsertOptions creates insert options
-func NewInsertOptions(opts ...insertOption) InsertOptions {
+func NewInsertOptions(opts ...InsertOption) InsertOptions {
 	var options insertOptions
 	for _, o := range opts {
 		o(&options)
@@ -32,7 +32,7 @@ func NewInsertOptions(opts ...insertOption) InsertOptions {
 	return options
 }
 
-type insertOption func(options *insertOptions)
+type InsertOption func(options *insertOptions)
 
 type randomStringOptions struct {
 	prefix string

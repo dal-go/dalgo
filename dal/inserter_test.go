@@ -24,7 +24,7 @@ func (foo foo) Validate() error {
 type inserterMock struct {
 }
 
-func (v inserterMock) Insert(c context.Context, record Record, opts ...insertOption) error {
+func (v inserterMock) Insert(c context.Context, record Record, opts ...InsertOption) error {
 	options := NewInsertOptions(opts...)
 	if idGenerator := options.IDGenerator(); idGenerator != nil {
 		if err := idGenerator(c, record); err != nil {
