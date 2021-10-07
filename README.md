@@ -1,6 +1,6 @@
 # DALgo - Database Abstraction Layer (DAL) in Go
 
-**Import**: [`github.com/strongo/dalgo`](https://github.com/strongo/dalgo)
+**To use**: [`go get github.com/strongo/dalgo`](https://github.com/strongo/dalgo)
 
 ## Status
 
@@ -10,7 +10,7 @@
 [![Sourcegraph](https://sourcegraph.com/github.com/strongo/dalgo/-/badge.svg)](https://sourcegraph.com/github.com/strongo/dalgo?badge)
 [![Coverage Status](https://coveralls.io/repos/github/strongo/dalgo/badge.svg?branch=main)](https://coveralls.io/github/strongo/dalgo?branch=main)
 
-### Summary
+## Summary
 
 Using this module allows you:
 
@@ -22,7 +22,13 @@ Using this module allows you:
 
 4. Write unit tests for your business logic without dependency on specific API.
 
-## Implementations for specific APIs
+## Packages
+
+- [`dal`](dal) - Database Abstraction Layer
+- [`orm`](orm) - Object–relational mapping
+- [`query`](query) - SQL like interface with support of WHERE conditions, GROUP BY, etc.
+
+## DAL implementations for specific APIs
 
 DALgo defines abstract interfaces and helpers methods to work with databases in abstract manner.
 
@@ -40,8 +46,8 @@ Here is modules that bridge DALgo to specific APIs:
   indexing and geospatial support.
 
 - ### [**dalgo2badger**](https://github.com/strongo/dalgo2badger)
-  for [BadgerDB](https://github.com/strongo/dalgo) - an embeddable, persistent and fast key-value (KV) database
-  written in pure Go.
+  for [BadgerDB](https://github.com/strongo/dalgo) - an embeddable, persistent and fast key-value (KV) database written
+  in pure Go.
 
 ## Test coverage
 
