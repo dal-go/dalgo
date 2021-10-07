@@ -77,7 +77,7 @@ type TransactionOptions interface {
 	// Password() string - TODO: document why it was added
 }
 
-type txOption func(options *txOptions)
+type TransactionOption func(options *txOptions)
 
 type txOptions struct {
 	isolationLevel TxIsolationLevel
@@ -109,7 +109,7 @@ func (v txOptions) Password() string {
 }
 
 // NewTransactionOptions creates instance of TransactionOptions
-func NewTransactionOptions(opts ...txOption) TransactionOptions {
+func NewTransactionOptions(opts ...TransactionOption) TransactionOptions {
 	options := txOptions{}
 	for _, opt := range opts {
 		opt(&options)
@@ -118,7 +118,7 @@ func NewTransactionOptions(opts ...txOption) TransactionOptions {
 }
 
 // TxWithIsolationLevel requests transaction with required isolation level
-func TxWithIsolationLevel(isolationLevel TxIsolationLevel) txOption {
+func TxWithIsolationLevel(isolationLevel TxIsolationLevel) TransactionOption {
 	if isolationLevel == TxUnspecified {
 		panic("isolationLevel == TxUnspecified")
 	}
@@ -134,20 +134,20 @@ func TxWithIsolationLevel(isolationLevel TxIsolationLevel) txOption {
 }
 
 // TxWithReadonly requests a readonly transaction
-func TxWithReadonly() txOption {
+func TxWithReadonly() TransactionOption {
 	return func(options *txOptions) {
 		options.isReadonly = true
 	}
 }
 
 // TxWithCrossGroup requires transaction that spans multiple entity groups
-func TxWithCrossGroup() txOption {
+func TxWithCrossGroup() TransactionOption {
 	return func(options *txOptions) {
 		options.isCrossGroup = true
 	}
 }
 
-//func WithPassword(password string) txOption {
+//func WithPassword(password string) TransactionOption {
 //	return func(options *txOptions) {
 //		options.password = password
 //	}

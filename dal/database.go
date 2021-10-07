@@ -20,10 +20,10 @@ type RWTxWorker = func(ctx context.Context, tx ReadwriteTransaction) error
 type TransactionCoordinator interface {
 
 	// RunReadonlyTransaction starts readonly transaction
-	RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...txOption) error
+	RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
 
 	// RunReadwriteTransaction starts read-write transaction
-	RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...txOption) error
+	RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
 }
 
 // Transaction defines an instance of DALgo transaction
