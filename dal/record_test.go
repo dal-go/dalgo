@@ -1,4 +1,4 @@
-package dalgo
+package dal
 
 import (
 	"github.com/pkg/errors"

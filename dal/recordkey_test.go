@@ -1,4 +1,4 @@
-package dalgo
+package dal
 
 import "testing"
 

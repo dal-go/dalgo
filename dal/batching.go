@@ -1,4 +1,4 @@
-package dalgo
+package dal
 
 //
 //func CreateEntityHoldersWithIntIDs(ids []int64, newRecord func() RecordWithIntID) (records []Record) {

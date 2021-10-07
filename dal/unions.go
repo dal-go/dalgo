@@ -1,4 +1,4 @@
-package dalgo
+package dal
 
 // arrayUnion is a special type in dalgo. It instructs the server to add its
 // elements to whatever array already exists, or to create an array if no value

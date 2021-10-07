@@ -1,4 +1,4 @@
-package dalgo
+package dal
 
 type Transform interface {
 	Name() string

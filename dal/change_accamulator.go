@@ -1,4 +1,4 @@
-package dalgo
+package dal
 
 // Changes accumulates DB changes
 type Changes struct {

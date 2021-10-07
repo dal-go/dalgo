@@ -3,7 +3,7 @@ package demo
 import (
 	"context"
 	"fmt"
-	"github.com/strongo/dalgo"
+	"github.com/strongo/dalgo/dal"
 	"github.com/strongo/dalgo/orm"
 )
 
@@ -13,8 +13,8 @@ type user struct {
 	LastName  orm.StringField
 }
 
-func (v user) Collection() dalgo.CollectionRef {
-	return dalgo.CollectionRef{
+func (v user) Collection() dal.CollectionRef {
+	return dal.CollectionRef{
 		Name: "users",
 	}
 }
@@ -24,8 +24,8 @@ var User = user{
 	LastName:  orm.NewStringField("last_name"),
 }
 
-func SelectUserByEmail(ctx context.Context, db dalgo.Database, email string) {
-	q := dalgo.Select{
+func SelectUserByEmail(ctx context.Context, db dal.Database, email string) {
+	q := dal.Select{
 		From:  User.Collection(),
 		Where: User.Email.EqualToString(email),
 	}
