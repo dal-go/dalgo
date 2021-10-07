@@ -21,7 +21,7 @@ func (v user) Collection() dalgo.CollectionRef {
 
 var User = user{
 	FirstName: orm.NewStringField("fist_name"),
-	LastName:  orm.NewStringField("fist_name"),
+	LastName:  orm.NewStringField("last_name"),
 }
 
 func SelectUserByEmail(ctx context.Context, db dalgo.Database, email string) {
