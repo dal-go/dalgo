@@ -28,7 +28,7 @@ type TransactionCoordinator interface {
 
 // Transaction defines an instance of DALgo transaction
 type Transaction interface {
-	IsolationLevel() TxIsolationLevel
+	Options() TransactionOptions
 }
 
 // ReadonlyTransaction defines an interface for a transaction

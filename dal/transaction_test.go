@@ -74,8 +74,16 @@ func TestNewTransactionOptions(t *testing.T) {
 	//})
 }
 
+type mockTx struct {
+	options TransactionOptions
+}
+
+func (t mockTx) Options() TransactionOptions {
+	return t.options
+}
+
 func TestGetTransaction(t *testing.T) {
-	expected := NewTransactionOptions()
+	expected := mockTx{options: NewTransactionOptions()}
 	ctx := context.Background()
 	txCtx := NewContextWithTransaction(ctx, expected)
 	actual := GetTransaction(txCtx)
@@ -85,7 +93,7 @@ func TestGetTransaction(t *testing.T) {
 }
 
 func TestGetNonTransactionalContext(t *testing.T) {
-	expected := NewTransactionOptions()
+	expected := mockTx{options: NewTransactionOptions()}
 	ctx := context.Background()
 	txCtx := NewContextWithTransaction(ctx, expected)
 	actual := GetNonTransactionalContext(txCtx)
