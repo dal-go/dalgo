@@ -27,7 +27,7 @@ var User = user{
 func SelectUserByEmail(ctx context.Context, db dalgo.Database, email string) {
 	q := dalgo.Select{
 		From:  User.Collection(),
-		Where: User.Email.EqualTo(email),
+		Where: User.Email.EqualToString(email),
 	}
 	fmt.Print(q)
 	_, err := db.Select(ctx, q)

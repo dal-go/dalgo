@@ -6,10 +6,12 @@ import (
 	"strings"
 )
 
+type Operator string
+
 const (
-	EqualOperator = "=="
-	AndOperator   = "AND"
-	OrOperator    = "OR"
+	Equal Operator = "=="
+	And            = "AND"
+	Or             = "OR"
 )
 
 // Column reference a column in a SELECT statement
@@ -27,6 +29,10 @@ func (v Column) String() string {
 
 type field struct {
 	Name string
+}
+
+func Field(name string) field {
+	return field{Name: name}
 }
 
 // Columns shortcut for creating slice of columns by names
@@ -52,7 +58,7 @@ func (f field) EqualTo(v interface{}) Condition {
 	case field:
 		val = v.(field)
 	}
-	return equal{comparison: comparison{operator: EqualOperator, expression1: f, expression2: val}}
+	return equal{comparison: comparison{operator: Equal, expression1: f, expression2: val}}
 }
 
 type constant struct {
@@ -73,22 +79,30 @@ type Expression interface {
 // Condition holds condition definition
 type Condition interface {
 	fmt.Stringer
-	Operator() string
+	Operator() Operator
 }
 
 type comparison struct {
-	operator    string
+	operator    Operator
 	expression1 Expression
 	expression2 Expression
 }
 
-func (v comparison) Operator() string {
+func (v comparison) Operator() Operator {
 	return v.operator
 }
 
 func (v comparison) String() string {
 	return fmt.Sprintf("%v %v %v",
 		v.expression1, v.operator, v.expression2)
+}
+
+func NewComparison(o Operator, exp1, exp2 Expression) comparison {
+	return comparison{operator: o, expression1: exp1, expression2: exp2}
+}
+
+func String(v string) Expression {
+	return constant{value: v}
 }
 
 type equal struct {

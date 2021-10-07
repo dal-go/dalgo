@@ -8,12 +8,13 @@ import (
 type Field interface {
 	Name() string
 	Type() string
+	CompareTo(operator query.Operator, v query.Expression) query.Condition
 }
 
 // StringField defines a string field
 type StringField interface {
 	Field
-	EqualTo(v string) query.Condition
+	EqualToString(s string) query.Condition
 }
 
 type field struct {
@@ -32,8 +33,12 @@ func (v stringField) Type() string {
 	return "string"
 }
 
-func (v stringField) EqualTo(s string) query.Condition {
-	return nil // TODO: implement
+func (v stringField) EqualToString(s string) query.Condition {
+	return v.CompareTo(query.Equal, query.String(s))
+}
+
+func (v stringField) CompareTo(operator query.Operator, expression query.Expression) query.Condition {
+	return query.NewComparison(operator, nil, expression)
 }
 
 // NewStringField defines a new string field

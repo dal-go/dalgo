@@ -34,7 +34,7 @@ type Select struct {
 }
 
 // And creates a new query by adding a condition to a predefined query
-func (q Select) groupWithConditions(operator string, conditions ...query.Condition) Select {
+func (q Select) groupWithConditions(operator query.Operator, conditions ...query.Condition) Select {
 	qry := Select{From: q.From}
 	and := groupCondition{operator: operator, Conditions: make([]query.Condition, len(conditions)+1)}
 	and.Conditions[0] = q.Where
@@ -47,20 +47,20 @@ func (q Select) groupWithConditions(operator string, conditions ...query.Conditi
 
 // And creates an inherited query by adding AND conditions
 func (q Select) And(conditions ...query.Condition) Select {
-	return q.groupWithConditions(query.AndOperator, conditions...)
+	return q.groupWithConditions(query.And, conditions...)
 }
 
 // Or creates an inherited query by adding OR conditions
 func (q Select) Or(conditions ...query.Condition) Select {
-	return q.groupWithConditions(query.OrOperator, conditions...)
+	return q.groupWithConditions(query.Or, conditions...)
 }
 
 type groupCondition struct {
-	operator   string
+	operator   query.Operator
 	Conditions []query.Condition
 }
 
-func (v groupCondition) Operator() string {
+func (v groupCondition) Operator() query.Operator {
 	return v.operator
 }
 
@@ -69,7 +69,7 @@ func (v groupCondition) String() string {
 	for i, condition := range v.Conditions {
 		s[i] = condition.String()
 	}
-	return fmt.Sprintf("(%v)", strings.Join(s, v.operator))
+	return fmt.Sprintf("(%v)", strings.Join(s, string(v.operator)))
 }
 
 // ReadAll reads all records from a reader
