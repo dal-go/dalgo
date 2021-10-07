@@ -8,6 +8,7 @@ import (
 type Field interface {
 	Name() string
 	Type() string
+	Required() bool
 	CompareTo(operator query.Operator, v query.Expression) query.Condition
 }
 
@@ -18,11 +19,16 @@ type StringField interface {
 }
 
 type field struct {
-	name string
+	name     string
+	required bool
 }
 
 func (v field) Name() string {
 	return v.name
+}
+
+func (v field) Required() bool {
+	return v.required
 }
 
 type stringField struct {
