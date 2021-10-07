@@ -1,6 +1,6 @@
 # DALgo - Database Abstraction Layer (DAL) in Go
 
-**To use**: [`go get github.com/strongo/dalgo`](https://github.com/strongo/dalgo)
+**To use**: `go get `[`github.com/strongo/dalgo`](https://github.com/strongo/dalgo)
 
 ## Status
 
