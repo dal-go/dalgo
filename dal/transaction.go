@@ -77,6 +77,7 @@ type TransactionOptions interface {
 	// Password() string - TODO: document why it was added
 }
 
+// TransactionOption defines contact for transaction option
 type TransactionOption func(options *txOptions)
 
 type txOptions struct {

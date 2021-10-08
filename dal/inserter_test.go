@@ -56,7 +56,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			insertsCount++
 			return nil
 		}
-		err := InsertWithRandomID(context.Background(), NewRecordWithData(&Key{kind: "test_kind"}, data), generateID,
+		err := InsertWithRandomID(context.Background(), NewRecordWithData(&Key{collection: "test_kind"}, data), generateID,
 			5,
 			exists, insert)
 		if err != nil {

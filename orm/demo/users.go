@@ -19,11 +19,13 @@ func (v user) Collection() dal.CollectionRef {
 	}
 }
 
+// User defines user collection
 var User = user{
 	FirstName: orm.NewStringField("fist_name"),
 	LastName:  orm.NewStringField("last_name"),
 }
 
+// SelectUserByEmail is a demo facade method
 func SelectUserByEmail(ctx context.Context, db dal.Database, email string) {
 	q := dal.Select{
 		From:  User.Collection(),

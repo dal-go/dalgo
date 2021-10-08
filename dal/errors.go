@@ -20,7 +20,7 @@ type ErrDuplicateUser struct {
 	DuplicateUserIDs []int64
 }
 
-var noError = errors.New("no error")
+var errNoError = errors.New("no error")
 
 // Error implements error interface
 func (err ErrDuplicateUser) Error() string {
@@ -101,6 +101,7 @@ func (v errRollbackFailed) RollbackError() error {
 	return v.rollbackError
 }
 
+// NewRollbackError creates a rollback error
 func NewRollbackError(rollbackError, originalError error) error {
 	return errRollbackFailed{originalError: originalError, rollbackError: rollbackError}
 }

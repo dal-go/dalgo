@@ -95,7 +95,7 @@ func Test_record_Key(t *testing.T) {
 		{
 			name:   "key",
 			fields: fields{key: NewKeyWithStrID("Kind1", "k1")},
-			want:   &Key{kind: "Kind1", ID: "k1"},
+			want:   &Key{collection: "Kind1", ID: "k1"},
 		},
 	}
 	for _, tt := range tests {

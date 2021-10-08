@@ -5,7 +5,8 @@ import (
 	"fmt"
 )
 
-var DoesNotExist = errors.New("does not exist")
+// ErrDoesNotExist indicates a record does not exist
+var ErrDoesNotExist = errors.New("does not exist")
 
 // Record is a gateway to a database record.
 type Record interface {
@@ -47,7 +48,7 @@ func (v record) Exists() bool {
 		if IsNotFound(v.err) {
 			return false
 		}
-		if v.err == noError {
+		if v.err == errNoError {
 			return true
 		}
 		panic("an attempt to check for existence a record with an error")
@@ -62,7 +63,7 @@ func (v record) Key() *Key {
 
 func (v record) Data() interface{} {
 	if v.err != nil {
-		if v.err == noError {
+		if v.err == errNoError {
 			return v.data
 		}
 		if !IsNotFound(v.err) {
@@ -95,7 +96,7 @@ func (v record) Data() interface{} {
 
 // Error returns error associated with a record
 func (v record) Error() error {
-	if v.err == noError || IsNotFound(v.err) {
+	if v.err == errNoError || IsNotFound(v.err) {
 		return nil
 	}
 	return v.err
@@ -104,7 +105,7 @@ func (v record) Error() error {
 // SetError sets error associated with a record
 func (v *record) SetError(err error) {
 	if err == nil {
-		v.err = noError
+		v.err = errNoError
 	} else {
 		v.err = err
 	}

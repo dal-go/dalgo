@@ -6,12 +6,21 @@ import (
 	"strings"
 )
 
+// Operator defines a Comparison operator
 type Operator string
 
 const (
+	// Equal is a Comparison operator
 	Equal Operator = "=="
-	And            = "AND"
-	Or             = "OR"
+
+	// And is a Comparison operator
+	And = "AND"
+
+	// Or is a Comparison operator
+	Or = "OR"
+
+	// In is a Comparison operator
+	In = "In"
 )
 
 // Column reference a column in a SELECT statement
@@ -31,7 +40,8 @@ type field struct {
 	Name string
 }
 
-func Field(name string) field {
+// Field creates new field
+func Field(name string) Expression {
 	return field{Name: name}
 }
 
@@ -44,6 +54,7 @@ func Columns(names ...string) []Column {
 	return cols
 }
 
+// String returns string representation of a field
 func (f field) String() string {
 	return fmt.Sprintf("[%v]", f.Name)
 }
@@ -58,7 +69,7 @@ func (f field) EqualTo(v interface{}) Condition {
 	case field:
 		val = v.(field)
 	}
-	return equal{comparison: comparison{operator: Equal, expression1: f, expression2: val}}
+	return equal{Comparison: Comparison{operator: Equal, expressions: []Expression{f, val}}}
 }
 
 type constant struct {
@@ -82,31 +93,46 @@ type Condition interface {
 	Operator() Operator
 }
 
-type comparison struct {
+// Comparison defines a contact for a comparison
+type Comparison struct {
 	operator    Operator
-	expression1 Expression
-	expression2 Expression
+	expressions []Expression
 }
 
-func (v comparison) Operator() Operator {
+// Operator returns comparison operator
+func (v Comparison) Operator() Operator {
 	return v.operator
 }
 
-func (v comparison) String() string {
-	return fmt.Sprintf("%v %v %v",
-		v.expression1, v.operator, v.expression2)
+// IsGroupOperator says if an operator is a group operator
+func IsGroupOperator(o Operator) bool {
+	return o == In
 }
 
-func NewComparison(o Operator, exp1, exp2 Expression) comparison {
-	return comparison{operator: o, expression1: exp1, expression2: exp2}
+// String returns string representation of a comparison
+func (v Comparison) String() string {
+	if IsGroupOperator(v.operator) {
+		s := make([]string, len(v.expressions))
+		for i, e := range v.expressions {
+			s[i] = e.String()
+		}
+		fmt.Sprintf("%v (%v)", v.operator, strings.Join(s, ", "))
+	}
+	return fmt.Sprintf("%v %v %v", v.expressions[0], v.operator, v.expressions[1])
 }
 
+// NewComparison creates new Comparison
+func NewComparison(o Operator, expressions ...Expression) Comparison {
+	return Comparison{operator: o, expressions: expressions}
+}
+
+// String creates a new constant expression
 func String(v string) Expression {
 	return constant{value: v}
 }
 
 type equal struct {
-	comparison
+	Comparison
 }
 
 type function struct {

@@ -1,7 +1,12 @@
 package dal
 
+// Transform defines a transform operation
 type Transform interface {
+
+	// Name returns name of a transform
 	Name() string
+
+	// Value returns arguments of transform
 	Value() interface{}
 }
 
@@ -18,6 +23,7 @@ func (v transform) Value() interface{} {
 	return v.name
 }
 
-func Increment(v int) transform {
+// Increment defines an increment transform operation
+func Increment(v int) Transform {
 	return transform{name: "increment", value: v}
 }

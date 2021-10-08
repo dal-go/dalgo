@@ -18,12 +18,14 @@ import (
 // has no equivalent string form.
 type FieldPath []string
 
+// Update defines an update of a single field
 type Update struct {
 	Field     string
 	FieldPath FieldPath
 	Value     interface{}
 }
 
+// Validate validates the update
 func (v Update) Validate() error {
 	if v.Field != "" && len(v.FieldPath) > 0 {
 		return fmt.Errorf("both FieldVal and FieldPath are provided: %v, %+v", v.Field, v.FieldPath)

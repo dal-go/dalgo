@@ -12,6 +12,7 @@ type FieldVal struct {
 	Value interface{} `json:"value"`
 }
 
+// Validate valodates field value
 func (v FieldVal) Validate() error {
 	if strings.TrimSpace(v.Name) == "" {
 		return errors.New("name is a required property")
@@ -24,11 +25,12 @@ func (v FieldVal) Validate() error {
 
 // Key represents a full path to a given record (no parent in case of root recordset)
 type Key struct {
-	parent *Key
-	kind   string
-	ID     interface{}
+	parent     *Key
+	collection string
+	ID         interface{}
 }
 
+// String returns string representation of a key instance
 func (v Key) String() string {
 	key := v
 	if err := key.Validate(); err != nil {
@@ -37,21 +39,47 @@ func (v Key) String() string {
 	s := make([]string, 0, (key.Level())*2)
 	for {
 		s = append(s, fmt.Sprintf("%v", key.ID))
-		s = append(s, key.kind)
+		s = append(s, key.collection)
 		if key.parent == nil {
 			break
 		} else {
 			key = *key.parent
 		}
 	}
-	return ReverseStringsJoin(s, "/")
+	return reverseStringsJoin(s, "/")
 }
+
+func reverseStringsJoin(elems []string, sep string) string {
+	if len(elems) == 0 {
+		return ""
+	}
+	n := len(sep) * (len(elems) - 1)
+	for i := 0; i < len(elems); i++ {
+		n += len(elems[i])
+	}
+
+	var b strings.Builder
+	b.Grow(n)
+	for i := len(elems) - 1; i >= 0; i-- {
+		if _, err := b.WriteString(elems[i]); err != nil {
+			panic(err)
+		}
+		if i > 0 {
+			if _, err := b.WriteString(sep); err != nil {
+				panic(err)
+			}
+		}
+	}
+	return b.String()
+}
+
 
 //func (v *Key) Child(key *Key) *Key {
 //	key.parent = v
 //	return key
 //}
 
+// Level returns level of key (e.g. how many parents it have)
 func (v Key) Level() int {
 	if v.parent == nil {
 		return 0
@@ -59,17 +87,20 @@ func (v Key) Level() int {
 	return v.parent.Level() + 1
 }
 
+// Parent return a reference to the parent key
 func (v Key) Parent() *Key {
 	return v.parent
 }
 
-func (v Key) Kind() string {
-	return v.kind
+// Collection returns reference to colection
+func (v Key) Collection() string {
+	return v.collection
 }
 
+// Validate validate key
 func (v Key) Validate() error {
-	if strings.TrimSpace(v.kind) == "" {
-		return errors.New("child must have 'kind'")
+	if strings.TrimSpace(v.collection) == "" {
+		return errors.New("child must have 'collection'")
 	}
 	if v.parent != nil {
 		return v.parent.Validate()
@@ -87,6 +118,7 @@ func (v Key) Validate() error {
 	return nil
 }
 
+// KeyOption defines contract for key option
 type KeyOption = func(*Key)
 
 func setKeyOptions(key *Key, options ...KeyOption) {
@@ -95,29 +127,33 @@ func setKeyOptions(key *Key, options ...KeyOption) {
 	}
 }
 
-func NewKeyWithID(kind string, id interface{}, options ...KeyOption) (key *Key) {
-	key = &Key{kind: kind, ID: id}
+// NewKeyWithID creates a new key with ID
+func NewKeyWithID(collection string, id interface{}, options ...KeyOption) (key *Key) {
+	key = &Key{collection: collection, ID: id}
 	setKeyOptions(key, options...)
 	return
 }
 
-func NewKey(kind string, options ...KeyOption) (key *Key) {
+// NewKey creates a new key
+func NewKey(collection string, options ...KeyOption) (key *Key) {
 	if len(options) == 0 {
 		panic("at least 1 child option should be specified")
 	}
 	key = &Key{
-		kind: kind,
+		collection: collection,
 	}
 	setKeyOptions(key, options...)
 	return
 }
 
+// WithID sets ID of a key
 func WithID(id interface{}) KeyOption {
 	return func(key *Key) {
 		key.ID = id
 	}
 }
 
+// WithFields sets a list of field values as key ID
 func WithFields(fields []FieldVal) KeyOption {
 	return func(key *Key) {
 		key.ID = fields
@@ -125,16 +161,16 @@ func WithFields(fields []FieldVal) KeyOption {
 }
 
 // NewKeyWithStrID create child with a single string ID
-func NewKeyWithStrID(kind string, id string, options ...KeyOption) *Key {
-	return NewKeyWithID(kind, id, options...)
+func NewKeyWithStrID(collection string, id string, options ...KeyOption) *Key {
+	return NewKeyWithID(collection, id, options...)
 }
 
 // NewKeyWithIntID create child with a single integer ID
-func NewKeyWithIntID(kind string, id int, options ...KeyOption) *Key {
-	return NewKeyWithID(kind, id, options...)
+func NewKeyWithIntID(collection string, id int, options ...KeyOption) *Key {
+	return NewKeyWithID(collection, id, options...)
 }
 
 // NewKeyWithFields creates a new record child from a sequence of record's references
-func NewKeyWithFields(kind string, fields ...FieldVal) *Key {
-	return &Key{kind: kind, ID: fields}
+func NewKeyWithFields(collection string, fields ...FieldVal) *Key {
+	return &Key{collection: collection, ID: fields}
 }

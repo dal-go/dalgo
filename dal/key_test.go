@@ -40,7 +40,7 @@ func TestField_Validate(t *testing.T) {
 //func TestKey_Child(t *testing.T) {
 //	type fields struct {
 //		level int
-//		kind  string
+//		collection  string
 //		ID    interface{}
 //	}
 //	type args struct {
@@ -59,7 +59,7 @@ func TestField_Validate(t *testing.T) {
 //		{
 //			name: "single_parent",
 //			fields: fields{
-//				kind: "Parent1",
+//				collection: "Parent1",
 //				ID:   "p1",
 //			},
 //			args: args{
@@ -67,26 +67,26 @@ func TestField_Validate(t *testing.T) {
 //			},
 //			want: want{
 //				fields: fields{
-//					kind:  "Kind1",
+//					collection:  "Kind1",
 //					ID:    "k1",
 //					level: 1,
 //				},
-//				parent: &fields{kind: "Parent1", ID: "p1", level: 0},
+//				parent: &fields{collection: "Parent1", ID: "p1", level: 0},
 //			},
 //		},
 //		{
 //			name: "two_parents",
 //			fields: fields{
-//				kind: "Parent1",
+//				collection: "Parent1",
 //				ID:   "p1",
 //			},
 //			args: args{
 //				child: NewKeyWithStrID("Parent2", "p2").Child(NewKeyWithStrID("Kind1", "k1")),
 //			},
 //			want: want{
-//				parent: &fields{kind: "Parent1", ID: "p1", level: 1},
+//				parent: &fields{collection: "Parent1", ID: "p1", level: 1},
 //				fields: fields{
-//					kind:  "Kind1",
+//					collection:  "Kind1",
 //					ID:    "k1",
 //					level: 2,
 //				},
@@ -96,7 +96,7 @@ func TestField_Validate(t *testing.T) {
 //	for _, tt := range tests {
 //		t.Run(tt.name, func(t *testing.T) {
 //			v := &Key{
-//				kind: tt.fields.kind,
+//				collection: tt.fields.collection,
 //				ID:   tt.fields.ID,
 //			}
 //			got := v.Child(tt.args.child)
@@ -110,8 +110,8 @@ func TestField_Validate(t *testing.T) {
 //				t.Error("Child().parent != nil, want nil")
 //			}
 //			if got.parent != nil && tt.want.parent != nil {
-//				if got.parent.kind != tt.want.parent.kind {
-//					t.Errorf("Child().parent.kind = %v, want %v", got.parent.kind, tt.want.parent.kind)
+//				if got.parent.collection != tt.want.parent.collection {
+//					t.Errorf("Child().parent.collection = %v, want %v", got.parent.collection, tt.want.parent.collection)
 //				}
 //				if got.parent.ID != tt.want.parent.ID {
 //					t.Errorf("Child().parent.ID = %v, want %v", got.parent.ID, tt.want.parent.ID)
@@ -126,24 +126,24 @@ func TestField_Validate(t *testing.T) {
 
 func TestKey_Kind(t *testing.T) {
 	type fields struct {
-		kind string
+		collection string
 	}
 	tests := []struct {
 		name   string
 		fields fields
 		want   string
 	}{
-		{name: "empty", fields: fields{kind: ""}, want: ""},
-		{name: "kind1", fields: fields{kind: "kind1"}, want: "kind1"},
-		{name: "kind2", fields: fields{kind: "kind2"}, want: "kind2"},
+		{name: "empty", fields: fields{collection: ""}, want: ""},
+		{name: "kind1", fields: fields{collection: "kind1"}, want: "kind1"},
+		{name: "kind2", fields: fields{collection: "kind2"}, want: "kind2"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := Key{
-				kind: tt.fields.kind,
+				collection: tt.fields.collection,
 			}
-			if got := v.Kind(); got != tt.want {
-				t.Errorf("Kind() = %v, want %v", got, tt.want)
+			if got := v.Collection(); got != tt.want {
+				t.Errorf("Collection() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -233,9 +233,9 @@ func TestKey_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := Key{
-				parent: tt.fields.parent,
-				kind:   tt.fields.kind,
-				ID:     tt.fields.ID,
+				parent:     tt.fields.parent,
+				collection: tt.fields.kind,
+				ID:         tt.fields.ID,
 			}
 			if err := v.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
@@ -271,8 +271,8 @@ func TestNewKey(t *testing.T) {
 
 func TestNewKeyWithIntID(t *testing.T) {
 	type args struct {
-		kind string
-		id   int
+		collection string
+		id         int
 	}
 	type want struct {
 		level  int
@@ -285,11 +285,11 @@ func TestNewKeyWithIntID(t *testing.T) {
 		args args
 		want *Key
 	}{
-		{name: "valid", args: args{kind: "kind1", id: 1}, want: &Key{kind: "kind1", ID: 1}},
+		{name: "valid", args: args{collection: "kind1", id: 1}, want: &Key{collection: "kind1", ID: 1}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewKeyWithIntID(tt.args.kind, tt.args.id); !reflect.DeepEqual(got, tt.want) {
+			if got := NewKeyWithIntID(tt.args.collection, tt.args.id); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewKeyWithIntID() = %v, want %v", got, tt.want)
 			}
 		})
@@ -298,8 +298,8 @@ func TestNewKeyWithIntID(t *testing.T) {
 
 func TestNewKeyWithStrID(t *testing.T) {
 	type args struct {
-		kind string
-		id   string
+		collection string
+		id         string
 	}
 	type want struct {
 		level  int
@@ -312,11 +312,11 @@ func TestNewKeyWithStrID(t *testing.T) {
 		args args
 		want *Key
 	}{
-		{name: "valid", args: args{kind: "kind1", id: "k1"}, want: &Key{kind: "kind1", ID: "k1"}},
+		{name: "valid", args: args{collection: "kind1", id: "k1"}, want: &Key{collection: "kind1", ID: "k1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewKeyWithStrID(tt.args.kind, tt.args.id); !reflect.DeepEqual(got, tt.want) {
+			if got := NewKeyWithStrID(tt.args.collection, tt.args.id); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewKeyWithStrID() = %v, want %v", got, tt.want)
 			}
 		})

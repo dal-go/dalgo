@@ -72,7 +72,7 @@ func TestGetRecordKind(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetRecordKind(tt.args.key); got != tt.want {
+			if got := tt.args.key.String(); got != tt.want {
 				t.Errorf("GetRecordKind() = %v, want %v", got, tt.want)
 			}
 		})
@@ -112,8 +112,8 @@ func TestReverseStringsJoin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ReverseStringsJoin(tt.args.elems, tt.args.sep); got != tt.want {
-				t.Errorf("ReverseStringsJoin() = %v, want %v", got, tt.want)
+			if got := reverseStringsJoin(tt.args.elems, tt.args.sep); got != tt.want {
+				t.Errorf("reverseStringsJoin() = %v, want %v", got, tt.want)
 			}
 		})
 	}

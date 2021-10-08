@@ -25,9 +25,9 @@ func Test_field_EqualTo(t *testing.T) {
 			fields: fields{Name: fieldName},
 			args:   args{v: 1},
 			want: equal{
-				comparison: comparison{
+				Comparison: Comparison{
 					operator:    "==",
-					expression1: field{Name: fieldName},
+					expressions: field{Name: fieldName},
 					expression2: constant{value: 1},
 				},
 			},

@@ -7,8 +7,10 @@ import (
 	"github.com/strongo/random"
 )
 
+// IDGenerator defines a contract for ID generator function
 type IDGenerator = func(ctx context.Context, record Record) error
 
+// InsertOptions defines interface for insert options
 type InsertOptions interface {
 	IDGenerator() IDGenerator
 }
@@ -32,6 +34,7 @@ func NewInsertOptions(opts ...InsertOption) InsertOptions {
 	return options
 }
 
+// InsertOption defines a contract for an insert option
 type InsertOption func(options *insertOptions)
 
 type randomStringOptions struct {
@@ -82,9 +85,9 @@ func WithRandomStringID(length int, options ...randomStringOption) KeyOption {
 }
 
 // WithParent sets parent
-func WithParent(kind string, id interface{}, options ...KeyOption) KeyOption {
+func WithParent(collection string, id interface{}, options ...KeyOption) KeyOption {
 	return func(key *Key) {
-		key.parent = NewKeyWithID(kind, id, options...)
+		key.parent = NewKeyWithID(collection, id, options...)
 	}
 }
 

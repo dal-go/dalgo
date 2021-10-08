@@ -7,6 +7,14 @@ type arrayUnion struct {
 	elems []interface{}
 }
 
+func (arrayUnion) Name() string {
+	return "ArrayUnion"
+}
+
+func (v arrayUnion) Value() interface{} {
+	return v.elems
+}
+
 // ArrayUnion specifies elements to be added to whatever array already exists in
 // the server, or to create an array if no value exists.
 //
@@ -19,6 +27,6 @@ type arrayUnion struct {
 // ArrayUnion must be the value of a field directly; it cannot appear in
 // array or struct values, or in any value that is itself inside an array or
 // struct.
-func ArrayUnion(elems ...interface{}) arrayUnion {
+func ArrayUnion(elems ...interface{}) Transform {
 	return arrayUnion{elems: elems}
 }

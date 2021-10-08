@@ -43,7 +43,7 @@ func (changes Changes) HasChanges() bool {
 }
 
 func equalKeys(k1, k2 *Key) bool {
-	if k1.Kind() != k2.Kind() {
+	if k1.Collection() != k2.Collection() {
 		return false
 	}
 	p1 := k1.Parent()
