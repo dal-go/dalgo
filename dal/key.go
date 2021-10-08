@@ -31,8 +31,8 @@ type Key struct {
 }
 
 // String returns string representation of a key instance
-func (v Key) String() string {
-	key := v
+func (k Key) String() string {
+	key := k
 	if err := key.Validate(); err != nil {
 		panic(fmt.Sprintf("will not generate path for invalid child: %v", err))
 	}
@@ -44,6 +44,24 @@ func (v Key) String() string {
 			break
 		} else {
 			key = *key.parent
+		}
+	}
+	return reverseStringsJoin(s, "/")
+}
+
+// CollectionPath return path to parent
+func (k *Key) CollectionPath() string {
+	key := k
+	var s []string
+	for {
+		if strings.TrimSpace(key.collection) == "" {
+			panic("k is referencing an empty kind")
+		}
+		s = append(s, key.collection)
+		if key.parent == nil {
+			break
+		} else {
+			key = key.parent
 		}
 	}
 	return reverseStringsJoin(s, "/")
@@ -73,46 +91,45 @@ func reverseStringsJoin(elems []string, sep string) string {
 	return b.String()
 }
 
-
 //func (v *Key) Child(key *Key) *Key {
 //	key.parent = v
 //	return key
 //}
 
 // Level returns level of key (e.g. how many parents it have)
-func (v Key) Level() int {
-	if v.parent == nil {
+func (k Key) Level() int {
+	if k.parent == nil {
 		return 0
 	}
-	return v.parent.Level() + 1
+	return k.parent.Level() + 1
 }
 
 // Parent return a reference to the parent key
-func (v Key) Parent() *Key {
-	return v.parent
+func (k Key) Parent() *Key {
+	return k.parent
 }
 
 // Collection returns reference to colection
-func (v Key) Collection() string {
-	return v.collection
+func (k Key) Collection() string {
+	return k.collection
 }
 
 // Validate validate key
-func (v Key) Validate() error {
-	if strings.TrimSpace(v.collection) == "" {
+func (k Key) Validate() error {
+	if strings.TrimSpace(k.collection) == "" {
 		return errors.New("child must have 'collection'")
 	}
-	if v.parent != nil {
-		return v.parent.Validate()
+	if k.parent != nil {
+		return k.parent.Validate()
 	}
-	if fields, ok := v.ID.([]FieldVal); ok {
+	if fields, ok := k.ID.([]FieldVal); ok {
 		for i, field := range fields {
 			if err := field.Validate(); err != nil {
 				return fmt.Errorf("child is referencing invalid field # %v: %w", i, err)
 			}
 		}
 	}
-	if id, ok := v.ID.(interface{ Validate() error }); ok {
+	if id, ok := k.ID.(interface{ Validate() error }); ok {
 		return id.Validate()
 	}
 	return nil

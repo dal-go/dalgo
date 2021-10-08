@@ -116,7 +116,7 @@ func (v Comparison) String() string {
 		for i, e := range v.expressions {
 			s[i] = e.String()
 		}
-		fmt.Sprintf("%v (%v)", v.operator, strings.Join(s, ", "))
+		return fmt.Sprintf("%v (%v)", v.operator, strings.Join(s, ", "))
 	}
 	return fmt.Sprintf("%v %v %v", v.expressions[0], v.operator, v.expressions[1])
 }

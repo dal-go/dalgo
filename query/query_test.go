@@ -27,8 +27,7 @@ func Test_field_EqualTo(t *testing.T) {
 			want: equal{
 				Comparison: Comparison{
 					operator:    "==",
-					expressions: field{Name: fieldName},
-					expression2: constant{value: 1},
+					expressions: []Expression{field{Name: fieldName}, constant{value: 1}},
 				},
 			},
 		}
