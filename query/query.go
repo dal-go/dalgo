@@ -53,6 +53,7 @@ func Field(name string) Expression {
 	return field{Name: name}
 }
 
+// ID creates an expression that compares an ID with a constant
 func ID(name string, value interface{}) Expression {
 	return Comparison{Operator: Equal, Expressions: []Expression{
 		field{Name: name, IsID: true},
