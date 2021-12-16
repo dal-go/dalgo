@@ -40,7 +40,7 @@ type field struct {
 	Name string
 }
 
-// Field creates new field
+// Field creates an expression that represents a field value
 func Field(name string) Expression {
 	return field{Name: name}
 }
@@ -49,7 +49,7 @@ func Field(name string) Expression {
 func Columns(names ...string) []Column {
 	cols := make([]Column, len(names))
 	for i, name := range names {
-		cols[i] = Column{Expression: field{Name: name}}
+		cols[i] = Column{Expression: field{Name: name}, Alias: name}
 	}
 	return cols
 }
@@ -148,20 +148,20 @@ func (v function) String() string {
 	return fmt.Sprintf("%v(%v)", v.name, strings.Join(args, ", "))
 }
 
-func sum(fieldName string) function {
-	return function{name: "SUM", args: []Expression{field{Name: fieldName}}}
+func sum(expression Expression) function {
+	return function{name: "SUM", args: []Expression{expression}}
 }
 
 // SumAs aggregate function (see SQL SUM())
-func SumAs(fieldName, alias string) Column {
-	return Column{Expression: sum(fieldName), Alias: alias}
+func SumAs(expression Expression, alias string) Column {
+	return Column{Expression: sum(expression), Alias: alias}
 }
 
-func count(fieldName string) function {
-	return function{name: "COUNT", args: []Expression{field{Name: fieldName}}}
+func count(expression Expression) function {
+	return function{name: "COUNT", args: []Expression{expression}}
 }
 
 // CountAs aggregate function (see SQL COUNT())
-func CountAs(fieldName, alias string) Column {
-	return Column{Expression: count(fieldName), Alias: alias}
+func CountAs(expression Expression, alias string) Column {
+	return Column{Expression: count(expression), Alias: alias}
 }
