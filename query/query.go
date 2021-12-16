@@ -25,10 +25,11 @@ const (
 
 // Column reference a column in a SELECT statement
 type Column struct {
-	Expression Expression
-	Alias      string
+	Alias      string     `json:"alias"`
+	Expression Expression `json:"expression"`
 }
 
+// String stringifies column value
 func (v Column) String() string {
 	if v.Alias == "" {
 		return v.Expression.String()
@@ -37,7 +38,7 @@ func (v Column) String() string {
 }
 
 type field struct {
-	Name string
+	Name string `json:"name"`
 }
 
 // Field creates an expression that represents a field value
@@ -59,26 +60,27 @@ func (f field) String() string {
 	return fmt.Sprintf("[%v]", f.Name)
 }
 
+// EqualTo creates equality condition for a field
 func (f field) EqualTo(v interface{}) Condition {
 	var val Expression
 	switch v.(type) {
 	case string, int:
-		val = constant{value: v}
+		val = constant{Value: v}
 	case constant:
 		val = v.(constant)
 	case field:
 		val = v.(field)
 	}
-	return equal{Comparison: Comparison{operator: Equal, expressions: []Expression{f, val}}}
+	return equal{Comparison: Comparison{Operator: Equal, Expressions: []Expression{f, val}}}
 }
 
 type constant struct {
-	value interface{}
+	Value interface{} `json:"value"`
 }
 
 // String returns string representation of a constant
 func (v constant) String() string {
-	s, _ := json.Marshal(v.value)
+	s, _ := json.Marshal(v.Value)
 	return string(s)
 }
 
@@ -90,18 +92,12 @@ type Expression interface {
 // Condition holds condition definition
 type Condition interface {
 	fmt.Stringer
-	Operator() Operator
 }
 
 // Comparison defines a contact for a comparison
 type Comparison struct {
-	operator    Operator
-	expressions []Expression
-}
-
-// Operator returns comparison operator
-func (v Comparison) Operator() Operator {
-	return v.operator
+	Operator    Operator     `json:"operator"`
+	Expressions []Expression `json:"expressions"`
 }
 
 // IsGroupOperator says if an operator is a group operator
@@ -111,57 +107,26 @@ func IsGroupOperator(o Operator) bool {
 
 // String returns string representation of a comparison
 func (v Comparison) String() string {
-	if IsGroupOperator(v.operator) {
-		s := make([]string, len(v.expressions))
-		for i, e := range v.expressions {
+	if IsGroupOperator(v.Operator) {
+		s := make([]string, len(v.Expressions))
+		for i, e := range v.Expressions {
 			s[i] = e.String()
 		}
-		return fmt.Sprintf("%v (%v)", v.operator, strings.Join(s, ", "))
+		return fmt.Sprintf("%v (%v)", v.Operator, strings.Join(s, ", "))
 	}
-	return fmt.Sprintf("%v %v %v", v.expressions[0], v.operator, v.expressions[1])
+	return fmt.Sprintf("%v %v %v", v.Expressions[0], v.Operator, v.Expressions[1])
 }
 
 // NewComparison creates new Comparison
 func NewComparison(o Operator, expressions ...Expression) Comparison {
-	return Comparison{operator: o, expressions: expressions}
+	return Comparison{Operator: o, Expressions: expressions}
 }
 
 // String creates a new constant expression
 func String(v string) Expression {
-	return constant{value: v}
+	return constant{Value: v}
 }
 
 type equal struct {
 	Comparison
-}
-
-type function struct {
-	name string
-	args []Expression
-}
-
-func (v function) String() string {
-	args := make([]string, len(v.args))
-	for i, arg := range v.args {
-		args[i] = arg.String()
-	}
-	return fmt.Sprintf("%v(%v)", v.name, strings.Join(args, ", "))
-}
-
-func sum(expression Expression) function {
-	return function{name: "SUM", args: []Expression{expression}}
-}
-
-// SumAs aggregate function (see SQL SUM())
-func SumAs(expression Expression, alias string) Column {
-	return Column{Expression: sum(expression), Alias: alias}
-}
-
-func count(expression Expression) function {
-	return function{name: "COUNT", args: []Expression{expression}}
-}
-
-// CountAs aggregate function (see SQL COUNT())
-func CountAs(expression Expression, alias string) Column {
-	return Column{Expression: count(expression), Alias: alias}
 }
