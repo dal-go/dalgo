@@ -22,7 +22,7 @@ func TestSelect_String(t *testing.T) {
 		want   string
 	}{
 		{
-			name: "select 1",
+			name: "select_1",
 			fields: fields{
 				Columns: []query.Column{
 					{Expression: constant.Int(1)},
@@ -31,7 +31,7 @@ func TestSelect_String(t *testing.T) {
 			want: "SELECT 1",
 		},
 		{
-			name: "select 'abc' AS first_col",
+			name: "select_'abc'_AS_first_col",
 			fields: fields{
 				Columns: []query.Column{
 					{Expression: constant.Str("abc"), Alias: "first_col"},
@@ -40,14 +40,14 @@ func TestSelect_String(t *testing.T) {
 			want: "SELECT 'abc' AS first_col",
 		},
 		{
-			name: "select * from User",
+			name: "select_*_from_User",
 			fields: fields{
 				From: &CollectionRef{Name: "User"},
 			},
 			want: "SELECT * FROM [User]",
 		},
 		{
-			name: "select * from [User] where [Email] = 'test@example.com'",
+			name: "select_*_from_User_where_Email_=_'test@example.com'",
 			fields: fields{
 				From:  &CollectionRef{Name: "User"},
 				Where: query.NewComparison(query.Equal, query.Field("Email"), query.String("test@example.com")),
