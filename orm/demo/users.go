@@ -13,8 +13,8 @@ type user struct {
 	LastName  orm.StringField
 }
 
-func (v user) Collection() dal.CollectionRef {
-	return dal.CollectionRef{
+func (v user) Collection() *dal.CollectionRef {
+	return &dal.CollectionRef{
 		Name: "users",
 	}
 }
