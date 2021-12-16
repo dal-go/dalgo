@@ -3,6 +3,8 @@ package query
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -34,7 +36,11 @@ func (v Column) String() string {
 	if v.Alias == "" {
 		return v.Expression.String()
 	}
-	return fmt.Sprintf("%v AS %v", v.Expression, v.Alias)
+	expr := v.Expression.String()
+	if expr == v.Alias {
+		return expr
+	}
+	return fmt.Sprintf("%v AS %v", expr, v.Alias)
 }
 
 type field struct {
@@ -78,10 +84,19 @@ type constant struct {
 	Value interface{} `json:"value"`
 }
 
+var stringType = reflect.TypeOf("")
+
 // String returns string representation of a constant
 func (v constant) String() string {
-	s, _ := json.Marshal(v.Value)
-	return string(s)
+	switch v.Value.(type) {
+	case int:
+		return strconv.Itoa(v.Value.(int))
+	case string:
+		return fmt.Sprintf("'%v'", v.Value)
+	default:
+		s, _ := json.Marshal(v.Value)
+		return string(s)
+	}
 }
 
 // Expression represent either a field, constant or a formula
@@ -114,7 +129,11 @@ func (v Comparison) String() string {
 		}
 		return fmt.Sprintf("%v (%v)", v.Operator, strings.Join(s, ", "))
 	}
-	return fmt.Sprintf("%v %v %v", v.Expressions[0], v.Operator, v.Expressions[1])
+	o := v.Operator
+	if o == Equal {
+		o = "="
+	}
+	return fmt.Sprintf("%v %v %v", v.Expressions[0], o, v.Expressions[1])
 }
 
 // NewComparison creates new Comparison

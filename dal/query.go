@@ -1,10 +1,13 @@
 package dal
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/strongo/dalgo/query"
 	"math"
+	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -25,7 +28,7 @@ func (v CollectionRef) Path() string {
 type Select struct {
 
 	// From defines target table/collection
-	From CollectionRef
+	From *CollectionRef
 
 	// Where defines filter condition
 	Where query.Condition
@@ -44,6 +47,53 @@ type Select struct {
 	// Limit specifies maximum number of records to be returned
 	Limit int
 }
+
+func (q Select) String() string {
+	writer := bytes.NewBuffer(make([]byte, 0, 1024))
+	writer.WriteString("SELECT")
+	if q.Limit > 0 {
+		writer.WriteString(" TOP " + strconv.Itoa(q.Limit))
+	}
+	switch len(q.Columns) {
+	case 0:
+		writer.WriteString(" *")
+	case 1:
+		_, _ = fmt.Fprint(writer, " ", q.Columns[0].String())
+	default:
+		for _, col := range q.Columns {
+			_, _ = fmt.Fprint(writer, "\n\t", col.String())
+		}
+	}
+	is1liner := len(q.Columns) <= 1 &&
+		(q.Where == nil || reflect.TypeOf(q.Where) == reflect.TypeOf(query.Comparison{}))
+
+	if q.From != nil {
+		if is1liner {
+			writer.WriteString(" ")
+		} else {
+			writer.WriteString("\n")
+		}
+		fmt.Fprintf(writer, "FROM [%v]", q.From.Path())
+	}
+	if q.Where != nil {
+		if is1liner {
+			writer.WriteString(" ")
+		} else {
+			writer.WriteString("\n")
+		}
+		writer.WriteString("WHERE " + q.Where.String())
+	}
+	if len(q.GroupBy) > 0 {
+		writer.WriteString("\nGROUP BY ")
+		for _, expr := range q.GroupBy {
+			writer.WriteString("\n\t")
+			writer.WriteString(expr.String())
+		}
+	}
+	return writer.String()
+}
+
+var _ fmt.Stringer = (*Select)(nil)
 
 // And creates a new query by adding a condition to a predefined query
 func (q Select) groupWithConditions(operator query.Operator, conditions ...query.Condition) Select {
