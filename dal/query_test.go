@@ -47,6 +47,14 @@ func TestSelect_String(t *testing.T) {
 			want: "SELECT * FROM [User]",
 		},
 		{
+			name: "select_*_from_Users_where_SomeID_=_123",
+			fields: fields{
+				From:  &CollectionRef{Name: "Users"},
+				Where: query.ID("SomeID", 123),
+			},
+			want: "SELECT * FROM [Users] WHERE [SomeID] = 123",
+		},
+		{
 			name: "select_*_from_User_where_Email_=_'test@example.com'",
 			fields: fields{
 				From:  &CollectionRef{Name: "User"},

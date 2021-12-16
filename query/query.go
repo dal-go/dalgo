@@ -45,11 +45,19 @@ func (v Column) String() string {
 
 type field struct {
 	Name string `json:"name"`
+	IsID bool   `json:"isID"`
 }
 
 // Field creates an expression that represents a field value
 func Field(name string) Expression {
 	return field{Name: name}
+}
+
+func ID(name string, value interface{}) Expression {
+	return Comparison{Operator: Equal, Expressions: []Expression{
+		field{Name: name, IsID: true},
+		constant{Value: value},
+	}}
 }
 
 // Columns shortcut for creating slice of columns by names
