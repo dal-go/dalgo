@@ -33,6 +33,9 @@ type Select struct {
 	// GroupBy defines expressions to group by
 	GroupBy []query.Expression
 
+	// OrderBy defines expressions to order by
+	OrderBy []query.Expression
+
 	// Columns defines what columns to return
 	Columns []query.Column
 
