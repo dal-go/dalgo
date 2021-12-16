@@ -56,6 +56,8 @@ and [end-to-end](https://github.com/strongo/dalgo-end2end-tests) integration tes
 
 ## DALgo interfaces
 
+**Package**: `github.com/strongo/dalgo/dal`
+
 The main abstraction is though `dalgo.Record` interface :
 
 	type Record interface {
@@ -68,24 +70,67 @@ The main abstraction is though `dalgo.Record` interface :
 
 All methods are working with the `Record` and use `context.Context`.
 
-The [`Database`](./interfaces.go) interface defines an interface to a storage that should be implemented by a specific
+The [`Database`](./dal/database.go) interface defines an interface to a storage that should be implemented by a specific
 driver. This repo contains implementation for Google AppEngine Datastore. Contributions for other engines are welcome.
 If the db driver does not support some operations it must return `dalgo.ErrNotSupported`.
 
 	type Database interface {
 		TransactionCoordinator
-		Session
+		ReadonlySession
 	}
 
-where for example the  `Getter` & `MultiGetter` interfaces defined as:
+    // TransactionCoordinator provides methods to work with transactions
+    type TransactionCoordinator interface {
+    
+        // RunReadonlyTransaction starts readonly transaction
+        RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
+    
+        // RunReadwriteTransaction starts read-write transaction
+        RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
+    }
 
-	type Getter interface {
-		Get(c context.Context, record Record) error
-	}
+    // ReadonlySession defines methods that do not modify database
+    type ReadonlySession interface {
+    
+        // Get gets a single record from database by key
+        Get(ctx context.Context, record Record) error
+    
+        // GetMulti gets multiples records from database by keys
+        GetMulti(ctx context.Context, records []Record) error
+    
+        // Select executes a data retrieval query
+        Select(ctx context.Context, query Select) (Reader, error)
+    }
 
-	type MultiGetter interface {
-		GetMulti(c context.Context, records []Record) error
-	}
+    // ReadwriteSession defines methods that can modify database
+    type ReadwriteSession interface {
+        ReadonlySession
+        writeOnlySession
+    }
+    
+    type writeOnlySession interface {
+    
+        // Insert inserts a single record in database
+        Insert(c context.Context, record Record, opts ...InsertOption) error
+    
+        // Set sets a single record in database by key
+        Set(ctx context.Context, record Record) error
+    
+        // SetMulti sets multiples records in database by keys
+        SetMulti(ctx context.Context, records []Record) error
+    
+        // Update updates a single record in database by key
+        Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
+    
+        // UpdateMulti updates multiples records in database by keys
+        UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
+    
+        // Delete deletes a single record from database by key
+        Delete(ctx context.Context, key *Key) error
+    
+        // DeleteMulti deletes multiple records from database by keys
+        DeleteMulti(ctx context.Context, keys []*Key) error
+    }
 
 Note that getters are populating records in place using target instance obtained via `Record.GetData()`.
 
