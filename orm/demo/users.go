@@ -23,18 +23,40 @@ func (v user) Collection() dal.CollectionRef {
 var User = user{
 	FirstName: orm.NewStringField("fist_name"),
 	LastName:  orm.NewStringField("last_name"),
+	Email:     orm.NewStringField("email"),
+}
+
+type userData struct {
+	Email string `json:"email"`
 }
 
 // SelectUserByEmail is a demo facade method
-func SelectUserByEmail(ctx context.Context, db dal.Database, email string) {
+func SelectUserByEmail(ctx context.Context, db dal.ReadonlySession, email string, into interface{}) error {
+	if db == nil {
+		panic("db is a required parameter")
+	}
+	if into == nil {
+		into = &userData{}
+	}
 	q := dal.Select{
 		From:  User.Collection(),
 		Where: User.Email.EqualToString(email),
+		Into: func() interface{} {
+			return into
+		},
+		Limit: 1,
 	}
 	fmt.Print(q)
-	_, err := db.Select(ctx, q)
+	reader, err := db.Select(ctx, q)
 	if err != nil {
-		fmt.Print(err)
-		return
+		return err
 	}
+	if reader == nil {
+		panic("db.Select() returned no error and nil reader")
+	}
+	_, err = reader.Next()
+	if err != nil {
+		return err
+	}
+	return nil
 }

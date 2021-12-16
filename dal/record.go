@@ -132,3 +132,7 @@ func NewRecordWithData(key *Key, data interface{}) Record {
 	record.data = data
 	return record
 }
+
+func NewRecordWithoutKey(data interface{}) Record {
+	return &record{data: data}
+}

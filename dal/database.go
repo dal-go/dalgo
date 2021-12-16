@@ -7,7 +7,7 @@ import (
 // Database is an interface that defines a DB provider
 type Database interface {
 	TransactionCoordinator
-	ReadwriteSession
+	ReadonlySession
 }
 
 // ROTxWorker defines a callback to be called to do work within a readonly transaction
@@ -88,7 +88,8 @@ type writeOnlySession interface {
 
 // Reader reads records one by one
 type Reader interface {
-	// Next returns next record for a query.
+
+	// Next returns the next record for a query.
 	// If no more records a nil record and ErrNoMoreRecords are returned.
 	Next() (Record, error)
 }

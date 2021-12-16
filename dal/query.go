@@ -14,11 +14,15 @@ type CollectionRef struct {
 	Parent *Key
 }
 
+func (v CollectionRef) Path() string {
+	if v.Parent == nil {
+		return v.Name
+	}
+	return v.Parent.String() + "/" + v.Name
+}
+
 // Select holds definition of a query
 type Select struct {
-
-	// Limit specifies maximum number of records to be returned
-	Limit int
 
 	// From defines target table/collection
 	From CollectionRef
@@ -31,6 +35,11 @@ type Select struct {
 
 	// Columns defines what columns to return
 	Columns []query.Column
+
+	Into func() interface{}
+
+	// Limit specifies maximum number of records to be returned
+	Limit int
 }
 
 // And creates a new query by adding a condition to a predefined query
@@ -73,7 +82,7 @@ func (v groupCondition) String() string {
 }
 
 // ReadAll reads all records from a reader
-func ReadAll(ctx context.Context, reader Reader, limit int) (records []Record, err error) {
+func ReadAll(_ context.Context, reader Reader, limit int) (records []Record, err error) {
 	var record Record
 	if limit <= 0 {
 		limit = math.MaxInt
