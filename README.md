@@ -52,7 +52,7 @@ Here is modules that bridge DALgo to specific APIs:
 ## Test coverage
 
 The CI process for this package and for officially supported bridges runs unit tests
-and [end-to-end](https://github.com/strongo/dalgo-end2end-tests) integration tests.
+and [end-to-end](end2end) integration tests.
 
 ## DALgo interfaces
 
