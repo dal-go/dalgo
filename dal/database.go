@@ -18,10 +18,18 @@ type RWTxWorker = func(ctx context.Context, tx ReadwriteTransaction) error
 
 // TransactionCoordinator provides methods to work with transactions
 type TransactionCoordinator interface {
+	ReadonlyTransactionCoordinator
+	ReadwriteTransactionCoordinator
+}
 
+// ReadonlyTransactionCoordinator creates a readonly transaction
+type ReadonlyTransactionCoordinator interface {
 	// RunReadonlyTransaction starts readonly transaction
 	RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
+}
 
+// ReadwriteTransactionCoordinator creates a read-write transaction
+type ReadwriteTransactionCoordinator interface {
 	// RunReadwriteTransaction starts read-write transaction
 	RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
 }
