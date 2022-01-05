@@ -1,7 +1,7 @@
 package dal
 
 import (
-	"github.com/pkg/errors"
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -161,8 +161,22 @@ func Test_record_SetError(t *testing.T) {
 		fields fields
 		args   args
 	}{
-		// TODO: Add test cases.
+		{
+			name: "set_nil_over_nil",
+			fields: fields{
+				err: nil,
+			},
+			args: args{err: nil},
+		},
+		{
+			name: "set_err_over_nil",
+			fields: fields{
+				err: nil,
+			},
+			args: args{err: errors.New("test error")},
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := record{
@@ -170,10 +184,45 @@ func Test_record_SetError(t *testing.T) {
 				data: tt.fields.data,
 				err:  tt.fields.err,
 			}
-			err := errors.New("test error")
-			v.SetError(err)
-			if actualErr := v.Error(); actualErr != err {
-				t.Errorf("expected %v, got: %v", err, actualErr)
+			v.SetError(tt.args.err)
+			if !(tt.args.err == nil && v.err == errNoError) && v.err != tt.args.err {
+				t.Errorf("expected %v, got: %v", tt.args.err, v.err)
+			}
+		})
+	}
+}
+
+func Test_record_MarkAsChanged(t *testing.T) {
+	type fields struct {
+		key     *Key
+		err     error
+		changed bool
+		data    interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+	}{
+		{
+			name:   "from_false_to_true",
+			fields: fields{changed: false},
+		},
+		{
+			name:   "from_true_to_true",
+			fields: fields{changed: true},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &record{
+				key:     tt.fields.key,
+				err:     tt.fields.err,
+				changed: tt.fields.changed,
+				data:    tt.fields.data,
+			}
+			v.MarkAsChanged()
+			if v.changed != true {
+				t.Errorf("failed to mark as changed")
 			}
 		})
 	}

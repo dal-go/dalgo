@@ -27,6 +27,12 @@ type Record interface {
 	// or DataTo() to be called first, otherwise panics.
 	Data() interface{}
 
+	// HasChanged & MarkAsChanged are methods of convenience
+	HasChanged() bool
+
+	// MarkAsChanged & HasChanged are methods of convenience
+	MarkAsChanged()
+
 	//// SetDataTo sets DataTo handler
 	//SetDataTo(dataTo func(target interface{}) error)
 
@@ -36,9 +42,10 @@ type Record interface {
 }
 
 type record struct {
-	key  *Key
-	err  error
-	data interface{}
+	key     *Key
+	err     error
+	changed bool
+	data    interface{}
 	//dataTo func(target interface{}) error
 }
 
@@ -59,6 +66,16 @@ func (v record) Exists() bool {
 // Key returns key of a record
 func (v record) Key() *Key {
 	return v.key
+}
+
+// HasChanged indicates if the record has changed since loading
+func (v record) HasChanged() bool {
+	return v.changed
+}
+
+// MarkAsChanged marks the record as changed since loading
+func (v *record) MarkAsChanged() {
+	v.changed = true
 }
 
 func (v record) Data() interface{} {
