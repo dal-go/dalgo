@@ -7,23 +7,23 @@ import (
 // Database is an interface that defines a DB provider
 type Database interface {
 	TransactionCoordinator
-	ReadonlySession
+	ReadSession
 }
 
 // ROTxWorker defines a callback to be called to do work within a readonly transaction
-type ROTxWorker = func(ctx context.Context, tx ReadonlyTransaction) error
+type ROTxWorker = func(ctx context.Context, tx ReadTransaction) error
 
 // RWTxWorker defines a callback to be called to do work within a readwrite transaction
 type RWTxWorker = func(ctx context.Context, tx ReadwriteTransaction) error
 
 // TransactionCoordinator provides methods to work with transactions
 type TransactionCoordinator interface {
-	ReadonlyTransactionCoordinator
+	ReadTransactionCoordinator
 	ReadwriteTransactionCoordinator
 }
 
-// ReadonlyTransactionCoordinator creates a readonly transaction
-type ReadonlyTransactionCoordinator interface {
+// ReadTransactionCoordinator creates a readonly transaction
+type ReadTransactionCoordinator interface {
 	// RunReadonlyTransaction starts readonly transaction
 	RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
 }
@@ -36,13 +36,14 @@ type ReadwriteTransactionCoordinator interface {
 
 // Transaction defines an instance of DALgo transaction
 type Transaction interface {
+	// Options indicates parameters that were requested at time of transaction creation.
 	Options() TransactionOptions
 }
 
-// ReadonlyTransaction defines an interface for a transaction
-type ReadonlyTransaction interface {
+// ReadTransaction defines an interface for a transaction
+type ReadTransaction interface {
 	Transaction
-	ReadonlySession
+	ReadSession
 }
 
 // ReadwriteTransaction defines an interface for a transaction
@@ -51,8 +52,8 @@ type ReadwriteTransaction interface {
 	ReadwriteSession
 }
 
-// ReadonlySession defines methods that do not modify database
-type ReadonlySession interface {
+// ReadSession defines methods that do not modify database
+type ReadSession interface {
 
 	// Get gets a single record from database by key
 	Get(ctx context.Context, record Record) error
@@ -64,13 +65,14 @@ type ReadonlySession interface {
 	Select(ctx context.Context, query Select) (Reader, error)
 }
 
-// ReadwriteSession defines methods that can modify database
+// ReadwriteSession defines methods that can read & modify database
 type ReadwriteSession interface {
-	ReadonlySession
-	writeOnlySession
+	ReadSession
+	WriteSession
 }
 
-type writeOnlySession interface {
+// WriteSession defines methods that can modify database
+type WriteSession interface {
 
 	// Insert inserts a single record in database
 	Insert(c context.Context, record Record, opts ...InsertOption) error

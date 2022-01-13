@@ -12,7 +12,7 @@ import (
 func TestSelectUserByEmail(t *testing.T) {
 	type args struct {
 		ctx   context.Context
-		db    dal.ReadonlySession
+		db    dal.ReadSession
 		email string
 	}
 	dbMock := dalmock.NewDbMock()

@@ -31,7 +31,7 @@ type userData struct {
 }
 
 // SelectUserByEmail is a demo facade method
-func SelectUserByEmail(ctx context.Context, db dal.ReadonlySession, email string, into interface{}) error {
+func SelectUserByEmail(ctx context.Context, db dal.ReadSession, email string, into interface{}) error {
 	if db == nil {
 		panic("db is a required parameter")
 	}

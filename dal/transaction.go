@@ -68,10 +68,10 @@ type TransactionOptions interface {
 	// IsolationLevel indicates requested isolation level
 	IsolationLevel() TxIsolationLevel
 
-	// IsReadonly indicates if a readonly transaction required
+	// IsReadonly indicates a readonly transaction
 	IsReadonly() bool
 
-	// IsCrossGroup indicates if a cross-group transaction required
+	// IsCrossGroup indicates a cross-group transaction. Makes sense for Google App Engine.
 	IsCrossGroup() bool
 
 	// Password() string - TODO: document why it was added

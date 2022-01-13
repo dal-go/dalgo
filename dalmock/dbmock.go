@@ -56,14 +56,14 @@ type readonlySession struct {
 	onSelectFrom map[string]SelectResult
 }
 
-var _ dal.ReadonlySession = (*readonlySession)(nil)
+var _ dal.ReadSession = (*readonlySession)(nil)
 
 type dbMock struct {
 	readonlySession
 }
 
 var _ dal.Database = (*dbMock)(nil)
-var _ dal.ReadonlySession = (*dbMock)(nil)
+var _ dal.ReadSession = (*dbMock)(nil)
 
 func (db dbMock) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker, options ...dal.TransactionOption) error {
 	//TODO implement me
