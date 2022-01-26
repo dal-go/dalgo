@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/strongo/dalgo/dal"
 	"github.com/strongo/dalgo/orm"
+	"github.com/strongo/dalgo/query"
 )
 
 type user struct {
@@ -13,17 +14,17 @@ type user struct {
 	LastName  orm.StringField
 }
 
-func (v user) Collection() *dal.CollectionRef {
-	return &dal.CollectionRef{
-		Name: "users",
-	}
-}
-
 // User defines user collection
 var User = user{
 	FirstName: orm.NewStringField("fist_name"),
 	LastName:  orm.NewStringField("last_name"),
 	Email:     orm.NewStringField("email"),
+}
+
+func (v user) Collection() *dal.CollectionRef {
+	return &dal.CollectionRef{
+		Name: "users",
+	}
 }
 
 type userData struct {
@@ -44,7 +45,8 @@ func SelectUserByEmail(ctx context.Context, db dal.ReadSession, email string, in
 		Into: func() interface{} {
 			return into
 		},
-		Limit: 1,
+		Columns: query.Columns(User.FirstName.Name(), User.LastName.Name()),
+		Limit:   1,
 	}
 	fmt.Print(q)
 	reader, err := db.Select(ctx, q)
