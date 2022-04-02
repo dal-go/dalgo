@@ -27,3 +27,9 @@ func (v transform) Value() interface{} {
 func Increment(v int) Transform {
 	return transform{name: "increment", value: v}
 }
+
+func IsTransform(v interface{}) (t Transform, ok bool) {
+	var t1 transform
+	t1, ok = v.(transform)
+	return t1, ok
+}
