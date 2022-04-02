@@ -20,7 +20,7 @@ func (v transform) Name() string {
 }
 
 func (v transform) Value() interface{} {
-	return v.name
+	return v.value
 }
 
 // Increment defines an increment transform operation

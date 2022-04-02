@@ -26,6 +26,8 @@ func TestIncrement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Increment(tt.args.v); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Increment() = %v, want %v", got, tt.want)
+			} else if v := got.Value(); v != tt.want.value {
+				t.Errorf("Increment().Value() = %v, want.value = %v", v, tt.want)
 			}
 		})
 	}
