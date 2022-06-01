@@ -37,8 +37,16 @@ func IsNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	_, ok := err.(ErrNotFoundByKey)
-	return ok || errors.Cause(err) == ErrRecordNotFound || errors.Is(err, ErrRecordNotFound)
+	if _, ok := err.(ErrNotFoundByKey); ok {
+		return true
+	}
+	if errors.Is(err, ErrRecordNotFound) {
+		return true
+	}
+	if errors.Cause(err) == ErrRecordNotFound {
+		return true
+	}
+	return false
 }
 
 // ErrNotFoundByKey indicates error was not found by Value
@@ -61,12 +69,19 @@ func (e errNotFoundByKey) Cause() error {
 	return e.cause
 }
 
+func (e errNotFoundByKey) Unwrap() error {
+	return e.cause
+}
+
 func (e errNotFoundByKey) Error() string {
+	if e.cause == ErrRecordNotFound {
+		return fmt.Sprintf("%v: by key=%v", e.cause, e.key)
+	}
 	s := fmt.Sprintf("record not found by key=%v", e.key)
 	if e.cause == nil {
 		return s
 	}
-	return s + fmt.Sprintf(": %T=%v", e.cause, e.cause)
+	return fmt.Sprintf("%v: %v", s, e.cause)
 }
 
 // NewErrNotFoundByKey creates an error that indicates that entity was not found by Value
