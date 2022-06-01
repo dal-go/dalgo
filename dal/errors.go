@@ -38,7 +38,7 @@ func IsNotFound(err error) bool {
 		return false
 	}
 	_, ok := err.(ErrNotFoundByKey)
-	return ok || errors.Is(err, ErrRecordNotFound)
+	return ok || errors.Cause(err) == ErrRecordNotFound || errors.Is(err, ErrRecordNotFound)
 }
 
 // ErrNotFoundByKey indicates error was not found by Value
