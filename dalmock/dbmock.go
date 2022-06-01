@@ -52,12 +52,6 @@ func NewSingleRecordReader(key *dal.Key, data string, into func() interface{}) *
 	return &singleRecordReader{key: key, data: data, into: into}
 }
 
-type readonlySession struct {
-	onSelectFrom map[string]SelectResult
-}
-
-var _ dal.ReadSession = (*readonlySession)(nil)
-
 type dbMock struct {
 	readonlySession
 }
@@ -71,24 +65,8 @@ func (db dbMock) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker, o
 }
 
 func (db dbMock) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (d readonlySession) Get(ctx context.Context, record dal.Record) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (d readonlySession) GetMulti(ctx context.Context, records []dal.Record) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (d readonlySession) Select(ctx context.Context, query dal.Select) (dal.Reader, error) {
-	collectionPath := query.From.Path()
-	result := d.onSelectFrom[collectionPath]
-	return result.reader(query.Into), result.err
+	txCtx := context.WithValue(ctx, "dalgo_tx", true)
+	return f(txCtx, readwriteTransaction{})
 }
 
 func NewDbMock() dbMock {
