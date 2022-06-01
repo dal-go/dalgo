@@ -1,4 +1,4 @@
-package dalmock
+package mock_dal
 
 import (
 	"context"

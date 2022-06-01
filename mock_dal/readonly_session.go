@@ -1,4 +1,4 @@
-package dalmock
+package mock_dal
 
 import (
 	"context"
@@ -6,14 +6,14 @@ import (
 )
 
 type readonlySession struct {
+	get          func(ctx context.Context, record dal.Record) error
 	onSelectFrom map[string]SelectResult
 }
 
 var _ dal.ReadSession = (*readonlySession)(nil)
 
 func (d readonlySession) Get(ctx context.Context, record dal.Record) error {
-	//TODO implement me
-	panic("implement me")
+	return d.get(ctx, record)
 }
 
 func (d readonlySession) GetMulti(ctx context.Context, records []dal.Record) error {

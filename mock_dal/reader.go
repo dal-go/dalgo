@@ -1,4 +1,4 @@
-package dalmock
+package mock_dal
 
 import "github.com/strongo/dalgo/dal"
 

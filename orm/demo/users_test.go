@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/strongo/dalgo/dal"
-	"github.com/strongo/dalgo/dalmock"
+	"github.com/strongo/dalgo/mock_dal"
 	"reflect"
 	"testing"
 )
@@ -15,11 +15,11 @@ func TestSelectUserByEmail(t *testing.T) {
 		db    dal.ReadSession
 		email string
 	}
-	dbMock := dalmock.NewDbMock()
+	dbMock := mock_dal.NewDbMock()
 	tests := []struct {
 		name         string
 		args         args
-		selectResult dalmock.SelectResult
+		selectResult mock_dal.SelectResult
 		want         *userData
 		wantErr      error
 	}{
@@ -30,7 +30,7 @@ func TestSelectUserByEmail(t *testing.T) {
 				ctx:   context.Background(),
 				email: "unknown@example.com",
 			},
-			selectResult: dalmock.NewSelectResult(
+			selectResult: mock_dal.NewSelectResult(
 				nil,
 				dal.ErrRecordNotFound,
 			),
@@ -44,9 +44,9 @@ func TestSelectUserByEmail(t *testing.T) {
 				ctx:   context.Background(),
 				email: "test@example.com",
 			},
-			selectResult: dalmock.NewSelectResult(
+			selectResult: mock_dal.NewSelectResult(
 				func(into func() interface{}) dal.Reader {
-					return dalmock.NewSingleRecordReader(
+					return mock_dal.NewSingleRecordReader(
 						dal.NewKeyWithIntID("users", 1),
 						`{"email":"test@example.com"}`,
 						into,

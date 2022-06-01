@@ -1,4 +1,4 @@
-package dalmock
+package mock_dal
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 )
 
 type readwriteTransaction struct {
-	onSelectFrom map[string]SelectResult
+	readonlySession
 }
 
 func (d readwriteTransaction) Options() dal.TransactionOptions {
