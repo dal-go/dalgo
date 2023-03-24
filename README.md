@@ -27,6 +27,7 @@ Using this module allows you:
 - [`dal`](dal) - Database Abstraction Layer
 - [`orm`](orm) - Object–relational mapping
 - [`query`](query) - SQL like interface with support of WHERE conditions, GROUP BY, etc.
+- [`record`](record) - helpers to simplify working with dalgo records in strongly typed way.
 
 ## DAL implementations for specific APIs
 
