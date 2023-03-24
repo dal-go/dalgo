@@ -72,13 +72,17 @@ and [end-to-end](end2end) integration tests.
 
 The main abstraction is though `dalgo.Record` interface :
 
-	type Record interface {
-      Key() *Key          // defines `table` name of the entity
-      Data() interface{}  // value to be stored/retrieved (without ID)
-      Error() error       // holds error for the record
-      SetError(err error) // sets error relevant to specific record
-      Exists() bool		// indicates if the record exists in DB
-	}
+```go
+package dal
+
+type Record interface {
+  Key() *Key          // defines `table` name of the entity
+  Data() interface{}  // value to be stored/retrieved (without ID)
+  Error() error       // holds error for the record
+  SetError(err error) // sets error relevant to specific record
+  Exists() bool		// indicates if the record exists in DB
+}
+```
 
 All methods are working with the `Record` and use `context.Context`.
 
@@ -86,63 +90,65 @@ The [`Database`](./dal/database.go) interface defines an interface to a storage 
 driver. This repo contains implementation for Google AppEngine Datastore. Contributions for other engines are welcome.
 If the db driver does not support some operations it must return `dalgo.ErrNotSupported`.
 
-	type Database interface {
-		TransactionCoordinator
-		ReadonlySession
-	}
+```go
+type Database interface {
+    TransactionCoordinator
+    ReadonlySession
+}
 
-    // TransactionCoordinator provides methods to work with transactions
-    type TransactionCoordinator interface {
-    
-        // RunReadonlyTransaction starts readonly transaction
-        RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
-    
-        // RunReadwriteTransaction starts read-write transaction
-        RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
-    }
+// TransactionCoordinator provides methods to work with transactions
+type TransactionCoordinator interface {
 
-    // ReadonlySession defines methods that do not modify database
-    type ReadonlySession interface {
-    
-        // Get gets a single record from database by key
-        Get(ctx context.Context, record Record) error
-    
-        // GetMulti gets multiples records from database by keys
-        GetMulti(ctx context.Context, records []Record) error
-    
-        // Select executes a data retrieval query
-        Select(ctx context.Context, query Select) (Reader, error)
-    }
+    // RunReadonlyTransaction starts readonly transaction
+    RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
 
-    // ReadwriteSession defines methods that can modify database
-    type ReadwriteSession interface {
-        ReadonlySession
-        writeOnlySession
-    }
-    
-    type writeOnlySession interface {
-    
-        // Insert inserts a single record in database
-        Insert(c context.Context, record Record, opts ...InsertOption) error
-    
-        // Set sets a single record in database by key
-        Set(ctx context.Context, record Record) error
-    
-        // SetMulti sets multiples records in database by keys
-        SetMulti(ctx context.Context, records []Record) error
-    
-        // Update updates a single record in database by key
-        Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
-    
-        // UpdateMulti updates multiples records in database by keys
-        UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
-    
-        // Delete deletes a single record from database by key
-        Delete(ctx context.Context, key *Key) error
-    
-        // DeleteMulti deletes multiple records from database by keys
-        DeleteMulti(ctx context.Context, keys []*Key) error
-    }
+    // RunReadwriteTransaction starts read-write transaction
+    RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
+}
+
+// ReadonlySession defines methods that do not modify database
+type ReadonlySession interface {
+
+    // Get gets a single record from database by key
+    Get(ctx context.Context, record Record) error
+
+    // GetMulti gets multiples records from database by keys
+    GetMulti(ctx context.Context, records []Record) error
+
+    // Select executes a data retrieval query
+    Select(ctx context.Context, query Select) (Reader, error)
+}
+
+// ReadwriteSession defines methods that can modify database
+type ReadwriteSession interface {
+    ReadonlySession
+    writeOnlySession
+}
+
+type writeOnlySession interface {
+
+    // Insert inserts a single record in database
+    Insert(c context.Context, record Record, opts ...InsertOption) error
+
+    // Set sets a single record in database by key
+    Set(ctx context.Context, record Record) error
+
+    // SetMulti sets multiples records in database by keys
+    SetMulti(ctx context.Context, records []Record) error
+
+    // Update updates a single record in database by key
+    Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
+
+    // UpdateMulti updates multiples records in database by keys
+    UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
+
+    // Delete deletes a single record from database by key
+    Delete(ctx context.Context, key *Key) error
+
+    // DeleteMulti deletes multiple records from database by keys
+    DeleteMulti(ctx context.Context, keys []*Key) error
+}
+```
 
 Note that getters are populating records in place using target instance obtained via `Record.GetData()`.
 
