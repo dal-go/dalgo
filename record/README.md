@@ -1,6 +1,6 @@
 # Dalgo helper package: `record`
 
-This helper package contains types that help to simplify working with dalgo records in strongly typed way.
+Contains helpers to simplify working with dalgo records in strongly typed way.
 
 ## Type [`WithID[K comparable]`](./with_id.go)
 
