@@ -87,7 +87,7 @@ type Record interface {
 All methods are working with the `Record` and use `context.Context`.
 
 The [`Database`](./dal/database.go) interface defines an interface to a storage that should be implemented by a specific
-driver. This repo contains implementation for Google AppEngine Datastore. Contributions for other engines are welcome.
+driver. Contributions for client bridges are very welcome!
 If the db driver does not support some operations it must return `dalgo.ErrNotSupported`.
 
 ```go
