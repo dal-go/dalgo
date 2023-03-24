@@ -18,19 +18,19 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
 
-      - name: go get ./...
+      - name: Go get
         run: go get ./...
 
-      - name: go vet ./...
+      - name: Go vet
         run: go vet ./...
 
-      - name: Test
+      - name: Go test
         run: go test ./...
 
-      - name: go build ./...
+      - name: Go build
         run: go build ./...
 
-      - name: golangci-lint
+      - name: Go lint
         uses: golangci/golangci-lint-action@v3
         with:
           # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
