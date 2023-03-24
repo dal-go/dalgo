@@ -26,8 +26,7 @@ type UserDto struct {
 // User is a type that holds both user data and user ID
 type User struct {
 	record.WithID[string] // In our case ID is a string
-	
-	// Dto provides strongly typed access to user data
+
 	Dto *UserDto
 }
 
@@ -35,8 +34,22 @@ type User struct {
 func NewUser(id string, dto *UserDto) (user User) {
 	user.ID = id
 	user.Dto = dto
-	user.Key = dal.NewKey("User", dal.WithID(id))
+	user.Key = dal.NewKey("users", dal.WithID(id))
 	user.Record = dal.NewRecordWithData(user.Key, dto)
 	return user
 }
+
+```
+
+The `User.Dto` provides strongly typed access to user data.
+We also can access it via `Data()` method of `record.Record` interface but that will require type assertion like:
+
+```go
+email := user.Record.Data().(*UserDto).Email // requires manual casting to *UserDto to access email
+```
+
+what is not very convenient. Compare it with:
+
+```go
+email := user.Dto.Email // this is strongly typed
 ```
