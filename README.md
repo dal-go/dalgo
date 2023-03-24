@@ -4,7 +4,7 @@
 
 ## Status
 
-[![Vet, Test, Build](https://github.com/strongo/dalgo/actions/workflows/ci.yml/badge.svg)](https://github.com/strongo/dalgo/actions/workflows/ci.yml)
+[![Build, Test, Vet, Lint](https://github.com/strongo/dalgo/actions/workflows/ci.yml/badge.svg)](https://github.com/strongo/dalgo/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/strongo/dalgo)](https://goreportcard.com/report/github.com/strongo/dalgo)
 [![GoDoc](https://godoc.org/github.com/strongo/dalgo?status.svg)](https://godoc.org/github.com/strongo/dalgo)
 [![Sourcegraph](https://sourcegraph.com/github.com/strongo/dalgo/-/badge.svg)](https://sourcegraph.com/github.com/strongo/dalgo?badge)
