@@ -213,7 +213,7 @@ func TestKey_Parent(t *testing.T) {
 
 func TestKey_Validate(t *testing.T) {
 	type fields struct {
-		level  int
+		//level  int
 		parent *Key
 		kind   string
 		ID     interface{}
@@ -274,12 +274,6 @@ func TestNewKeyWithIntID(t *testing.T) {
 		collection string
 		id         int
 	}
-	type want struct {
-		level  int
-		parent *Key
-		kind   string
-		id     int
-	}
 	tests := []struct {
 		name string
 		args args
@@ -300,12 +294,6 @@ func TestNewKeyWithStrID(t *testing.T) {
 	type args struct {
 		collection string
 		id         string
-	}
-	type want struct {
-		level  int
-		parent *Key
-		kind   string
-		id     string
 	}
 	tests := []struct {
 		name string

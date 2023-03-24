@@ -3,7 +3,6 @@ package query
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 )
@@ -78,13 +77,13 @@ func (f field) String() string {
 // EqualTo creates equality condition for a field
 func (f field) EqualTo(v interface{}) Condition {
 	var val Expression
-	switch v.(type) {
+	switch v := v.(type) {
 	case string, int:
 		val = constant{Value: v}
 	case constant:
-		val = v.(constant)
+		val = v
 	case field:
-		val = v.(field)
+		val = v
 	}
 	return equal{Comparison: Comparison{Operator: Equal, Expressions: []Expression{f, val}}}
 }
@@ -92,8 +91,6 @@ func (f field) EqualTo(v interface{}) Condition {
 type constant struct {
 	Value interface{} `json:"value"`
 }
-
-var stringType = reflect.TypeOf("")
 
 // String returns string representation of a constant
 func (v constant) String() string {

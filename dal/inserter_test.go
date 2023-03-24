@@ -2,45 +2,43 @@ package dal
 
 import (
 	"context"
-	"fmt"
 	"testing"
 )
 
-type foo struct {
-	title string
-}
+//type foo struct {
+//	title string
+//}
+//
+//func (foo foo) Kind() string {
+//	return "foo"
+//}
+//
+//func (foo foo) Validate() error {
+//	if foo.title == "" {
+//		return fmt.Errorf("missing required field: title")
+//	}
+//	return nil
+//}
 
-func (foo foo) Kind() string {
-	return "foo"
-}
-
-func (foo foo) Validate() error {
-	if foo.title == "" {
-		return fmt.Errorf("missing required field: title")
-	}
-	return nil
-}
-
-type inserterMock struct {
-}
-
-func (v inserterMock) Insert(c context.Context, record Record, opts ...InsertOption) error {
-	options := NewInsertOptions(opts...)
-	if idGenerator := options.IDGenerator(); idGenerator != nil {
-		if err := idGenerator(c, record); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+//type inserterMock struct {
+//}
+//
+//func (v inserterMock) Insert(c context.Context, record Record, opts ...InsertOption) error {
+//	options := NewInsertOptions(opts...)
+//	if idGenerator := options.IDGenerator(); idGenerator != nil {
+//		if err := idGenerator(c, record); err != nil {
+//			return err
+//		}
+//	}
+//	return nil
+//}
 
 func TestInsertWithRandomID(t *testing.T) {
 	t.Run("should_pass", func(t *testing.T) {
 		data := new(map[string]interface{})
 
 		generatesCount := 0
-		var generateID IDGenerator
-		generateID = func(ctx context.Context, record Record) error {
+		var generateID = func(ctx context.Context, record Record) error {
 			generatesCount++
 			return nil
 		}

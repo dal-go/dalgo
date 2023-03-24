@@ -64,8 +64,16 @@ func (db dbMock) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker, o
 	panic("implement me")
 }
 
+type txContextKey struct {
+	id string
+}
+
+func (v txContextKey) String() string {
+	return v.id
+}
+
 func (db dbMock) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
-	txCtx := context.WithValue(ctx, "dalgo_tx", true)
+	txCtx := context.WithValue(ctx, txContextKey{id: "dalgo_tx"}, true)
 	return f(txCtx, readwriteTransaction{})
 }
 
