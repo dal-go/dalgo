@@ -31,7 +31,7 @@ type Key struct {
 }
 
 // String returns string representation of a key instance
-func (k Key) String() string {
+func (k *Key) String() string {
 	key := k
 	if err := key.Validate(); err != nil {
 		panic(fmt.Sprintf("will not generate path for invalid child: %v", err))
@@ -43,7 +43,7 @@ func (k Key) String() string {
 		if key.parent == nil {
 			break
 		} else {
-			key = *key.parent
+			key = key.parent
 		}
 	}
 	return reverseStringsJoin(s, "/")
@@ -97,7 +97,7 @@ func reverseStringsJoin(elems []string, sep string) string {
 //}
 
 // Level returns level of key (e.g. how many parents it have)
-func (k Key) Level() int {
+func (k *Key) Level() int {
 	if k.parent == nil {
 		return 0
 	}
@@ -105,17 +105,17 @@ func (k Key) Level() int {
 }
 
 // Parent return a reference to the parent key
-func (k Key) Parent() *Key {
+func (k *Key) Parent() *Key {
 	return k.parent
 }
 
 // Collection returns reference to colection
-func (k Key) Collection() string {
+func (k *Key) Collection() string {
 	return k.collection
 }
 
 // Validate validate key
-func (k Key) Validate() error {
+func (k *Key) Validate() error {
 	if strings.TrimSpace(k.collection) == "" {
 		return errors.New("child must have 'collection'")
 	}
@@ -139,13 +139,16 @@ func (k Key) Validate() error {
 type KeyOption = func(*Key)
 
 func setKeyOptions(key *Key, options ...KeyOption) {
-	for _, setOptions := range options {
-		setOptions(key)
+	for _, setOption := range options {
+		setOption(key)
 	}
 }
 
-// NewKeyWithID creates a new key with ID
-func NewKeyWithID(collection string, id interface{}, options ...KeyOption) (key *Key) {
+// NewKeyWithID creates a new key with an ID
+func NewKeyWithID[T comparable](collection string, id T, options ...KeyOption) (key *Key) {
+	if collection == "" {
+		panic("collection is a required parameter")
+	}
 	key = &Key{collection: collection, ID: id}
 	setKeyOptions(key, options...)
 	return
@@ -164,7 +167,7 @@ func NewKey(collection string, options ...KeyOption) (key *Key) {
 }
 
 // WithID sets ID of a key
-func WithID(id interface{}) KeyOption {
+func WithID[T comparable](id T) KeyOption {
 	return func(key *Key) {
 		key.ID = id
 	}
@@ -175,16 +178,6 @@ func WithFields(fields []FieldVal) KeyOption {
 	return func(key *Key) {
 		key.ID = fields
 	}
-}
-
-// NewKeyWithStrID create child with a single string ID
-func NewKeyWithStrID(collection string, id string, options ...KeyOption) *Key {
-	return NewKeyWithID(collection, id, options...)
-}
-
-// NewKeyWithIntID create child with a single integer ID
-func NewKeyWithIntID(collection string, id int, options ...KeyOption) *Key {
-	return NewKeyWithID(collection, id, options...)
 }
 
 // NewKeyWithFields creates a new record child from a sequence of record's references

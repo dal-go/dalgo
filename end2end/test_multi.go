@@ -8,9 +8,9 @@ import (
 )
 
 func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
-	k1r1Key := dal.NewKeyWithStrID(E2ETestKind1, "k1r1")
-	k1r2Key := dal.NewKeyWithStrID(E2ETestKind1, "k1r2")
-	k2r1Key := dal.NewKeyWithStrID(E2ETestKind2, "k2r1")
+	k1r1Key := dal.NewKeyWithID(E2ETestKind1, "k1r1")
+	k1r2Key := dal.NewKeyWithID(E2ETestKind1, "k1r2")
+	k2r1Key := dal.NewKeyWithID(E2ETestKind2, "k2r1")
 	allKeys := []*dal.Key{k1r1Key, k1r2Key, k2r1Key}
 
 	deleteAllRecords := func(ctx context.Context, t *testing.T, db dal.Database, keys []*dal.Key) {
@@ -104,8 +104,8 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 		keys := []*dal.Key{
 			k1r1Key,
 			k1r2Key,
-			dal.NewKeyWithStrID(E2ETestKind1, "k1r9"),
-			dal.NewKeyWithStrID(E2ETestKind2, "k2r9"),
+			dal.NewKeyWithID(E2ETestKind1, "k1r9"),
+			dal.NewKeyWithID(E2ETestKind2, "k2r9"),
 		}
 		data := make([]TestData, len(keys))
 		records := make([]dal.Record, len(keys))
