@@ -2,6 +2,7 @@ package dal
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -25,6 +26,17 @@ func TestWithReadonly(t *testing.T) {
 		if txOptions.IsReadonly() {
 			t.Errorf("expected to be readonly")
 		}
+	})
+}
+
+func TestWithAttempts(t *testing.T) {
+	t.Run("not_set", func(t *testing.T) {
+		txOptions := NewTransactionOptions()
+		assert.Equal(t, 0, txOptions.Attempts())
+	})
+	t.Run("set_to_3", func(t *testing.T) {
+		txOptions := NewTransactionOptions(TxWithAttempts(3))
+		assert.Equal(t, 3, txOptions.Attempts())
 	})
 }
 
@@ -53,14 +65,15 @@ func TestNewTransactionOptions(t *testing.T) {
 		//	t.Error("expected not to have a password, got: "+password)
 		//}
 	})
-	t.Run("readonly", func(t *testing.T) {
-		options := NewTransactionOptions(TxWithReadonly())
-		if !options.IsReadonly() {
-			t.Errorf("expected to be readonly")
-		}
-		//if password := options.Password(); password != "" {
-		//	t.Errorf("expected not to have a password, got: %v", password)
-		//}
+	t.Run("readonly_cross_group_5_attempts", func(t *testing.T) {
+		options := NewTransactionOptions(
+			TxWithReadonly(),
+			TxWithCrossGroup(),
+			TxWithAttempts(5),
+		)
+		assert.True(t, options.IsReadonly())
+		assert.True(t, options.IsCrossGroup())
+		assert.Equal(t, 5, options.Attempts())
 	})
 	//t.Run("password", func(t *testing.T) {
 	//	const expectedPassword = "test-pwd"

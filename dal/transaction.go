@@ -74,6 +74,9 @@ type TransactionOptions interface {
 	// IsCrossGroup indicates a cross-group transaction. Makes sense for Google App Engine.
 	IsCrossGroup() bool
 
+	// Attempts returns number of attempts to execute a transaction. This is used in Google Datastore for example.
+	Attempts() int
+
 	// Password() string - TODO: document why it was added
 }
 
@@ -84,6 +87,7 @@ type txOptions struct {
 	isolationLevel TxIsolationLevel
 	isReadonly     bool
 	isCrossGroup   bool
+	attempts       int
 	password       string
 }
 
@@ -102,6 +106,10 @@ func (v txOptions) IsolationLevel() TxIsolationLevel {
 // IsCrossGroup indicates a cross-group transaction was requested
 func (v txOptions) IsCrossGroup() bool {
 	return v.isCrossGroup
+}
+
+func (v txOptions) Attempts() int {
+	return v.attempts
 }
 
 // Password // TODO: why we need it?
@@ -131,6 +139,13 @@ func TxWithIsolationLevel(isolationLevel TxIsolationLevel) TransactionOption {
 			panic("an attempt to request more then 1 isolation level")
 		}
 		options.isolationLevel = isolationLevel
+	}
+}
+
+// TxWithAttempts specifies number of attempts to execute a transaction
+func TxWithAttempts(attempts int) TransactionOption {
+	return func(options *txOptions) {
+		options.attempts = attempts
 	}
 }
 
