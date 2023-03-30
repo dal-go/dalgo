@@ -19,21 +19,21 @@ func TestNewErrNotFoundByKey(t *testing.T) {
 		{
 			name: "ErrRecordNotFound",
 			args: args{
-				key:   NewKeyWithStrID("Foo", "bar"),
+				key:   NewKeyWithID("Foo", "bar"),
 				cause: ErrRecordNotFound,
 			},
 		},
 		{
 			name: "nil",
 			args: args{
-				key:   NewKeyWithStrID("Foo", "bar"),
+				key:   NewKeyWithID("Foo", "bar"),
 				cause: nil,
 			},
 		},
 		{
 			name: "some_error",
 			args: args{
-				key:   NewKeyWithStrID("Foo", "bar"),
+				key:   NewKeyWithID("Foo", "bar"),
 				cause: errors.New("some error"),
 			},
 		},

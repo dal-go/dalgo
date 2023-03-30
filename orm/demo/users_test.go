@@ -47,7 +47,7 @@ func TestSelectUserByEmail(t *testing.T) {
 			selectResult: mock_dal.NewSelectResult(
 				func(into func() interface{}) dal.Reader {
 					return mock_dal.NewSingleRecordReader(
-						dal.NewKeyWithIntID("users", 1),
+						dal.NewKeyWithID("users", 1),
 						`{"email":"test@example.com"}`,
 						into,
 					)

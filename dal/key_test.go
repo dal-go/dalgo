@@ -63,7 +63,7 @@ func TestField_Validate(t *testing.T) {
 //				ID:   "p1",
 //			},
 //			args: args{
-//				child: NewKeyWithStrID("Kind1", "k1"),
+//				child: NewKeyWithID("Kind1", "k1"),
 //			},
 //			want: want{
 //				fields: fields{
@@ -81,7 +81,7 @@ func TestField_Validate(t *testing.T) {
 //				ID:   "p1",
 //			},
 //			args: args{
-//				child: NewKeyWithStrID("Parent2", "p2").Child(NewKeyWithStrID("Kind1", "k1")),
+//				child: NewKeyWithID("Parent2", "p2").Child(NewKeyWithID("Kind1", "k1")),
 //			},
 //			want: want{
 //				parent: &fields{collection: "Parent1", ID: "p1", level: 1},
@@ -283,14 +283,14 @@ func TestNewKeyWithIntID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewKeyWithIntID(tt.args.collection, tt.args.id); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewKeyWithIntID() = %v, want %v", got, tt.want)
+			if got := NewKeyWithID(tt.args.collection, tt.args.id); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewKeyWithID() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestNewKeyWithStrID(t *testing.T) {
+func TestNewKeyWithID(t *testing.T) {
 	type args struct {
 		collection string
 		id         string
@@ -304,8 +304,8 @@ func TestNewKeyWithStrID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewKeyWithStrID(tt.args.collection, tt.args.id); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewKeyWithStrID() = %v, want %v", got, tt.want)
+			if got := NewKeyWithID(tt.args.collection, tt.args.id); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewKeyWithID() = %v, want %v", got, tt.want)
 			}
 		})
 	}
