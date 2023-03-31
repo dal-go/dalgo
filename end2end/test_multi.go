@@ -3,6 +3,7 @@ package end2end
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/strongo/dalgo/dal"
 	"testing"
 )
@@ -145,6 +146,10 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 			return tx.UpdateMulti(ctx, []*dal.Key{k1r1Key, k1r2Key}, updates)
 		})
 		if err != nil {
+			if errors.Is(err, dal.ErrNotSupported) {
+				t.Skipf("skipping test as UpdateMulti is not supported: %v", err)
+				return
+			}
 			t.Fatalf("failed to update 2 records at once: %v", err)
 		}
 		records := []dal.Record{
