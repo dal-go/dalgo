@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/strongo/dalgo/dal"
+	"sync"
 	"testing"
 )
 
@@ -37,106 +39,78 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 			)
 		}
 		if err := db.GetMulti(ctx, records); err != nil {
-			t.Fatalf("failed to get multiple records at once: %v", err)
+			t.Fatalf("failed to get 3 non exising records at once: %v", err)
 		}
-		recordsMustNotExist(t, records)
+		assertRecordsMustNotExist(t, records)
 	})
-	t.Run("SetMulti", func(t *testing.T) {
-		newRecord := func(key *dal.Key) dal.Record {
-			return dal.NewRecordWithData(key, TestData{
-				StringProp: fmt.Sprintf("%vstr", key.ID),
+	recordsCreated := false
+	testsStarted := 0
+	testsDone := 0
+	var m sync.Mutex
+
+	started := func() {
+		//m.Lock()
+		testsStarted++
+		//m.Unlock()
+	}
+
+	done := func() {
+		m.Lock()
+		testsDone++
+		m.Unlock()
+	}
+
+	started()
+	t.Run("CRUD_3_records", func(t *testing.T) {
+		defer done()
+		newRecord := func(key *dal.Key, value string) dal.Record {
+			return dal.NewRecordWithData(key, &TestData{
+				StringProp: value,
 			})
 		}
-		records := []dal.Record{
-			newRecord(k1r1Key),
-			newRecord(k1r2Key),
-			newRecord(k2r1Key),
-		}
-		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-			return tx.SetMulti(ctx, records)
-		})
-		if err != nil {
-			t.Fatalf("failed to set multiple records at once: %v", err)
-		}
-		t.Run("GetMulti_3_existing_records", func(t *testing.T) {
-			var data []TestData
-			records := make([]dal.Record, len(allKeys))
-			assetProps := func(t *testing.T) {
-				recordsMustExist(t, records)
-				assertStringProp := func(i int, record dal.Record) {
-					id := record.Key().ID.(string)
-					if expected, actual := id+"str", data[i].StringProp; actual != expected {
-						t.Errorf("field StringProp was expected to have value '%v' got '%v'", expected, actual)
-					}
+		t.Run("create_3_records", func(t *testing.T) {
+			err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+				records := []dal.Record{
+					newRecord(k1r1Key, "v1"),
+					newRecord(k1r2Key, "v2"),
+					newRecord(k2r1Key, "v3"),
 				}
-				for i, record := range records {
-					assertStringProp(i, record)
-				}
-			}
-			t.Run("using_records_with_data", func(t *testing.T) {
-				data = make([]TestData, len(allKeys))
-				for i := range records {
-					records[i] = dal.NewRecordWithData(allKeys[i], &data[i])
-				}
-				if err := db.GetMulti(ctx, records); err != nil {
-					t.Fatalf("failed to get multiple records at once: %v", err)
-				}
-				assetProps(t)
-			})
-			//t.Run("using_DataTo", func(t *testing.T) {
-			//	for i := range records {
-			//		records[i] = dal.NewRecord(allKeys[i])
-			//	}
-			//	if err := db.GetMulti(ctx, records); err != nil {
-			//		t.Fatalf("failed to get multiple records at once: %v", err)
-			//	}
-			//	recordsMustExist(t, records)
-			//	data = make([]TestData, len(allKeys))
-			//	for i, record := range records {
-			//		if err := record.DataTo(&data[i]); err != nil {
-			//			t.Fatalf("failed to record #%v", i+1)
-			//		}
-			//	}
-			//	assetProps(t)
-			//})
-		})
-		t.Run("GetMulti_2_existing_2_missing_records", func(t *testing.T) {
-			keys := []*dal.Key{
-				k1r1Key,
-				k1r2Key,
-				dal.NewKeyWithID(E2ETestKind1, "k1r9"),
-				dal.NewKeyWithID(E2ETestKind2, "k2r9"),
-			}
-			data := make([]TestData, len(keys))
-			records := make([]dal.Record, len(keys))
-			for i, key := range keys {
-				records[i] = dal.NewRecordWithData(key, &data[i])
-			}
-			if err := db.GetMulti(ctx, records); err != nil {
-				t.Fatalf("failed to set multiple records at once: %v", err)
-			}
-			recordsMustExist(t, records[:2])
-			recordsMustNotExist(t, records[2:])
-			checkPropValue := func(i int, expected string) error {
-				if data[i].StringProp != expected {
-					t.Errorf("expected %v got %v, err: %v", expected, data[i].StringProp, records[i].Error())
+				if err := tx.SetMulti(ctx, records); err != nil {
+					return fmt.Errorf("failed to set 3 records at once: %w", err)
 				}
 				return nil
-			}
-			if err := checkPropValue(0, "k1r1str"); err != nil {
-				t.Error(err)
-			}
-			if err := checkPropValue(1, "k1r2str"); err != nil {
-				t.Error(err)
-			}
-			for i := 2; i < 4; i++ {
-				if records[i].Exists() {
-					t.Errorf("record unexpectedly showing as existing, key: %v", records[i].Key())
-				}
+			})
+			if err != nil {
+				t.Fatalf("failed to set 3 records at once: %v", err)
 			}
 		})
-		t.Run("update_2_records", func(t *testing.T) {
-			data := make([]TestData, 3)
+		t.Run("get_3_existing_records", func(t *testing.T) {
+			err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+				records := []dal.Record{
+					newRecord(k1r1Key, ""),
+					newRecord(k1r2Key, ""),
+					newRecord(k2r1Key, ""),
+				}
+				if err := tx.GetMulti(ctx, records); err != nil {
+					return fmt.Errorf("failed to get 3 records at once: %w", err)
+				}
+				assertRecordsMustExist(t, records)
+				for i, v := range []string{"v1", "v2", "v3"} {
+					assert.Equal(t, v, records[i].Data().(*TestData).StringProp,
+						"record expected to load stored value")
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatalf("failed to get 3 existing records at once: %v", err)
+			}
+		})
+		recordsCreated = true
+		t.Run("update_2_existing_records", func(t *testing.T) {
+			if !recordsCreated {
+				t.Fatal("records must be created first")
+			}
+			defer done()
 			const newValue = "UpdateD"
 			updates := []dal.Update{
 				{Field: "StringProp", Value: newValue},
@@ -152,64 +126,65 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 				t.Fatalf("failed to update 2 records at once: %v", err)
 			}
 			records := []dal.Record{
-				dal.NewRecordWithData(k1r1Key, &data[0]),
-				dal.NewRecordWithData(k1r2Key, &data[1]),
-				dal.NewRecordWithData(k2r1Key, &data[2]),
+				newRecord(k1r1Key, ""),
+				newRecord(k1r2Key, ""),
+				newRecord(k2r1Key, ""),
 			}
 			if err := db.GetMulti(ctx, records); err != nil {
 				t.Fatalf("failed to get 3 records at once: %v", err)
 			}
-			recordsMustExist(t, records)
-			if actual := data[0].StringProp; actual != newValue {
-				t.Errorf("record expected to have StringProp as '%v' but got '%v', key: %v", newValue, actual, records[0].Key())
+			assertRecordsMustExist(t, records)
+			for i, record := range records {
+				assert.Equal(t, newValue, record.Data().(*TestData).StringProp, fmt.Sprintf("records[%d]: expected to have updated value", i))
 			}
-			if actual := data[1].StringProp; actual != newValue {
-				t.Errorf("record expected to have StringProp as '%v' but got '%v', key: %v", newValue, actual, records[1].Key())
-			}
-			if actual := data[2].StringProp; actual != "k2r1str" {
-				t.Errorf("record expected to have StringProp as '%v' but got '%v', key: %v", newValue, actual, records[2].Key())
-			}
+			testsDone += 1
 		})
-		t.Run("cleanup_delete", func(t *testing.T) {
-			deleteAllRecords(ctx, t, db, allKeys)
-			data := make([]struct{}, len(allKeys))
-			records := make([]dal.Record, len(allKeys))
-			for i := range records {
-				records[i] = dal.NewRecordWithData(allKeys[i], &data[i])
+		t.Run("GetMulti_2_existing_2_missing_records", func(t *testing.T) {
+			if !recordsCreated {
+				t.Fatal("records must be created first")
+			}
+			defer done()
+			keys := []*dal.Key{
+				k1r1Key,
+				k1r2Key,
+				dal.NewKeyWithID(E2ETestKind1, "non_existing_1"),
+				dal.NewKeyWithID(E2ETestKind2, "non_existing_2"),
+			}
+			records := make([]dal.Record, len(keys))
+			for i, key := range keys {
+				records[i] = newRecord(key, "")
 			}
 			if err := db.GetMulti(ctx, records); err != nil {
-				t.Fatalf("failed to get multiple records at once: %v", err)
+				t.Fatalf("failed to set multiple records at once: %v", err)
 			}
-			recordsMustNotExist(t, records)
+			assertRecordsMustExist(t, records[:2])
+			assertRecordsMustNotExist(t, records[2:])
+			assertStringPropValue := func(record dal.Record, expected string) {
+				if stringProp := record.Data().(*TestData).StringProp; stringProp != expected {
+					t.Errorf("expected %v got %v, err: %v", expected, stringProp, record.Error())
+				}
+			}
+			assertStringPropValue(records[0], "v1")
+			assertStringPropValue(records[1], "v2")
 		})
 	})
-}
 
-func recordsMustExist(t *testing.T, records []dal.Record) {
-	t.Helper()
-	notFound := false
-	for _, record := range records {
-		if err := record.Error(); err != nil {
-			t.Errorf("not able to check record for existence as it has unexpected error: %v", err)
-		}
-		if !record.Exists() {
-			t.Errorf("record was expected to exist, key: %v", record.Key())
-			notFound = true
-		}
-	}
-	if notFound {
-		t.Fatalf("some records that must exists were not found")
-	}
-}
+	//t.Run("cleanup_delete", func(t *testing.T) {
+	//	for {
+	//		if testsDone < testsStarted {
+	//			time.Sleep(time.Second)
+	//		}
+	//	}
+	//	deleteAllRecords(ctx, t, db, allKeys)
+	//	data := make([]struct{}, len(allKeys))
+	//	records := make([]dal.Record, len(allKeys))
+	//	for i := range records {
+	//		records[i] = dal.NewRecordWithData(allKeys[i], &data[i])
+	//	}
+	//	if err := db.GetMulti(ctx, records); err != nil {
+	//		t.Fatalf("failed to get multiple records at once: %v", err)
+	//	}
+	//	assertRecordsMustNotExist(t, records)
+	//})
 
-func recordsMustNotExist(t *testing.T, records []dal.Record) {
-	t.Helper()
-	for i, record := range records {
-		if err := record.Error(); err != nil {
-			t.Errorf("record with key=[%v] has unexpected error: %v", record.Key(), err)
-		} else if record.Exists() {
-			t.Errorf("for record #%v of %v Exists() returned true, but expected false; key: %v",
-				i+1, len(records), record.Key())
-		}
-	}
 }

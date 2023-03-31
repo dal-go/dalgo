@@ -1,12 +1,13 @@
 package dal
 
 import (
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 )
 
 // ErrNotSupported - return this if db driver does not support requested operation.
 // (for example no support for transactions)
+//
 //goland:noinspection GoUnusedGlobalVariable
 var ErrNotSupported = errors.New("not supported")
 
@@ -20,7 +21,7 @@ type ErrDuplicateUser struct {
 	DuplicateUserIDs []int64
 }
 
-var errNoError = errors.New("no error")
+var NoError = errors.New("no error")
 
 // Error implements error interface
 func (err ErrDuplicateUser) Error() string {
@@ -41,9 +42,6 @@ func IsNotFound(err error) bool {
 		return true
 	}
 	if errors.Is(err, ErrRecordNotFound) {
-		return true
-	}
-	if errors.Cause(err) == ErrRecordNotFound {
 		return true
 	}
 	return false
@@ -93,7 +91,7 @@ func errNotFoundCause(cause error) error {
 	if cause == nil || cause == ErrRecordNotFound {
 		return ErrRecordNotFound
 	}
-	return errors.WithMessage(ErrRecordNotFound, cause.Error())
+	return fmt.Errorf("%w: %v", ErrRecordNotFound, cause)
 }
 
 type errRollbackFailed struct {

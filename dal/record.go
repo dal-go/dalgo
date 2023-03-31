@@ -49,27 +49,26 @@ type record struct {
 	//dataTo func(target interface{}) error
 }
 
-// Exists returns if records exists. Panics if there was no a `get` operation on a record before.
-func (v record) Exists() bool {
+// Exists returns if records exists.
+func (v *record) Exists() bool {
 	if v.err != nil {
 		if IsNotFound(v.err) {
 			return false
 		}
-		if v.err == errNoError {
+		if v.err == NoError {
 			return true
 		}
-		panic("an attempt to check for existence a record with an error")
 	}
-	panic("tried to check if record exists before receiving the record data")
+	panic("an attempt to check if record exists before it was retrieved from database and SetError(error) called")
 }
 
 // Key returns key of a record
-func (v record) Key() *Key {
+func (v *record) Key() *Key {
 	return v.key
 }
 
 // HasChanged indicates if the record has changed since loading
-func (v record) HasChanged() bool {
+func (v *record) HasChanged() bool {
 	return v.changed
 }
 
@@ -78,9 +77,9 @@ func (v *record) MarkAsChanged() {
 	v.changed = true
 }
 
-func (v record) Data() interface{} {
+func (v *record) Data() interface{} {
 	if v.err != nil {
-		if v.err == errNoError {
+		if v.err == NoError {
 			return v.data
 		}
 		if !IsNotFound(v.err) {
@@ -112,8 +111,8 @@ func (v record) Data() interface{} {
 //}
 
 // Error returns error associated with a record
-func (v record) Error() error {
-	if v.err == errNoError || IsNotFound(v.err) {
+func (v *record) Error() error {
+	if v.err == NoError || IsNotFound(v.err) {
 		return nil
 	}
 	return v.err
@@ -122,7 +121,7 @@ func (v record) Error() error {
 // SetError sets error associated with a record
 func (v *record) SetError(err error) {
 	if err == nil {
-		v.err = errNoError
+		v.err = NoError
 	} else {
 		v.err = err
 	}

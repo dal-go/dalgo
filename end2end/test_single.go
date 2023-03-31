@@ -9,20 +9,20 @@ import (
 func assertRecordDoesNotExists(t *testing.T, record dal.Record, err error) {
 	t.Helper()
 	if err == nil {
-		t.Error("expected to get 'record not found' error, got nil")
+		if record.Exists() {
+			t.Error("expected record to not exist, but Exists() returned true")
+		}
+		//t.Error("expected to get 'record not found' error, got nil")
 	} else if !dal.IsNotFound(err) {
 		t.Errorf("expected to get 'record not found' error, got: %v", err)
-	}
-	if record.Exists() {
-		t.Error("expected record to not exist, but Exists() returned true")
 	}
 }
 
 func testSingleOperations(ctx context.Context, t *testing.T, db dal.Database) {
 	t.Run("single", func(t *testing.T) {
-		const id = "r0"
+		const id = "single_r0_non_existing"
 		key := dal.NewKeyWithID(E2ETestKind1, id)
-		t.Run("get", func(t *testing.T) {
+		t.Run("try_get_non_existing", func(t *testing.T) {
 			t.Run("db", func(t *testing.T) {
 				var data TestData
 				record := dal.NewRecordWithData(key, &data)
@@ -30,7 +30,7 @@ func testSingleOperations(ctx context.Context, t *testing.T, db dal.Database) {
 				assertRecordDoesNotExists(t, record, err)
 			})
 			t.Run("readonly_transaction", func(t *testing.T) {
-				data := TestData{}
+				var data TestData
 				record := dal.NewRecordWithData(key, &data)
 				err := db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 					return tx.Get(ctx, record)

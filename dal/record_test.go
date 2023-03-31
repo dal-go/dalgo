@@ -185,7 +185,7 @@ func Test_record_SetError(t *testing.T) {
 				err:  tt.fields.err,
 			}
 			v.SetError(tt.args.err)
-			if !(tt.args.err == nil && v.err == errNoError) && v.err != tt.args.err {
+			if !(tt.args.err == nil && v.err == NoError) && v.err != tt.args.err {
 				t.Errorf("expected %v, got: %v", tt.args.err, v.err)
 			}
 		})
