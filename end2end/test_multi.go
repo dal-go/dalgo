@@ -187,13 +187,18 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 
 func recordsMustExist(t *testing.T, records []dal.Record) {
 	t.Helper()
+	notFound := false
 	for _, record := range records {
 		if err := record.Error(); err != nil {
 			t.Errorf("not able to check record for existence as it has unexpected error: %v", err)
 		}
 		if !record.Exists() {
 			t.Errorf("record was expected to exist, key: %v", record.Key())
+			notFound = true
 		}
+	}
+	if notFound {
+		t.Fatalf("some records that must exists were not found")
 	}
 }
 
