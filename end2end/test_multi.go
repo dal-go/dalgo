@@ -6,11 +6,15 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/strongo/dalgo/dal"
+	"reflect"
 	"sync"
 	"testing"
 )
 
 func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
+
+	const updatedValue = "UpdateD"
+
 	k1r1Key := dal.NewKeyWithID(E2ETestKind1, "k1r1")
 	k1r2Key := dal.NewKeyWithID(E2ETestKind1, "k1r2")
 	k2r1Key := dal.NewKeyWithID(E2ETestKind2, "k2r1")
@@ -44,14 +48,14 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 		assertRecordsMustNotExist(t, records)
 	})
 	recordsCreated := false
-	testsStarted := 0
-	testsDone := 0
+
+	var testsStarted, testsDone int
 	var m sync.Mutex
 
 	started := func() {
-		//m.Lock()
+		m.Lock()
 		testsStarted++
-		//m.Unlock()
+		m.Unlock()
 	}
 
 	done := func() {
@@ -106,39 +110,6 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 			}
 		})
 		recordsCreated = true
-		t.Run("update_2_existing_records", func(t *testing.T) {
-			if !recordsCreated {
-				t.Fatal("records must be created first")
-			}
-			defer done()
-			const newValue = "UpdateD"
-			updates := []dal.Update{
-				{Field: "StringProp", Value: newValue},
-			}
-			err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-				return tx.UpdateMulti(ctx, []*dal.Key{k1r1Key, k1r2Key}, updates)
-			})
-			if err != nil {
-				if errors.Is(err, dal.ErrNotSupported) {
-					t.Skipf("skipping test as UpdateMulti is not supported: %v", err)
-					return
-				}
-				t.Fatalf("failed to update 2 records at once: %v", err)
-			}
-			records := []dal.Record{
-				newRecord(k1r1Key, ""),
-				newRecord(k1r2Key, ""),
-				newRecord(k2r1Key, ""),
-			}
-			if err := db.GetMulti(ctx, records); err != nil {
-				t.Fatalf("failed to get 3 records at once: %v", err)
-			}
-			assertRecordsMustExist(t, records)
-			for i, record := range records {
-				assert.Equal(t, newValue, record.Data().(*TestData).StringProp, fmt.Sprintf("records[%d]: expected to have updated value", i))
-			}
-			testsDone += 1
-		})
 		t.Run("GetMulti_2_existing_2_missing_records", func(t *testing.T) {
 			if !recordsCreated {
 				t.Fatal("records must be created first")
@@ -166,6 +137,55 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 			}
 			assertStringPropValue(records[0], "v1")
 			assertStringPropValue(records[1], "v2")
+			assertStringPropValue(records[2], "")
+			assertStringPropValue(records[3], "")
+		})
+		t.Run("update_2_existing_records", func(t *testing.T) {
+			if !recordsCreated {
+				t.Fatal("records must be created first")
+			}
+			defer done()
+			testData := TestData{}
+			field := GetStructFieldName(&testData, &testData.StringProp)
+			updates := []dal.Update{
+				{Field: field, Value: updatedValue},
+			}
+			keysToUpdate := []*dal.Key{k1r1Key, k1r2Key}
+			err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+				return tx.UpdateMulti(ctx, keysToUpdate, updates)
+			})
+			if err != nil {
+				if errors.Is(err, dal.ErrNotSupported) {
+					t.Skipf("skipping test as UpdateMulti is not supported: %v", err)
+					return
+				}
+				t.Fatalf("failed to update 2 records at once: %v", err)
+			}
+			records := []dal.Record{
+				newRecord(k1r1Key, ""),
+				newRecord(k1r2Key, ""),
+				newRecord(k2r1Key, ""),
+			}
+			if err := db.GetMulti(ctx, records); err != nil {
+				t.Fatalf("failed to get 3 records at once: %v", err)
+			}
+			assertRecordsMustExist(t, records)
+			isUpdated := func(record dal.Record) bool {
+				id := record.Key().ID
+				for _, key := range keysToUpdate {
+					if key.ID == id {
+						return true
+					}
+				}
+				return false
+			}
+			for i, record := range records {
+				if isUpdated(record) {
+					assert.Equal(t, updatedValue, record.Data().(*TestData).StringProp,
+						fmt.Sprintf("records[%d]: expected to have updated value", i))
+				}
+			}
+			testsDone += 1
 		})
 	})
 
@@ -187,4 +207,18 @@ func testMultiOperations(ctx context.Context, t *testing.T, db dal.Database) {
 	//	assertRecordsMustNotExist(t, records)
 	//})
 
+}
+
+func GetStructFieldName(Struct interface{}, field interface{}) (name string) {
+	s := reflect.ValueOf(Struct).Elem()
+
+	f := reflect.ValueOf(field).Elem()
+
+	for i := 0; i < s.NumField(); i++ {
+		valueField := s.Field(i)
+		if valueField.Addr().Interface() == f.Addr().Interface() {
+			return s.Type().Field(i).Name
+		}
+	}
+	return ""
 }
