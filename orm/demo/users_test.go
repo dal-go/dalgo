@@ -3,6 +3,7 @@ package demo
 import (
 	"context"
 	"errors"
+	"github.com/golang/mock/gomock"
 	"github.com/strongo/dalgo/dal"
 	"github.com/strongo/dalgo/mock_dal"
 	"reflect"
@@ -15,7 +16,8 @@ func TestSelectUserByEmail(t *testing.T) {
 		db    dal.ReadSession
 		email string
 	}
-	dbMock := mock_dal.NewDbMock()
+	mockCtrl := gomock.NewController(t)
+	dbMock := mock_dal.NewMockDatabase(mockCtrl)
 	tests := []struct {
 		name         string
 		args         args
@@ -59,9 +61,11 @@ func TestSelectUserByEmail(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dbMock.ForSelect(dal.Select{
-				From: User.Collection(),
-			}).Return(tt.selectResult)
+			dbMock.EXPECT().
+				Select(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, query dal.Select) (dal.Reader, error) {
+					return tt.selectResult.Reader(query.Into), tt.selectResult.Err
+				})
 			got := &userData{}
 			err := SelectUserByEmail(tt.args.ctx, tt.args.db, tt.args.email, got)
 			if !errors.Is(err, tt.wantErr) {

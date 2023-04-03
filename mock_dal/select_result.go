@@ -1,26 +1,27 @@
 package mock_dal
 
 import (
-	"context"
 	"encoding/json"
 	"github.com/strongo/dalgo/dal"
 )
 
+// SelectResult is a helper class that can be used in test definitions (TT)
 type SelectResult struct {
-	reader func(into func() interface{}) dal.Reader
-	err    error
+	Reader func(into func() interface{}) dal.Reader
+	Err    error
 }
 
+// NewSelectResult creates new SelectResult
 func NewSelectResult(getReader func(into func() interface{}) dal.Reader, err error) SelectResult {
 	if getReader == nil && err == nil {
-		panic("getReader == nil && err == nil")
+		panic("getReader == nil && Err == nil")
 	}
-	return SelectResult{reader: func(into func() interface{}) dal.Reader {
+	return SelectResult{Reader: func(into func() interface{}) dal.Reader {
 		if getReader == nil {
 			return nil
 		}
 		return getReader(into)
-	}, err: err}
+	}, Err: err}
 }
 
 type singleRecordReader struct {
@@ -48,35 +49,7 @@ func (s *singleRecordReader) Next() (dal.Record, error) {
 
 var _ dal.Reader = (*singleRecordReader)(nil)
 
+// NewSingleRecordReader creates a reader that returns a single record
 func NewSingleRecordReader(key *dal.Key, data string, into func() interface{}) *singleRecordReader {
 	return &singleRecordReader{key: key, data: data, into: into}
-}
-
-type dbMock struct {
-	readonlySession
-}
-
-var _ dal.Database = (*dbMock)(nil)
-var _ dal.ReadSession = (*dbMock)(nil)
-
-func (db dbMock) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker, options ...dal.TransactionOption) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-type txContextKey struct {
-	id string
-}
-
-func (v txContextKey) String() string {
-	return v.id
-}
-
-func (db dbMock) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
-	txCtx := context.WithValue(ctx, txContextKey{id: "dalgo_tx"}, true)
-	return f(txCtx, readwriteTransaction{})
-}
-
-func NewDbMock() dbMock {
-	return dbMock{readonlySession{onSelectFrom: make(map[string]SelectResult)}}
 }
