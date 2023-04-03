@@ -1,4 +1,4 @@
-package mock_dal
+package mocks4dal
 
 import (
 	"encoding/json"
