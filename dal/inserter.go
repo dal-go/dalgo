@@ -3,7 +3,6 @@ package dal
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/strongo/random"
 )
 
@@ -119,7 +118,7 @@ func InsertWithRandomID(
 	tmp := &record{key: key}
 	for i := 1; i <= attempts; i++ {
 		if err := generateID(c, tmp); err != nil {
-			return errors.Wrap(err, "failed to generate random Value")
+			return fmt.Errorf("failed to generate random value: %w", err)
 		}
 		if err := exists(key); err == nil {
 			continue
