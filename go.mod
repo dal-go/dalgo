@@ -4,7 +4,6 @@ go 1.20
 
 require (
 	github.com/golang/mock v1.6.0
-	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.6.0
 	github.com/strongo/random v0.0.1
 	github.com/strongo/validation v0.0.1
