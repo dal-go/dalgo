@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	dal "github.com/strongo/dalgo/dal"
+	dal "github.com/dal-go/dalgo/dal"
 )
 
 // MockDatabase is a mock of Database interface.

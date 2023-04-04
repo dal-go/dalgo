@@ -2,7 +2,7 @@ package record
 
 import (
 	"fmt"
-	"github.com/strongo/dalgo/dal"
+	"github.com/dal-go/dalgo/dal"
 )
 
 // WithID is a record with a strongly typed ID

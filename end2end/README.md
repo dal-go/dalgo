@@ -1,6 +1,6 @@
 # dalgo-end2end-tests
 
-End-to-end tests for https://github.com/strongo/dalgo
+End-to-end tests for https://github.com/dal-go/dalgo
 
 The tests include:
 

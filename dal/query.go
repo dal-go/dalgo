@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/strongo/dalgo/query"
+	"github.com/dal-go/dalgo/query"
 	"math"
 	"reflect"
 	"strconv"

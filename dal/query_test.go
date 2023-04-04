@@ -1,8 +1,8 @@
 package dal
 
 import (
-	"github.com/strongo/dalgo/query"
-	"github.com/strongo/dalgo/query/constant"
+	"github.com/dal-go/dalgo/query"
+	"github.com/dal-go/dalgo/query/constant"
 	"testing"
 )
 

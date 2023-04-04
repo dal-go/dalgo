@@ -2,7 +2,7 @@ package end2end
 
 import (
 	"context"
-	"github.com/strongo/dalgo/dal"
+	"github.com/dal-go/dalgo/dal"
 	"testing"
 )
 

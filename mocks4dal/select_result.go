@@ -2,7 +2,7 @@ package mocks4dal
 
 import (
 	"encoding/json"
-	"github.com/strongo/dalgo/dal"
+	"github.com/dal-go/dalgo/dal"
 )
 
 // SelectResult is a helper class that can be used in test definitions (TT)

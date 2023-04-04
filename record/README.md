@@ -13,8 +13,8 @@ Like:
 package models4user
 
 import (
-	"github.com/strongo/dalgo/dal"
-	"github.com/strongo/dalgo/record"
+	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/record"
 )
 
 // UserDto is a type that holds user data

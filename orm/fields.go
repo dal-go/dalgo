@@ -1,7 +1,7 @@
 package orm
 
 import (
-	"github.com/strongo/dalgo/query"
+	"github.com/dal-go/dalgo/query"
 )
 
 // Field defines field

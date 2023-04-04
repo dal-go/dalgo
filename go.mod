@@ -1,4 +1,4 @@
-module github.com/strongo/dalgo
+module github.com/dal-go/dalgo
 
 go 1.20
 

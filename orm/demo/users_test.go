@@ -3,9 +3,9 @@ package demo
 import (
 	"context"
 	"errors"
+	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/mocks4dal"
 	"github.com/golang/mock/gomock"
-	"github.com/strongo/dalgo/dal"
-	"github.com/strongo/dalgo/mocks4dal"
 	"reflect"
 	"testing"
 )

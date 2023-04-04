@@ -3,9 +3,9 @@ package demo
 import (
 	"context"
 	"fmt"
-	"github.com/strongo/dalgo/dal"
-	"github.com/strongo/dalgo/orm"
-	"github.com/strongo/dalgo/query"
+	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/orm"
+	"github.com/dal-go/dalgo/query"
 )
 
 type user struct {
