@@ -1,15 +1,5 @@
 {
   "extends": [
-    "config:base"
-  ],
-  "packageRules": [
-    {
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "automerge": true,
-      "automergeType": "branch"
-    }
+    "github>dal-go/dalgo-renovate-config"
   ]
 }
