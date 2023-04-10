@@ -184,3 +184,46 @@ func WithFields(fields []FieldVal) KeyOption {
 func NewKeyWithFields(collection string, fields ...FieldVal) *Key {
 	return &Key{collection: collection, ID: fields}
 }
+
+func EqualKeys(k1 *Key, k2 *Key) bool {
+
+	k1s := make([]*Key, 0, k1.Level())
+	k2s := make([]*Key, 0, k2.Level())
+
+	panicIfCircular := func(key *Key, keys []*Key) {
+		for _, k := range keys {
+			if EqualKeys(k, key) {
+				panic(fmt.Sprintf("circular key: %s=%v", k.collection, k.ID))
+			}
+		}
+	}
+	for {
+		if k1 == nil && k2 == nil {
+			return true
+		}
+		if k1 == nil || k2 == nil {
+			return false
+		}
+		if k1.Collection() != k2.Collection() {
+			return false
+		}
+		if k1.ID == nil && k2.ID != nil || k2.ID == nil && k1.ID != nil {
+			return false
+		}
+		if k1.ID != k2.ID {
+			return false
+		}
+		k1s = append(k1s, k1)
+		k2s = append(k2s, k2)
+
+		k1 = k1.Parent()
+		k2 = k2.Parent()
+
+		panicIfCircular(k1, k1s)
+		panicIfCircular(k2, k2s)
+	}
+}
+
+func (k *Key) Equal(key *Key) bool {
+	return EqualKeys(k, key)
+}
