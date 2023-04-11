@@ -4,14 +4,14 @@ package dal
 // elements to whatever array already exists, or to create an array if no value
 // exists.
 type arrayUnion struct {
-	elems []interface{}
+	elems []any
 }
 
 func (arrayUnion) Name() string {
 	return "ArrayUnion"
 }
 
-func (v arrayUnion) Value() interface{} {
+func (v arrayUnion) Value() any {
 	return v.elems
 }
 
@@ -27,6 +27,6 @@ func (v arrayUnion) Value() interface{} {
 // ArrayUnion must be the value of a field directly; it cannot appear in
 // array or struct values, or in any value that is itself inside an array or
 // struct.
-func ArrayUnion(elems ...interface{}) Transform {
+func ArrayUnion(elems ...any) Transform {
 	return arrayUnion{elems: elems}
 }

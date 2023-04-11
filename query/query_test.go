@@ -11,7 +11,7 @@ func Test_field_EqualTo(t *testing.T) {
 		Name string
 	}
 	type args struct {
-		v interface{}
+		v any
 	}
 	type tst struct {
 		name   string
@@ -19,7 +19,7 @@ func Test_field_EqualTo(t *testing.T) {
 		args   args
 		want   Condition
 	}
-	test := func(name string, value interface{}) tst {
+	test := func(name string, value any) tst {
 		return tst{
 			name:   name,
 			fields: fields{Name: fieldName},

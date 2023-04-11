@@ -13,7 +13,7 @@ func TestSelect_String(t *testing.T) {
 		GroupBy []query.Expression
 		OrderBy []query.Expression
 		Columns []query.Column
-		Into    func() interface{}
+		Into    func() any
 		Limit   int
 	}
 	tests := []struct {

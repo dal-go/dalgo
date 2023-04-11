@@ -9,7 +9,7 @@ import (
 func TestNewRecord(t *testing.T) {
 	type args struct {
 		key  *Key
-		data interface{}
+		data any
 	}
 	tests := []struct {
 		name string
@@ -33,13 +33,13 @@ func TestNewRecord(t *testing.T) {
 func Test_record_Data(t *testing.T) {
 	type fields struct {
 		key  *Key
-		data interface{}
+		data any
 		err  error
 	}
 	tests := []struct {
 		name   string
 		fields fields
-		want   interface{}
+		want   any
 	}{
 		{name: "string", fields: fields{data: "test"}, want: "test"},
 	}
@@ -84,7 +84,7 @@ func Test_record_Error(t *testing.T) {
 func Test_record_Key(t *testing.T) {
 	type fields struct {
 		key  *Key
-		data interface{}
+		data any
 		err  error
 	}
 	tests := []struct {
@@ -115,11 +115,11 @@ func Test_record_Key(t *testing.T) {
 //func Test_record_SetData(t *testing.T) {
 //	type fields struct {
 //		key  *Key
-//		data interface{}
+//		data any
 //		err  error
 //	}
 //	type args struct {
-//		data interface{}
+//		data any
 //	}
 //	tests := []struct {
 //		name   string
@@ -150,7 +150,7 @@ func Test_record_Key(t *testing.T) {
 func Test_record_SetError(t *testing.T) {
 	type fields struct {
 		key  *Key
-		data interface{}
+		data any
 		err  error
 	}
 	type args struct {
@@ -197,7 +197,7 @@ func Test_record_MarkAsChanged(t *testing.T) {
 		key     *Key
 		err     error
 		changed bool
-		data    interface{}
+		data    any
 	}
 	tests := []struct {
 		name   string

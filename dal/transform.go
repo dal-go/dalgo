@@ -7,19 +7,19 @@ type Transform interface {
 	Name() string
 
 	// Value returns arguments of transform
-	Value() interface{}
+	Value() any
 }
 
 type transform struct {
 	name  string
-	value interface{}
+	value any
 }
 
 func (v transform) Name() string {
 	return v.name
 }
 
-func (v transform) Value() interface{} {
+func (v transform) Value() any {
 	return v.value
 }
 
@@ -28,7 +28,7 @@ func Increment(v int) Transform {
 	return transform{name: "increment", value: v}
 }
 
-func IsTransform(v interface{}) (t Transform, ok bool) {
+func IsTransform(v any) (t Transform, ok bool) {
 	var t1 transform
 	t1, ok = v.(transform)
 	return t1, ok

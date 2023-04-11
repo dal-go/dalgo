@@ -23,3 +23,11 @@ func (v WithID[K]) String() string {
 	}
 	return fmt.Sprintf(`{ID=%+v, FullID="%s", Key=%v, Record=%v}`, v.ID, v.FullID, v.Key, v.Record)
 }
+
+func NewWithID[T comparable](id T, key *dal.Key, data any) WithID[T] {
+	return WithID[T]{
+		ID:     id,
+		Key:    key,
+		Record: dal.NewRecordWithData(key, data),
+	}
+}

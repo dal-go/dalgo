@@ -25,7 +25,7 @@ type Record interface {
 	// Data returns record data (without ID/key).
 	// Requires either record to be created by NewRecordWithData()
 	// or DataTo() to be called first, otherwise panics.
-	Data() interface{}
+	Data() any
 
 	// HasChanged & MarkAsChanged are methods of convenience
 	HasChanged() bool
@@ -34,19 +34,19 @@ type Record interface {
 	MarkAsChanged()
 
 	//// SetDataTo sets DataTo handler
-	//SetDataTo(dataTo func(target interface{}) error)
+	//SetDataTo(dataTo func(target any) error)
 
 	//// DataTo deserializes record data into a struct. Throws panic if called before `Get`.
 	//// Uses a handler set by SetDataTo.
-	//DataTo(target interface{}) error
+	//DataTo(target any) error
 }
 
 type record struct {
 	key     *Key
 	err     error
 	changed bool
-	data    interface{}
-	//dataTo func(target interface{}) error
+	data    any
+	//dataTo func(target any) error
 }
 
 // Exists returns if records exists.
@@ -77,7 +77,7 @@ func (v *record) MarkAsChanged() {
 	v.changed = true
 }
 
-func (v *record) Data() interface{} {
+func (v *record) Data() any {
 	if v.err != nil {
 		if v.err == NoError {
 			return v.data
@@ -91,12 +91,12 @@ func (v *record) Data() interface{} {
 }
 
 //// SetDataTo sets DataTo handler
-//func (v *record) SetDataTo(dataTo func(target interface{}) error) {
+//func (v *record) SetDataTo(dataTo func(target any) error) {
 //	v.dataTo = dataTo
 //}
 //
 //// DataTo marshals record data into target
-//func (v record) DataTo(target interface{}) error {
+//func (v record) DataTo(target any) error {
 //	if target == nil {
 //		panic("not possible to marshall data into a nil value")
 //	}
@@ -143,12 +143,12 @@ func newRecord(key *Key) *record {
 }
 
 // NewRecordWithData creates a new record with a data target struct
-func NewRecordWithData(key *Key, data interface{}) Record {
+func NewRecordWithData(key *Key, data any) Record {
 	record := newRecord(key)
 	record.data = data
 	return record
 }
 
-func NewRecordWithoutKey(data interface{}) Record {
+func NewRecordWithoutKey(data any) Record {
 	return &record{data: data}
 }

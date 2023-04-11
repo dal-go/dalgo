@@ -8,7 +8,7 @@ import (
 func TestField_Validate(t *testing.T) {
 	type fields struct {
 		Name  string
-		Value interface{}
+		Value any
 	}
 	tests := []struct {
 		name    string
@@ -41,7 +41,7 @@ func TestField_Validate(t *testing.T) {
 //	type fields struct {
 //		level int
 //		collection  string
-//		ID    interface{}
+//		ID    any
 //	}
 //	type args struct {
 //		child *Key
@@ -216,7 +216,7 @@ func TestKey_Validate(t *testing.T) {
 		//level  int
 		parent *Key
 		kind   string
-		ID     interface{}
+		ID     any
 	}
 	tests := []struct {
 		name    string

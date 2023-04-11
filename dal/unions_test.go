@@ -7,7 +7,7 @@ import (
 
 func TestArrayUnion(t *testing.T) {
 	type args struct {
-		elems []interface{}
+		elems []any
 	}
 	tests := []struct {
 		name string
@@ -21,8 +21,8 @@ func TestArrayUnion(t *testing.T) {
 		},
 		{
 			name: "single element",
-			args: args{elems: []interface{}{"s1"}},
-			want: ArrayUnion([]interface{}{"s1"}...),
+			args: args{elems: []any{"s1"}},
+			want: ArrayUnion([]any{"s1"}...),
 		},
 	}
 	for _, tt := range tests {

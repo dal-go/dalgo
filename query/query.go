@@ -53,7 +53,7 @@ func Field(name string) Expression {
 }
 
 // ID creates an expression that compares an ID with a constant
-func ID(name string, value interface{}) Expression {
+func ID(name string, value any) Expression {
 	return Comparison{Operator: Equal, Expressions: []Expression{
 		field{Name: name, IsID: true},
 		constant{Value: value},
@@ -75,7 +75,7 @@ func (f field) String() string {
 }
 
 // EqualTo creates equality condition for a field
-func (f field) EqualTo(v interface{}) Condition {
+func (f field) EqualTo(v any) Condition {
 	var val Expression
 	switch v := v.(type) {
 	case string, int:
@@ -89,7 +89,7 @@ func (f field) EqualTo(v interface{}) Condition {
 }
 
 type constant struct {
-	Value interface{} `json:"value"`
+	Value any `json:"value"`
 }
 
 // String returns string representation of a constant

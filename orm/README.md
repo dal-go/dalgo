@@ -46,7 +46,7 @@ query := dal.Select{
     From:  User.Collection(),
     Where: User.Email.EqualToString(email),
     Columns: query.Columns(User.FirstName.Name(), User.LastName.Name()),
-    Into: func() interface{} {
+    Into: func() any {
         return &row{}
     },
     Limit: 1,

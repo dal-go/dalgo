@@ -35,7 +35,7 @@ import (
 
 func TestInsertWithRandomID(t *testing.T) {
 	t.Run("should_pass", func(t *testing.T) {
-		data := new(map[string]interface{})
+		data := new(map[string]any)
 
 		generatesCount := 0
 		var generateID = func(ctx context.Context, record Record) error {

@@ -42,7 +42,7 @@ type Select struct {
 	// Columns defines what columns to return
 	Columns []query.Column
 
-	Into func() interface{}
+	Into func() any
 
 	// Limit specifies maximum number of records to be returned
 	Limit int

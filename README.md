@@ -96,7 +96,7 @@ package dal
 
 type Record interface {
 	Key() *Key          // defines `table` name of the entity
-	Data() interface{}  // value to be stored/retrieved (without ID)
+	Data() any  // value to be stored/retrieved (without ID)
 	Error() error       // holds error for the record
 	SetError(err error) // sets error relevant to specific record
 	Exists() bool       // indicates if the record exists in DB

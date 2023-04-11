@@ -8,8 +8,8 @@ import (
 
 // FieldVal hold a reference to a single record within a root or nested recordset.
 type FieldVal struct {
-	Name  string      `json:"name"`
-	Value interface{} `json:"value"`
+	Name  string `json:"name"`
+	Value any    `json:"value"`
 }
 
 // Validate valodates field value
@@ -27,7 +27,7 @@ func (v FieldVal) Validate() error {
 type Key struct {
 	parent     *Key
 	collection string
-	ID         interface{}
+	ID         any
 }
 
 // String returns string representation of a key instance
