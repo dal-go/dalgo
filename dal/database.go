@@ -62,7 +62,7 @@ type ReadSession interface {
 	GetMulti(ctx context.Context, records []Record) error
 
 	// Select executes a data retrieval query
-	Select(ctx context.Context, query Select) (Reader, error)
+	Select(ctx context.Context, query Query) (Reader, error)
 }
 
 // ReadwriteSession defines methods that can read & modify database

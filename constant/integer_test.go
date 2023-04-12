@@ -12,22 +12,22 @@ func TestInt(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want integer
+		want IntConst
 	}{
 		{
 			name: "0",
 			args: args{0},
-			want: integer{value: 0},
+			want: IntConst{value: 0},
 		},
 		{
 			name: "10",
 			args: args{10},
-			want: integer{value: 10},
+			want: IntConst{value: 10},
 		},
 		{
 			name: "-20",
 			args: args{-20},
-			want: integer{value: -20},
+			want: IntConst{value: -20},
 		},
 	}
 	for _, tt := range tests {
@@ -46,7 +46,7 @@ func TestStr(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want str
+		want StrConst
 	}{
 		// TODO: Add test cases.
 	}
@@ -81,7 +81,7 @@ func Test_integer_String(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i := integer{
+			i := IntConst{
 				value: tt.fields.value,
 			}
 			if got := i.String(); got != tt.want {
@@ -113,7 +113,7 @@ func Test_str_String(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := str{
+			v := StrConst{
 				value: tt.fields.value,
 			}
 			if got := v.String(); got != tt.want {

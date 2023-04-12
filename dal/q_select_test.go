@@ -1,19 +1,18 @@
 package dal
 
 import (
-	"github.com/dal-go/dalgo/query"
-	"github.com/dal-go/dalgo/query/constant"
+	"github.com/dal-go/dalgo/constant"
 	"testing"
 )
 
 func TestSelect_String(t *testing.T) {
 	type fields struct {
 		From    *CollectionRef
-		Where   query.Condition
-		GroupBy []query.Expression
-		OrderBy []query.Expression
-		Columns []query.Column
-		Into    func() any
+		Where   Condition
+		GroupBy []Expression
+		OrderBy []Expression
+		Columns []Column
+		Into    func() Record
 		Limit   int
 	}
 	tests := []struct {
@@ -24,7 +23,7 @@ func TestSelect_String(t *testing.T) {
 		{
 			name: "select_1",
 			fields: fields{
-				Columns: []query.Column{
+				Columns: []Column{
 					{Expression: constant.Int(1)},
 				},
 			},
@@ -33,7 +32,7 @@ func TestSelect_String(t *testing.T) {
 		{
 			name: "select_'abc'_AS_first_col",
 			fields: fields{
-				Columns: []query.Column{
+				Columns: []Column{
 					{Expression: constant.Str("abc"), Alias: "first_col"},
 				},
 			},
@@ -50,7 +49,7 @@ func TestSelect_String(t *testing.T) {
 			name: "select_*_from_Users_where_SomeID_=_123",
 			fields: fields{
 				From:  &CollectionRef{Name: "Users"},
-				Where: query.ID("SomeID", 123),
+				Where: ID("SomeID", 123),
 			},
 			want: "SELECT * FROM [Users] WHERE [SomeID] = 123",
 		},
@@ -58,7 +57,7 @@ func TestSelect_String(t *testing.T) {
 			name: "select_*_from_User_where_Email_=_'test@example.com'",
 			fields: fields{
 				From:  &CollectionRef{Name: "User"},
-				Where: query.NewComparison(query.Equal, query.Field("Email"), query.String("test@example.com")),
+				Where: NewComparison(Equal, FieldRef{Name: "Email"}, String("test@example.com")),
 			},
 			want: "SELECT * FROM [User] WHERE [Email] = 'test@example.com'",
 		},
@@ -73,7 +72,7 @@ func TestSelect_String(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := Select{
+			q := Query{
 				From:    tt.fields.From,
 				Where:   tt.fields.Where,
 				GroupBy: tt.fields.GroupBy,

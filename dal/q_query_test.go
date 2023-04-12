@@ -1,4 +1,4 @@
-package query
+package dal
 
 import (
 	"reflect"
@@ -27,7 +27,7 @@ func Test_field_EqualTo(t *testing.T) {
 			want: equal{
 				Comparison: Comparison{
 					Operator:    "==",
-					Expressions: []Expression{field{Name: fieldName}, constant{Value: 1}},
+					Expressions: []Expression{FieldRef{Name: fieldName}, constantCondition{Value: 1}},
 				},
 			},
 		}
@@ -40,7 +40,7 @@ func Test_field_EqualTo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := field{
+			f := FieldRef{
 				Name: tt.fields.Name,
 			}
 			if got := f.EqualTo(tt.args.v); !reflect.DeepEqual(got, tt.want) {

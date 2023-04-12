@@ -1,7 +1,7 @@
 package orm
 
 import (
-	"github.com/dal-go/dalgo/query"
+	"github.com/dal-go/dalgo/dal"
 )
 
 // Field defines field
@@ -9,13 +9,13 @@ type Field interface {
 	Name() string
 	Type() string
 	Required() bool
-	CompareTo(operator query.Operator, v query.Expression) query.Condition
+	CompareTo(operator dal.Operator, v dal.Expression) dal.Condition
 }
 
 // StringField defines a string field
 type StringField interface {
 	Field
-	EqualToString(s string) query.Condition
+	EqualToString(s string) dal.Condition
 }
 
 type field struct {
@@ -39,12 +39,12 @@ func (v stringField) Type() string {
 	return "string"
 }
 
-func (v stringField) EqualToString(s string) query.Condition {
-	return v.CompareTo(query.Equal, query.String(s))
+func (v stringField) EqualToString(s string) dal.Condition {
+	return v.CompareTo(dal.Equal, dal.String(s))
 }
 
-func (v stringField) CompareTo(operator query.Operator, expression query.Expression) query.Condition {
-	return query.NewComparison(operator, nil, expression)
+func (v stringField) CompareTo(operator dal.Operator, expression dal.Expression) dal.Condition {
+	return dal.NewComparison(operator, nil, expression)
 }
 
 // NewStringField defines a new string field
