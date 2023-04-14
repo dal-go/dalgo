@@ -67,6 +67,9 @@ type ReadSession interface {
 
 	// SelectAllIDs can be used to get a list of simple IDs
 	SelectAllIDs(ctx context.Context, query Query) ([]any, error)
+	SelectAllStrIDs(ctx context.Context, query Query) ([]string, error)
+	SelectAllIntIDs(ctx context.Context, query Query) ([]int, error)
+	SelectAllInt64IDs(ctx context.Context, query Query) ([]int64, error)
 }
 
 // ReadwriteSession defines methods that can read & modify database
