@@ -3,6 +3,7 @@ package dal
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -12,7 +13,7 @@ type FieldVal struct {
 	Value any    `json:"value"`
 }
 
-// Validate valodates field value
+// Validate validates field value
 func (v FieldVal) Validate() error {
 	if strings.TrimSpace(v.Name) == "" {
 		return errors.New("name is a required property")
@@ -28,11 +29,12 @@ type Key struct {
 	parent     *Key
 	collection string
 	ID         any
+	IDKind     reflect.Kind
 }
 
 // String returns string representation of a key instance
 func (k *Key) String() string {
-	key := k
+	key := k // This is intended as we want to traverse the key ancestors
 	if err := key.Validate(); err != nil {
 		panic(fmt.Sprintf("will not generate path for invalid child: %v", err))
 	}
@@ -51,7 +53,7 @@ func (k *Key) String() string {
 
 // CollectionPath return path to parent
 func (k *Key) CollectionPath() string {
-	key := k
+	key := k // This is intended as we want to traverse the key ancestors
 	var s []string
 	for {
 		if strings.TrimSpace(key.collection) == "" {
@@ -152,6 +154,17 @@ func NewKeyWithID[T comparable](collection string, id T, options ...KeyOption) (
 	key = &Key{collection: collection, ID: id}
 	setKeyOptions(key, options...)
 	return
+}
+
+func NewIncompleteKey(collection string, idKind reflect.Kind, parent *Key) *Key {
+	if idKind == reflect.Invalid {
+		panic("idKind == reflect.Invalid")
+	}
+	return &Key{
+		parent:     parent,
+		collection: collection,
+		IDKind:     idKind,
+	}
 }
 
 // NewKey creates a new key

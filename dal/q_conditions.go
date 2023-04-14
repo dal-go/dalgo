@@ -2,7 +2,7 @@ package dal
 
 import (
 	"fmt"
-	"strings"
+	"reflect"
 )
 
 type Condition interface {
@@ -11,8 +11,13 @@ type Condition interface {
 
 // Comparison defines a contact for a comparison
 type Comparison struct {
-	Operator    Operator     `json:"operator"`
-	Expressions []Expression `json:"expressions"`
+	Operator Operator
+	Left     Expression
+	Right    Expression
+}
+
+func (v Comparison) Equal(b Comparison) bool {
+	return v.Operator == b.Operator && reflect.DeepEqual(v.Left, b.Left) && reflect.DeepEqual(v.Right, b.Right)
 }
 
 // IsGroupOperator says if an operator is a group operator
@@ -22,30 +27,19 @@ func IsGroupOperator(o Operator) bool {
 
 // String returns string representation of a comparison
 func (v Comparison) String() string {
-	if IsGroupOperator(v.Operator) {
-		s := make([]string, len(v.Expressions))
-		for i, e := range v.Expressions {
-			s[i] = e.String()
-		}
-		return fmt.Sprintf("%v (%v)", v.Operator, strings.Join(s, ", "))
-	}
 	o := v.Operator
 	if o == Equal {
 		o = "="
 	}
-	return fmt.Sprintf("%v %v %v", v.Expressions[0], o, v.Expressions[1])
+	return fmt.Sprintf("%v %v %v", v.Left, o, v.Right)
 }
 
 // NewComparison creates new Comparison
-func NewComparison(o Operator, expressions ...Expression) Comparison {
-	return Comparison{Operator: o, Expressions: expressions}
+func NewComparison(left Expression, o Operator, right Expression) Comparison {
+	return Comparison{Operator: o, Left: left, Right: right}
 }
 
-// String creates a new constantCondition expression
+// String creates a new constantExpression expression
 func String(v string) Expression {
-	return constantCondition{Value: v}
-}
-
-type equal struct {
-	Comparison
+	return constantExpression{Value: v}
 }

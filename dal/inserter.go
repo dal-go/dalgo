@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/strongo/random"
+	"reflect"
 )
 
 // IDGenerator defines a contract for ID generator function
@@ -76,6 +77,7 @@ func WithRandomStringID(length int, options ...randomStringOption) KeyOption {
 		setOption(&rso)
 	}
 	return func(key *Key) {
+		key.IDKind = reflect.String
 		key.ID = WithIDGenerator(func(ctx context.Context, record Record) error {
 			key.ID = random.ID(length)
 			return nil

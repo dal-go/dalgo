@@ -63,6 +63,10 @@ type ReadSession interface {
 
 	// Select executes a data retrieval query
 	Select(ctx context.Context, query Query) (Reader, error)
+	SelectAll(ctx context.Context, query Query) ([]Record, error)
+
+	// SelectAllIDs can be used to get a list of simple IDs
+	SelectAllIDs(ctx context.Context, query Query) ([]any, error)
 }
 
 // ReadwriteSession defines methods that can read & modify database
@@ -102,4 +106,5 @@ type Reader interface {
 	// Next returns the next record for a query.
 	// If no more records a nil record and ErrNoMoreRecords are returned.
 	Next() (Record, error)
+	Cursor() (string, error)
 }

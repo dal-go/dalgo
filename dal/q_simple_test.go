@@ -1,16 +1,15 @@
-package where
+package dal
 
 import (
-	"github.com/dal-go/dalgo/dal"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestSimpleQuery(t *testing.T) {
-	newRecord := func() dal.Record {
+	newRecord := func() Record {
 		return nil
 	}
-	var q = dal.From("test",
+	var q = From("test",
 		Field("field_1").EqualTo("value_1"),
 	).SelectInto(newRecord)
 	assert.NotNil(t, q)

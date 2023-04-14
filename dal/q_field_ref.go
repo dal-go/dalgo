@@ -1,10 +1,16 @@
 package dal
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type FieldRef struct {
 	Name string
 	IsID bool
+}
+
+func (f FieldRef) Equal(b FieldRef) bool {
+	return f.Name == b.Name && f.IsID == b.IsID
 }
 
 // String returns string representation of a field
@@ -14,14 +20,18 @@ func (f FieldRef) String() string {
 
 // EqualTo creates equality condition for a field
 func (f FieldRef) EqualTo(v any) Condition {
+	return WhereField(f.Name, Equal, v)
+}
+
+func WhereField(name string, operator Operator, v any) Condition {
 	var val Expression
 	switch v := v.(type) {
 	case string, int:
-		val = constantCondition{Value: v}
-	case constantCondition:
+		val = constantExpression{Value: v}
+	case constantExpression:
 		val = v
 	case FieldRef:
 		val = v
 	}
-	return equal{Comparison: Comparison{Operator: Equal, Expressions: []Expression{f, val}}}
+	return Comparison{Operator: operator, Left: Field(name), Right: val}
 }

@@ -3,6 +3,7 @@ package dal
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 // ErrDoesNotExist indicates a record does not exist
@@ -149,6 +150,17 @@ func NewRecordWithData(key *Key, data any) Record {
 	return record
 }
 
-func NewRecordWithoutKey(data any) Record {
-	return &record{data: data}
+// NewRecordWithIncompleteKey creates a new record with an incomplete key
+// This is mostly intended for use in Select queries
+func NewRecordWithIncompleteKey(collection string, idKind reflect.Kind, data any) Record {
+	return &record{
+		key:  NewIncompleteKey(collection, idKind, nil),
+		data: data,
+	}
+}
+
+// NewRecordWithoutKey creates a new record without a key
+// Obsolete, use NewRecordWithIncompleteKey instead
+func NewRecordWithoutKey(collection string, idKind reflect.Kind, data any) Record {
+	return NewRecordWithIncompleteKey(collection, idKind, data)
 }

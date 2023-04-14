@@ -6,12 +6,16 @@ import (
 	"strconv"
 )
 
-type constantCondition struct {
+type constantExpression struct {
 	Value any `json:"value"`
 }
 
-// String returns string representation of a constantCondition
-func (v constantCondition) String() string {
+func (v constantExpression) Equal(b constantExpression) bool {
+	return v.Value == b.Value
+}
+
+// String returns string representation of a constantExpression
+func (v constantExpression) String() string {
 	switch v.Value.(type) {
 	case int:
 		return strconv.Itoa(v.Value.(int))

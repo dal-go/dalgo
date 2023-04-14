@@ -23,12 +23,11 @@ func Test_field_EqualTo(t *testing.T) {
 		return tst{
 			name:   name,
 			fields: fields{Name: fieldName},
-			args:   args{v: 1},
-			want: equal{
-				Comparison: Comparison{
-					Operator:    "==",
-					Expressions: []Expression{FieldRef{Name: fieldName}, constantCondition{Value: 1}},
-				},
+			args:   args{v: value},
+			want: Comparison{
+				Operator: Equal,
+				Left:     FieldRef{Name: fieldName},
+				Right:    constantExpression{Value: value},
 			},
 		}
 	}
@@ -44,7 +43,7 @@ func Test_field_EqualTo(t *testing.T) {
 				Name: tt.fields.Name,
 			}
 			if got := f.EqualTo(tt.args.v); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("EqualTo(%v) = %v, want %v", tt.args.v, got, tt.want)
+				t.Errorf("EqualTo(%v) = %T:%v, want %T:%v", tt.args.v, got, got, tt.want, tt.want)
 			}
 		})
 	}

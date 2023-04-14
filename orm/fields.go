@@ -44,7 +44,7 @@ func (v stringField) EqualToString(s string) dal.Condition {
 }
 
 func (v stringField) CompareTo(operator dal.Operator, expression dal.Expression) dal.Condition {
-	return dal.NewComparison(operator, nil, expression)
+	return dal.NewComparison(dal.FieldRef{Name: v.name}, operator, expression)
 }
 
 // NewStringField defines a new string field

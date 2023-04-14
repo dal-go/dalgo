@@ -10,7 +10,7 @@ func TestSelect_String(t *testing.T) {
 		From    *CollectionRef
 		Where   Condition
 		GroupBy []Expression
-		OrderBy []Expression
+		OrderBy []OrderExpression
 		Columns []Column
 		Into    func() Record
 		Limit   int
@@ -57,7 +57,7 @@ func TestSelect_String(t *testing.T) {
 			name: "select_*_from_User_where_Email_=_'test@example.com'",
 			fields: fields{
 				From:  &CollectionRef{Name: "User"},
-				Where: NewComparison(Equal, FieldRef{Name: "Email"}, String("test@example.com")),
+				Where: NewComparison(FieldRef{Name: "Email"}, Equal, String("test@example.com")),
 			},
 			want: "SELECT * FROM [User] WHERE [Email] = 'test@example.com'",
 		},
@@ -68,6 +68,18 @@ func TestSelect_String(t *testing.T) {
 				Limit: 7,
 			},
 			want: "SELECT TOP 7 * FROM [User]",
+		},
+		{
+			name: "select top 7 * from User order by Email, Created DESC",
+			fields: fields{
+				From:  &CollectionRef{Name: "User"},
+				Limit: 7,
+				OrderBy: []OrderExpression{
+					Ascending(Field("Email")),
+					Descending(Field("Created")),
+				},
+			},
+			want: "SELECT TOP 7 * FROM [User]\nORDER BY [Email], [Created] DESC",
 		},
 	}
 	for _, tt := range tests {
@@ -82,7 +94,7 @@ func TestSelect_String(t *testing.T) {
 				Limit:   tt.fields.Limit,
 			}
 			if got := q.String(); got != tt.want {
-				t.Errorf("String() = %v, want %v", got, tt.want)
+				t.Errorf("Got:\n%v\n\nWant:\n%v", got, tt.want)
 			} else {
 				t.Log(got)
 			}
