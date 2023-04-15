@@ -6,6 +6,8 @@ import (
 
 // Database is an interface that defines a DB provider
 type Database interface {
+	ID() string
+	Client() ClientInfo
 	TransactionCoordinator
 	ReadSession
 }
@@ -18,41 +20,52 @@ type RWTxWorker = func(ctx context.Context, tx ReadwriteTransaction) error
 
 // TransactionCoordinator provides methods to work with transactions
 type TransactionCoordinator interface {
+
+	// ReadTransactionCoordinator can start a readonly transaction
 	ReadTransactionCoordinator
+
+	// ReadwriteTransactionCoordinator can start a readwrite transaction
 	ReadwriteTransactionCoordinator
 }
 
 // ReadTransactionCoordinator creates a readonly transaction
 type ReadTransactionCoordinator interface {
+
 	// RunReadonlyTransaction starts readonly transaction
 	RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
 }
 
 // ReadwriteTransactionCoordinator creates a read-write transaction
 type ReadwriteTransactionCoordinator interface {
+
 	// RunReadwriteTransaction starts read-write transaction
 	RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
 }
 
 // Transaction defines an instance of DALgo transaction
 type Transaction interface {
+
 	// Options indicates parameters that were requested at time of transaction creation.
 	Options() TransactionOptions
 }
 
-// ReadTransaction defines an interface for a transaction
+// ReadTransaction defines an interface for a readonly transaction
 type ReadTransaction interface {
 	Transaction
 	ReadSession
 }
 
-// ReadwriteTransaction defines an interface for a transaction
+// ReadwriteTransaction defines an interface for a readwrite transaction
 type ReadwriteTransaction interface {
+
+	// ID returns a unique ID of a transaction if it is supported by the underlying DB client
+	ID() string
+
 	Transaction
 	ReadwriteSession
 }
 
-// ReadSession defines methods that do not modify database
+// ReadSession defines methods that query data from DB and does not modify it
 type ReadSession interface {
 
 	// Get gets a single record from database by key
@@ -61,18 +74,26 @@ type ReadSession interface {
 	// GetMulti gets multiples records from database by keys
 	GetMulti(ctx context.Context, records []Record) error
 
-	// Select executes a data retrieval query
+	// Select executes a data retrieval query that returns a reader
 	Select(ctx context.Context, query Query) (Reader, error)
+
+	// SelectAll can be used to get a slice of records
 	SelectAll(ctx context.Context, query Query) ([]Record, error)
 
 	// SelectAllIDs can be used to get a list of simple IDs
 	SelectAllIDs(ctx context.Context, query Query) ([]any, error)
+
+	// SelectAllStrIDs can be used to get a list of string IDs
 	SelectAllStrIDs(ctx context.Context, query Query) ([]string, error)
+
+	// SelectAllIntIDs can be used to get a list of int IDs
 	SelectAllIntIDs(ctx context.Context, query Query) ([]int, error)
+
+	// SelectAllInt64IDs can be used to get a list of int64 IDs
 	SelectAllInt64IDs(ctx context.Context, query Query) ([]int64, error)
 }
 
-// ReadwriteSession defines methods that can read & modify database
+// ReadwriteSession defines methods that can read & modify database. Some databases allow to modify data without transaction.
 type ReadwriteSession interface {
 	ReadSession
 	WriteSession
@@ -109,5 +130,7 @@ type Reader interface {
 	// Next returns the next record for a query.
 	// If no more records a nil record and ErrNoMoreRecords are returned.
 	Next() (Record, error)
+
+	// Cursor points to a position in the result set. This can be used for pagination.
 	Cursor() (string, error)
 }

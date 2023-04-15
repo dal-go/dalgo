@@ -19,35 +19,34 @@ type RecordAfterLoadHook interface {
 
 type Data = any
 
-type RecordEvent = func(c context.Context, key *Key, data Data) error
+type RecordHook = func(c context.Context, record Record) error
 
-var _ RecordBeforeSaveHook = (*recordMaker[any])(nil)
-var _ RecordAfterLoadHook = (*recordMaker[any])(nil)
+type RecordDataHook = func(c context.Context, db Database, key *Key, data any) (err error)
 
-type recordMaker[T any] struct {
+type recordData[T any] struct {
 	Data
-	beforeSave RecordEvent
-	afterLoad  RecordEvent
+	beforeSave RecordDataHook
+	afterLoad  RecordDataHook
 }
 
-func (v recordMaker[T]) DTO() any {
+func (v recordData[T]) DTO() any {
 	return v.Data
 }
 
-func (v recordMaker[T]) String() string {
+func (v recordData[T]) String() string {
 	return fmt.Sprintf("%v", v.Data)
 }
 
-func (v recordMaker[T]) BeforeSave(c context.Context, key *Key) (err error) {
+func (v recordData[T]) BeforeSave(c context.Context, db Database, key *Key) (err error) {
 	if v.beforeSave != nil {
-		err = v.beforeSave(c, key, v.Data.(T))
+		err = v.beforeSave(c, db, key, v)
 	}
 	return
 }
 
-func (v recordMaker[T]) AfterLoad(c context.Context, key *Key) (err error) {
+func (v recordData[T]) AfterLoad(c context.Context, db Database, key *Key) (err error) {
 	if v.afterLoad != nil {
-		err = v.afterLoad(c, key, v.Data.(T))
+		err = v.afterLoad(c, db, key, v.Data.(T))
 	}
 	return
 }
@@ -58,10 +57,10 @@ func MakeRecordData[T any](data T) RecordData {
 
 func MakeRecordDataWithCallbacks[T any](
 	data T,
-	beforeSave RecordEvent,
-	afterLoad RecordEvent,
+	beforeSave RecordDataHook,
+	afterLoad RecordDataHook,
 ) RecordData {
-	return &recordMaker[T]{
+	return &recordData[T]{
 		Data:       data,
 		beforeSave: beforeSave,
 		afterLoad:  afterLoad,

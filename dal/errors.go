@@ -118,3 +118,5 @@ func (v errRollbackFailed) RollbackError() error {
 func NewRollbackError(rollbackError, originalError error) error {
 	return errRollbackFailed{originalError: originalError, rollbackError: rollbackError}
 }
+
+var ErrHookFailed = errors.New("hook(s) failed")
