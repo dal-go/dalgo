@@ -1,0 +1,7 @@
+assign_issues:
+  - trakhimenok
+assign_prs:
+  - trakhimenok
+ignore_authors:
+  - dependabot
+  - renovate
