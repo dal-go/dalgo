@@ -2,7 +2,6 @@ package dal
 
 import (
 	"context"
-	"errors"
 	"fmt"
 )
 
@@ -20,16 +19,15 @@ func BeforeSave(c context.Context, db Database, record Record) error {
 }
 
 func callRecordHooks(c context.Context, record Record, hooks []RecordHook) error {
-	errs := make([]error, 0, len(hooks))
-	for _, hook := range beforeSafeHooks {
+	//errs := make([]error, 0, len(hooks))
+	for _, hook := range hooks {
 		if err := hook(c, record); err != nil {
-			errs = append(errs, err)
-			return err
+			return fmt.Errorf("%w: %v", ErrHookFailed, err)
 		}
 	}
-	if len(errs) > 0 {
-		return fmt.Errorf("%w: %v", ErrHookFailed, errors.Join(errs...))
-	}
+	//if len(errs) > 0 {
+	//	return fmt.Errorf("%w: %v", ErrHookFailed, errors.Join(errs...))
+	//}
 	return nil
 }
 
