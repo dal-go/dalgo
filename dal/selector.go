@@ -29,7 +29,7 @@ func (s selector) SelectAll(c context.Context, query Query) (records []Record, e
 	if reader, err = s.getReader(c, query); err != nil {
 		return
 	}
-	for i := 0; i <= query.Limit; i++ {
+	for i := 0; query.Limit <= 0 || i <= query.Limit; i++ {
 		var record Record
 		if record, err = reader.Next(); err != nil {
 			if errors.Is(err, ErrNoMoreRecords) {
@@ -82,7 +82,7 @@ func (s selector) selectAllIDsWorker(c context.Context, query Query, addID func(
 	if reader, err = s.getReader(c, query); err != nil {
 		return err
 	}
-	for i := 0; i <= query.Limit; i++ {
+	for i := 0; query.Limit <= 0 || i <= query.Limit; i++ {
 		var record Record
 		if record, err = reader.Next(); err != nil {
 			if errors.Is(err, ErrNoMoreRecords) {
