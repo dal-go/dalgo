@@ -16,26 +16,26 @@ type QueryExecutor interface {
 	// It reads reader created by QueryReader until it returns ErrNoMoreRecords.
 	// If you are interested only in IDs, use like:
 	//
-	//		reader, err := selector.SelectReader(ctx)
+	//		reader, err := queryExecutor.SelectReader(ctx)
 	//      // handle err
 	//		var ids []int
 	//		ids, err = dal.SelectAllIDs[int](reader)
 	QueryAllRecords(ctx context.Context, query Query) (records []Record, err error)
 }
 
-var _ QueryExecutor = (*selector)(nil)
+var _ QueryExecutor = (*queryExecutor)(nil)
 
-type selector struct {
+type queryExecutor struct {
 	query     Query
 	getReader func(c context.Context, query Query) (Reader, error)
 }
 
-func (s selector) QueryReader(c context.Context, query Query) (Reader, error) {
+func (s queryExecutor) QueryReader(c context.Context, query Query) (Reader, error) {
 	return s.getReader(c, query)
 }
 
 // QueryAllRecords is a helper method that for a given reader returns all records as a slice.
-func (s selector) QueryAllRecords(c context.Context, query Query) (records []Record, err error) {
+func (s queryExecutor) QueryAllRecords(c context.Context, query Query) (records []Record, err error) {
 	var reader Reader
 	if reader, err = s.getReader(c, query); err != nil {
 		return
@@ -49,7 +49,7 @@ func NewQueryExecutor(getReader ReaderProvider) QueryExecutor {
 	if getReader == nil {
 		panic("getReader is a required parameter, got nil")
 	}
-	return &selector{getReader: getReader}
+	return &queryExecutor{getReader: getReader}
 }
 
 func SelectAllIDs[T comparable](reader Reader, limit int) (ids []T, err error) {

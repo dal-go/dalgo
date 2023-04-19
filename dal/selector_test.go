@@ -42,7 +42,7 @@ func Test_selector_SelectReader(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := selector{
+			s := queryExecutor{
 				query:     tt.args.query,
 				getReader: tt.fields.getReader,
 			}
@@ -75,7 +75,7 @@ func Test_selector_QueryAllRecords(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := selector{
+			s := queryExecutor{
 				getReader: tt.fields.getReader,
 			}
 			gotRecords, err := s.QueryAllRecords(tt.args.c, tt.args.query)
