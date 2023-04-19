@@ -60,7 +60,7 @@ func (s queryBuilder) SelectInto(into func() Record) Query {
 	case 1:
 		q.Where = s.conditions[0]
 	default:
-		q.Where = groupCondition{conditions: s.conditions, operator: And}
+		q.Where = GroupCondition{conditions: s.conditions, operator: And}
 	}
 	return q
 }
@@ -76,7 +76,7 @@ func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) Query {
 	case 1:
 		q.Where = s.conditions[0]
 	default:
-		q.Where = groupCondition{conditions: s.conditions, operator: And}
+		q.Where = GroupCondition{conditions: s.conditions, operator: And}
 	}
 	return q
 }

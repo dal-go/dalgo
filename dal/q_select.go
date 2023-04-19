@@ -100,7 +100,7 @@ var _ fmt.Stringer = (*Query)(nil)
 // And creates a new query by adding a condition to a predefined query
 func (q Query) groupWithConditions(operator Operator, conditions ...Condition) Query {
 	qry := Query{From: q.From}
-	and := groupCondition{operator: operator, conditions: make([]Condition, len(conditions)+1)}
+	and := GroupCondition{operator: operator, conditions: make([]Condition, len(conditions)+1)}
 	and.conditions[0] = q.Where
 	for i, condition := range conditions {
 		and.conditions[i+1] = condition

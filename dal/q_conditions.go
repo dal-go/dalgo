@@ -39,7 +39,7 @@ func NewComparison(left Expression, o Operator, right Expression) Comparison {
 	return Comparison{Operator: o, Left: left, Right: right}
 }
 
-// String creates a new constantExpression expression
+// String creates a new Constant expression
 func String(v string) Expression {
-	return constantExpression{Value: v}
+	return Constant{Value: v}
 }

@@ -27,7 +27,7 @@ func Test_field_EqualTo(t *testing.T) {
 			want: Comparison{
 				Operator: Equal,
 				Left:     FieldRef{Name: fieldName},
-				Right:    constantExpression{Value: value},
+				Right:    Constant{Value: value},
 			},
 		}
 	}

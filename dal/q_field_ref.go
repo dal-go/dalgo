@@ -27,11 +27,13 @@ func WhereField(name string, operator Operator, v any) Condition {
 	var val Expression
 	switch v := v.(type) {
 	case string, int:
-		val = constantExpression{Value: v}
-	case constantExpression:
+		val = Constant{Value: v}
+	case Constant:
 		val = v
 	case FieldRef:
 		val = v
+	default:
+
 	}
 	return Comparison{Operator: operator, Left: Field(name), Right: val}
 }

@@ -5,20 +5,20 @@ import (
 	"strings"
 )
 
-type groupCondition struct {
+type GroupCondition struct {
 	operator   Operator
 	conditions []Condition
 }
 
-func (v groupCondition) Operator() Operator {
+func (v GroupCondition) Operator() Operator {
 	return v.operator
 }
 
-func (v groupCondition) Conditions() []Condition {
+func (v GroupCondition) Conditions() []Condition {
 	return v.conditions
 }
 
-func (v groupCondition) String() string {
+func (v GroupCondition) String() string {
 	s := make([]string, len(v.conditions))
 	for i, condition := range v.conditions {
 		s[i] = condition.String()
