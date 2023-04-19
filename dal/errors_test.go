@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -47,4 +48,25 @@ func TestNewErrNotFoundByKey(t *testing.T) {
 			assert.True(t, IsNotFound(err2))
 		})
 	}
+}
+
+func TestErrNotImplementedYet(t *testing.T) {
+	assert.Equal(t, "not implemented yet", ErrNotImplementedYet.Error())
+	err := fmt.Errorf("%w: justification and ETA", ErrNotImplementedYet)
+	assert.True(t, errors.Is(err, ErrNotImplementedYet))
+}
+
+func TestErrNotSupported(t *testing.T) {
+	assert.Equal(t, "not supported", ErrNotSupported.Error())
+	err := fmt.Errorf("%w: explanation why", ErrNotSupported)
+	assert.True(t, errors.Is(err, ErrNotSupported))
+}
+
+func TestNewRollbackError(t *testing.T) {
+	err := NewRollbackError(errors.New("some rollback error"), errors.New("some original error"))
+	rollbackErr, isRollbackError := err.(rollbackError)
+	assert.True(t, true, isRollbackError)
+	assert.NotNil(t, rollbackErr)
+	assert.True(t, strings.Contains(err.Error(), "some rollback error"))
+	assert.True(t, strings.Contains(err.Error(), "some original error"))
 }

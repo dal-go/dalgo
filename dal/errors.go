@@ -7,9 +7,10 @@ import (
 
 // ErrNotSupported - return this if db driver does not support requested operation.
 // (for example no support for transactions)
-//
-//goland:noinspection GoUnusedGlobalVariable
 var ErrNotSupported = errors.New("not supported")
+
+// ErrNotImplementedYet - return this if db driver does not support requested operation yet.
+var ErrNotImplementedYet = errors.New("not implemented yet")
 
 // ErrNoMoreRecords indicates there is no more records
 var ErrNoMoreRecords = errors.New("no more errors")
@@ -94,29 +95,30 @@ func errNotFoundCause(cause error) error {
 	return fmt.Errorf("%w: %v", ErrRecordNotFound, cause)
 }
 
-type errRollbackFailed struct {
-	originalError error
-	rollbackError error
+type rollbackError struct {
+	originalErr error
+	rollbackErr error
 }
 
-func (v errRollbackFailed) Error() string {
-	if v.originalError == nil {
-		return fmt.Sprintf("rollback failed: %v", v.rollbackError)
+func (v rollbackError) Error() string {
+	if v.originalErr == nil {
+		return fmt.Sprintf("rollback failed: %v", v.rollbackErr)
 	}
-	return fmt.Sprintf("rollback failed: %v: original error: %v", v.rollbackError, v.originalError)
+	return fmt.Sprintf("rollback failed: %v: original error: %v", v.rollbackErr, v.originalErr)
 }
 
-func (v errRollbackFailed) OriginalError() error {
-	return v.originalError
+func (v rollbackError) OriginalError() error {
+	return v.originalErr
 }
 
-func (v errRollbackFailed) RollbackError() error {
-	return v.rollbackError
+func (v rollbackError) RollbackError() error {
+	return v.rollbackErr
 }
 
 // NewRollbackError creates a rollback error
-func NewRollbackError(rollbackError, originalError error) error {
-	return errRollbackFailed{originalError: originalError, rollbackError: rollbackError}
+func NewRollbackError(rollbackErr, originalErr error) error {
+	return &rollbackError{originalErr: originalErr, rollbackErr: rollbackErr}
 }
 
-var ErrHookFailed = errors.New("hook(s) failed")
+// ErrHookFailed indicates that error occurred during hook execution
+var ErrHookFailed = errors.New("failed in dalgo hook")
