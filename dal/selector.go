@@ -43,8 +43,10 @@ func (s queryExecutor) QueryAllRecords(c context.Context, query Query) (records 
 	return SelectAllRecords(reader, query.Limit)
 }
 
+// ReaderProvider is a function that returns a Reader for the given Query.
 type ReaderProvider = func(c context.Context, query Query) (reader Reader, err error)
 
+// NewQueryExecutor creates a new query executor. This is supposed to be used by dalgo DB drivers.
 func NewQueryExecutor(getReader ReaderProvider) QueryExecutor {
 	if getReader == nil {
 		panic("getReader is a required parameter, got nil")
@@ -52,6 +54,7 @@ func NewQueryExecutor(getReader ReaderProvider) QueryExecutor {
 	return &queryExecutor{getReader: getReader}
 }
 
+// SelectAllIDs is a helper method that for a given reader returns all IDs as a strongly typed slice.
 func SelectAllIDs[T comparable](reader Reader, limit int) (ids []T, err error) {
 	for i := 0; limit <= 0 || i < limit; i++ {
 		var record Record
@@ -66,6 +69,7 @@ func SelectAllIDs[T comparable](reader Reader, limit int) (ids []T, err error) {
 	return
 }
 
+// SelectAllRecords	is a helper method that for a given reader returns all records as a slice.
 func SelectAllRecords(reader Reader, limit int) (records []Record, err error) {
 	for i := 0; limit <= 0 || i < limit; i++ {
 		var record Record
