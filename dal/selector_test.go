@@ -10,19 +10,19 @@ import (
 func TestNewSelector(t *testing.T) {
 	t.Run("panic_on_nil", func(t *testing.T) {
 		assert.Panics(t, func() {
-			NewSelector(nil)
+			NewSelector(Query{}, nil)
 		})
 	})
 	t.Run("should_pass", func(t *testing.T) {
 		getReader := func(c context.Context, query Query) (Reader, error) {
 			return nil, nil
 		}
-		selector := NewSelector(getReader)
+		selector := NewSelector(Query{}, getReader)
 		assert.NotNil(t, selector)
 	})
 }
 
-func Test_selector_Select(t *testing.T) {
+func Test_selector_SelectReader(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
 		getReader func(c context.Context, query Query) (Reader, error)
@@ -43,9 +43,10 @@ func Test_selector_Select(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := selector{
+				query:     tt.args.query,
 				getReader: tt.fields.getReader,
 			}
-			got, err := s.Select(tt.args.c, tt.args.query)
+			got, err := s.SelectReader(tt.args.c)
 			if !tt.wantErr(t, err, fmt.Sprintf("Select(%v, %v)", tt.args.c, tt.args.query)) {
 				return
 			}
@@ -57,11 +58,11 @@ func Test_selector_Select(t *testing.T) {
 func Test_selector_SelectAll(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
+		query     Query
 		getReader func(c context.Context, query Query) (Reader, error)
 	}
 	type args struct {
-		c     context.Context
-		query Query
+		c context.Context
 	}
 	tests := []struct {
 		name        string
@@ -70,18 +71,19 @@ func Test_selector_SelectAll(t *testing.T) {
 		wantRecords []Record
 		wantErr     assert.ErrorAssertionFunc
 	}{
-		{name: "empty"},
+		{name: "empty", args: args{c: context.Background()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := selector{
+				query:     tt.fields.query,
 				getReader: tt.fields.getReader,
 			}
-			gotRecords, err := s.SelectAll(tt.args.c, tt.args.query)
-			if !tt.wantErr(t, err, fmt.Sprintf("SelectAll(%v, %v)", tt.args.c, tt.args.query)) {
+			gotRecords, err := s.SelectAllRecords(tt.args.c)
+			if !tt.wantErr(t, err, fmt.Sprintf("SelectAll(%v)", tt.args.c)) {
 				return
 			}
-			assert.Equalf(t, tt.wantRecords, gotRecords, "SelectAll(%v, %v)", tt.args.c, tt.args.query)
+			assert.Equalf(t, tt.wantRecords, gotRecords, "SelectAll(%v)", tt.args.c)
 		})
 	}
 }
@@ -89,11 +91,11 @@ func Test_selector_SelectAll(t *testing.T) {
 func Test_selector_SelectAllIDs(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
+		query     Query
 		getReader func(c context.Context, query Query) (Reader, error)
 	}
 	type args struct {
-		c     context.Context
-		query Query
+		c context.Context
 	}
 	tests := []struct {
 		name    string
@@ -102,18 +104,19 @@ func Test_selector_SelectAllIDs(t *testing.T) {
 		wantIds []any
 		wantErr assert.ErrorAssertionFunc
 	}{
-		{name: "empty"},
+		{name: "empty", args: args{c: context.Background()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := selector{
+				query:     tt.fields.query,
 				getReader: tt.fields.getReader,
 			}
-			gotIds, err := s.SelectAllIDs(tt.args.c, tt.args.query)
-			if !tt.wantErr(t, err, fmt.Sprintf("SelectAllIDs(%v, %v)", tt.args.c, tt.args.query)) {
+			gotIds, err := s.SelectAllIDs(tt.args.c)
+			if !tt.wantErr(t, err, fmt.Sprintf("SelectAllIDs(%v)", tt.args.c)) {
 				return
 			}
-			assert.Equalf(t, tt.wantIds, gotIds, "SelectAllIDs(%v, %v)", tt.args.c, tt.args.query)
+			assert.Equalf(t, tt.wantIds, gotIds, "SelectAllIDs(%v)", tt.args.c)
 		})
 	}
 }
@@ -121,11 +124,11 @@ func Test_selector_SelectAllIDs(t *testing.T) {
 func Test_selector_SelectAllInt64IDs(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
+		query     Query
 		getReader func(c context.Context, query Query) (Reader, error)
 	}
 	type args struct {
-		c     context.Context
-		query Query
+		c context.Context
 	}
 	tests := []struct {
 		name    string
@@ -134,18 +137,19 @@ func Test_selector_SelectAllInt64IDs(t *testing.T) {
 		wantIds []int64
 		wantErr assert.ErrorAssertionFunc
 	}{
-		{name: "empty"},
+		{name: "empty", args: args{c: context.Background()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := selector{
+				query:     tt.fields.query,
 				getReader: tt.fields.getReader,
 			}
-			gotIds, err := s.SelectAllInt64IDs(tt.args.c, tt.args.query)
-			if !tt.wantErr(t, err, fmt.Sprintf("SelectAllInt64IDs(%v, %v)", tt.args.c, tt.args.query)) {
+			gotIds, err := s.SelectAllInt64IDs(tt.args.c)
+			if !tt.wantErr(t, err, fmt.Sprintf("SelectAllInt64IDs(%v)", tt.args.c)) {
 				return
 			}
-			assert.Equalf(t, tt.wantIds, gotIds, "SelectAllInt64IDs(%v, %v)", tt.args.c, tt.args.query)
+			assert.Equalf(t, tt.wantIds, gotIds, "SelectAllInt64IDs(%v)", tt.args.c)
 		})
 	}
 }
@@ -153,11 +157,11 @@ func Test_selector_SelectAllInt64IDs(t *testing.T) {
 func Test_selector_SelectAllIntIDs(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
+		query     Query
 		getReader func(c context.Context, query Query) (Reader, error)
 	}
 	type args struct {
-		c     context.Context
-		query Query
+		c context.Context
 	}
 	tests := []struct {
 		name    string
@@ -166,18 +170,19 @@ func Test_selector_SelectAllIntIDs(t *testing.T) {
 		wantIds []int
 		wantErr assert.ErrorAssertionFunc
 	}{
-		{name: "empty"},
+		{name: "empty", args: args{c: context.Background()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := selector{
+				query:     tt.fields.query,
 				getReader: tt.fields.getReader,
 			}
-			gotIds, err := s.SelectAllIntIDs(tt.args.c, tt.args.query)
-			if !tt.wantErr(t, err, fmt.Sprintf("SelectAllIntIDs(%v, %v)", tt.args.c, tt.args.query)) {
+			gotIds, err := s.SelectAllIntIDs(tt.args.c)
+			if !tt.wantErr(t, err, fmt.Sprintf("SelectAllIntIDs(%v)", tt.args.c)) {
 				return
 			}
-			assert.Equalf(t, tt.wantIds, gotIds, "SelectAllIntIDs(%v, %v)", tt.args.c, tt.args.query)
+			assert.Equalf(t, tt.wantIds, gotIds, "SelectAllIntIDs(%v)", tt.args.c)
 		})
 	}
 }
@@ -185,11 +190,11 @@ func Test_selector_SelectAllIntIDs(t *testing.T) {
 func Test_selector_SelectAllStrIDs(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
+		query     Query
 		getReader func(c context.Context, query Query) (Reader, error)
 	}
 	type args struct {
-		c     context.Context
-		query Query
+		c context.Context
 	}
 	tests := []struct {
 		name    string
@@ -203,13 +208,14 @@ func Test_selector_SelectAllStrIDs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := selector{
+				query:     tt.fields.query,
 				getReader: tt.fields.getReader,
 			}
-			gotIds, err := s.SelectAllStrIDs(tt.args.c, tt.args.query)
-			if !tt.wantErr(t, err, fmt.Sprintf("SelectAllStrIDs(%v, %v)", tt.args.c, tt.args.query)) {
+			gotIds, err := s.SelectAllStrIDs(tt.args.c)
+			if !tt.wantErr(t, err, fmt.Sprintf("SelectAllStrIDs(%v)", tt.args.c)) {
 				return
 			}
-			assert.Equalf(t, tt.wantIds, gotIds, "SelectAllStrIDs(%v, %v)", tt.args.c, tt.args.query)
+			assert.Equalf(t, tt.wantIds, gotIds, "SelectAllStrIDs(%v)", tt.args.c)
 		})
 	}
 }

@@ -74,23 +74,7 @@ type ReadSession interface {
 	// GetMulti gets multiples records from database by keys
 	GetMulti(ctx context.Context, records []Record) error
 
-	// Select executes a data retrieval query that returns a reader
-	Select(ctx context.Context, query Query) (Reader, error)
-
-	// SelectAll can be used to get a slice of records
-	SelectAll(ctx context.Context, query Query) ([]Record, error)
-
-	// SelectAllIDs can be used to get a list of simple IDs
-	SelectAllIDs(ctx context.Context, query Query) ([]any, error)
-
-	// SelectAllStrIDs can be used to get a list of string IDs
-	SelectAllStrIDs(ctx context.Context, query Query) ([]string, error)
-
-	// SelectAllIntIDs can be used to get a list of int IDs
-	SelectAllIntIDs(ctx context.Context, query Query) ([]int, error)
-
-	// SelectAllInt64IDs can be used to get a list of int64 IDs
-	SelectAllInt64IDs(ctx context.Context, query Query) ([]int64, error)
+	QueryExecutor
 }
 
 // ReadwriteSession defines methods that can read & modify database. Some databases allow to modify data without transaction.
