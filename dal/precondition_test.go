@@ -1,37 +1,48 @@
 package dal
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
 func TestWithExistsPrecondition(t *testing.T) {
-	if WithExistsPrecondition() == nil {
-		t.Fatalf("expected to be != nil")
-	}
-}
-func TestPreconditions_Exists(t *testing.T) {
 	preconditions := preConditions{}
-	if preconditions.Exists() {
-		t.Fatalf("preconditions.Exists() exoected to be false")
-	}
-	v := WithExistsPrecondition()
-	v(&preconditions)
-	if !preconditions.Exists() {
-		t.Errorf("preconditions.Exists() exoected to be true")
-	}
+	assert.False(t, preconditions.Exists())
+	preCondition := WithExistsPrecondition()
+	assert.NotNil(t, preCondition)
+	preCondition.apply(&preconditions)
+	assert.True(t, preconditions.Exists())
 }
 
 func TestWithLastUpdateTimePrecondition(t *testing.T) {
 	preconditions := preConditions{}
-	if !preconditions.lastUpdateTime.IsZero() {
-		t.Fatalf("preconditions.lastUpdateTime exoected to be zero")
-	}
+	assert.True(t, preconditions.lastUpdateTime.IsZero())
 	expected := time.Now()
-	v := WithLastUpdateTimePrecondition(expected)
-	v(&preconditions)
-	actual := preconditions.lastUpdateTime
-	if !actual.Equal(expected) {
-		t.Errorf("actual != expected")
+	preCondition := WithLastUpdateTimePrecondition(expected)
+	assert.NotNil(t, preCondition)
+	preCondition.apply(&preconditions)
+	assert.Equal(t, expected, preconditions.LastUpdateTime())
+}
+
+func TestGetPreconditions(t *testing.T) {
+	type args struct {
+		items []Precondition
+	}
+	now := time.Now()
+	tests := []struct {
+		name string
+		args args
+		want Preconditions
+	}{
+		{"empty", args{[]Precondition{}}, preConditions{}},
+		{"exists", args{[]Precondition{WithExistsPrecondition()}}, preConditions{exists: true}},
+		{"last_update_time", args{[]Precondition{WithLastUpdateTimePrecondition(now)}}, preConditions{lastUpdateTime: now}},
+		{"all", args{[]Precondition{WithExistsPrecondition(), WithLastUpdateTimePrecondition(now)}}, preConditions{exists: true, lastUpdateTime: now}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, GetPreconditions(tt.args.items...), "GetPreconditions(%v)", tt.args.items)
+		})
 	}
 }
