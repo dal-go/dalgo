@@ -32,7 +32,7 @@ type Key struct {
 	IDKind     reflect.Kind
 }
 
-var escapeCharsReplacer = strings.NewReplacer(
+var idCharsReplacer = strings.NewReplacer(
 	".", "%2E",
 	"$", "%24",
 	"#", "%23",
@@ -40,6 +40,10 @@ var escapeCharsReplacer = strings.NewReplacer(
 	"]", "%5D",
 	"/", "%2F",
 )
+
+func EscapeID(id string) string {
+	return idCharsReplacer.Replace(id)
+}
 
 // String returns string representation of a key instance
 func (k *Key) String() string {
@@ -50,7 +54,7 @@ func (k *Key) String() string {
 	s := make([]string, 0, (key.Level())*2)
 	for {
 		id := fmt.Sprintf("%v", key.ID)
-		id = escapeCharsReplacer.Replace(id)
+		id = EscapeID(id)
 		s = append(s, id)
 		s = append(s, key.collection)
 		if key.parent == nil {
