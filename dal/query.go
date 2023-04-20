@@ -1,9 +1,13 @@
 package dal
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+)
 
 // Query represents a query to a collection
 type Query interface {
+	fmt.Stringer
 
 	// From defines target table/collection
 	From() *CollectionRef

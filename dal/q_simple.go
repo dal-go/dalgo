@@ -14,8 +14,8 @@ type QueryBuilder interface {
 	Where(conditions ...Condition) QueryBuilder
 	WhereField(name string, operator Operator, v any) QueryBuilder
 	OrderBy(expressions ...OrderExpression) QueryBuilder
-	SelectInto(func() Record) query
-	SelectKeysOnly(idKind reflect.Kind) query
+	SelectInto(func() Record) Query
+	SelectKeysOnly(idKind reflect.Kind) Query
 	StartFrom(cursor Cursor) QueryBuilder
 }
 
@@ -64,13 +64,13 @@ func (s queryBuilder) WhereField(name string, operator Operator, v any) QueryBui
 	return s
 }
 
-func (s queryBuilder) SelectInto(into func() Record) query {
+func (s queryBuilder) SelectInto(into func() Record) Query {
 	q := s.newQuery()
 	q.into = into
 	return q
 }
 
-func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) query {
+func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) Query {
 	q := s.newQuery()
 	q.idKind = idKind
 	return q
