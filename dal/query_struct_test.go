@@ -51,7 +51,7 @@ func TestSelect_String(t *testing.T) {
 				From:  &CollectionRef{Name: "Users"},
 				Where: ID("SomeID", 123),
 			},
-			want: "SELECT * FROM [Users] WHERE [SomeID] = 123",
+			want: "SELECT * FROM [Users] WHERE SomeID = 123",
 		},
 		{
 			name: "select_*_from_User_where_Email_=_'test@example.com'",
@@ -59,7 +59,7 @@ func TestSelect_String(t *testing.T) {
 				From:  &CollectionRef{Name: "User"},
 				Where: NewComparison(FieldRef{Name: "Email"}, Equal, String("test@example.com")),
 			},
-			want: "SELECT * FROM [User] WHERE [Email] = 'test@example.com'",
+			want: "SELECT * FROM [User] WHERE Email = 'test@example.com'",
 		},
 		{
 			name: "select top 7 * from User",
@@ -79,7 +79,7 @@ func TestSelect_String(t *testing.T) {
 					Descending(Field("Created")),
 				},
 			},
-			want: "SELECT TOP 7 * FROM [User]\nORDER BY [Email], [Created] DESC",
+			want: "SELECT TOP 7 * FROM [User]\nORDER BY Email, Created DESC",
 		},
 	}
 	for _, tt := range tests {

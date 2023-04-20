@@ -9,7 +9,7 @@ type QueryExecutor interface {
 
 	// QueryReader returns a reader for the given query to read records 1 by 1 sequentially.
 	// The Reader.Next() method returns ErrNoMoreRecords when there are no more records.
-	QueryReader(c context.Context, query query) (Reader, error)
+	QueryReader(c context.Context, query Query) (Reader, error)
 
 	// QueryAllRecords is a helper method that returns all records for the given query.
 	// It reads reader created by QueryReader until it returns ErrNoMoreRecords.
@@ -19,7 +19,7 @@ type QueryExecutor interface {
 	//      // handle err
 	//		var ids []int
 	//		ids, err = dal.SelectAllIDs[int](reader)
-	QueryAllRecords(ctx context.Context, query query) (records []Record, err error)
+	QueryAllRecords(ctx context.Context, query Query) (records []Record, err error)
 }
 
 var _ QueryExecutor = (*queryExecutor)(nil)
@@ -29,12 +29,12 @@ type queryExecutor struct {
 	getReader ReaderProvider
 }
 
-func (s queryExecutor) QueryReader(c context.Context, query query) (Reader, error) {
+func (s queryExecutor) QueryReader(c context.Context, query Query) (Reader, error) {
 	return s.getReader(c, query)
 }
 
 // QueryAllRecords is a helper method that for a given reader returns all records as a slice.
-func (s queryExecutor) QueryAllRecords(c context.Context, query query) (records []Record, err error) {
+func (s queryExecutor) QueryAllRecords(c context.Context, query Query) (records []Record, err error) {
 	var reader Reader
 	if reader, err = s.getReader(c, query); err != nil {
 		return
