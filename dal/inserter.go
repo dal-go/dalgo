@@ -85,14 +85,14 @@ func WithRandomStringID(length int, options ...randomStringOption) KeyOption {
 	}
 }
 
-// WithParent sets parent
+// WithParent sets Parent
 func WithParent(collection string, id any, options ...KeyOption) KeyOption {
 	return func(key *Key) {
 		key.parent = NewKeyWithID(collection, id, options...)
 	}
 }
 
-// WithParentKey sets parent key
+// WithParentKey sets Parent key
 func WithParentKey(parent *Key) KeyOption {
 	return func(key *Key) {
 		key.parent = parent

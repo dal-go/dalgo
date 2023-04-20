@@ -122,18 +122,18 @@ func Test_record_Key(t *testing.T) {
 //		data any
 //	}
 //	tests := []struct {
-//		name   string
+//		Name   string
 //		fields fields
 //		args   args
 //	}{
 //		{
-//			name:   "nil",
+//			Name:   "nil",
 //			fields: fields{},
 //			args:   args{data: "test_data"},
 //		},
 //	}
 //	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
+//		t.Run(tt.Name, func(t *testing.T) {
 //			v := record{
 //				key:  tt.fields.key,
 //				data: tt.fields.data,

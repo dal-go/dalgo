@@ -44,7 +44,7 @@ func TestGetRecordKeyPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.args.key.String(); got != tt.want {
-				t.Errorf("key.String() = %v, want %v, child:%+v, parent: %+v", got, tt.want, tt.args.key, tt.args.key.parent)
+				t.Errorf("key.String() = %v, want %v, child:%+v, Parent: %+v", got, tt.want, tt.args.key, tt.args.key.parent)
 			}
 		})
 	}

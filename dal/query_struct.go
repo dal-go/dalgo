@@ -51,15 +51,15 @@ func (q query) Where() Condition {
 }
 
 func (q query) GroupBy() []Expression {
-	return q.groupBy
+	return q.groupBy[:]
 }
 
 func (q query) OrderBy() []OrderExpression {
-	return q.orderBy
+	return q.orderBy[:]
 }
 
 func (q query) Columns() []Column {
-	return q.columns
+	return q.columns[:]
 }
 
 func (q query) Into() func() Record {

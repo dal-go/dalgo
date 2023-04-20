@@ -3,7 +3,7 @@ package dal
 // Transform defines a transform operation
 type Transform interface {
 
-	// Name returns name of a transform
+	// Name returns Name of a transform
 	Name() string
 
 	// Value returns arguments of transform

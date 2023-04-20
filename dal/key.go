@@ -9,14 +9,14 @@ import (
 
 // FieldVal hold a reference to a single record within a root or nested recordset.
 type FieldVal struct {
-	Name  string `json:"name"`
+	Name  string `json:"Name"`
 	Value any    `json:"value"`
 }
 
 // Validate validates field value
 func (v FieldVal) Validate() error {
 	if strings.TrimSpace(v.Name) == "" {
-		return errors.New("name is a required property")
+		return errors.New("Name is a required property")
 	}
 	if v.Value == nil {
 		return errors.New("Value is a required property")
@@ -24,7 +24,7 @@ func (v FieldVal) Validate() error {
 	return nil
 }
 
-// Key represents a full path to a given record (no parent in case of root recordset)
+// Key represents a full path to a given record (no Parent in case of root recordset)
 type Key struct {
 	parent     *Key
 	collection string
@@ -51,7 +51,7 @@ func (k *Key) String() string {
 	return reverseStringsJoin(s, "/")
 }
 
-// CollectionPath return path to parent
+// CollectionPath return path to Parent
 func (k *Key) CollectionPath() string {
 	key := k // This is intended as we want to traverse the key ancestors
 	var s []string
@@ -94,7 +94,7 @@ func reverseStringsJoin(elems []string, sep string) string {
 }
 
 //func (v *Key) Child(key *Key) *Key {
-//	key.parent = v
+//	key.Parent = v
 //	return key
 //}
 
@@ -106,7 +106,7 @@ func (k *Key) Level() int {
 	return k.parent.Level() + 1
 }
 
-// Parent return a reference to the parent key
+// Parent return a reference to the Parent key
 func (k *Key) Parent() *Key {
 	return k.parent
 }

@@ -48,16 +48,16 @@ func TestField_Validate(t *testing.T) {
 //	}
 //	type want struct {
 //		fields
-//		parent *fields
+//		Parent *fields
 //	}
 //	tests := []struct {
-//		name   string
+//		Name   string
 //		fields fields
 //		args   args
 //		want   want
 //	}{
 //		{
-//			name: "single_parent",
+//			Name: "single_parent",
 //			fields: fields{
 //				collection: "Parent1",
 //				ID:   "p1",
@@ -71,11 +71,11 @@ func TestField_Validate(t *testing.T) {
 //					ID:    "k1",
 //					level: 1,
 //				},
-//				parent: &fields{collection: "Parent1", ID: "p1", level: 0},
+//				Parent: &fields{collection: "Parent1", ID: "p1", level: 0},
 //			},
 //		},
 //		{
-//			name: "two_parents",
+//			Name: "two_parents",
 //			fields: fields{
 //				collection: "Parent1",
 //				ID:   "p1",
@@ -84,7 +84,7 @@ func TestField_Validate(t *testing.T) {
 //				child: NewKeyWithID("Parent2", "p2").Child(NewKeyWithID("Kind1", "k1")),
 //			},
 //			want: want{
-//				parent: &fields{collection: "Parent1", ID: "p1", level: 1},
+//				Parent: &fields{collection: "Parent1", ID: "p1", level: 1},
 //				fields: fields{
 //					collection:  "Kind1",
 //					ID:    "k1",
@@ -94,30 +94,30 @@ func TestField_Validate(t *testing.T) {
 //		},
 //	}
 //	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
+//		t.Run(tt.Name, func(t *testing.T) {
 //			v := &Key{
 //				collection: tt.fields.collection,
 //				ID:   tt.fields.ID,
 //			}
 //			got := v.Child(tt.args.child)
 //			if got.Level() != tt.want.level {
-//				t.Errorf("Child().level = %v, want %v, got %v, parent %+v", got.Level(), tt.want.level, got, got.parent)
+//				t.Errorf("Child().level = %v, want %v, got %v, Parent %+v", got.Level(), tt.want.level, got, got.Parent)
 //			}
-//			if got.parent == nil && tt.want.parent != nil {
-//				t.Errorf("Child().parent = nil, want %+v", tt.want.parent)
+//			if got.Parent == nil && tt.want.Parent != nil {
+//				t.Errorf("Child().Parent = nil, want %+v", tt.want.Parent)
 //			}
-//			if got.parent != nil && tt.want.parent == nil {
-//				t.Error("Child().parent != nil, want nil")
+//			if got.Parent != nil && tt.want.Parent == nil {
+//				t.Error("Child().Parent != nil, want nil")
 //			}
-//			if got.parent != nil && tt.want.parent != nil {
-//				if got.parent.collection != tt.want.parent.collection {
-//					t.Errorf("Child().parent.collection = %v, want %v", got.parent.collection, tt.want.parent.collection)
+//			if got.Parent != nil && tt.want.Parent != nil {
+//				if got.Parent.collection != tt.want.Parent.collection {
+//					t.Errorf("Child().Parent.collection = %v, want %v", got.Parent.collection, tt.want.Parent.collection)
 //				}
-//				if got.parent.ID != tt.want.parent.ID {
-//					t.Errorf("Child().parent.ID = %v, want %v", got.parent.ID, tt.want.parent.ID)
+//				if got.Parent.ID != tt.want.Parent.ID {
+//					t.Errorf("Child().Parent.ID = %v, want %v", got.Parent.ID, tt.want.Parent.ID)
 //				}
-//				if got.parent.Level() != tt.want.parent.level {
-//					t.Errorf("Child().parent.level = %v, want %v, parent %+v", got.parent.Level(), tt.want.parent.level, got.parent)
+//				if got.Parent.Level() != tt.want.Parent.level {
+//					t.Errorf("Child().Parent.level = %v, want %v, Parent %+v", got.Parent.Level(), tt.want.Parent.level, got.Parent)
 //				}
 //			}
 //		})
@@ -180,7 +180,7 @@ func TestKey_Level(t *testing.T) {
 				parent: tt.fields.parent,
 			}
 			if got := v.Level(); got != tt.want {
-				t.Errorf("Level() = %v, want %v, for %+v, parent %+v", got, tt.want, v, v.parent)
+				t.Errorf("Level() = %v, want %v, for %+v, Parent %+v", got, tt.want, v, v.parent)
 			}
 		})
 	}

@@ -26,7 +26,7 @@ var _ QueryExecutor = (*queryExecutor)(nil)
 
 type queryExecutor struct {
 	query     query
-	getReader func(c context.Context, query query) (Reader, error)
+	getReader ReaderProvider
 }
 
 func (s queryExecutor) QueryReader(c context.Context, query query) (Reader, error) {
@@ -43,7 +43,7 @@ func (s queryExecutor) QueryAllRecords(c context.Context, query query) (records 
 }
 
 // ReaderProvider is a function that returns a Reader for the given query.
-type ReaderProvider = func(c context.Context, query query) (reader Reader, err error)
+type ReaderProvider = func(c context.Context, query Query) (reader Reader, err error)
 
 // NewQueryExecutor creates a new query executor. This is supposed to be used by dalgo DB drivers.
 func NewQueryExecutor(getReader ReaderProvider) QueryExecutor {

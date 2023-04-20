@@ -4,7 +4,7 @@ import "fmt"
 
 // Column reference a column in a SELECT statement
 type Column struct {
-	Alias      string     `json:"alias"`
+	Alias      string     `json:"Alias"`
 	Expression Expression `json:"expression"`
 }
 

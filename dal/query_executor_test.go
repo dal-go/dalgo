@@ -14,7 +14,7 @@ func TestNewSelector(t *testing.T) {
 		})
 	})
 	t.Run("should_pass", func(t *testing.T) {
-		var getReader = func(c context.Context, query query) (Reader, error) {
+		var getReader = func(c context.Context, query Query) (Reader, error) {
 			return nil, nil
 		}
 		selector := NewQueryExecutor(getReader)
@@ -25,7 +25,7 @@ func TestNewSelector(t *testing.T) {
 func Test_selector_SelectReader(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
-		getReader func(c context.Context, query query) (Reader, error)
+		getReader func(c context.Context, query Query) (Reader, error)
 	}
 	type args struct {
 		c     context.Context
@@ -58,7 +58,7 @@ func Test_selector_SelectReader(t *testing.T) {
 func Test_selector_QueryAllRecords(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
-		getReader func(c context.Context, query query) (Reader, error)
+		getReader func(c context.Context, query Query) (Reader, error)
 	}
 	type args struct {
 		c     context.Context

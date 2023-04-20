@@ -56,7 +56,7 @@ func GetTransaction(ctx context.Context) Transaction {
 	return ctx.Value(&transactionContextKey).(Transaction)
 }
 
-// GetNonTransactionalContext returns non transaction context (e.g. parent of transactional context)
+// GetNonTransactionalContext returns non transaction context (e.g. Parent of transactional context)
 // TODO: This is can be dangerous if child context creates a new context with a deadline for example
 func GetNonTransactionalContext(ctx context.Context) context.Context {
 	return ctx.Value(&nonTransactionalContextKey).(context.Context)

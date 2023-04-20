@@ -56,25 +56,23 @@ func (s queryBuilder) WhereField(name string, operator Operator, v any) QueryBui
 }
 
 func (s queryBuilder) SelectInto(into func() Record) query {
-	q := query{
-		from: &CollectionRef{Name: s.collection},
-		into: into,
-	}
-	switch len(s.conditions) {
-	case 0: // no conditions
-	case 1:
-		q.where = s.conditions[0]
-	default:
-		q.where = GroupCondition{conditions: s.conditions, operator: And}
-	}
+	q := s.newQuery()
+	q.into = into
 	return q
 }
 
 func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) query {
+	q := s.newQuery()
+	q.idKind = idKind
+	return q
+}
+
+func (s queryBuilder) newQuery() query {
 	q := query{
-		from:   &CollectionRef{Name: s.collection},
-		into:   nil,
-		idKind: idKind,
+		from:    &CollectionRef{Name: s.collection},
+		limit:   s.limit,
+		orderBy: s.orderBy,
+		offset:  s.offset,
 	}
 	switch len(s.conditions) {
 	case 0: // no conditions

@@ -2,6 +2,7 @@ package dal
 
 import (
 	"fmt"
+	"regexp"
 )
 
 type FieldRef struct {
@@ -15,7 +16,16 @@ func (f FieldRef) Equal(b FieldRef) bool {
 
 // String returns string representation of a field
 func (f FieldRef) String() string {
-	return fmt.Sprintf("[%v]", f.Name)
+	if RequiresEscaping(f.Name) {
+		return fmt.Sprintf("[%v]", f.Name)
+	}
+	return f.Name
+}
+
+var reRegularName = regexp.MustCompile(`^\w+$`)
+
+func RequiresEscaping(s string) bool {
+	return !reRegularName.MatchString(s)
 }
 
 // EqualTo creates equality condition for a field
