@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// RecordData is a wrapper for data transfer objects (DTOs).
+// TODO: document intended usage or consider removing as it makes implementation of Reader more complex.
 type RecordData interface {
 	DTO() any
 }
