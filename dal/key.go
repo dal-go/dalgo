@@ -32,6 +32,15 @@ type Key struct {
 	IDKind     reflect.Kind
 }
 
+var escapeCharsReplacer = strings.NewReplacer(
+	".", "%2E",
+	"$", "%24",
+	"#", "%23",
+	"[", "%5B",
+	"]", "%5D",
+	"/", "%2F",
+)
+
 // String returns string representation of a key instance
 func (k *Key) String() string {
 	key := k // This is intended as we want to traverse the key ancestors
@@ -40,7 +49,9 @@ func (k *Key) String() string {
 	}
 	s := make([]string, 0, (key.Level())*2)
 	for {
-		s = append(s, fmt.Sprintf("%v", key.ID))
+		id := fmt.Sprintf("%v", key.ID)
+		id = escapeCharsReplacer.Replace(id)
+		s = append(s, id)
 		s = append(s, key.collection)
 		if key.parent == nil {
 			break

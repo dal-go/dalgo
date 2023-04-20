@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 )
@@ -307,6 +308,36 @@ func TestNewKeyWithID(t *testing.T) {
 			if got := NewKeyWithID(tt.args.collection, tt.args.id); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewKeyWithID() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestKey_String(t *testing.T) {
+	type fields struct {
+		parent     *Key
+		collection string
+		ID         any
+		IDKind     reflect.Kind
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{name: "no_parent-string_id", fields: fields{ID: "k1", collection: "Kind1"}, want: "Kind1/k1"},
+		{name: "no_parent-int_id", fields: fields{ID: 1, collection: "Kind1"}, want: "Kind1/1"},
+		{name: "no_parent_string_id-escaped", fields: fields{ID: "k1/k2", collection: "Kind1"}, want: "Kind1/k1%2Fk2"},
+		{name: "single_parent-string_id", fields: fields{ID: "k1", collection: "Kind1", parent: NewKeyWithID("Parent1", "p1")}, want: "Parent1/p1/Kind1/k1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k := &Key{
+				parent:     tt.fields.parent,
+				collection: tt.fields.collection,
+				ID:         tt.fields.ID,
+				IDKind:     tt.fields.IDKind,
+			}
+			assert.Equalf(t, tt.want, k.String(), "String()")
 		})
 	}
 }
