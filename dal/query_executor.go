@@ -25,7 +25,6 @@ type QueryExecutor interface {
 var _ QueryExecutor = (*queryExecutor)(nil)
 
 type queryExecutor struct {
-	query     query
 	getReader ReaderProvider
 }
 

@@ -4,6 +4,9 @@ import "errors"
 
 // SelectAllIDs is a helper method that for a given reader returns all IDs as a strongly typed slice.
 func SelectAllIDs[T comparable](reader Reader, limit int) (ids []T, err error) {
+	if reader == nil {
+		panic("reader is a required parameter, got nil")
+	}
 	for i := 0; limit <= 0 || i < limit; i++ {
 		var record Record
 		if record, err = reader.Next(); err != nil {
