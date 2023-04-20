@@ -13,10 +13,10 @@ func TestSimpleQuery(t *testing.T) {
 		Field("field_1").EqualTo("value_1"),
 	).SelectInto(newRecord)
 	assert.NotNil(t, q)
-	assert.NotNil(t, q.From)
-	assert.Equal(t, "test", q.From.Name)
-	assert.NotNil(t, q.Where)
-	assert.NotNil(t, q.Into)
+	assert.NotNil(t, q.From())
+	assert.Equal(t, "test", q.From().Name)
+	assert.NotNil(t, q.Where())
+	assert.NotNil(t, q.Into())
 	//assert.Equal(t, newRecord, q.Into)
 	t.Log("\n" + q.String())
 }

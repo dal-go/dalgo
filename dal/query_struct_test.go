@@ -13,7 +13,7 @@ func TestSelect_String(t *testing.T) {
 		OrderBy []OrderExpression
 		Columns []Column
 		Into    func() Record
-		Limit   int
+		limit   int
 	}
 	tests := []struct {
 		name   string
@@ -65,7 +65,7 @@ func TestSelect_String(t *testing.T) {
 			name: "select top 7 * from User",
 			fields: fields{
 				From:  &CollectionRef{Name: "User"},
-				Limit: 7,
+				limit: 7,
 			},
 			want: "SELECT TOP 7 * FROM [User]",
 		},
@@ -73,7 +73,7 @@ func TestSelect_String(t *testing.T) {
 			name: "select top 7 * from User order by Email, Created DESC",
 			fields: fields{
 				From:  &CollectionRef{Name: "User"},
-				Limit: 7,
+				limit: 7,
 				OrderBy: []OrderExpression{
 					Ascending(Field("Email")),
 					Descending(Field("Created")),
@@ -84,14 +84,14 @@ func TestSelect_String(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := Query{
-				From:    tt.fields.From,
-				Where:   tt.fields.Where,
-				GroupBy: tt.fields.GroupBy,
-				OrderBy: tt.fields.OrderBy,
-				Columns: tt.fields.Columns,
-				Into:    tt.fields.Into,
-				Limit:   tt.fields.Limit,
+			q := query{
+				from:    tt.fields.From,
+				where:   tt.fields.Where,
+				groupBy: tt.fields.GroupBy,
+				orderBy: tt.fields.OrderBy,
+				columns: tt.fields.Columns,
+				into:    tt.fields.Into,
+				limit:   tt.fields.limit,
 			}
 			if got := q.String(); got != tt.want {
 				t.Errorf("Got:\n%v\n\nWant:\n%v", got, tt.want)
