@@ -31,4 +31,7 @@ type Query interface {
 
 	// Limit specifies maximum number of records to be returned
 	Limit() int
+
+	// StartFrom specifies the startCursor/point to start from
+	StartFrom() Cursor
 }

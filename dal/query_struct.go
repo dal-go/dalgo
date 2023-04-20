@@ -38,8 +38,8 @@ type query struct {
 
 	idKind reflect.Kind
 
-	// StartCursor specifies the cursor/point to start from
-	startCursor string
+	// StartCursor specifies the startCursor/point to start from
+	startCursor Cursor
 }
 
 func (q query) From() *CollectionRef {
@@ -70,7 +70,7 @@ func (q query) IDKind() reflect.Kind {
 	return q.idKind
 }
 
-func (q query) StartCursor() string {
+func (q query) StartFrom() Cursor {
 	return q.startCursor
 }
 

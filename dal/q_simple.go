@@ -6,6 +6,8 @@ type SingleSource interface {
 	Where(conditions ...Condition) QueryBuilder
 }
 
+type Cursor string
+
 type QueryBuilder interface {
 	Offset(int) QueryBuilder
 	Limit(int) QueryBuilder
@@ -14,6 +16,7 @@ type QueryBuilder interface {
 	OrderBy(expressions ...OrderExpression) QueryBuilder
 	SelectInto(func() Record) query
 	SelectKeysOnly(idKind reflect.Kind) query
+	StartFrom(cursor Cursor) QueryBuilder
 }
 
 var _ QueryBuilder = (*queryBuilder)(nil)
@@ -23,11 +26,17 @@ func From(collection string, conditions ...Condition) QueryBuilder {
 }
 
 type queryBuilder struct {
-	collection string
-	offset     int
-	limit      int
-	conditions []Condition
-	orderBy    []OrderExpression
+	collection  string
+	offset      int
+	limit       int
+	conditions  []Condition
+	orderBy     []OrderExpression
+	startCursor Cursor
+}
+
+func (s queryBuilder) StartFrom(cursor Cursor) QueryBuilder {
+	s.startCursor = cursor
+	return s
 }
 
 func (s queryBuilder) Offset(i int) QueryBuilder {
@@ -69,10 +78,11 @@ func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) query {
 
 func (s queryBuilder) newQuery() query {
 	q := query{
-		from:    &CollectionRef{Name: s.collection},
-		limit:   s.limit,
-		orderBy: s.orderBy,
-		offset:  s.offset,
+		from:        &CollectionRef{Name: s.collection},
+		limit:       s.limit,
+		orderBy:     s.orderBy,
+		offset:      s.offset,
+		startCursor: s.startCursor,
 	}
 	switch len(s.conditions) {
 	case 0: // no conditions
