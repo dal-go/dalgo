@@ -6,13 +6,17 @@ func Field(name string) FieldRef {
 }
 
 type OrderExpression interface {
-	Expression
+	Expression() Expression
 	Descending() bool
 }
 
 type orderExpression struct {
 	expression Expression
 	descending bool
+}
+
+func (v orderExpression) Expression() Expression {
+	return v.expression
 }
 
 func (v orderExpression) String() string {
