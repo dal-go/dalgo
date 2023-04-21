@@ -1,11 +1,14 @@
 package dal
 
+import "fmt"
+
 // Field creates an expression that represents a FieldRef value
 func Field(name string) FieldRef {
 	return FieldRef{Name: name}
 }
 
 type OrderExpression interface {
+	fmt.Stringer
 	Expression() Expression
 	Descending() bool
 }
