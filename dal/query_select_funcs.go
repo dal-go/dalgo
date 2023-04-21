@@ -16,7 +16,8 @@ func SelectAllIDs[T comparable](reader Reader, limit int) (ids []T, err error) {
 			}
 			return
 		}
-		ids = append(ids, record.Key().ID.(T))
+		id := record.Key().ID.(T) // on separate line for debug purposes
+		ids = append(ids, id)
 	}
 	return ids, reader.Close()
 }
