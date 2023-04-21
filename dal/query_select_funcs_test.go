@@ -11,6 +11,10 @@ var _ Reader = (*emptyReader)(nil)
 type emptyReader struct {
 }
 
+func (e emptyReader) Close() error {
+	return nil
+}
+
 func (e emptyReader) Next() (Record, error) {
 	return nil, ErrNoMoreRecords
 }
@@ -31,7 +35,7 @@ func TestSelectAllIDs(t *testing.T) {
 		wantErr error
 	}
 	tests := []testCase[int]{
-		{name: "empty_reader", args: args{reader: emptyReader{}}, wantIds: nil, wantErr: nil},
+		{name: "empty_reader", args: args{reader: emptyReader{}}, wantIds: []int{}, wantErr: nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

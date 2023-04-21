@@ -117,4 +117,7 @@ type Reader interface {
 
 	// Cursor points to a position in the result set. This can be used for pagination.
 	Cursor() (string, error)
+
+	// Close closes the reader
+	Close() error
 }
