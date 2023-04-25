@@ -7,6 +7,7 @@ import (
 
 var _ Collection = (*UserCollection)(nil)
 
+// This will be used to query data
 var Users = UserCollection{
 	Field: UserFields{
 		Email: NewField("Email", Required[string]()),
