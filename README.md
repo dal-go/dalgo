@@ -95,7 +95,7 @@ package dal
 
 type Record interface {
 	Key() *Key          // defines `table` name of the entity
-	Data() any  // value to be stored/retrieved (without ID)
+	Data() any          // value to be stored/retrieved (without ID)
 	Error() error       // holds error for the record
 	SetError(err error) // sets error relevant to specific record
 	Exists() bool       // indicates if the record exists in DB
@@ -112,61 +112,61 @@ If the db driver does not support some operations it must return `dalgo.ErrNotSu
 package dal
 
 type Database interface {
-  TransactionCoordinator
-  ReadonlySession
+	TransactionCoordinator
+	ReadonlySession
 }
 
 // TransactionCoordinator provides methods to work with transactions
 type TransactionCoordinator interface {
 
-// RunReadonlyTransaction starts readonly transaction
-RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
+	// RunReadonlyTransaction starts readonly transaction
+	RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
 
-// RunReadwriteTransaction starts read-write transaction
-RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
+	// RunReadwriteTransaction starts read-write transaction
+	RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
 }
 
 // ReadonlySession defines methods that do not modify database
 type ReadonlySession interface {
 
-// Get gets a single record from database by key
-Get(ctx context.Context, record Record) error
+	// Get gets a single record from database by key
+	Get(ctx context.Context, record Record) error
 
-// GetMulti gets multiples records from database by keys
-GetMulti(ctx context.Context, records []Record) error
+	// GetMulti gets multiples records from database by keys
+	GetMulti(ctx context.Context, records []Record) error
 
-// Select executes a data retrieval query
-Select(ctx context.Context, query Select) (Reader, error)
+	// Select executes a data retrieval query
+	Select(ctx context.Context, query Select) (Reader, error)
 }
 
 // ReadwriteSession defines methods that can modify database
 type ReadwriteSession interface {
-ReadonlySession
-writeOnlySession
+	ReadonlySession
+	writeOnlySession
 }
 
 type writeOnlySession interface {
 
-// Insert inserts a single record in database
-Insert(c context.Context, record Record, opts ...InsertOption) error
+	// Insert inserts a single record in database
+	Insert(c context.Context, record Record, opts ...InsertOption) error
 
-// Set sets a single record in database by key
-Set(ctx context.Context, record Record) error
+	// Set sets a single record in database by key
+	Set(ctx context.Context, record Record) error
 
-// SetMulti sets multiples records in database by keys
-SetMulti(ctx context.Context, records []Record) error
+	// SetMulti sets multiples records in database by keys
+	SetMulti(ctx context.Context, records []Record) error
 
-// Update updates a single record in database by key
-Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
+	// Update updates a single record in database by key
+	Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
 
-// UpdateMulti updates multiples records in database by keys
-UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
+	// UpdateMulti updates multiples records in database by keys
+	UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
 
-// Delete deletes a single record from database by key
-Delete(ctx context.Context, key *Key) error
+	// Delete deletes a single record from database by key
+	Delete(ctx context.Context, key *Key) error
 
-// DeleteMulti deletes multiple records from database by keys
-DeleteMulti(ctx context.Context, keys []*Key) error
+	// DeleteMulti deletes multiple records from database by keys
+	DeleteMulti(ctx context.Context, keys []*Key) error
 }
 ```
 
@@ -177,9 +177,8 @@ specifics. This works well with other key-value storages as well. Also `dalgo` s
 
 ## Frameworks that utilise DALgo
 
-* <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a>
-
-- framework to build chat-bots in Go language.
+* <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a> - framework to build chat-bots
+  in Go language.
 
 ## [Contributing](CONTRIBUTING.md)
 
