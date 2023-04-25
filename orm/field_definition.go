@@ -6,20 +6,6 @@ import (
 	"strings"
 )
 
-// Field defines field
-type Field interface {
-	Name() string
-	Type() string
-	IsRequired() bool
-	CompareTo(operator dal.Operator, v dal.Expression) dal.Condition
-}
-
-// StringField defines a string field
-type StringField interface {
-	Field
-	EqualToString(s string) dal.Condition
-}
-
 type FieldDefinition[T any] struct {
 	name       string
 	valueType  string
@@ -73,20 +59,4 @@ func NewFieldWithType[T any](name, valueType string, options ...FieldOption[T]) 
 		f = o(f)
 	}
 	return f
-}
-
-type FieldOption[T any] func(f FieldDefinition[T]) FieldDefinition[T]
-
-func Required[T any]() FieldOption[T] {
-	return func(f FieldDefinition[T]) FieldDefinition[T] {
-		f.isRequired = true
-		return f
-	}
-}
-
-func Default[T any](value T) FieldOption[T] {
-	return func(f FieldDefinition[T]) FieldDefinition[T] {
-		f.defaultVal = value
-		return f
-	}
 }
