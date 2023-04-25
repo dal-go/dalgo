@@ -1,30 +1,49 @@
 package orm
 
 import (
-	"reflect"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-func TestNewStringField(t *testing.T) {
-	type args struct {
-		name string
-	}
+func TestNewField(t *testing.T) {
 	tests := []struct {
-		name string
-		args args
-		want StringField
+		name        string
+		newField    func(name string) FieldDefinition[string]
+		assertField func(t *testing.T, f FieldDefinition[string])
 	}{
 		{
-			name: "str1",
-			args: args{name: "str1"},
-			want: stringField{field: field{name: "str1"}},
+			name: "string_field_with_just_name",
+			newField: func(name string) FieldDefinition[string] {
+				return NewField[string](name)
+			},
+			assertField: func(t *testing.T, f FieldDefinition[string]) {
+				assert.False(t, f.IsRequired())
+			},
+		},
+		{
+			name: "required_string_field_1",
+			newField: func(name string) FieldDefinition[string] {
+				return NewField(name, Required[string]())
+			},
+			assertField: func(t *testing.T, f FieldDefinition[string]) {
+				assert.True(t, f.IsRequired())
+			},
+		},
+		{
+			name: "required_string_field_with_default_value",
+			newField: func(name string) FieldDefinition[string] {
+				return NewField[string](name, Required[string](), Default[string]("default_value_1"))
+			},
+			assertField: func(t *testing.T, f FieldDefinition[string]) {
+				assert.True(t, f.IsRequired())
+				assert.Equal(t, "default_value_1", f.DefaultValue())
+			},
 		},
 	}
+
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := NewStringField(tt.args.name); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewStringField() = %v, want %v", got, tt.want)
-			}
-		})
+		f := tt.newField(tt.name)
+		assert.Equal(t, tt.name, f.Name())
+		tt.assertField(t, f)
 	}
 }

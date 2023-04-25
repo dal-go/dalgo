@@ -8,7 +8,7 @@ import (
 type Field interface {
 	Name() string
 	Type() string
-	Required() bool
+	IsRequired() bool
 	CompareTo(operator dal.Operator, v dal.Expression) dal.Condition
 }
 
@@ -18,36 +18,57 @@ type StringField interface {
 	EqualToString(s string) dal.Condition
 }
 
-type field struct {
-	name     string
-	required bool
+type FieldDefinition[T any] struct {
+	name       string
+	valueType  string
+	isRequired bool
+	defaultVal T
 }
 
-func (v field) Name() string {
+func (v FieldDefinition[T]) DefaultValue() T {
+	return v.defaultVal
+}
+
+func (v FieldDefinition[T]) Name() string {
 	return v.name
 }
 
-func (v field) Required() bool {
-	return v.required
+func (v FieldDefinition[T]) IsRequired() bool {
+	return v.isRequired
 }
 
-type stringField struct {
-	field
+func (v FieldDefinition[T]) Type() string {
+	return v.valueType
 }
 
-func (v stringField) Type() string {
-	return "string"
-}
-
-func (v stringField) EqualToString(s string) dal.Condition {
-	return v.CompareTo(dal.Equal, dal.String(s))
-}
-
-func (v stringField) CompareTo(operator dal.Operator, expression dal.Expression) dal.Condition {
+func (v FieldDefinition[T]) CompareTo(operator dal.Operator, expression dal.Expression) dal.Condition {
 	return dal.NewComparison(dal.FieldRef{Name: v.name}, operator, expression)
 }
 
-// NewStringField defines a new string field
-func NewStringField(name string) StringField {
-	return stringField{field: field{name: name}}
+func (v FieldDefinition[T]) EqualTo(value T) dal.Condition {
+	return v.CompareTo(dal.Equal, dal.Constant{Value: value})
+}
+
+func NewField[T any](name string, options ...FieldOption[T]) FieldDefinition[T] {
+	f := FieldDefinition[T]{name: name}
+	for _, o := range options {
+		f = o(f)
+	}
+	return f
+}
+
+type FieldOption[T any] func(f FieldDefinition[T]) FieldDefinition[T]
+
+func Required[T any]() FieldOption[T] {
+	return func(f FieldDefinition[T]) FieldDefinition[T] {
+		f.isRequired = true
+		return f
+	}
+}
+
+func Default[T any](value T) FieldOption[T] {
+	return func(f FieldDefinition[T]) FieldDefinition[T] {
+		f.defaultVal = value
+		return f
+	}
 }
