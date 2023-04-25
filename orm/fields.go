@@ -3,6 +3,7 @@ package orm
 import (
 	"github.com/dal-go/dalgo/dal"
 	"reflect"
+	"strings"
 )
 
 // Field defines field
@@ -56,6 +57,14 @@ func NewField[T any](name string, options ...FieldOption[T]) FieldDefinition[T] 
 }
 
 func NewFieldWithType[T any](name, valueType string, options ...FieldOption[T]) FieldDefinition[T] {
+	if strings.TrimSpace(name) == "" {
+		panic("name cannot be empty")
+	}
+	var v T
+	kind := reflect.TypeOf(v).Kind()
+	if kindName := kind.String(); kindName != "any" && kindName != valueType {
+		panic("valueType must be " + kind.String())
+	}
 	f := FieldDefinition[T]{
 		name:      name,
 		valueType: valueType,
