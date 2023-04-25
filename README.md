@@ -175,10 +175,12 @@ Note that getters are populating records in place using target instance obtained
 Originally developed to support work with Google AppEngine Datastore and Firebase Firestore it takes into account its
 specifics. This works well with other key-value storages as well. Also `dalgo` supports SQL databases.
 
-## Frameworks that utilise DALgo
+## Projects & modules that use DALgo
 
-* <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a> - framework to build chat-bots
+* <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a> - framework to build chatbots
   in Go language.
+
+[More dependants](https://sourcegraph.com/search?q=context%3Aglobal+github.com%2Fdal-go%2Fdalgo&patternType=standard&sm=1&groupBy=repo) can be found using SourceGraph search. 
 
 ## [Contributing](CONTRIBUTING.md)
 
