@@ -2,6 +2,7 @@ package orm
 
 import (
 	"github.com/dal-go/dalgo/dal"
+	"reflect"
 )
 
 // Field defines field
@@ -50,7 +51,15 @@ func (v FieldDefinition[T]) EqualTo(value T) dal.Condition {
 }
 
 func NewField[T any](name string, options ...FieldOption[T]) FieldDefinition[T] {
-	f := FieldDefinition[T]{name: name}
+	var v T
+	return NewFieldWithType(name, reflect.TypeOf(v).String(), options...)
+}
+
+func NewFieldWithType[T any](name, valueType string, options ...FieldOption[T]) FieldDefinition[T] {
+	f := FieldDefinition[T]{
+		name:      name,
+		valueType: valueType,
+	}
 	for _, o := range options {
 		f = o(f)
 	}

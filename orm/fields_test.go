@@ -44,6 +44,7 @@ func TestNewField(t *testing.T) {
 	for _, tt := range tests {
 		f := tt.newField(tt.name)
 		assert.Equal(t, tt.name, f.Name())
+		assert.Equal(t, "string", f.Type())
 		tt.assertField(t, f)
 	}
 }
