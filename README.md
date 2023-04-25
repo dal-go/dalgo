@@ -51,7 +51,6 @@ needs.
 
 - [`dal`](dal) - Database Abstraction Layer
 - [`orm`](orm) - Object–relational mapping
-- [`query`](query) - SQL like interface with support of WHERE conditions, GROUP BY, etc.
 - [`record`](record) - helpers to simplify working with dalgo records in strongly typed way.
 
 ## DAL implementations for specific APIs
@@ -83,7 +82,7 @@ Here is modules that bridge DALgo to specific APIs:
 ## Test coverage
 
 The CI process for this package and for officially supported bridges runs unit tests
-and [end-to-end](end2end) integration tests.
+and [end-to-end](https://github.com/dal-go/dalgo-end2end-tests) integration tests.
 
 ## DALgo interfaces
 
@@ -110,9 +109,11 @@ driver. Contributions for client bridges are very welcome!
 If the db driver does not support some operations it must return `dalgo.ErrNotSupported`.
 
 ```go
+package dal
+
 type Database interface {
-TransactionCoordinator
-ReadonlySession
+  TransactionCoordinator
+  ReadonlySession
 }
 
 // TransactionCoordinator provides methods to work with transactions
@@ -179,3 +180,7 @@ specifics. This works well with other key-value storages as well. Also `dalgo` s
 * <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a>
 
 - framework to build chat-bots in Go language.
+
+## [Contributing](CONTRIBUTING.md)
+
+Contributions are welcome but should follow the [contribution guidelines](CONTRIBUTING.md).
