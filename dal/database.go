@@ -65,15 +65,20 @@ type ReadwriteTransaction interface {
 	ReadwriteSession
 }
 
-// ReadSession defines methods that query data from DB and does not modify it
-type ReadSession interface {
-
+type Getter interface {
 	// Get gets a single record from database by key
 	Get(ctx context.Context, record Record) error
+}
 
+type MultiGetter interface {
 	// GetMulti gets multiples records from database by keys
 	GetMulti(ctx context.Context, records []Record) error
+}
 
+// ReadSession defines methods that query data from DB and does not modify it
+type ReadSession interface {
+	Getter
+	MultiGetter
 	QueryExecutor
 }
 
@@ -83,29 +88,50 @@ type ReadwriteSession interface {
 	WriteSession
 }
 
-// WriteSession defines methods that can modify database
-type WriteSession interface {
-
-	// Insert inserts a single record in database
-	Insert(c context.Context, record Record, opts ...InsertOption) error
-
+type Setter interface {
 	// Set sets a single record in database by key
 	Set(ctx context.Context, record Record) error
+}
 
+type MultiSetter interface {
 	// SetMulti sets multiples records in database by keys
 	SetMulti(ctx context.Context, records []Record) error
+}
 
-	// Update updates a single record in database by key
-	Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
-
-	// UpdateMulti updates multiples records in database by keys
-	UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
-
+type Deleter interface {
 	// Delete deletes a single record from database by key
 	Delete(ctx context.Context, key *Key) error
+}
 
+type MultiDeleter interface {
 	// DeleteMulti deletes multiple records from database by keys
 	DeleteMulti(ctx context.Context, keys []*Key) error
+}
+
+type Updater interface {
+	// Update updates a single record in database by key
+	Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
+}
+
+type MultiUpdater interface {
+	// UpdateMulti updates multiples records in database by keys
+	UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
+}
+
+type Inserter interface {
+	// Insert inserts a single record in database
+	Insert(c context.Context, record Record, opts ...InsertOption) error
+}
+
+// WriteSession defines methods that can modify database
+type WriteSession interface {
+	Setter
+	MultiSetter
+	Deleter
+	MultiDeleter
+	Updater
+	MultiUpdater
+	Inserter
 }
 
 // Reader reads records one by one
