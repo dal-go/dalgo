@@ -53,7 +53,11 @@ func NewContextWithTransaction(nonTransactionalContext context.Context, tx Trans
 
 // GetTransaction returns original transaction object
 func GetTransaction(ctx context.Context) Transaction {
-	return ctx.Value(&transactionContextKey).(Transaction)
+	tx := ctx.Value(&transactionContextKey)
+	if tx == nil {
+		return nil
+	}
+	return tx.(Transaction)
 }
 
 // GetNonTransactionalContext returns non transaction context (e.g. Parent of transactional context)
