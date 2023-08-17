@@ -10,7 +10,15 @@ func TestNewField(t *testing.T) {
 		name        string
 		newField    func(name string) FieldDefinition[string]
 		assertField func(t *testing.T, f FieldDefinition[string])
+		shouldPanic bool
 	}{
+		{
+			name:        "empty_name",
+			shouldPanic: true,
+			newField: func(_ string) FieldDefinition[string] {
+				return NewField[string]("")
+			},
+		},
 		{
 			name: "string_field_with_just_name",
 			newField: func(name string) FieldDefinition[string] {
@@ -42,9 +50,24 @@ func TestNewField(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		if tt.shouldPanic {
+			assert.Panics(t, func() {
+				tt.newField(tt.name)
+			})
+			continue
+		}
 		f := tt.newField(tt.name)
 		assert.Equal(t, tt.name, f.Name())
 		assert.Equal(t, "string", f.Type())
 		tt.assertField(t, f)
 	}
+}
+
+func TestNewFieldWithType(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("NewFieldWithType() did not panic")
+		}
+	}()
+	NewFieldWithType[string]("name", "ABC")
 }
