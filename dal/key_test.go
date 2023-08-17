@@ -341,3 +341,31 @@ func TestKey_String(t *testing.T) {
 		})
 	}
 }
+
+func TestNewIncompleteKey(t *testing.T) {
+	type args struct {
+		collection string
+		idKind     reflect.Kind
+		parent     *Key
+	}
+	type test struct {
+		name        string
+		args        args
+		shouldPanic bool
+	}
+	for _, tt := range []test{
+		{name: "valid", args: args{collection: "Kind1", idKind: reflect.String, parent: nil}, shouldPanic: false},
+		{name: "invalid_id_kind", args: args{collection: "Kind1", idKind: reflect.Invalid, parent: nil}, shouldPanic: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil && tt.shouldPanic {
+						t.Errorf("NewIncompleteKey() did not panic")
+					}
+				}()
+			}
+			NewIncompleteKey(tt.args.collection, tt.args.idKind, tt.args.parent)
+		})
+	}
+}
