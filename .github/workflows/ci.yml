@@ -11,6 +11,7 @@ on:
       - '**'
 
 jobs:
+
   strongo_workflow:
     permissions:
       contents: write
