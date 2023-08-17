@@ -39,26 +39,6 @@ func TestInt(t *testing.T) {
 	}
 }
 
-func TestStr(t *testing.T) {
-	type args struct {
-		v string
-	}
-	tests := []struct {
-		name string
-		args args
-		want StrConst
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := Str(tt.args.v); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Str() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_integer_String(t *testing.T) {
 	type fields struct {
 		value int
@@ -85,38 +65,6 @@ func Test_integer_String(t *testing.T) {
 				value: tt.fields.value,
 			}
 			if got := i.String(); got != tt.want {
-				t.Errorf("String() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_str_String(t *testing.T) {
-	type fields struct {
-		value string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   string
-	}{
-		{
-			name:   "empty",
-			fields: fields{value: ""},
-			want:   "''",
-		},
-		{
-			name:   "aBc",
-			fields: fields{value: "aBc"},
-			want:   "'aBc'",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v := StrConst{
-				value: tt.fields.value,
-			}
-			if got := v.String(); got != tt.want {
 				t.Errorf("String() = %v, want %v", got, tt.want)
 			}
 		})
