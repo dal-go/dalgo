@@ -297,14 +297,30 @@ func TestNewKeyWithID(t *testing.T) {
 		id         string
 	}
 	tests := []struct {
-		name string
-		args args
-		want *Key
+		name        string
+		args        args
+		want        *Key
+		shouldPanic string
 	}{
 		{name: "valid", args: args{collection: "kind1", id: "k1"}, want: &Key{collection: "kind1", ID: "k1"}},
+		{name: "empty_collection", shouldPanic: "collection is a required parameter", args: args{collection: "", id: "k1"}, want: &Key{collection: "kind1", ID: "k1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic != "" {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("NewKeyWithID() did not panic")
+					} else {
+						switch s := r.(type) {
+						case string:
+							if s != tt.shouldPanic {
+								t.Errorf("NewKeyWithID() panic = %v, want %v", s, tt.shouldPanic)
+							}
+						}
+					}
+				}()
+			}
 			if got := NewKeyWithID(tt.args.collection, tt.args.id); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewKeyWithID() = %v, want %v", got, tt.want)
 			}
