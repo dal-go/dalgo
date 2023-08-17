@@ -18,3 +18,5 @@ jobs:
     uses: strongo/go-ci-action/.github/workflows/workflow.yml@main
     secrets:
       gh_token: ${{ secrets.GITHUB_TOKEN }}
+    with:
+      code_coverage: true
