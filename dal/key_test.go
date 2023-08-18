@@ -558,10 +558,11 @@ func TestKey_Equal(t *testing.T) {
 	k21 := &Key{collection: "collection2", ID: "id1"}
 
 	for _, tt := range []struct {
-		name     string
-		k1       *Key
-		k2       *Key
-		expected bool
+		name            string
+		k1              *Key
+		k2              *Key
+		expected        bool
+		shouldPanicWith []string
 	}{
 		{
 			name:     "both nil",
@@ -599,8 +600,35 @@ func TestKey_Equal(t *testing.T) {
 			k2:       k12,
 			expected: false,
 		},
+		{
+			name: "k1circular",
+			k1: NewKeyWithParentAndID(
+				NewKeyWithParentAndID(
+					NewKeyWithID("collection1", "id1"),
+					"collection1", "id2"),
+				"collection1", "id1"),
+			k2: NewKeyWithParentAndID(
+				NewKeyWithParentAndID(
+					NewKeyWithID("collection1", "id3"),
+					"collection1", "id2"),
+				"collection1", "id1"),
+			shouldPanicWith: []string{"circular", "id1", "collection1"},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			if len(tt.shouldPanicWith) > 0 {
+				defer func() {
+					r := recover()
+					if r == nil {
+						t.Errorf("expected to panic")
+						return
+					}
+					s := fmt.Sprintf("%v", r)
+					for _, expected := range tt.shouldPanicWith {
+						assert.Contains(t, s, expected)
+					}
+				}()
+			}
 			actual := tt.k1.Equal(tt.k2)
 			assert.Equal(t, tt.expected, actual)
 		})

@@ -225,7 +225,7 @@ func EqualKeys(k1 *Key, k2 *Key) bool {
 
 	panicIfCircular := func(key *Key, keys []*Key) {
 		for _, k := range keys {
-			if EqualKeys(k, key) {
+			if k.ID == key.ID && k.collection == key.collection {
 				panic(fmt.Sprintf("circular key: %s=%v", k.collection, k.ID))
 			}
 		}
@@ -249,11 +249,12 @@ func EqualKeys(k1 *Key, k2 *Key) bool {
 		k1s = append(k1s, k1)
 		k2s = append(k2s, k2)
 
-		k1 = k1.Parent()
-		k2 = k2.Parent()
-
-		panicIfCircular(k1, k1s)
-		panicIfCircular(k2, k2s)
+		if k1 = k1.Parent(); k1 != nil {
+			panicIfCircular(k1, k1s)
+		}
+		if k2 = k2.Parent(); k2 != nil {
+			panicIfCircular(k2, k2s)
+		}
 	}
 }
 
