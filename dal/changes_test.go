@@ -55,14 +55,44 @@ func TestChanges_IsChanged(t *testing.T) {
 }
 
 func TestChanges_FlagAsChanged(t *testing.T) {
-	r := record{key: &Key{ID: "r1", collection: "records"}}
-	c := Changes{}
-	c.FlagAsChanged(&r)
-	if !r.changed {
-		t.Errorf("record should be marked as changed")
+	type test struct {
+		name        string
+		changes     Changes
+		r           *record
+		shouldPanic bool
 	}
-	if len(c.records) != 1 {
-		t.Errorf("should be 1 record in changes, got %d", len(c.records))
+
+	tests := []test{
+		{
+			name:        "empty_record_not_nil",
+			changes:     Changes{},
+			r:           &record{key: &Key{ID: "r1", collection: "records"}},
+			shouldPanic: false,
+		},
+		{
+			name:        "empty_record_is_nil",
+			changes:     Changes{},
+			r:           nil,
+			shouldPanic: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if recover() == nil {
+						t.Errorf("should panic")
+					}
+				}()
+			}
+			tt.changes.FlagAsChanged(tt.r)
+			if !tt.r.changed {
+				t.Errorf("record should be marked as changed")
+			}
+			if len(tt.changes.records) != 1 {
+				t.Errorf("should be 1 record in changes, got %d", len(tt.changes.records))
+			}
+		})
 	}
 }
 
