@@ -25,6 +25,8 @@ type RecordHook = func(c context.Context, record Record) error
 
 type RecordDataHook = func(c context.Context, db Database, key *Key, data any) (err error)
 
+var _ RecordData = (*recordData[string])(nil)
+
 type recordData[T any] struct {
 	Data
 	beforeSave RecordDataHook
