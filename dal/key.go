@@ -214,7 +214,12 @@ func NewKeyWithFields(collection string, fields ...FieldVal) *Key {
 }
 
 func EqualKeys(k1 *Key, k2 *Key) bool {
-
+	if k1 == nil && k2 == nil {
+		return true
+	}
+	if k1 == nil || k2 == nil {
+		return false
+	}
 	k1s := make([]*Key, 0, k1.Level())
 	k2s := make([]*Key, 0, k2.Level())
 
