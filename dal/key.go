@@ -7,23 +7,6 @@ import (
 	"strings"
 )
 
-// FieldVal hold a reference to a single record within a root or nested recordset.
-type FieldVal struct {
-	Name  string `json:"Name"`
-	Value any    `json:"value"`
-}
-
-// Validate validates field value
-func (v FieldVal) Validate() error {
-	if strings.TrimSpace(v.Name) == "" {
-		return errors.New("Name is a required property")
-	}
-	if v.Value == nil {
-		return errors.New("Value is a required property")
-	}
-	return nil
-}
-
 // Key represents a full path to a given record (no Parent in case of root recordset)
 type Key struct {
 	parent     *Key
