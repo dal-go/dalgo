@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"errors"
 	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
@@ -212,6 +213,17 @@ func TestKey_Parent(t *testing.T) {
 	}
 }
 
+type validatableID struct {
+	isValid bool
+}
+
+func (v validatableID) Validate() error {
+	if v.isValid {
+		return nil
+	}
+	return errors.New("invalid")
+}
+
 func TestKey_Validate(t *testing.T) {
 	type fields struct {
 		//level  int
@@ -229,6 +241,19 @@ func TestKey_Validate(t *testing.T) {
 		}},
 		{name: "no_parent-int_id", wantErr: false, fields: fields{
 			kind: "Kind1", ID: 1,
+		}},
+		{name: "no_parent-validatable_id-valid", wantErr: false, fields: fields{
+			kind: "Kind1", ID: validatableID{isValid: true},
+		}},
+		{name: "no_parent-validatable_id-invalid", wantErr: true, fields: fields{
+			kind: "Kind1", ID: validatableID{isValid: false},
+		}},
+		{name: "no_parent-field_val", wantErr: false, fields: fields{
+			kind: "Kind1",
+			ID: []FieldVal{
+				{Name: "f1", Value: "v1"},
+				{Name: "f2", Value: "v2"},
+			},
 		}},
 	}
 	for _, tt := range tests {
@@ -445,6 +470,112 @@ func TestKey_Collection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			key := Key{collection: tt.collection}
 			assert.Equal(t, tt.collection, key.Collection())
+		})
+	}
+}
+
+func TestWithID(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		id   string
+	}{
+		{name: "empty_id", id: ""},
+		{name: "non_empty_id", id: "id1"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			key := Key{}
+			WithID(tt.id)(&key)
+			assert.Equal(t, tt.id, key.ID)
+		})
+	}
+}
+
+func TestWithFields(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		id   []FieldVal
+	}{
+		{name: "nil", id: nil},
+		{name: "single_field", id: []FieldVal{{Name: "f1", Value: "v1"}}},
+		{name: "multiple_fields", id: []FieldVal{{Name: "f1", Value: "v1"}, {Name: "f2", Value: "v2"}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			key := Key{}
+			WithFields(tt.id)(&key)
+			assert.Equal(t, tt.id, key.ID)
+		})
+	}
+}
+
+func TestNewKeyWithFields(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		fields []FieldVal
+	}{
+		{name: "nil", fields: nil},
+		{name: "single_field", fields: []FieldVal{{Name: "f1", Value: "v1"}}},
+		{name: "multiple_fields", fields: []FieldVal{{Name: "f1", Value: "v1"}, {Name: "f2", Value: "v2"}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			key := NewKeyWithFields("collection1", tt.fields...)
+			assert.Equal(t, "collection1", key.Collection())
+			assert.Equal(t, tt.fields, key.ID.([]FieldVal))
+		})
+	}
+}
+
+func TestKey_Equal(t *testing.T) {
+	k11 := &Key{collection: "collection1", ID: "id1"}
+	k12 := &Key{collection: "collection1", ID: "id2"}
+
+	k21 := &Key{collection: "collection2", ID: "id1"}
+
+	for _, tt := range []struct {
+		name     string
+		k1       *Key
+		k2       *Key
+		expected bool
+	}{
+		{
+			name:     "both nil",
+			k1:       nil,
+			k2:       nil,
+			expected: true,
+		},
+		{
+			name:     "arg_nil",
+			k1:       k11,
+			k2:       nil,
+			expected: false,
+		},
+		{
+			name:     "same",
+			k1:       k11,
+			k2:       k11,
+			expected: true,
+		},
+		{
+			name:     "equal",
+			k1:       k11,
+			k2:       &(*k11),
+			expected: true,
+		},
+		{
+			name:     "same_id_different_collection",
+			k1:       k11,
+			k2:       k21,
+			expected: false,
+		},
+		{
+			name:     "same_collection_different_id",
+			k1:       k11,
+			k2:       k12,
+			expected: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := tt.k1.Equal(tt.k2)
+			assert.Equal(t, tt.expected, actual)
 		})
 	}
 }
