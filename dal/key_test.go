@@ -433,3 +433,18 @@ func TestKey_CollectionPath(t *testing.T) {
 		})
 	}
 }
+
+func TestKey_Collection(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		collection string
+	}{
+		{name: "empty", collection: ""},
+		{name: "with_value", collection: "records"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			key := Key{collection: tt.collection}
+			assert.Equal(t, tt.collection, key.Collection())
+		})
+	}
+}
