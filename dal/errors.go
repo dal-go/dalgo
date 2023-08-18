@@ -40,9 +40,6 @@ func IsNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	if _, ok := err.(ErrNotFoundByKey); ok {
-		return true
-	}
 	if errors.Is(err, ErrRecordNotFound) {
 		return true
 	}
@@ -76,7 +73,7 @@ func (e errNotFoundByKey) Unwrap() error {
 }
 
 func (e errNotFoundByKey) Error() string {
-	if e.cause == ErrRecordNotFound {
+	if errors.Is(e.cause, ErrRecordNotFound) {
 		return fmt.Sprintf("%v: by key=%v", e.cause, e.key)
 	}
 	s := fmt.Sprintf("record not found by key=%v", e.key)

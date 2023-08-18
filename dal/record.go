@@ -7,7 +7,8 @@ import (
 )
 
 // ErrDoesNotExist indicates a record does not exist
-var ErrDoesNotExist = errors.New("does not exist")
+// Deprecated: use ErrRecordNotFound instead
+//var ErrDoesNotExist = errors.New("does not exist")
 
 // Record is a gateway to a database record.
 type Record interface {
@@ -80,16 +81,13 @@ func (v *record) MarkAsChanged() {
 }
 
 func (v *record) Data() any {
-	if v.err != nil {
-		if v.err == NoError {
-			return v.data
-		}
-		if !IsNotFound(v.err) {
-			panic("an attempt to retrieve data from a record with an error")
-		}
+	if v.err == nil {
+		panic("an attempt to access record data before it was retrieved from database and SetError(error) called")
 	}
-	//panic("an attempt to access record data before it was retrieved from database and SetError(error) called")
-	return v.data
+	if errors.Is(v.err, NoError) {
+		return v.data
+	}
+	panic(fmt.Errorf("an attempt to retrieve data from a record with an error: %w", v.err))
 }
 
 //// SetDataTo sets DataTo handler
@@ -122,6 +120,10 @@ func (v *record) Error() error {
 
 // SetError sets error associated with a record
 func (v *record) SetError(err error) Record {
+	return v.setError(err)
+}
+
+func (v *record) setError(err error) *record {
 	if err == nil {
 		v.err = NoError
 	} else {
@@ -163,6 +165,6 @@ func NewRecordWithIncompleteKey(collection string, idKind reflect.Kind, data any
 
 // NewRecordWithoutKey creates a new record without a key
 // Obsolete, use NewRecordWithIncompleteKey instead
-func NewRecordWithoutKey(collection string, idKind reflect.Kind, data any) Record {
-	return NewRecordWithIncompleteKey(collection, idKind, data)
-}
+//func NewRecordWithoutKey(collection string, idKind reflect.Kind, data any) Record {
+//	return NewRecordWithIncompleteKey(collection, idKind, data)
+//}

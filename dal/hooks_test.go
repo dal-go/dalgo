@@ -37,7 +37,7 @@ func TestBeforeSave(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			data := test.data
-			err := BeforeSave(context.Background(), nil, NewRecordWithIncompleteKey("test", reflect.Struct, data))
+			err := BeforeSave(context.Background(), nil, NewRecordWithIncompleteKey("test", reflect.Struct, data).SetError(NoError))
 			if data.isValid {
 				assert.Nil(t, err)
 			} else {

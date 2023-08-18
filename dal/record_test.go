@@ -272,3 +272,30 @@ func TestRecord_HasChanged(t *testing.T) {
 		})
 	}
 }
+
+func TestRecord_Data(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		data        any
+		r           *record
+		shouldPanic bool
+	}{
+		{name: "panics_if_is_not_found", shouldPanic: true, r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(ErrRecordNotFound)},
+		{name: "nil", r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(NoError)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.r.data = tt.data
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("expected panic")
+					}
+				}()
+			}
+			data := tt.r.Data()
+			if data != tt.data {
+				t.Errorf("expected %v, got: %v", tt.data, data)
+			}
+		})
+	}
+}
