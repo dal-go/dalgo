@@ -108,26 +108,34 @@ func TestField(t *testing.T) {
 		args args
 		want FieldRef
 	}{
-		// TODO: Add test cases.
+		{name: "Field", args: args{name: "date"}, want: FieldRef{Name: "date"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, Field(tt.args.name), "Field(%v)", tt.args.name)
+			actual := Field(tt.args.name)
+			assert.Equal(t, tt.want, actual)
 		})
 	}
 }
 
-func Test_orderExpression_Descending(t *testing.T) {
+func Test_orderExpression(t *testing.T) {
 	type fields struct {
 		expression Expression
 		descending bool
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		want   bool
+		name     string
+		fields   fields
+		expected string
 	}{
-		// TODO: Add test cases.
+		{
+			name: "order",
+			fields: fields{
+				expression: Field("date1"),
+				descending: true,
+			},
+			expected: "date1 DESC",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -135,30 +143,13 @@ func Test_orderExpression_Descending(t *testing.T) {
 				expression: tt.fields.expression,
 				descending: tt.fields.descending,
 			}
-			assert.Equalf(t, tt.want, v.Descending(), "Descending()")
-		})
-	}
-}
-
-func Test_orderExpression_Expression(t *testing.T) {
-	type fields struct {
-		expression Expression
-		descending bool
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   Expression
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v := orderExpression{
-				expression: tt.fields.expression,
-				descending: tt.fields.descending,
+			assert.Equalf(t, tt.fields.descending, v.Descending(), "Descending()")
+			assert.Equalf(t, tt.fields.expression, v.Expression(), "Expression()")
+			if tt.fields.descending {
+				assert.Equalf(t, tt.expected, v.String(), "String()")
+			} else {
+				assert.Equalf(t, tt.expected, v.String(), "String()")
 			}
-			assert.Equalf(t, tt.want, v.Expression(), "Expression()")
 		})
 	}
 }
