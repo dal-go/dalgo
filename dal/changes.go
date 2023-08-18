@@ -43,22 +43,23 @@ func (changes *Changes) Records() (records []Record) {
 
 // HasChanges returns true if there are changes
 func (changes *Changes) HasChanges() bool {
-	// TODO: should it be simply len(changes.records) > 0 ?
-	for _, r := range changes.records {
-		if r.HasChanged() {
-			return true
-		}
-	}
-	return false
+	return len(changes.records) > 0
+	//// Records are always marked as changed
+	//for _, r := range changes.records {
+	//	if r.HasChanged() {
+	//		return true
+	//	}
+	//}
+	//return false
 }
 
-// ChangedRecords returns slice of changed records
-func (changes *Changes) ChangedRecords() (changed []Record) {
-	// TODO: Can we remove this method if records are always marked as changed?
-	for _, r := range changes.records {
-		if r.HasChanged() {
-			changed = append(changed, r)
-		}
-	}
-	return changed
-}
+// Remove as records are always marked as changed
+//// ChangedRecords returns slice of changed records
+//func (changes *Changes) ChangedRecords() (changed []Record) {
+//	for _, r := range changes.records {
+//		if r.HasChanged() {
+//			changed = append(changed, r)
+//		}
+//	}
+//	return changed
+//}
