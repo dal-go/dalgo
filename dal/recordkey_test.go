@@ -19,23 +19,20 @@ func TestGetRecordKeyPath(t *testing.T) {
 		{
 			name: "single_parent-string_id",
 			args: args{
-				key: NewKeyWithID("Kind1", "id1",
-					WithParentKey(
-						NewKeyWithID("Parent1", "p1"),
-					),
-				),
+				key: NewKeyWithParentAndID(NewKeyWithID("Parent1", "p1"), "Kind1", "id1"),
 			},
 			want: "Parent1/p1/Kind1/id1",
 		},
 		{
 			name: "two_parents-string_id",
 			args: args{
-				key: NewKeyWithID("Kind1", "id1",
-					WithParentKey(
-						NewKeyWithID("Parent1", "p1",
-							WithParentKey(NewKeyWithID("Parent2", "p2")),
-						),
+				key: NewKeyWithParentAndID(
+					NewKeyWithParentAndID(
+						NewKeyWithID("Parent2", "p2"),
+						"Parent1", "p1",
 					),
+					"Kind1",
+					"id1",
 				),
 			},
 			want: "Parent2/p2/Parent1/p1/Kind1/id1",
@@ -66,7 +63,7 @@ func TestKeyCollectionPath(t *testing.T) {
 		},
 		{
 			name: "single_parent-string_id",
-			args: args{key: NewKeyWithID("Kind1", "id1", WithParentKey(NewKeyWithID("Parent1", "p1")))},
+			args: args{key: NewKeyWithParentAndID(NewKeyWithID("Parent1", "p1"), "Kind1", "id1")},
 			want: "Parent1/Kind1",
 		},
 	}

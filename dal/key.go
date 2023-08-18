@@ -136,23 +136,40 @@ func (k *Key) Validate() error {
 }
 
 // KeyOption defines contract for key option
-type KeyOption = func(*Key)
+type KeyOption = func(*Key) error
 
-func setKeyOptions(key *Key, options ...KeyOption) {
-	for _, setOption := range options {
-		setOption(key)
+func setKeyOptions(key *Key, options ...KeyOption) error {
+	for _, o := range options {
+		if err := o(key); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func NewKeyWithParentAndID[T comparable](parent *Key, collection string, id T) (key *Key) {
+	key = NewKeyWithID(collection, id)
+	key.parent = parent
+	return key
 }
 
 // NewKeyWithID creates a new key with an ID
 // We need to make it generic to enforce `comparable` restriction on Key.ID
-func NewKeyWithID[T comparable](collection string, id T, options ...KeyOption) (key *Key) {
+func NewKeyWithID[T comparable](collection string, id T) (key *Key) {
 	if collection == "" {
 		panic("collection is a required parameter")
 	}
 	key = &Key{collection: collection, ID: id}
-	setKeyOptions(key, options...)
-	return
+	return key
+}
+
+// NewKeyWithOptions creates a new key with an ID
+func NewKeyWithOptions(collection string, options ...KeyOption) (key *Key, err error) {
+	if collection == "" {
+		panic("collection is a required parameter")
+	}
+	key = &Key{collection: collection}
+	return key, setKeyOptions(key, options...)
 }
 
 func NewIncompleteKey(collection string, idKind reflect.Kind, parent *Key) *Key {
@@ -166,29 +183,19 @@ func NewIncompleteKey(collection string, idKind reflect.Kind, parent *Key) *Key 
 	}
 }
 
-// NewKey creates a new key
-func NewKey(collection string, options ...KeyOption) (key *Key) {
-	if len(options) == 0 {
-		panic("at least 1 key option should be specified")
-	}
-	key = &Key{
-		collection: collection,
-	}
-	setKeyOptions(key, options...)
-	return
-}
-
 // WithID sets ID of a key
 func WithID[T comparable](id T) KeyOption {
-	return func(key *Key) {
+	return func(key *Key) error {
 		key.ID = id
+		return nil
 	}
 }
 
 // WithFields sets a list of field values as key ID
 func WithFields(fields []FieldVal) KeyOption {
-	return func(key *Key) {
+	return func(key *Key) error {
 		key.ID = fields
+		return nil
 	}
 }
 

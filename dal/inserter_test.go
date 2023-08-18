@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -77,4 +78,30 @@ func TestInsertOptions_IDGenerator(t *testing.T) {
 		idGenerator: idGenerator,
 	}
 	assert.Equal(t, err, io.IDGenerator()(context.Background(), nil))
+}
+
+func TestNewInsertOptions(t *testing.T) {
+	called := false
+	o := func(options *insertOptions) {
+		called = true
+	}
+	io := NewInsertOptions(o)
+	assert.NotNil(t, io)
+	assert.True(t, called)
+}
+
+func TestWithRandomStringID(t *testing.T) {
+	key, err := NewKeyWithOptions("c1", WithRandomStringID(context.Background(), 10))
+	assert.Nil(t, err)
+	assert.NotNil(t, key)
+	id := key.ID.(string)
+	assert.NotEqual(t, "", id)
+	assert.Equal(t, 10, len(id))
+}
+
+func TestWithPrefix(t *testing.T) {
+	key, err := NewKeyWithOptions("c1", WithRandomStringID(context.Background(), 10, WithPrefix("prefix_")))
+	assert.Nil(t, err)
+	assert.NotNil(t, key)
+	assert.True(t, strings.HasPrefix(key.ID.(string), "prefix_"))
 }

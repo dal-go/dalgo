@@ -171,7 +171,7 @@ func TestKey_Level(t *testing.T) {
 		{
 			name: "two",
 			fields: fields{
-				parent: NewKeyWithID("P1", "p1", WithParent("P2", "p2")),
+				parent: NewKeyWithParentAndID(NewKeyWithID("P2", "p2"), "P1", "p1"),
 			},
 			want: 2,
 		},
@@ -288,7 +288,9 @@ func TestNewKey(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotKey := NewKey(tt.args.kind, tt.args.options...); !reflect.DeepEqual(gotKey, tt.wantKey) {
+			gotKey, err := NewKeyWithOptions(tt.args.kind, tt.args.options...)
+			assert.Nil(t, err)
+			if !reflect.DeepEqual(gotKey, tt.wantKey) {
 				t.Errorf("NewKey() = %v, want %v", gotKey, tt.wantKey)
 			}
 		})
@@ -484,7 +486,8 @@ func TestWithID(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			key := Key{}
-			WithID(tt.id)(&key)
+			err := WithID(tt.id)(&key)
+			assert.Nil(t, err)
 			assert.Equal(t, tt.id, key.ID)
 		})
 	}
@@ -501,7 +504,8 @@ func TestWithFields(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			key := Key{}
-			WithFields(tt.id)(&key)
+			err := WithFields(tt.id)(&key)
+			assert.Nil(t, err)
 			assert.Equal(t, tt.id, key.ID)
 		})
 	}

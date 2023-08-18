@@ -61,48 +61,52 @@ func (v randomStringOptions) Prefix() string {
 type randomStringOption func(opts *randomStringOptions)
 
 // WithIDGenerator sets ID generator for a random string (usually random)
-func WithIDGenerator(g IDGenerator) KeyOption {
-	return func(key *Key) {
+func WithIDGenerator(c context.Context, g IDGenerator) KeyOption {
+	return func(key *Key) error {
 		if key.ID != nil {
 			panic("an attempt to set ID generator for a child that already have an ID value")
 		}
-		key.ID = g
+		return g(c, &record{key: key})
 	}
 }
 
 // WithRandomStringID sets ID generator to random string
-func WithRandomStringID(length int, options ...randomStringOption) KeyOption {
+func WithRandomStringID(ctx context.Context, length int, options ...randomStringOption) KeyOption {
 	var rso randomStringOptions
 	for _, setOption := range options {
 		setOption(&rso)
 	}
-	return func(key *Key) {
+	return func(key *Key) error {
 		key.IDKind = reflect.String
-		key.ID = WithIDGenerator(func(ctx context.Context, record Record) error {
-			key.ID = random.ID(length)
+		return WithIDGenerator(ctx, func(ctx context.Context, record Record) error {
+			key.ID = rso.prefix + random.ID(length)
 			return nil
-		})
+		})(key)
 	}
 }
 
-// WithParent sets Parent
-func WithParent(collection string, id any, options ...KeyOption) KeyOption {
-	return func(key *Key) {
-		key.parent = NewKeyWithID(collection, id, options...)
-	}
-}
+//// WithParent sets Parent
+//func WithParent[T comparable](collection string, id T, options ...KeyOption) KeyOption {
+//	return func(key *Key) (err error) {
+//		options = append(options, WithID(id))
+//		key.parent, err = NewKeyWithOptions(collection, options...)
+//		return err
+//	}
+//}
 
-// WithParentKey sets Parent key
-func WithParentKey(parent *Key) KeyOption {
-	return func(key *Key) {
-		key.parent = parent
-	}
-}
+//// WithParentKey sets Parent key
+//func WithParentKey(parent *Key) KeyOption {
+//	return func(key *Key) error {
+//		key.parent = parent
+//		return nil
+//	}
+//}
 
 // WithStringID sets ID as a predefined string
 func WithStringID(id string) KeyOption {
-	return func(key *Key) {
+	return func(key *Key) error {
 		key.ID = id
+		return nil
 	}
 }
 
