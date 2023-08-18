@@ -227,3 +227,30 @@ func Test_record_MarkAsChanged(t *testing.T) {
 		})
 	}
 }
+
+func TestRecord_Exists(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		r           Record
+		shouldPanic bool
+		expected    bool
+	}{
+		{name: "panics_if_exists_not_set", r: &record{key: NewKeyWithID("Kind1", "k1")}, shouldPanic: true},
+		{name: "exists", r: (&record{key: NewKeyWithID("Kind1", "k1")}).SetError(nil), expected: true},
+		{name: "does_not_exist", r: (&record{key: NewKeyWithID("Kind1", "k1")}).SetError(ErrRecordNotFound), expected: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("expected panic")
+					}
+				}()
+			}
+			actual := tt.r.Exists()
+			if actual != tt.expected {
+				t.Errorf("expected %v, got: %v", tt.expected, actual)
+			}
+		})
+	}
+}

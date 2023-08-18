@@ -21,7 +21,8 @@ type Record interface {
 	Exists() bool
 
 	// SetError sets error relevant to specific record. Intended to be used only by DALgo DB drivers.
-	SetError(err error)
+	// Returns the record itself for convenience.
+	SetError(err error) Record
 
 	// Data returns record data (without ID/key).
 	// Requires either record to be created by NewRecordWithData()
@@ -120,12 +121,13 @@ func (v *record) Error() error {
 }
 
 // SetError sets error associated with a record
-func (v *record) SetError(err error) {
+func (v *record) SetError(err error) Record {
 	if err == nil {
 		v.err = NoError
 	} else {
 		v.err = err
 	}
+	return v
 }
 
 // NewRecord creates a new record
