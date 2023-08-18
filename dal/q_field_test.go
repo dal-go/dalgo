@@ -153,26 +153,3 @@ func Test_orderExpression(t *testing.T) {
 		})
 	}
 }
-
-func Test_orderExpression_String(t *testing.T) {
-	type fields struct {
-		expression Expression
-		descending bool
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v := orderExpression{
-				expression: tt.fields.expression,
-				descending: tt.fields.descending,
-			}
-			assert.Equalf(t, tt.want, v.String(), "String()")
-		})
-	}
-}
