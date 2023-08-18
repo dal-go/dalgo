@@ -114,6 +114,11 @@ func TestIsNotFound(t *testing.T) {
 			err:  errNotFoundByKey{cause: ErrRecordNotFound},
 			want: true,
 		},
+		{
+			name: "ErrNotFoundByKey_no_cause",
+			err:  errNotFoundByKey{cause: nil},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -183,8 +188,23 @@ func TestRollbackError_Error(t *testing.T) {
 			err:  rollbackError{},
 		},
 		{
-			name: "with_original_error",
-			err:  rollbackError{originalErr: errors.New("some error")},
+			name: "with_original_error_only",
+			err: rollbackError{
+				originalErr: errors.New("original error"),
+			},
+		},
+		{
+			name: "with_rollback_error_only",
+			err: rollbackError{
+				rollbackErr: errors.New("rollback_error"),
+			},
+		},
+		{
+			name: "with_rollback_and_original_error",
+			err: rollbackError{
+				rollbackErr: errors.New("rollback_error"),
+				originalErr: errors.New("original_error"),
+			},
 		},
 	}
 	for _, tt := range tests {

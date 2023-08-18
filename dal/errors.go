@@ -65,22 +65,21 @@ func (e errNotFoundByKey) Key() *Key {
 }
 
 func (e errNotFoundByKey) Cause() error {
+	if e.cause == nil {
+		return ErrRecordNotFound
+	}
 	return e.cause
 }
 
 func (e errNotFoundByKey) Unwrap() error {
-	return e.cause
+	return e.Cause()
 }
 
 func (e errNotFoundByKey) Error() string {
 	if errors.Is(e.cause, ErrRecordNotFound) {
 		return fmt.Sprintf("%v: by key=%v", e.cause, e.key)
 	}
-	s := fmt.Sprintf("record not found by key=%v", e.key)
-	if e.cause == nil {
-		return s
-	}
-	return fmt.Sprintf("%v: %v", s, e.cause)
+	return fmt.Sprintf("%v: not found by key=%v", e.Cause(), e.key)
 }
 
 // NewErrNotFoundByKey creates an error that indicates that entity was not found by Value
