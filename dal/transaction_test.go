@@ -96,12 +96,34 @@ func (t mockTx) Options() TransactionOptions {
 }
 
 func TestGetTransaction(t *testing.T) {
-	expected := mockTx{options: NewTransactionOptions()}
-	ctx := context.Background()
-	txCtx := NewContextWithTransaction(ctx, expected)
-	actual := GetTransaction(txCtx)
-	if actual != expected {
-		t.Errorf("transactional context does not provide transaction's value")
+	tx := mockTx{options: NewTransactionOptions()}
+	for _, tt := range []struct {
+		name     string
+		ctx      context.Context
+		expected Transaction
+	}{
+		{
+			name:     "background",
+			ctx:      context.Background(),
+			expected: nil,
+		},
+		{
+			name:     "nil",
+			ctx:      NewContextWithTransaction(context.Background(), nil),
+			expected: nil,
+		},
+		{
+			name:     "with_transaction",
+			ctx:      NewContextWithTransaction(context.Background(), tx),
+			expected: tx,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := GetTransaction(tt.ctx)
+			if actual != tt.expected {
+				t.Errorf("expected %v, got: %v", tt.expected, actual)
+			}
+		})
 	}
 }
 
@@ -112,5 +134,63 @@ func TestGetNonTransactionalContext(t *testing.T) {
 	actual := GetNonTransactionalContext(txCtx)
 	if actual != ctx {
 		t.Errorf("transactional context does not provide original context")
+	}
+}
+
+func TestTxWithIsolationLevel(t *testing.T) {
+	for _, tt := range []struct {
+		name             string
+		txIsolationLevel TxIsolationLevel
+		shouldPanic      bool
+	}{
+		{
+			name:             "TxUnspecified",
+			txIsolationLevel: TxUnspecified,
+			shouldPanic:      true,
+		},
+		{
+			name:             "TxReadCommitted",
+			txIsolationLevel: TxReadCommitted,
+			shouldPanic:      false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r != nil && !tt.shouldPanic {
+						t.Errorf("unexpected panic: %v", r)
+					}
+				}()
+			}
+			to := new(txOptions)
+			o := TxWithIsolationLevel(tt.txIsolationLevel)
+			o(to)
+			assert.Equal(t, tt.txIsolationLevel, to.isolationLevel)
+		})
+	}
+}
+
+func TestTxOptions(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		txOptions   *txOptions
+		shouldPanic bool
+	}{
+		{name: "nil", shouldPanic: true, txOptions: nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("expected panic")
+					}
+				}()
+			}
+			assert.Equal(t, tt.txOptions.attempts, tt.txOptions.Attempts())
+			assert.Equal(t, tt.txOptions.isCrossGroup, tt.txOptions.IsCrossGroup())
+			assert.Equal(t, tt.txOptions.isReadonly, tt.txOptions.IsReadonly())
+			assert.Equal(t, tt.txOptions.isolationLevel, tt.txOptions.IsolationLevel())
+			assert.Equal(t, tt.txOptions.password, tt.txOptions.Password())
+		})
 	}
 }
