@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -49,24 +50,34 @@ func TestInsertWithRandomID(t *testing.T) {
 		name string
 		args insertArgs
 		//
-		generatedID         any
-		generatorErr        error
-		expectedErrTexts    []string
-		generateOnAttemptNo int
+		generatorErr            error
+		generatorErrOnAttemptNo int
+		expectedErrTexts        []string
+		existsFalseOnAttemptNo  int
+		existsErrorOnAttemptNo  int
 	}{
 		{
-			name:                "should_pass_on_first_attempt",
-			generateOnAttemptNo: 1,
+			name:                   "should_pass_on_first_attempt",
+			existsFalseOnAttemptNo: 1,
 			args: insertArgs{
 				ctx:      context.Background(),
 				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
 				attempts: 1,
 			},
-			generatedID: "id1",
 		},
 		{
-			name:                "exceeds_max_generates_count",
-			generateOnAttemptNo: 7,
+			name:                   "exists_error_on_first_attempt",
+			existsErrorOnAttemptNo: 1,
+			existsFalseOnAttemptNo: 1,
+			args: insertArgs{
+				ctx:      context.Background(),
+				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
+				attempts: 1,
+			},
+		},
+		{
+			name:                   "exceeds_max_generates_count",
+			existsFalseOnAttemptNo: 7,
 			args: insertArgs{
 				ctx:      context.Background(),
 				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
@@ -76,9 +87,9 @@ func TestInsertWithRandomID(t *testing.T) {
 			expectedErrTexts: []string{ErrExceedsMaxNumberOfAttempts.Error(), "5"},
 		},
 		{
-			name:                "should_fail",
-			generatorErr:        errors.New("test generator intentional error"),
-			generateOnAttemptNo: 2,
+			name:                   "should_fail",
+			generatorErr:           errors.New("test generator intentional error"),
+			existsFalseOnAttemptNo: 2,
 			args: insertArgs{
 				ctx:      context.Background(),
 				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
@@ -91,15 +102,15 @@ func TestInsertWithRandomID(t *testing.T) {
 			generatesCount := 0
 			var generateID = func(ctx context.Context, record Record) error {
 				generatesCount++
-				if tt.generateOnAttemptNo == generatesCount {
-					record.Key().ID = tt.generatedID
+				if tt.generatorErrOnAttemptNo == generatesCount {
 					return tt.generatorErr
 				}
+				record.Key().ID = strconv.Itoa(generatesCount)
 				return nil
 			}
 
 			exists := func(key *Key) error {
-				if generatesCount < tt.generateOnAttemptNo {
+				if generatesCount < tt.existsFalseOnAttemptNo {
 					return nil
 				}
 				return ErrRecordNotFound
@@ -130,8 +141,8 @@ func TestInsertWithRandomID(t *testing.T) {
 				return
 			}
 			assert.NotNil(t, args.record.Key().ID)
-			if generatesCount != tt.generateOnAttemptNo {
-				t.Errorf("Value generator expected to be called 3 times, actual: %v", generatesCount)
+			if generatesCount != tt.existsFalseOnAttemptNo {
+				t.Errorf("id generator expected to be called %d times, actual: %d", tt.existsFalseOnAttemptNo, generatesCount)
 			}
 		})
 	}

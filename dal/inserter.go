@@ -156,6 +156,7 @@ func InsertWithRandomID(
 			return fmt.Errorf("failed to check if record exists: %w", err)
 		}
 	}
+	r.Key().ID = nil
 	return fmt.Errorf("not able to generate unique id: %w: %d", ErrExceedsMaxNumberOfAttempts, attempts)
 }
 
