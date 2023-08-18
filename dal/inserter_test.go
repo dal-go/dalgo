@@ -55,6 +55,7 @@ func TestInsertWithRandomID(t *testing.T) {
 		expectedErrTexts        []string
 		existsFalseOnAttemptNo  int
 		existsErrorOnAttemptNo  int
+		existsError             error
 	}{
 		{
 			name:                   "should_pass_on_first_attempt",
@@ -68,6 +69,7 @@ func TestInsertWithRandomID(t *testing.T) {
 		{
 			name:                   "exists_error_on_first_attempt",
 			existsErrorOnAttemptNo: 1,
+			existsError:            errors.New("test exists error"),
 			existsFalseOnAttemptNo: 1,
 			args: insertArgs{
 				ctx:      context.Background(),
@@ -87,9 +89,9 @@ func TestInsertWithRandomID(t *testing.T) {
 			expectedErrTexts: []string{ErrExceedsMaxNumberOfAttempts.Error(), "5"},
 		},
 		{
-			name:                   "should_fail",
-			generatorErr:           errors.New("test generator intentional error"),
-			existsFalseOnAttemptNo: 2,
+			name:                    "generator_err_on_first_attempt",
+			generatorErrOnAttemptNo: 1,
+			generatorErr:            errors.New("test generator intentional error"),
 			args: insertArgs{
 				ctx:      context.Background(),
 				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
@@ -99,18 +101,21 @@ func TestInsertWithRandomID(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 
-			generatesCount := 0
+			attempt := 0
 			var generateID = func(ctx context.Context, record Record) error {
-				generatesCount++
-				if tt.generatorErrOnAttemptNo == generatesCount {
+				attempt++
+				if tt.generatorErrOnAttemptNo == attempt {
 					return tt.generatorErr
 				}
-				record.Key().ID = strconv.Itoa(generatesCount)
+				record.Key().ID = strconv.Itoa(attempt)
 				return nil
 			}
 
 			exists := func(key *Key) error {
-				if generatesCount < tt.existsFalseOnAttemptNo {
+				if tt.existsErrorOnAttemptNo == attempt {
+					return tt.existsError
+				}
+				if attempt < tt.existsFalseOnAttemptNo {
 					return nil
 				}
 				return ErrRecordNotFound
@@ -125,10 +130,11 @@ func TestInsertWithRandomID(t *testing.T) {
 			args := tt.args
 			err := InsertWithRandomID(args.ctx, args.record, generateID, 5, exists, insert)
 			if err != nil {
-				if tt.generatorErr == nil {
-					t.Errorf("failed to insert: %v", err)
-				} else if !errors.Is(err, tt.generatorErr) {
+				if tt.generatorErr != nil && !errors.Is(err, tt.generatorErr) {
 					t.Errorf("expected error: %v, actual: %v", tt.generatorErr, err)
+				}
+				if tt.existsError != nil && !errors.Is(err, tt.existsError) {
+					t.Errorf("expected error: %v, actual: %v", tt.existsError, err)
 				}
 				if len(tt.expectedErrTexts) > 0 {
 					for _, expectedErrText := range tt.expectedErrTexts {
@@ -141,8 +147,9 @@ func TestInsertWithRandomID(t *testing.T) {
 				return
 			}
 			assert.NotNil(t, args.record.Key().ID)
-			if generatesCount != tt.existsFalseOnAttemptNo {
-				t.Errorf("id generator expected to be called %d times, actual: %d", tt.existsFalseOnAttemptNo, generatesCount)
+			assert.Equal(t, 1, insertsCount)
+			if attempt != tt.existsFalseOnAttemptNo {
+				t.Errorf("id generator expected to be called %d times, actual: %d", tt.existsFalseOnAttemptNo, attempt)
 			}
 		})
 	}

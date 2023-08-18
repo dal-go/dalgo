@@ -153,6 +153,7 @@ func InsertWithRandomID(
 		} else if IsNotFound(err) {
 			return insert(r) // r shares child with tmp
 		} else {
+			r.Key().ID = nil
 			return fmt.Errorf("failed to check if record exists: %w", err)
 		}
 	}
