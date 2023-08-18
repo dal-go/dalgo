@@ -255,6 +255,12 @@ func TestKey_Validate(t *testing.T) {
 				{Name: "f2", Value: "v2"},
 			},
 		}},
+		{name: "no_parent-invalid_field_val", wantErr: true, fields: fields{
+			kind: "Kind1",
+			ID: []FieldVal{
+				{Name: ""},
+			},
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
