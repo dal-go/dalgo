@@ -117,7 +117,7 @@ func (k *Key) Collection() string {
 // Validate validate key
 func (k *Key) Validate() error {
 	if strings.TrimSpace(k.collection) == "" {
-		return errors.New("child must have 'collection'")
+		return errors.New("key must have `collection` field value")
 	}
 	if k.parent != nil {
 		return k.parent.Validate()
@@ -125,7 +125,7 @@ func (k *Key) Validate() error {
 	if fields, ok := k.ID.([]FieldVal); ok {
 		for i, field := range fields {
 			if err := field.Validate(); err != nil {
-				return fmt.Errorf("child is referencing invalid field # %v: %w", i, err)
+				return fmt.Errorf("key has a invalid referencing to a field value #%v: %w", i, err)
 			}
 		}
 	}
@@ -169,7 +169,7 @@ func NewIncompleteKey(collection string, idKind reflect.Kind, parent *Key) *Key 
 // NewKey creates a new key
 func NewKey(collection string, options ...KeyOption) (key *Key) {
 	if len(options) == 0 {
-		panic("at least 1 child option should be specified")
+		panic("at least 1 key option should be specified")
 	}
 	key = &Key{
 		collection: collection,
@@ -192,7 +192,7 @@ func WithFields(fields []FieldVal) KeyOption {
 	}
 }
 
-// NewKeyWithFields creates a new record child from a sequence of record's references
+// NewKeyWithFields creates a new record key from a sequence of record's references
 func NewKeyWithFields(collection string, fields ...FieldVal) *Key {
 	return &Key{collection: collection, ID: fields}
 }
