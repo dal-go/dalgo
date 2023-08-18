@@ -37,10 +37,28 @@ func (changes *Changes) FlagAsChanged(record Record) {
 func (changes *Changes) Records() (records []Record) {
 	records = make([]Record, len(changes.records))
 	copy(records, changes.records)
-	return
+	return records
+	//return changes.records[:]
 }
 
 // HasChanges returns true if there are changes
 func (changes *Changes) HasChanges() bool {
-	return len(changes.records) > 0
+	// TODO: should it be simply len(changes.records) > 0 ?
+	for _, r := range changes.records {
+		if r.HasChanged() {
+			return true
+		}
+	}
+	return false
+}
+
+// ChangedRecords returns slice of changed records
+func (changes *Changes) ChangedRecords() (changed []Record) {
+	// TODO: Can we remove this method if records are always marked as changed?
+	for _, r := range changes.records {
+		if r.HasChanged() {
+			changed = append(changed, r)
+		}
+	}
+	return changed
 }
