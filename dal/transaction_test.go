@@ -177,6 +177,11 @@ func TestTxOptions(t *testing.T) {
 		shouldPanic bool
 	}{
 		{name: "nil", shouldPanic: true, txOptions: nil},
+		{name: "attempts", txOptions: &txOptions{attempts: 1}},
+		{name: "isCrossGroup", txOptions: &txOptions{isCrossGroup: true}},
+		{name: "isReadonly", txOptions: &txOptions{isReadonly: true}},
+		{name: "isolationLevel", txOptions: &txOptions{isolationLevel: TxReadCommitted}},
+		{name: "password", txOptions: &txOptions{password: "test-pwd"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.shouldPanic {
