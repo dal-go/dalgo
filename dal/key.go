@@ -32,7 +32,7 @@ func EscapeID(id string) string {
 func (k *Key) String() string {
 	key := k // This is intended as we want to traverse the key ancestors
 	if err := key.Validate(); err != nil {
-		panic(fmt.Sprintf("will not generate path for invalid child: %v", err))
+		panic(fmt.Sprintf("will not generate path for invalid key: %v", err))
 	}
 	s := make([]string, 0, (key.Level())*2)
 	for {
