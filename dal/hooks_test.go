@@ -46,3 +46,49 @@ func TestBeforeSave(t *testing.T) {
 		})
 	}
 }
+
+func TestCallRecordHooks(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		hooks      []RecordHook
+		expectsErr bool
+	}{
+		{
+			name:       "nil_hooks",
+			hooks:      nil,
+			expectsErr: false,
+		},
+		{
+			name:       "empty_hooks",
+			hooks:      []RecordHook{},
+			expectsErr: false,
+		},
+		{
+			name: "one_hook_with_no_error",
+			hooks: []RecordHook{
+				func(c context.Context, record Record) error {
+					return nil
+				},
+			},
+			expectsErr: false,
+		},
+		{
+			name: "one_hook_with_error",
+			hooks: []RecordHook{
+				func(c context.Context, record Record) error {
+					return errors.New("error")
+				},
+			},
+			expectsErr: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := callRecordHooks(context.Background(), nil, tt.hooks)
+			if tt.expectsErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+		})
+	}
+}
