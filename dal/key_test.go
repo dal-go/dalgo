@@ -300,7 +300,7 @@ func TestNewKeyWithOptions(t *testing.T) {
 		},
 		{
 			name:    "option_with_error",
-			args:    args{collection: "", options: []KeyOption{func(key *Key) error { return errors.New("key option error") }}},
+			args:    args{collection: "collection1", options: []KeyOption{func(key *Key) error { return errors.New("key option error") }}},
 			wantErr: true,
 		},
 	}

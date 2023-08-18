@@ -175,7 +175,10 @@ func NewKeyWithOptions(collection string, options ...KeyOption) (key *Key, err e
 		return nil, errors.New("collection is a required parameter")
 	}
 	key = &Key{collection: collection}
-	return key, setKeyOptions(key, options...)
+	if err = setKeyOptions(key, options...); err != nil {
+		return nil, err
+	}
+	return key, err
 }
 
 func NewIncompleteKey(collection string, idKind reflect.Kind, parent *Key) *Key {
