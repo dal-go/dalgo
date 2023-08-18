@@ -10,8 +10,9 @@ func TestChanges_IsChanged(t *testing.T) {
 		expected bool
 	}
 
-	r1unchanged := record{key: &Key{ID: "r1", collection: "records"}}
+	r1changed := record{changed: true, key: &Key{ID: "r1", collection: "records"}}
 	r2changed := record{changed: true, key: &Key{ID: "r2", collection: "records"}}
+	r1duplicate := record{changed: true, key: &Key{ID: "r1", collection: "records"}}
 
 	for _, tt := range []test{
 		{
@@ -33,16 +34,16 @@ func TestChanges_IsChanged(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "unchanged",
-			changes:  Changes{records: []Record{&r1unchanged, &r2changed}},
-			record:   &r1unchanged,
-			expected: false,
+			name:     "changed",
+			changes:  Changes{records: []Record{&r1changed, &r2changed}},
+			record:   &r2changed,
+			expected: true,
 		},
 		{
-			name:     "changed",
-			changes:  Changes{records: []Record{&r1unchanged, &r2changed}},
-			record:   &r2changed,
-			expected: false,
+			name:     "duplicate",
+			changes:  Changes{records: []Record{&r1changed, &r2changed}},
+			record:   &r1duplicate,
+			expected: true,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
