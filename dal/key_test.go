@@ -336,10 +336,12 @@ func TestKey_String(t *testing.T) {
 		IDKind     reflect.Kind
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		want   string
+		name        string
+		fields      fields
+		want        string
+		shouldPanic bool
 	}{
+		{name: "should_panic_on_invalid_key", shouldPanic: true, fields: fields{ID: nil, collection: "", IDKind: reflect.Invalid}, want: "Kind1/1"},
 		{name: "no_parent-string_id", fields: fields{ID: "k1", collection: "Kind1"}, want: "Kind1/k1"},
 		{name: "no_parent-int_id", fields: fields{ID: 1, collection: "Kind1"}, want: "Kind1/1"},
 		{name: "no_parent_string_id-escaped", fields: fields{ID: "k1/k2", collection: "Kind1"}, want: "Kind1/k1%2Fk2"},
@@ -352,6 +354,13 @@ func TestKey_String(t *testing.T) {
 				collection: tt.fields.collection,
 				ID:         tt.fields.ID,
 				IDKind:     tt.fields.IDKind,
+			}
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("expected to panic")
+					}
+				}()
 			}
 			assert.Equalf(t, tt.want, k.String(), "String()")
 		})
