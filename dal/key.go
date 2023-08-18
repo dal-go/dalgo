@@ -172,7 +172,7 @@ func NewKeyWithID[T comparable](collection string, id T) (key *Key) {
 // NewKeyWithOptions creates a new key with an ID
 func NewKeyWithOptions(collection string, options ...KeyOption) (key *Key, err error) {
 	if collection == "" {
-		panic("collection is a required parameter")
+		return nil, errors.New("collection is a required parameter")
 	}
 	key = &Key{collection: collection}
 	return key, setKeyOptions(key, options...)
