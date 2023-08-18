@@ -177,6 +177,32 @@ func TestErrNotFoundByKey_Error(t *testing.T) {
 	}
 }
 
+func TestRollbackError(t *testing.T) {
+
+	for _, tt := range []struct {
+		name string
+		err  rollbackError
+	}{
+		{
+			name: "RollbackError",
+			err: rollbackError{
+				rollbackErr: errors.New("rollback error"),
+			},
+		},
+		{
+			name: "OriginalError",
+			err: rollbackError{
+				originalErr: errors.New("original error"),
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.err.rollbackErr, tt.err.RollbackError())
+			assert.Equal(t, tt.err.originalErr, tt.err.OriginalError())
+		})
+	}
+}
+
 func TestRollbackError_Error(t *testing.T) {
 	type test struct {
 		name string
