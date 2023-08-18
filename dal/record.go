@@ -137,10 +137,10 @@ func (v *record) setError(err error) *record {
 
 // NewRecord creates a new record
 func NewRecord(key *Key) Record {
-	return newRecord(key)
+	return newRecordWithOnlyKey(key)
 }
 
-func newRecord(key *Key) *record {
+func newRecordWithOnlyKey(key *Key) *record {
 	if key == nil {
 		panic("parameter 'key' is required for dalgo.NewRecord()")
 	}
@@ -152,7 +152,7 @@ func newRecord(key *Key) *record {
 
 // NewRecordWithData creates a new record with a data target struct
 func NewRecordWithData(key *Key, data any) Record {
-	record := newRecord(key)
+	record := newRecordWithOnlyKey(key)
 	record.data = data
 	return record
 }

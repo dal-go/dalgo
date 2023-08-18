@@ -302,3 +302,29 @@ func TestRecord_Data(t *testing.T) {
 		})
 	}
 }
+
+func TestNewRecordWithOnlyKey(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		key         *Key
+		shouldPanic bool
+	}{
+		{name: "nil", shouldPanic: true, key: nil},
+		{name: "invalid_key", shouldPanic: true, key: &Key{IDKind: reflect.Invalid}},
+		{name: "valid_key", key: &Key{IDKind: reflect.String, collection: "Kind1", ID: "k1"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("expected panic")
+					}
+				}()
+			}
+			r := newRecordWithOnlyKey(tt.key)
+			if r.Key() != tt.key {
+				t.Errorf("expected %v, got: %v", tt.key, r.Key())
+			}
+		})
+	}
+}

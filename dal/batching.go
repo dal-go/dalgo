@@ -1,10 +1,10 @@
 package dal
 
 //
-//func CreateEntityHoldersWithIntIDs(ids []int64, newRecord func() RecordWithIntID) (records []Record) {
+//func CreateEntityHoldersWithIntIDs(ids []int64, newRecordWithOnlyKey func() RecordWithIntID) (records []Record) {
 //	records = make([]Record, len(ids))
 //	for i := range records {
-//		record := newRecord()
+//		record := newRecordWithOnlyKey()
 //		id := ids[i]
 //		if id == 0 {
 //			panic(fmt.Sprintf("ids[%v] == 0", i))

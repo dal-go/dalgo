@@ -17,6 +17,6 @@ func TestSimpleQuery(t *testing.T) {
 	assert.Equal(t, "test", q.From().Name)
 	assert.NotNil(t, q.Where())
 	assert.NotNil(t, q.Into())
-	//assert.Equal(t, newRecord, q.Into)
+	//assert.Equal(t, newRecordWithOnlyKey, q.Into)
 	t.Log("\n" + q.String())
 }
