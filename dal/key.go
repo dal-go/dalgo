@@ -67,7 +67,7 @@ func (k *Key) CollectionPath() string {
 	return reverseStringsJoin(s, "/")
 }
 
-func reverseStringsJoin(elems []string, sep string) string {
+func reverseStringsJoin(elems []string, sep string, forcePanic ...bool) string {
 	if len(elems) == 0 {
 		return ""
 	}
@@ -79,11 +79,17 @@ func reverseStringsJoin(elems []string, sep string) string {
 	var b strings.Builder
 	b.Grow(n)
 	for i := len(elems) - 1; i >= 0; i-- {
-		if _, err := b.WriteString(elems[i]); err != nil {
+		if _, err := b.WriteString(elems[i]); err != nil || len(forcePanic) == 1 {
+			if err == nil {
+				err = errors.New("force panic")
+			}
 			panic(err)
 		}
 		if i > 0 {
-			if _, err := b.WriteString(sep); err != nil {
+			if _, err := b.WriteString(sep); err != nil || len(forcePanic) == 2 {
+				if err == nil {
+					err = errors.New("force panic")
+				}
 				panic(err)
 			}
 		}
