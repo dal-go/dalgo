@@ -258,7 +258,7 @@ func TestNewKey(t *testing.T) {
 		{
 			name:    "single_with_string_id",
 			args:    args{kind: "Kind1", options: []KeyOption{WithStringID("k1")}},
-			wantKey: NewKeyWithID("Kind1", "k1"),
+			wantKey: &Key{collection: "Kind1", ID: "k1"},
 		},
 	}
 	for _, tt := range tests {

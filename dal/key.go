@@ -145,6 +145,7 @@ func setKeyOptions(key *Key, options ...KeyOption) {
 }
 
 // NewKeyWithID creates a new key with an ID
+// We need to make it generic to enforce `comparable` restriction on Key.ID
 func NewKeyWithID[T comparable](collection string, id T, options ...KeyOption) (key *Key) {
 	if collection == "" {
 		panic("collection is a required parameter")
