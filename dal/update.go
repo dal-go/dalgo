@@ -1,7 +1,9 @@
 package dal
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 )
 
 // A FieldPath is a non-empty sequence of non-empty fields that reference a value.
@@ -33,6 +35,9 @@ type Update struct {
 
 // Validate validates the update
 func (v Update) Validate() error {
+	if strings.TrimSpace(v.Field) == "" && len(v.FieldPath) == 0 {
+		return errors.New("either FieldVal or FieldPath must be provided")
+	}
 	if v.Field != "" && len(v.FieldPath) > 0 {
 		return fmt.Errorf("both FieldVal and FieldPath are provided: %v, %+v", v.Field, v.FieldPath)
 	}
