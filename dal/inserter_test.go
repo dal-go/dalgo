@@ -2,6 +2,8 @@ package dal
 
 import (
 	"context"
+	"errors"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -64,4 +66,15 @@ func TestInsertWithRandomID(t *testing.T) {
 			t.Errorf("Value generator expected to be called 3 times, actual: %v", generatesCount)
 		}
 	})
+}
+
+func TestInsertOptions_IDGenerator(t *testing.T) {
+	err := errors.New("test error")
+	idGenerator := func(ctx context.Context, record Record) error {
+		return err
+	}
+	io := insertOptions{
+		idGenerator: idGenerator,
+	}
+	assert.Equal(t, err, io.IDGenerator()(context.Background(), nil))
 }
