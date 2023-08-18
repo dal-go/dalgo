@@ -280,6 +280,7 @@ func TestRecord_Data(t *testing.T) {
 		r           *record
 		shouldPanic bool
 	}{
+		{name: "panics_if_err_is_not_set", shouldPanic: true, r: &record{key: NewKeyWithID("Kind1", "k1")}},
 		{name: "panics_if_is_not_found", shouldPanic: true, r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(ErrRecordNotFound)},
 		{name: "nil", r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(NoError)},
 	} {
