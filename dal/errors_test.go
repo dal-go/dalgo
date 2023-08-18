@@ -110,7 +110,7 @@ func TestIsNotFound(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "errNotFoundByKey",
+			name: "ErrNotFoundByKey",
 			err:  errNotFoundByKey{cause: ErrRecordNotFound},
 			want: true,
 		},

@@ -51,10 +51,12 @@ func IsNotFound(err error) bool {
 
 // ErrNotFoundByKey indicates error was not found by Value
 type ErrNotFoundByKey interface {
-	Key() Key
+	Key() *Key
 	Cause() error
 	error
 }
+
+var _ ErrNotFoundByKey = (*errNotFoundByKey)(nil)
 
 type errNotFoundByKey struct {
 	key   *Key
