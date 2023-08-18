@@ -254,3 +254,21 @@ func TestRecord_Exists(t *testing.T) {
 		})
 	}
 }
+
+func TestRecord_HasChanged(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		r        Record
+		expected bool
+	}{
+		{name: "changed", r: &record{changed: true}, expected: true},
+		{name: "not_changed", r: &record{changed: false}, expected: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := tt.r.HasChanged()
+			if actual != tt.expected {
+				t.Errorf("expected %v, got: %v", tt.expected, actual)
+			}
+		})
+	}
+}
