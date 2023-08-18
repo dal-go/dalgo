@@ -139,19 +139,32 @@ func TestGetNonTransactionalContext(t *testing.T) {
 
 func TestTxWithIsolationLevel(t *testing.T) {
 	for _, tt := range []struct {
-		name             string
-		txIsolationLevel TxIsolationLevel
-		shouldPanic      bool
+		name              string
+		txIsolationLevel1 TxIsolationLevel
+		txIsolationLevel2 TxIsolationLevel
+		shouldPanic       bool
 	}{
 		{
-			name:             "TxUnspecified",
-			txIsolationLevel: TxUnspecified,
-			shouldPanic:      true,
+			name:              "TxUnspecified",
+			txIsolationLevel1: TxUnspecified,
+			shouldPanic:       true,
 		},
 		{
-			name:             "TxReadCommitted",
-			txIsolationLevel: TxReadCommitted,
-			shouldPanic:      false,
+			name:              "TxReadCommitted",
+			txIsolationLevel1: TxReadCommitted,
+			shouldPanic:       false,
+		},
+		{
+			name:              "twice_same",
+			txIsolationLevel1: TxReadCommitted,
+			txIsolationLevel2: TxReadCommitted,
+			shouldPanic:       true,
+		},
+		{
+			name:              "twice_different",
+			txIsolationLevel1: TxReadUncommitted,
+			txIsolationLevel2: TxReadCommitted,
+			shouldPanic:       true,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -163,9 +176,13 @@ func TestTxWithIsolationLevel(t *testing.T) {
 				}()
 			}
 			to := new(txOptions)
-			o := TxWithIsolationLevel(tt.txIsolationLevel)
+			o := TxWithIsolationLevel(tt.txIsolationLevel1)
 			o(to)
-			assert.Equal(t, tt.txIsolationLevel, to.isolationLevel)
+			if tt.txIsolationLevel2 != TxUnspecified {
+				o = TxWithIsolationLevel(tt.txIsolationLevel2)
+				o(to)
+			}
+			assert.Equal(t, tt.txIsolationLevel1, to.isolationLevel)
 		})
 	}
 }
