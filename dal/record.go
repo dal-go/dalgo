@@ -112,7 +112,10 @@ func (v *record) Data() any {
 
 // Error returns error associated with a record
 func (v *record) Error() error {
-	if v.err == NoError || IsNotFound(v.err) {
+	if errors.Is(v.err, NoError) {
+		return nil
+	}
+	if IsNotFound(v.err) { // TODO: Is it wrong?
 		return nil
 	}
 	return v.err
