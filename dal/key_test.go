@@ -557,7 +557,7 @@ func TestKey_Equal(t *testing.T) {
 		{
 			name:     "equal",
 			k1:       k11,
-			k2:       &(*k11),
+			k2:       &Key{collection: "collection1", ID: "id1"},
 			expected: true,
 		},
 		{
