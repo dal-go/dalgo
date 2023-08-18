@@ -112,6 +112,9 @@ func (v *record) Data() any {
 
 // Error returns error associated with a record
 func (v *record) Error() error {
+	if v.err == nil {
+		return nil
+	}
 	if errors.Is(v.err, NoError) {
 		return nil
 	}

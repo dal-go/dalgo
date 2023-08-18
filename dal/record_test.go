@@ -68,6 +68,7 @@ func Test_record_Error(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "nil", fields: fields{err: nil}, wantErr: false},
+		{name: "NoError", fields: fields{err: NoError}, wantErr: false},
 		{name: "not_found", fields: fields{err: ErrRecordNotFound}, wantErr: false}, // TODO: should it return error?
 		{name: "with_error", fields: fields{err: errors.New("some_error")}, wantErr: true},
 	}
