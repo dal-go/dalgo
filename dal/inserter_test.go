@@ -41,9 +41,6 @@ type insertArgs struct {
 	record Record
 	//generateID IDGenerator
 	attempts int
-	exists   func(*Key) error
-	insert   func(Record) error
-	//
 }
 
 func TestInsertWithRandomID(t *testing.T) {

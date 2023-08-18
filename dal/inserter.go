@@ -97,15 +97,13 @@ func WithRandomStringID(options ...randomStringOption) KeyOption {
 	}
 	return func(key *Key) error {
 		key.IDKind = reflect.String
-		return WithIDGenerator(
-			nil, // Context is not used here as not required by any option
-			func(_ context.Context, record Record) error {
-				length := rso.Length()
-				prefix := rso.Prefix()
-				key.ID = prefix + random.ID(length)
-				return nil
-			},
-		)(key)
+		var ctx context.Context = nil // intentionally nil as not required by any option
+		return WithIDGenerator(ctx, func(_ context.Context, record Record) error {
+			length := rso.Length()
+			prefix := rso.Prefix()
+			key.ID = prefix + random.ID(length)
+			return nil
+		})(key)
 	}
 }
 
