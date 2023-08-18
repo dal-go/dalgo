@@ -62,10 +62,24 @@ func TestChanges_FlagAsChanged(t *testing.T) {
 		shouldPanic bool
 	}
 
+	r1 := &record{key: &Key{ID: "r1", collection: "records"}}
+
 	tests := []test{
 		{
 			name:        "empty_record_not_nil",
 			changes:     Changes{},
+			r:           &record{key: &Key{ID: "r1", collection: "records"}},
+			shouldPanic: false,
+		},
+		{
+			name:        "non_empty_same_record",
+			changes:     Changes{records: []Record{r1}},
+			r:           r1,
+			shouldPanic: false,
+		},
+		{
+			name:        "non_empty_equal_kys",
+			changes:     Changes{records: []Record{r1}},
 			r:           &record{key: &Key{ID: "r1", collection: "records"}},
 			shouldPanic: false,
 		},
@@ -85,7 +99,11 @@ func TestChanges_FlagAsChanged(t *testing.T) {
 					}
 				}()
 			}
-			tt.changes.FlagAsChanged(tt.r)
+			var record Record
+			if tt.r != nil {
+				record = tt.r
+			}
+			tt.changes.FlagAsChanged(record)
 			if !tt.r.changed {
 				t.Errorf("record should be marked as changed")
 			}
