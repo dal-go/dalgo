@@ -298,6 +298,11 @@ func TestNewKeyWithOptions(t *testing.T) {
 			args:    args{collection: ""},
 			wantErr: true,
 		},
+		{
+			name:    "option_with_error",
+			args:    args{collection: "", options: []KeyOption{func(key *Key) error { return errors.New("key option error") }}},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
