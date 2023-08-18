@@ -38,19 +38,16 @@ func NewInsertOptions(opts ...InsertOption) InsertOptions {
 type InsertOption func(options *insertOptions)
 
 type randomStringOptions struct {
+	length int
 	prefix string
 }
 
-// RandomStringOptions defines settings for random string
-type RandomStringOptions interface {
-	Prefix() string
-}
-
-// WithPrefix sets prefix for a random string
-func WithPrefix(prefix string) func(options *randomStringOptions) {
-	return func(options *randomStringOptions) {
-		options.prefix = prefix
+// Length returns a predefined length for a random string. Default is DefaultRandomStringIDLength
+func (v randomStringOptions) Length() int {
+	if v.length == 0 {
+		return DefaultRandomStringIDLength
 	}
+	return v.length
 }
 
 // Prefix returns a predefined prefix for a random string
@@ -58,30 +55,57 @@ func (v randomStringOptions) Prefix() string {
 	return v.prefix
 }
 
+// RandomStringOptions defines settings for random string
+type RandomStringOptions interface {
+	Prefix() string
+	Length() int
+}
+
+// Prefix sets prefix for a random string
+func Prefix(prefix string) func(options *randomStringOptions) {
+	return func(options *randomStringOptions) {
+		options.prefix = prefix
+	}
+}
+
+// RandomLength sets prefix for a random string
+func RandomLength(length int) func(options *randomStringOptions) {
+	return func(options *randomStringOptions) {
+		options.length = length
+	}
+}
+
 type randomStringOption func(opts *randomStringOptions)
 
 // WithIDGenerator sets ID generator for a random string (usually random)
-func WithIDGenerator(c context.Context, g IDGenerator) KeyOption {
+func WithIDGenerator(ctx context.Context, g IDGenerator) KeyOption {
 	return func(key *Key) error {
 		if key.ID != nil {
 			panic("an attempt to set ID generator for a child that already have an ID value")
 		}
-		return g(c, &record{key: key})
+		return g(ctx, &record{key: key})
 	}
 }
 
+var DefaultRandomStringIDLength = 16
+
 // WithRandomStringID sets ID generator to random string
-func WithRandomStringID(ctx context.Context, length int, options ...randomStringOption) KeyOption {
+func WithRandomStringID(options ...randomStringOption) KeyOption {
 	var rso randomStringOptions
 	for _, setOption := range options {
 		setOption(&rso)
 	}
 	return func(key *Key) error {
 		key.IDKind = reflect.String
-		return WithIDGenerator(ctx, func(ctx context.Context, record Record) error {
-			key.ID = rso.prefix + random.ID(length)
-			return nil
-		})(key)
+		return WithIDGenerator(
+			nil, // Context is not used here as not required by any option
+			func(_ context.Context, record Record) error {
+				length := rso.Length()
+				prefix := rso.Prefix()
+				key.ID = prefix + random.ID(length)
+				return nil
+			},
+		)(key)
 	}
 }
 
@@ -134,5 +158,7 @@ func InsertWithRandomID(
 			return fmt.Errorf("failed to check if record exists: %w", err)
 		}
 	}
-	return fmt.Errorf("not able to generate unique Value in %v attempts", attempts)
+	return fmt.Errorf("not able to generate unique id: %w: %d", ErrExceedsMaxNumberOfAttempts, attempts)
 }
+
+var ErrExceedsMaxNumberOfAttempts = fmt.Errorf("exceeds max number of attempts")

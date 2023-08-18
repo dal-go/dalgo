@@ -36,37 +36,108 @@ import (
 //	return nil
 //}
 
+type insertArgs struct {
+	ctx    context.Context
+	record Record
+	//generateID IDGenerator
+	attempts int
+	exists   func(*Key) error
+	insert   func(Record) error
+	//
+}
+
 func TestInsertWithRandomID(t *testing.T) {
-	t.Run("should_pass", func(t *testing.T) {
-		data := new(map[string]any)
 
-		generatesCount := 0
-		var generateID = func(ctx context.Context, record Record) error {
-			generatesCount++
-			return nil
-		}
+	for _, tt := range []struct {
+		name string
+		args insertArgs
+		//
+		generatedID         any
+		generatorErr        error
+		expectedErrTexts    []string
+		generateOnAttemptNo int
+	}{
+		{
+			name:                "should_pass_on_first_attempt",
+			generateOnAttemptNo: 1,
+			args: insertArgs{
+				ctx:      context.Background(),
+				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
+				attempts: 1,
+			},
+			generatedID: "id1",
+		},
+		{
+			name:                "exceeds_max_generates_count",
+			generateOnAttemptNo: 7,
+			args: insertArgs{
+				ctx:      context.Background(),
+				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
+				attempts: 5,
+			},
+			generatorErr:     ErrExceedsMaxNumberOfAttempts,
+			expectedErrTexts: []string{ErrExceedsMaxNumberOfAttempts.Error(), "5"},
+		},
+		{
+			name:                "should_fail",
+			generatorErr:        errors.New("test generator intentional error"),
+			generateOnAttemptNo: 2,
+			args: insertArgs{
+				ctx:      context.Background(),
+				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
+				attempts: 5,
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
 
-		exists := func(key *Key) error {
-			if generatesCount < 3 {
+			generatesCount := 0
+			var generateID = func(ctx context.Context, record Record) error {
+				generatesCount++
+				if tt.generateOnAttemptNo == generatesCount {
+					record.Key().ID = tt.generatedID
+					return tt.generatorErr
+				}
 				return nil
 			}
-			return ErrRecordNotFound
-		}
-		insertsCount := 0
-		insert := func(r Record) error {
-			insertsCount++
-			return nil
-		}
-		err := InsertWithRandomID(context.Background(), NewRecordWithData(&Key{collection: "test_kind"}, data), generateID,
-			5,
-			exists, insert)
-		if err != nil {
-			t.Errorf("failed to insert: %v", err)
-		}
-		if generatesCount != 3 {
-			t.Errorf("Value generator expected to be called 3 times, actual: %v", generatesCount)
-		}
-	})
+
+			exists := func(key *Key) error {
+				if generatesCount < tt.generateOnAttemptNo {
+					return nil
+				}
+				return ErrRecordNotFound
+			}
+
+			insertsCount := 0
+			insert := func(r Record) error {
+				insertsCount++
+				return nil
+			}
+
+			args := tt.args
+			err := InsertWithRandomID(args.ctx, args.record, generateID, 5, exists, insert)
+			if err != nil {
+				if tt.generatorErr == nil {
+					t.Errorf("failed to insert: %v", err)
+				} else if !errors.Is(err, tt.generatorErr) {
+					t.Errorf("expected error: %v, actual: %v", tt.generatorErr, err)
+				}
+				if len(tt.expectedErrTexts) > 0 {
+					for _, expectedErrText := range tt.expectedErrTexts {
+						if !strings.Contains(err.Error(), expectedErrText) {
+							t.Errorf("expected error text to contain: %v, actual: %v", expectedErrText, err.Error())
+						}
+					}
+				}
+				assert.Nil(t, args.record.Key().ID)
+				return
+			}
+			assert.NotNil(t, args.record.Key().ID)
+			if generatesCount != tt.generateOnAttemptNo {
+				t.Errorf("Value generator expected to be called 3 times, actual: %v", generatesCount)
+			}
+		})
+	}
 }
 
 func TestInsertOptions_IDGenerator(t *testing.T) {
@@ -91,17 +162,53 @@ func TestNewInsertOptions(t *testing.T) {
 }
 
 func TestWithRandomStringID(t *testing.T) {
-	key, err := NewKeyWithOptions("c1", WithRandomStringID(context.Background(), 10))
+	const length = 10
+	key, err := NewKeyWithOptions("c1", WithRandomStringID(RandomLength(length)))
 	assert.Nil(t, err)
 	assert.NotNil(t, key)
 	id := key.ID.(string)
 	assert.NotEqual(t, "", id)
-	assert.Equal(t, 10, len(id))
+	assert.Equal(t, length, len(id))
 }
 
 func TestWithPrefix(t *testing.T) {
-	key, err := NewKeyWithOptions("c1", WithRandomStringID(context.Background(), 10, WithPrefix("prefix_")))
+	key, err := NewKeyWithOptions("c1", WithRandomStringID(Prefix("prefix_")))
 	assert.Nil(t, err)
 	assert.NotNil(t, key)
 	assert.True(t, strings.HasPrefix(key.ID.(string), "prefix_"))
+}
+
+func TestWithIDGenerator(t *testing.T) {
+
+	for _, tt := range []struct {
+		name        string
+		key         *Key
+		id          string
+		shouldPanic bool
+	}{
+		{name: "nil_id", shouldPanic: false, id: "id1", key: &Key{ID: nil, collection: "c1"}},
+		{name: "nil_generator", shouldPanic: true, id: "", key: &Key{ID: "id1", collection: "c1"}},
+		{name: "not_nil_id", shouldPanic: true, id: "id2", key: &Key{ID: "id1", collection: "c1"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("panic expected")
+					}
+				}()
+			}
+			ctx := context.Background()
+			var idGenerator IDGenerator
+			if tt.id != "" {
+				idGenerator = func(ctx context.Context, record Record) error {
+					record.Key().ID = tt.id
+					return nil
+				}
+			}
+			err := WithIDGenerator(ctx, idGenerator)(tt.key)
+			assert.Nil(t, err)
+			assert.NotNil(t, tt.key.ID)
+		})
+	}
 }
