@@ -641,7 +641,7 @@ func TestReverseStringsJoin(t *testing.T) {
 		{
 			name:        "panics2",
 			args:        args{elems: []string{"el1", "el2", "el3"}, sep: "/"},
-			shouldPanic: 1,
+			shouldPanic: 2,
 		},
 	}
 	for _, tt := range tests {
