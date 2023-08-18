@@ -55,7 +55,7 @@ func (k *Key) CollectionPath() string {
 	var s []string
 	for {
 		if strings.TrimSpace(key.collection) == "" {
-			panic("k is referencing an empty kind")
+			panic("k is referencing an empty collection")
 		}
 		s = append(s, key.collection)
 		if key.parent == nil {
@@ -79,16 +79,16 @@ func reverseStringsJoin(elems []string, sep string, forcePanic ...bool) string {
 	var b strings.Builder
 	b.Grow(n)
 	for i := len(elems) - 1; i >= 0; i-- {
-		if _, err := b.WriteString(elems[i]); err != nil || len(forcePanic) == 1 {
+		if _, err := b.WriteString(elems[i]); err != nil || len(forcePanic) == 2 {
 			if err == nil {
-				err = errors.New("force panic")
+				err = errors.New("force panic 2")
 			}
 			panic(err)
 		}
 		if i > 0 {
-			if _, err := b.WriteString(sep); err != nil || len(forcePanic) == 2 {
+			if _, err := b.WriteString(sep); err != nil || len(forcePanic) == 1 {
 				if err == nil {
-					err = errors.New("force panic")
+					err = errors.New("force panic 1")
 				}
 				panic(err)
 			}

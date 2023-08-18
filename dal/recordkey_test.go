@@ -1,6 +1,8 @@
 package dal
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGetRecordKeyPath(t *testing.T) {
 	type args struct {
@@ -71,69 +73,6 @@ func TestKeyCollectionPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.args.key.CollectionPath(); got != tt.want {
 				t.Errorf("CollectionPath() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestReverseStringsJoin(t *testing.T) {
-	type args struct {
-		elems []string
-		sep   string
-	}
-	tests := []struct {
-		name        string
-		args        args
-		want        string
-		shouldPanic int
-	}{
-		{
-			name: "empty",
-			args: args{elems: []string{}, sep: "/"},
-			want: "",
-		},
-		{
-			name: "single",
-			args: args{elems: []string{"el1"}, sep: "/"},
-			want: "el1",
-		},
-		{
-			name: "two",
-			args: args{elems: []string{"el1", "el2"}, sep: "/"},
-			want: "el2/el1",
-		},
-		{
-			name: "three",
-			args: args{elems: []string{"el1", "el2", "el3"}, sep: "/"},
-			want: "el3/el2/el1",
-		},
-		{
-			name:        "panics1",
-			args:        args{elems: []string{"el1", "el2", "el3"}, sep: "/"},
-			shouldPanic: 1,
-		},
-		{
-			name:        "panics2",
-			args:        args{elems: []string{"el1", "el2", "el3"}, sep: "/"},
-			shouldPanic: 1,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				if tt.shouldPanic > 0 {
-					if r := recover(); r == nil {
-						t.Errorf("panic expected")
-					}
-				}
-			}()
-			var forcePanic []bool
-			if tt.shouldPanic > 0 {
-				forcePanic = make([]bool, tt.shouldPanic)
-			}
-			got := reverseStringsJoin(tt.args.elems, tt.args.sep, forcePanic...)
-			if got != tt.want {
-				t.Errorf("reverseStringsJoin() = %v, want %v", got, tt.want)
 			}
 		})
 	}

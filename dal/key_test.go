@@ -2,6 +2,7 @@ package dal
 
 import (
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
@@ -276,28 +277,39 @@ func TestKey_Validate(t *testing.T) {
 	}
 }
 
-func TestNewKey(t *testing.T) {
+func TestNewKeyWithOptions(t *testing.T) {
 	type args struct {
-		kind    string
-		options []KeyOption
+		collection string
+		options    []KeyOption
 	}
 	tests := []struct {
 		name    string
 		args    args
 		wantKey *Key
+		wantErr bool
 	}{
 		{
 			name:    "single_with_string_id",
-			args:    args{kind: "Kind1", options: []KeyOption{WithStringID("k1")}},
+			args:    args{collection: "Kind1", options: []KeyOption{WithStringID("k1")}},
 			wantKey: &Key{collection: "Kind1", ID: "k1"},
+		},
+		{
+			name:    "empty_collection_arg",
+			args:    args{collection: ""},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotKey, err := NewKeyWithOptions(tt.args.kind, tt.args.options...)
-			assert.Nil(t, err)
-			if !reflect.DeepEqual(gotKey, tt.wantKey) {
-				t.Errorf("NewKey() = %v, want %v", gotKey, tt.wantKey)
+			key, err := NewKeyWithOptions(tt.args.collection, tt.args.options...)
+			if tt.wantErr {
+				assert.NotNil(t, err)
+				assert.Nil(t, key)
+			} else {
+				assert.Nil(t, err)
+				if !reflect.DeepEqual(key, tt.wantKey) {
+					t.Errorf("NewKey() = %v, want %v", key, tt.wantKey)
+				}
 			}
 		})
 	}
@@ -586,6 +598,73 @@ func TestKey_Equal(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			actual := tt.k1.Equal(tt.k2)
 			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestReverseStringsJoin(t *testing.T) {
+	type args struct {
+		elems []string
+		sep   string
+	}
+	tests := []struct {
+		name        string
+		args        args
+		want        string
+		shouldPanic int
+	}{
+		{
+			name: "empty",
+			args: args{elems: []string{}, sep: "/"},
+			want: "",
+		},
+		{
+			name: "single",
+			args: args{elems: []string{"el1"}, sep: "/"},
+			want: "el1",
+		},
+		{
+			name: "two",
+			args: args{elems: []string{"el1", "el2"}, sep: "/"},
+			want: "el2/el1",
+		},
+		{
+			name: "three",
+			args: args{elems: []string{"el1", "el2", "el3"}, sep: "/"},
+			want: "el3/el2/el1",
+		},
+		{
+			name:        "panics1",
+			args:        args{elems: []string{"el1", "el2", "el3"}, sep: "/"},
+			shouldPanic: 1,
+		},
+		{
+			name:        "panics2",
+			args:        args{elems: []string{"el1", "el2", "el3"}, sep: "/"},
+			shouldPanic: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if tt.shouldPanic > 0 {
+					r := recover()
+					if r == nil {
+						t.Errorf("panic expected")
+						return
+					}
+					s := fmt.Sprintf("%v", r)
+					assert.Equal(t, fmt.Sprintf("force panic %d", tt.shouldPanic), s)
+				}
+			}()
+			var forcePanic []bool
+			if tt.shouldPanic > 0 {
+				forcePanic = make([]bool, tt.shouldPanic)
+			}
+			got := reverseStringsJoin(tt.args.elems, tt.args.sep, forcePanic...)
+			if got != tt.want {
+				t.Errorf("reverseStringsJoin() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
