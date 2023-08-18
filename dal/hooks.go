@@ -31,7 +31,7 @@ func callRecordHooks(c context.Context, record Record, hooks []RecordHook) error
 	return nil
 }
 
-func beforeSafe(c context.Context, db Database, record Record) error {
+func beforeSafe(_ context.Context, _ Database, record Record) error {
 	data := record.Data()
 	if validatable, ok := data.(ValidatableRecord); ok {
 		if err := validatable.Validate(); err != nil {
