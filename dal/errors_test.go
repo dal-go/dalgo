@@ -70,3 +70,19 @@ func TestNewRollbackError(t *testing.T) {
 	assert.True(t, strings.Contains(err.Error(), "some rollback error"))
 	assert.True(t, strings.Contains(err.Error(), "some original error"))
 }
+
+func TestErrDuplicateUser_Error(t *testing.T) {
+	err := ErrDuplicateUser{SearchCriteria: "criteria1", DuplicateUserIDs: []string{"id1", "id2"}}
+	s := err.Error()
+	if s == "" {
+		t.Fatal("Expected non-empty string")
+	}
+	if !strings.Contains(s, err.SearchCriteria) {
+		t.Errorf("Expected %v to contain %v", s, err.SearchCriteria)
+	}
+	for _, uid := range err.DuplicateUserIDs {
+		if !strings.Contains(s, uid) {
+			t.Errorf("Expected %v to contain %v", s, uid)
+		}
+	}
+}

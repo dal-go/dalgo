@@ -3,6 +3,7 @@ package dal
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ErrNotSupported - return this if db driver does not support requested operation.
@@ -19,14 +20,14 @@ var ErrNoMoreRecords = errors.New("no more errors")
 type ErrDuplicateUser struct {
 	// TODO: Should it be moved out of this package to strongo/app/user?
 	SearchCriteria   string
-	DuplicateUserIDs []int64
+	DuplicateUserIDs []string
 }
 
 var NoError = errors.New("no error")
 
 // Error implements error interface
 func (err ErrDuplicateUser) Error() string {
-	return fmt.Sprintf("Multiple users by given search criteria[%v]: %v", err.SearchCriteria, err.DuplicateUserIDs)
+	return fmt.Sprintf("multiple users by given search criteria[%v]: %v", err.SearchCriteria, strings.Join(err.DuplicateUserIDs, ","))
 }
 
 var (
