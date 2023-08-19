@@ -143,9 +143,10 @@ func TestWhereField(t *testing.T) {
 		v        any
 	}
 	tests := []struct {
-		name string
-		args args
-		want Condition
+		name        string
+		args        args
+		want        Condition
+		shouldPanic bool
 	}{
 		{
 			name: "string",
@@ -192,9 +193,25 @@ func TestWhereField(t *testing.T) {
 			},
 			want: Comparison{Left: Field("f1"), Operator: Equal, Right: FieldRef{Name: "f2"}},
 		},
+		{
+			name: "key",
+			args: args{
+				name:     "f1",
+				operator: Equal,
+				v:        &Key{},
+			},
+			shouldPanic: true, // TODO: might be wrong, we might want to  filter by key value?
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("WhereField() should have panicked!")
+					}
+				}()
+			}
 			condition := WhereField(tt.args.name, tt.args.operator, tt.args.v)
 			assert.Equal(t, tt.want, condition)
 		})

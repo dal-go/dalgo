@@ -3,6 +3,7 @@ package dal
 import (
 	"fmt"
 	"regexp"
+	"time"
 )
 
 type FieldRef struct {
@@ -37,14 +38,21 @@ func (f FieldRef) EqualTo(v any) Condition {
 func WhereField(name string, operator Operator, v any) Condition {
 	var val Expression
 	switch v := v.(type) {
-	case nil, string, int:
+	case
+		nil,
+		bool,
+		string,
+		float32, float64,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		time.Time:
 		val = Constant{Value: v}
 	case Constant:
 		val = v
 	case FieldRef:
 		val = v
 	default:
-
+		panic(fmt.Errorf("unsupported type %T", v))
 	}
 	return Comparison{Operator: operator, Left: Field(name), Right: val}
 }
