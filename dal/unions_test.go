@@ -1,9 +1,19 @@
 package dal
 
 import (
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 )
+
+func TestArrayUnion_Name(t *testing.T) {
+	assert.Equal(t, "ArrayUnion", ArrayUnion().Name())
+}
+
+func TestArrayUnion_Value(t *testing.T) {
+	assert.Nil(t, arrayUnion{}.Value())
+	assert.Equal(t, []any{"s1"}, arrayUnion{elems: []any{"s1"}}.Value())
+}
 
 func TestArrayUnion(t *testing.T) {
 	type args struct {
