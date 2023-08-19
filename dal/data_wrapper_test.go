@@ -13,7 +13,6 @@ func TestMakeRecordData(t *testing.T) {
 	type testCase[T any] struct {
 		name string
 		args args[T]
-		want DataWrapper
 	}
 	tests := []testCase[any]{
 		{
@@ -40,7 +39,6 @@ func TestMakeRecordDataWithCallbacks(t *testing.T) {
 	type testCase[T any] struct {
 		name string
 		args args[T]
-		want DataWrapper
 	}
 	tests := []testCase[any]{
 		{
