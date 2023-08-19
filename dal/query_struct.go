@@ -7,11 +7,11 @@ import (
 	"strconv"
 )
 
-var _ Query = query{}
-var _ Query = (*query)(nil)
+var _ Query = theQuery{}
+var _ Query = (*theQuery)(nil)
 
 // query holds definition of a query
-type query struct {
+type theQuery struct {
 
 	// From defines target table/collection
 	from *CollectionRef
@@ -42,47 +42,47 @@ type query struct {
 	startCursor Cursor
 }
 
-func (q query) From() *CollectionRef {
+func (q theQuery) From() *CollectionRef {
 	return q.from
 }
 
-func (q query) Where() Condition {
+func (q theQuery) Where() Condition {
 	return q.where
 }
 
-func (q query) GroupBy() []Expression {
+func (q theQuery) GroupBy() []Expression {
 	return q.groupBy[:]
 }
 
-func (q query) OrderBy() []OrderExpression {
+func (q theQuery) OrderBy() []OrderExpression {
 	return q.orderBy[:]
 }
 
-func (q query) Columns() []Column {
+func (q theQuery) Columns() []Column {
 	return q.columns[:]
 }
 
-func (q query) Into() func() Record {
+func (q theQuery) Into() func() Record {
 	return q.into
 }
 
-func (q query) IDKind() reflect.Kind {
+func (q theQuery) IDKind() reflect.Kind {
 	return q.idKind
 }
 
-func (q query) StartFrom() Cursor {
+func (q theQuery) StartFrom() Cursor {
 	return q.startCursor
 }
 
-func (q query) Offset() int {
+func (q theQuery) Offset() int {
 	return q.offset
 }
 
-func (q query) Limit() int {
+func (q theQuery) Limit() int {
 	return q.limit
 }
 
-func (q query) String() string {
+func (q theQuery) String() string {
 	writer := bytes.NewBuffer(make([]byte, 0, 1024))
 	writer.WriteString("SELECT")
 	if q.limit > 0 {
@@ -138,11 +138,11 @@ func (q query) String() string {
 	return writer.String()
 }
 
-var _ fmt.Stringer = (*query)(nil)
+var _ fmt.Stringer = (*theQuery)(nil)
 
 // And creates a new query by adding a condition to a predefined query
-func (q query) groupWithConditions(operator Operator, conditions ...Condition) query {
-	qry := query{from: q.from}
+func (q theQuery) groupWithConditions(operator Operator, conditions ...Condition) theQuery {
+	qry := theQuery{from: q.from}
 	and := GroupCondition{operator: operator, conditions: make([]Condition, len(conditions)+1)}
 	and.conditions[0] = q.where
 	for i, condition := range conditions {
@@ -153,11 +153,11 @@ func (q query) groupWithConditions(operator Operator, conditions ...Condition) q
 }
 
 // And creates an inherited query by adding AND conditions
-func (q query) And(conditions ...Condition) query {
+func (q theQuery) And(conditions ...Condition) theQuery {
 	return q.groupWithConditions(And, conditions...)
 }
 
 // Or creates an inherited query by adding OR conditions
-func (q query) Or(conditions ...Condition) query {
+func (q theQuery) Or(conditions ...Condition) theQuery {
 	return q.groupWithConditions(Or, conditions...)
 }

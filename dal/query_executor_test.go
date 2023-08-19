@@ -29,7 +29,7 @@ func Test_selector_SelectReader(t *testing.T) {
 	}
 	type args struct {
 		c     context.Context
-		query query
+		query theQuery
 	}
 	tests := []struct {
 		name    string
@@ -61,7 +61,7 @@ func Test_selector_QueryAllRecords(t *testing.T) {
 	}
 	type args struct {
 		c     context.Context
-		query query
+		query theQuery
 	}
 	tests := []struct {
 		name        string

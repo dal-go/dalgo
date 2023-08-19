@@ -84,7 +84,7 @@ func TestSelect_String(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := query{
+			q := theQuery{
 				from:    tt.fields.From,
 				where:   tt.fields.Where,
 				groupBy: tt.fields.GroupBy,

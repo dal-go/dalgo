@@ -76,8 +76,8 @@ func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) Query {
 	return q
 }
 
-func (s queryBuilder) newQuery() query {
-	q := query{
+func (s queryBuilder) newQuery() theQuery {
+	q := theQuery{
 		from:        &CollectionRef{Name: s.collection},
 		limit:       s.limit,
 		orderBy:     s.orderBy,
