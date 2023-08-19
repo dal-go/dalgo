@@ -52,7 +52,7 @@ func Test_record_Data(t *testing.T) {
 			}
 			v.SetError(nil)
 			if got := v.Data(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Data() = %v, want %v", got, tt.want)
+				t.Errorf("data() = %v, want %v", got, tt.want)
 			}
 		})
 	}
