@@ -607,6 +607,12 @@ func TestKey_Equal(t *testing.T) {
 			expected: false,
 		},
 		{
+			name:     "equal_1st_level_parent_only_k1",
+			k1:       &Key{collection: "c1", ID: "id1", parent: &Key{collection: "c2", ID: "id2"}},
+			k2:       &Key{collection: "c1", ID: "id1"},
+			expected: false,
+		},
+		{
 			name: "k1circular",
 			k1: NewKeyWithParentAndID(
 				NewKeyWithParentAndID(
