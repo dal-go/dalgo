@@ -68,6 +68,9 @@ type recordsReader struct {
 }
 
 func (r *recordsReader) Next() (record Record, err error) {
+	if r.records == nil {
+		return nil, errors.New("if no records use EmptyReader")
+	}
 	r.current++
 	if r.current >= len(r.records) {
 		return nil, ErrNoMoreRecords

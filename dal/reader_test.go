@@ -13,6 +13,7 @@ func TestReadAll(t *testing.T) {
 		reader               Reader
 		shouldPanic          bool
 		expectedRecordsCount int
+		expectedErrTexts     []string
 	}{
 		{name: "nil_reader_no_limit", reader: nil, shouldPanic: true},
 		{name: "empty_reader", reader: &EmptyReader{}, expectedRecordsCount: 0},
@@ -20,6 +21,7 @@ func TestReadAll(t *testing.T) {
 			NewRecord(NewKeyWithID("collection", 1)),
 			NewRecord(NewKeyWithID("collection", 2)),
 		}), expectedRecordsCount: 2},
+		{name: "fails in next", reader: NewRecordsReader(nil), expectedErrTexts: []string{"no records"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.shouldPanic {
@@ -31,8 +33,16 @@ func TestReadAll(t *testing.T) {
 			}
 			ctx := context.Background()
 			records, err := ReadAll(ctx, tt.reader, -1)
-			assert.Nil(t, err)
-			assert.Equal(t, tt.expectedRecordsCount, len(records))
+			if tt.expectedErrTexts == nil {
+				assert.Nil(t, err)
+				assert.Equal(t, tt.expectedRecordsCount, len(records))
+			} else {
+				assert.Nil(t, records)
+				assert.NotNil(t, err)
+				for _, expectedErrText := range tt.expectedErrTexts {
+					assert.Contains(t, err.Error(), expectedErrText)
+				}
+			}
 		})
 	}
 }
