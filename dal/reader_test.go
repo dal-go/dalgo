@@ -75,26 +75,34 @@ func TestRecordsReader(t *testing.T) {
 	})
 	t.Run("Next", func(t *testing.T) {
 		for _, tt := range []struct {
-			name        string
-			reader      Reader
-			expectedErr error
+			name             string
+			reader           Reader
+			expectedErr      error
+			expectedErrTexts []string
 		}{
-			{name: "no_records", reader: NewRecordsReader(nil), expectedErr: ErrNoMoreRecords},
+			{name: "no_records", reader: NewRecordsReader(nil), expectedErrTexts: []string{"no records"}},
+			{name: "empty_records", reader: NewRecordsReader([]Record{}), expectedErr: ErrNoMoreRecords},
 			{name: "single_record", reader: NewRecordsReader([]Record{NewRecord(NewKeyWithID("a", "b"))}), expectedErr: nil},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
 				record, err := tt.reader.Next()
 
-				if tt.expectedErr == nil {
+				if tt.expectedErr == nil && tt.expectedErrTexts == nil {
 					assert.Nil(t, err)
 					assert.NotNil(t, record)
 				} else {
-					assert.True(t, errors.Is(err, tt.expectedErr))
-					if errors.Is(err, ErrNoMoreRecords) {
-						assert.Nil(t, record)
+					if tt.expectedErr != nil {
+						assert.True(t, errors.Is(err, tt.expectedErr))
+						if errors.Is(err, ErrNoMoreRecords) {
+							assert.Nil(t, record)
+						}
+					}
+					if tt.expectedErrTexts != nil {
+						for _, expectedErrText := range tt.expectedErrTexts {
+							assert.Contains(t, err.Error(), expectedErrText)
+						}
 					}
 				}
-				assert.True(t, errors.Is(err, tt.expectedErr))
 			})
 		}
 	})
