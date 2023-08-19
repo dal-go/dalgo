@@ -22,7 +22,7 @@ func (f FieldRef) String() string {
 	return f.Name
 }
 
-var reRegularName = regexp.MustCompile(`^\w+$`)
+var reRegularName = regexp.MustCompile(`^\w*$`)
 
 func RequiresEscaping(s string) bool {
 	return !reRegularName.MatchString(s)
@@ -36,7 +36,7 @@ func (f FieldRef) EqualTo(v any) Condition {
 func WhereField(name string, operator Operator, v any) Condition {
 	var val Expression
 	switch v := v.(type) {
-	case string, int:
+	case nil, string, int:
 		val = Constant{Value: v}
 	case Constant:
 		val = v
