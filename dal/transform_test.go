@@ -35,8 +35,7 @@ func TestIncrement(t *testing.T) {
 }
 
 func TestIsTransform(t *testing.T) {
-	var t1 any
-	t1 = transform{}
+	t1 := transform{}
 	t2, ok := IsTransform(t1)
 	assert.True(t, ok)
 	assert.Equal(t, t1, t2)
