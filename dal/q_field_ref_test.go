@@ -145,6 +145,42 @@ func TestWhereField(t *testing.T) {
 			},
 			want: Comparison{Left: Field("f1"), Operator: Equal, Right: Constant{Value: "v1"}},
 		},
+		{
+			name: "int",
+			args: args{
+				name:     "f1",
+				operator: Equal,
+				v:        123,
+			},
+			want: Comparison{Left: Field("f1"), Operator: Equal, Right: Constant{Value: 123}},
+		},
+		{
+			name: "nil",
+			args: args{
+				name:     "f1",
+				operator: Equal,
+				v:        nil,
+			},
+			want: Comparison{Left: Field("f1"), Operator: Equal, Right: Constant{Value: nil}},
+		},
+		{
+			name: "Constant",
+			args: args{
+				name:     "f1",
+				operator: Equal,
+				v:        Constant{Value: 123},
+			},
+			want: Comparison{Left: Field("f1"), Operator: Equal, Right: Constant{Value: 123}},
+		},
+		{
+			name: "FieldRef",
+			args: args{
+				name:     "f1",
+				operator: Equal,
+				v:        FieldRef{Name: "f2"},
+			},
+			want: Comparison{Left: Field("f1"), Operator: Equal, Right: FieldRef{Name: "f2"}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
