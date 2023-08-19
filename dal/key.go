@@ -240,9 +240,6 @@ func EqualKeys(k1 *Key, k2 *Key) bool {
 		if k1.Collection() != k2.Collection() {
 			return false
 		}
-		if k1.ID == nil && k2.ID != nil || k2.ID == nil && k1.ID != nil {
-			return false
-		}
 		if k1.ID != k2.ID {
 			return false
 		}

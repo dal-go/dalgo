@@ -571,9 +571,15 @@ func TestKey_Equal(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "arg_nil",
+			name:     "arg1_nil",
 			k1:       k11,
 			k2:       nil,
+			expected: false,
+		},
+		{
+			name:     "arg2_nil",
+			k1:       nil,
+			k2:       k12,
 			expected: false,
 		},
 		{
