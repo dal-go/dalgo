@@ -22,7 +22,8 @@ func (f FieldRef) String() string {
 	return f.Name
 }
 
-var reRegularName = regexp.MustCompile(`^\w*$`)
+// Empty string requires escaping!
+var reRegularName = regexp.MustCompile(`^\w+$`)
 
 func RequiresEscaping(s string) bool {
 	return !reRegularName.MatchString(s)

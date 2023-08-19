@@ -75,12 +75,23 @@ func TestFieldRef_String(t *testing.T) {
 		{
 			name:     "empty",
 			fieldRef: FieldRef{},
-			want:     "",
+			want:     "[]",
+		},
+		{
+			name:     "no_escaping",
+			fieldRef: FieldRef{Name: "f1"},
+			want:     "f1",
+		},
+		{
+			name:     "with_escaping",
+			fieldRef: FieldRef{Name: "f 1"},
+			want:     "[f 1]",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, tt.fieldRef.String(), "String()")
+			actual := tt.fieldRef.String()
+			assert.Equalf(t, tt.want, actual, "String()")
 		})
 	}
 }
@@ -94,7 +105,7 @@ func TestRequiresEscaping(t *testing.T) {
 		{
 			name:  "empty",
 			input: "",
-			want:  false,
+			want:  true,
 		},
 		{
 			name:  "letter",
