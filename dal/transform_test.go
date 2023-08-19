@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 )
@@ -31,4 +32,18 @@ func TestIncrement(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsTransform(t *testing.T) {
+	var t1 any
+	t1 = transform{}
+	t2, ok := IsTransform(t1)
+	assert.True(t, ok)
+	assert.Equal(t, t1, t2)
+}
+
+func TestTransform(t *testing.T) {
+	t1 := transform{name: "t1", value: "v1"}
+	assert.Equal(t, t1.name, t1.Name())
+	assert.Equal(t, t1.value, t1.Value())
 }
