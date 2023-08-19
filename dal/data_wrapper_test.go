@@ -108,8 +108,7 @@ func testHook(
 	hookFactory func(hook RecordDataHook) func(rd *recordData),
 	callHook func(rd *recordData, c context.Context, db Database, key *Key) (err error),
 ) {
-	var originalData any
-	originalData = "abc"
+	originalData := "abc"
 
 	var called int
 	var hook = func(c context.Context, db Database, key *Key, data any) (err error) {
