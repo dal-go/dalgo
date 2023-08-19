@@ -39,7 +39,7 @@ func (v recordData) String() string {
 
 func (v recordData) BeforeSave(c context.Context, db Database, key *Key) (err error) {
 	if v.beforeSave != nil {
-		err = v.beforeSave(c, db, key, v)
+		err = v.beforeSave(c, db, key, v.data)
 	}
 	return
 }
