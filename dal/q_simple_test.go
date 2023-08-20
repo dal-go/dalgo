@@ -32,7 +32,7 @@ func TestSimpleQuery(t *testing.T) {
 		qbNoConditions := From("test")
 		q := qbNoConditions.SelectKeysOnly(reflect.String)
 		assert.Equal(t, reflect.String, q.IDKind())
-		assertQuery(t, q)
+		assert.Equal(t, "test", q.From().Name)
 	})
 
 	t.Run("with_single_condition", func(t *testing.T) {
