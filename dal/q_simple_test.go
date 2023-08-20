@@ -29,7 +29,8 @@ func TestSimpleQuery(t *testing.T) {
 		assert.NotNil(t, q.StartFrom())
 	}
 	t.Run("no_conditions", func(t *testing.T) {
-		q := qb.SelectKeysOnly(reflect.String)
+		qbNoConditions := From("test")
+		q := qbNoConditions.SelectKeysOnly(reflect.String)
 		assert.Equal(t, reflect.String, q.IDKind())
 		assertQuery(t, q)
 	})
