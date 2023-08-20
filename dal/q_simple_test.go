@@ -10,9 +10,7 @@ func TestSimpleQuery(t *testing.T) {
 	newRecord := func() Record {
 		return nil
 	}
-	var qb = From("test",
-		Field("field_1").EqualTo("value_1"),
-	).
+	var qb = From("test").
 		Where().
 		Limit(10).
 		Offset(20).
