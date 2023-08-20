@@ -28,8 +28,11 @@ func IsGroupOperator(o Operator) bool {
 // String returns string representation of a comparison
 func (v Comparison) String() string {
 	o := v.Operator
-	if o == Equal {
+	switch o {
+	case Equal:
 		o = "="
+	case "":
+		o = "{NO_OPERATOR}"
 	}
 	return fmt.Sprintf("%v %v %v", v.Left, o, v.Right)
 }
