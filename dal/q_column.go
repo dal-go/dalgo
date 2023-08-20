@@ -8,12 +8,6 @@ type Column struct {
 
 // String stringifies column value
 func (v Column) String() string {
-	if v.Alias == "" {
-		if v.Expression == nil {
-			return "NULL"
-		}
-		return v.Expression.String()
-	}
 	var expr string
 	if v.Expression == nil {
 		expr = "NULL"
