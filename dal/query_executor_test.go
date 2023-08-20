@@ -93,10 +93,11 @@ func Test_queryExecutor_QueryAllRecords(t *testing.T) {
 		query Query
 	}
 	tests := []struct {
-		name    string
-		qe      queryExecutor
-		args    args
-		wantErr assert.ErrorAssertionFunc
+		name        string
+		qe          queryExecutor
+		args        args
+		shouldPanic bool
+		wantErr     assert.ErrorAssertionFunc
 	}{
 		{
 			name: "returns_error",
@@ -109,14 +110,39 @@ func Test_queryExecutor_QueryAllRecords(t *testing.T) {
 				return assert.NotNil(t, err, i...)
 			},
 		},
+		{
+			name: "nil_reader",
+			qe: queryExecutor{
+				getReader: func(c context.Context, query Query) (reader Reader, err error) {
+					return nil, nil
+				},
+			},
+			shouldPanic: true,
+		},
+		{
+			name: "empty_reader",
+			qe: queryExecutor{
+				getReader: func(c context.Context, query Query) (reader Reader, err error) {
+					return &EmptyReader{}, nil
+				},
+			},
+			shouldPanic: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("QueryAllRecords() should have panicked!")
+					}
+				}()
+			}
 			got, err := tt.qe.QueryAllRecords(tt.args.c, tt.args.query)
-			if !tt.wantErr(t, err, fmt.Sprintf("QueryReader(%v, %v)", tt.args.c, tt.args.query)) {
+			if tt.wantErr(t, err, fmt.Sprintf("QueryReader(%v, %v)", tt.args.c, tt.args.query)) {
 				return
 			}
-			if err != nil {
+			if err == nil {
 				assert.Nil(t, got)
 			}
 		})

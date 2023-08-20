@@ -38,6 +38,9 @@ func (s queryExecutor) QueryAllRecords(c context.Context, query Query) (records 
 	if reader, err = s.getReader(c, query); err != nil {
 		return
 	}
+	if reader == nil {
+		panic("reader is nil")
+	}
 	return SelectAllRecords(reader, query.Limit())
 }
 
