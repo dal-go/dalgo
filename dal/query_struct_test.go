@@ -65,10 +65,15 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_*_from_User_where_Email_=_'test@example.com'",
 			q: theQuery{
-				from:  &CollectionRef{Name: "User"},
+				from: &CollectionRef{Name: "User"},
+				columns: []Column{
+					{Expression: Field("id")},
+					{Expression: Field("name")},
+					{Expression: Field("email")},
+				},
 				where: NewComparison(FieldRef{Name: "Email"}, Equal, String("test@example.com")),
 			},
-			want: "SELECT * FROM [User] WHERE Email = 'test@example.com'",
+			want: "SELECT\n\tid,\n\tname,\n\temail\nFROM [User]\nWHERE Email = 'test@example.com'",
 		},
 		{
 			name: "select top 7 * from User",
@@ -150,6 +155,10 @@ func TestSelect(t *testing.T) {
 			})
 			t.Run("And", func(t *testing.T) {
 				q := tt.q.And(NewComparison(FieldRef{Name: "Email"}, Equal, String("test@example.com")))
+				assert.NotEqual(t, tt.q, q)
+			})
+			t.Run("Or", func(t *testing.T) {
+				q := tt.q.Or(NewComparison(FieldRef{Name: "Email"}, Equal, String("test@example.com")))
 				assert.NotEqual(t, tt.q, q)
 			})
 		})

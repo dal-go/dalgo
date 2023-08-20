@@ -88,18 +88,23 @@ func (q theQuery) String() string {
 	if q.limit > 0 {
 		writer.WriteString(" TOP " + strconv.Itoa(q.limit))
 	}
+
+	is1liner := len(q.columns) <= 1 &&
+		(q.where == nil || reflect.TypeOf(q.where) == reflect.TypeOf(Comparison{}))
+
 	switch len(q.columns) {
 	case 0:
 		writer.WriteString(" *")
 	case 1:
 		_, _ = fmt.Fprint(writer, " ", q.columns[0].String())
 	default:
-		for _, col := range q.columns {
+		for i, col := range q.columns {
 			_, _ = fmt.Fprint(writer, "\n\t", col.String())
+			if i < len(q.columns)-1 {
+				writer.WriteString(",")
+			}
 		}
 	}
-	is1liner := len(q.columns) <= 1 &&
-		(q.where == nil || reflect.TypeOf(q.where) == reflect.TypeOf(Comparison{}))
 
 	if q.from != nil {
 		if is1liner {
