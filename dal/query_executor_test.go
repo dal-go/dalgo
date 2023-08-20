@@ -87,7 +87,7 @@ func Test_selector_QueryAllRecords(t *testing.T) {
 	}
 }
 
-func Test_queryExecutor_QueryAllRecords(t *testing.T) {
+func Test_queryExecutor(t *testing.T) {
 	type args struct {
 		c     context.Context
 		query Query
@@ -131,20 +131,32 @@ func Test_queryExecutor_QueryAllRecords(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.shouldPanic {
-				defer func() {
-					if r := recover(); r == nil {
-						t.Errorf("QueryAllRecords() should have panicked!")
-					}
-				}()
+			runTest := func(t *testing.T, execut func() (any, error)) {
+				if tt.shouldPanic {
+					defer func() {
+						if r := recover(); r == nil {
+							t.Errorf("QueryAllRecords() should have panicked!")
+						}
+					}()
+				}
+				got, err := execut()
+				if tt.wantErr(t, err, fmt.Sprintf("QueryReader(%v, %v)", tt.args.c, tt.args.query)) {
+					return
+				}
+				if err == nil {
+					assert.Nil(t, got)
+				}
 			}
-			got, err := tt.qe.QueryAllRecords(tt.args.c, tt.args.query)
-			if tt.wantErr(t, err, fmt.Sprintf("QueryReader(%v, %v)", tt.args.c, tt.args.query)) {
-				return
-			}
-			if err == nil {
-				assert.Nil(t, got)
-			}
+			t.Run("QueryAllRecords", func(t *testing.T) {
+				runTest(t, func() (any, error) {
+					return tt.qe.QueryAllRecords(tt.args.c, tt.args.query)
+				})
+			})
+			t.Run("QueryReader", func(t *testing.T) {
+				runTest(t, func() (any, error) {
+					return tt.qe.QueryReader(tt.args.c, tt.args.query)
+				})
+			})
 		})
 	}
 }
