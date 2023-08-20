@@ -38,6 +38,23 @@ func TestSelect(t *testing.T) {
 			want: "SELECT * FROM [User]",
 		},
 		{
+			name: "select_top_10_*_from_User",
+			q: theQuery{
+				from:  &CollectionRef{Name: "User"},
+				limit: 10,
+			},
+			want: "SELECT TOP 10 * FROM [User]",
+		},
+		{
+			name: "select_top_10_*_from_User_offset_20",
+			q: theQuery{
+				from:   &CollectionRef{Name: "User"},
+				limit:  10,
+				offset: 20,
+			},
+			want: "SELECT TOP 10 * FROM [User]\nOFFSET 20",
+		},
+		{
 			name: "select_*_from_Users_where_SomeID_=_123",
 			q: theQuery{
 				from:  &CollectionRef{Name: "Users"},
@@ -87,7 +104,7 @@ func TestSelect(t *testing.T) {
 					Field("Created"),
 				},
 			},
-			want: "SELECT TOP 7 * FROM [User]\nORDER BY Email, Created DESC\nGROUP BY Email, Created",
+			want: "SELECT TOP 7 * FROM [User]\nGROUP BY Email, Created\nORDER BY Email, Created DESC",
 		},
 	}
 	for _, tt := range tests {
@@ -119,6 +136,12 @@ func TestSelect(t *testing.T) {
 			})
 			t.Run("StartFrom", func(t *testing.T) {
 				assert.Equal(t, tt.q.startCursor, tt.q.StartFrom())
+			})
+			t.Run("Offset", func(t *testing.T) {
+				assert.Equal(t, tt.q.offset, tt.q.Offset())
+			})
+			t.Run("Limit", func(t *testing.T) {
+				assert.Equal(t, tt.q.limit, tt.q.Limit())
 			})
 			t.Run("String", func(t *testing.T) {
 				if got := tt.q.String(); got != tt.want {

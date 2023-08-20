@@ -117,6 +117,15 @@ func (q theQuery) String() string {
 		}
 		writer.WriteString("WHERE " + q.where.String())
 	}
+	if len(q.groupBy) > 0 {
+		writer.WriteString("\nGROUP BY ")
+		for i, expr := range q.groupBy {
+			if i > 0 {
+				writer.WriteString(", ")
+			}
+			writer.WriteString(expr.String())
+		}
+	}
 	if len(q.orderBy) > 0 {
 		writer.WriteString("\nORDER BY ")
 		for i, expr := range q.orderBy {
@@ -126,14 +135,8 @@ func (q theQuery) String() string {
 			writer.WriteString(expr.String())
 		}
 	}
-	if len(q.groupBy) > 0 {
-		writer.WriteString("\nGROUP BY ")
-		for i, expr := range q.groupBy {
-			if i > 0 {
-				writer.WriteString(", ")
-			}
-			writer.WriteString(expr.String())
-		}
+	if q.offset > 0 {
+		writer.WriteString("\nOFFSET " + strconv.Itoa(q.offset))
 	}
 	return writer.String()
 }
