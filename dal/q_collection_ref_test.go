@@ -37,3 +37,77 @@ func TestNewCollectionRef(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectionRef(t *testing.T) {
+	type expected struct {
+		string string
+		path   string
+	}
+	for _, tt := range []struct {
+		name          string
+		collectionRef CollectionRef
+		expected      expected
+	}{
+		{
+			name:          "empty",
+			collectionRef: CollectionRef{},
+			expected: expected{
+				string: "",
+				path:   "",
+			},
+		},
+		{
+			name: "name_only",
+			collectionRef: CollectionRef{
+				Name: "collection1",
+			},
+			expected: expected{
+				string: "collection1",
+				path:   "collection1",
+			},
+		},
+		{
+			name: "no_parent_with_alias",
+			collectionRef: CollectionRef{
+				Name:  "collection1",
+				Alias: "c1",
+			},
+			expected: expected{
+				string: "collection1 AS c1",
+				path:   "collection1",
+			},
+		},
+		{
+			name: "single_parent",
+			collectionRef: CollectionRef{
+				Name:   "collection1",
+				Parent: &Key{collection: "collection2", ID: "id2"},
+			},
+			expected: expected{
+				string: "collection2/id2/collection1",
+				path:   "collection2/id2/collection1",
+			},
+		},
+		{
+			name: "single_parent_with_alias",
+			collectionRef: CollectionRef{
+				Name:   "collection1",
+				Alias:  "c1",
+				Parent: &Key{collection: "collection2", ID: "id2"},
+			},
+			expected: expected{
+				string: "collection2/id2/collection1 AS c1",
+				path:   "collection2/id2/collection1",
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Run("string", func(t *testing.T) {
+				assert.Equal(t, tt.expected.string, tt.collectionRef.String())
+			})
+			t.Run("path", func(t *testing.T) {
+				assert.Equal(t, tt.expected.path, tt.collectionRef.Path())
+			})
+		})
+	}
+}
