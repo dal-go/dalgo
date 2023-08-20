@@ -2,12 +2,13 @@ package dal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-func TestNewSelector(t *testing.T) {
+func TestNewQueryExecutor(t *testing.T) {
 	t.Run("panic_on_nil", func(t *testing.T) {
 		assert.Panics(t, func() {
 			NewQueryExecutor(nil)
@@ -82,6 +83,42 @@ func Test_selector_QueryAllRecords(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.wantRecords, gotRecords, "SelectAll(%v)", tt.args.c)
+		})
+	}
+}
+
+func Test_queryExecutor_QueryAllRecords(t *testing.T) {
+	type args struct {
+		c     context.Context
+		query Query
+	}
+	tests := []struct {
+		name    string
+		qe      queryExecutor
+		args    args
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "returns_error",
+			qe: queryExecutor{
+				getReader: func(c context.Context, query Query) (reader Reader, err error) {
+					return nil, errors.New("test not implemented")
+				},
+			},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.NotNil(t, err, i...)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.qe.QueryAllRecords(tt.args.c, tt.args.query)
+			if !tt.wantErr(t, err, fmt.Sprintf("QueryReader(%v, %v)", tt.args.c, tt.args.query)) {
+				return
+			}
+			if err != nil {
+				assert.Nil(t, got)
+			}
 		})
 	}
 }
