@@ -12,12 +12,14 @@ func TestSelectAll(t *testing.T) {
 		limit  int
 	}
 	type testCase[T comparable] struct {
-		name    string
-		args    args
-		wantIds []T
-		wantErr error
+		name        string
+		args        args
+		shouldPanic bool
+		wantIds     []T
+		wantErr     error
 	}
 	tests := []testCase[int]{
+		{name: "nil_reader", shouldPanic: true, args: args{reader: nil}},
 		{name: "empty_reader", args: args{reader: EmptyReader{}}, wantIds: []int{}, wantErr: nil},
 	}
 	for _, tt := range tests {
@@ -34,11 +36,25 @@ func TestSelectAll(t *testing.T) {
 				}
 			}
 			t.Run("SelectAllIDs", func(t *testing.T) {
+				if tt.shouldPanic {
+					defer func() {
+						if r := recover(); r == nil {
+							t.Errorf("expected panic")
+						}
+					}()
+				}
 				gotIds, err := SelectAllIDs[int](tt.args.reader, tt.args.limit)
 				assertErr(err)
 				assert.Equal(t, tt.wantIds, gotIds)
 			})
 			t.Run("SelectAllRecords", func(t *testing.T) {
+				if tt.shouldPanic {
+					defer func() {
+						if r := recover(); r == nil {
+							t.Errorf("expected panic")
+						}
+					}()
+				}
 				gotRecords, err := SelectAllRecords(tt.args.reader, tt.args.limit)
 				assertErr(err)
 				if err == nil {
