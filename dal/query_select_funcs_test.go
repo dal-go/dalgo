@@ -41,7 +41,15 @@ func TestSelectAll(t *testing.T) {
 				limit:  0,
 				reader: getRecordsReader,
 			},
-			wantIds: []int{},
+			wantIds: []int{1, 2, 3, 4},
+		},
+		{
+			name: "with_records_negative_limit",
+			args: args{
+				reader: getRecordsReader,
+				limit:  -1,
+			},
+			wantIds: []int{1, 2, 3, 4},
 		},
 		{
 			name: "with_records_limit_2",
@@ -50,14 +58,6 @@ func TestSelectAll(t *testing.T) {
 				reader: getRecordsReader,
 			},
 			wantIds: []int{1, 2},
-		},
-		{
-			name: "with_records_no_limit",
-			args: args{
-				reader: getRecordsReader,
-				limit:  -1,
-			},
-			wantIds: []int{1, 2, 3, 4},
 		},
 	}
 	for _, tt := range tests {
@@ -81,7 +81,7 @@ func TestSelectAll(t *testing.T) {
 						}
 					}()
 				}
-				gotIds, err := SelectAllIDs[int](tt.args.reader(), tt.args.limit)
+				gotIds, err := SelectAllIDs[int](tt.args.reader(), WithLimit(tt.args.limit))
 				assertErr(t, err)
 				assert.Equal(t, tt.wantIds, gotIds)
 			})
@@ -93,7 +93,7 @@ func TestSelectAll(t *testing.T) {
 						}
 					}()
 				}
-				gotRecords, err := SelectAllRecords(tt.args.reader(), tt.args.limit)
+				gotRecords, err := SelectAllRecords(tt.args.reader(), WithLimit(tt.args.limit))
 				assertErr(t, err)
 				if err == nil {
 					assert.NotNil(t, gotRecords)
@@ -101,4 +101,20 @@ func TestSelectAll(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestWithOffset(t *testing.T) {
+	ro := new(readerOptions)
+	WithOffset(3)(ro)
+	assert.Equal(t, 3, ro.offset)
+	ro.offset = 0
+	assert.Equal(t, readerOptions{}, *ro)
+}
+
+func TestWithLimit(t *testing.T) {
+	ro := new(readerOptions)
+	WithLimit(4)(ro)
+	assert.Equal(t, 4, ro.limit)
+	ro.limit = 0
+	assert.Equal(t, readerOptions{}, *ro)
 }

@@ -41,7 +41,7 @@ func (s queryExecutor) QueryAllRecords(c context.Context, query Query) (records 
 	if reader == nil {
 		panic("reader is nil")
 	}
-	return SelectAllRecords(reader, query.Limit())
+	return SelectAllRecords(reader)
 }
 
 // ReaderProvider is a function that returns a Reader for the given query.
