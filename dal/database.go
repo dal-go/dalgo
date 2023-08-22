@@ -8,6 +8,7 @@ import (
 type Database interface {
 	ID() string
 	Client() ClientInfo
+	Close() error
 	TransactionCoordinator
 	ReadSession
 }
