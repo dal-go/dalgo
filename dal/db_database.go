@@ -13,9 +13,12 @@ type DB interface {
 	// without opening connection explicitly.
 	TransactionCoordinator
 
+	// ReadSession implements a virtual read session that opens connection/session for each read call on DB level
+	// TODO: consider to sacrifice some simplicity for the sake of interoperability?
+	ReadSession
+
 	// Removed members:
 	// ===================================================================================
 	// Close() error - is part of a connection.
 	// Connect(ctx context.Context) (connection, error) - considered unneeded
-	// ReadSession - decided to sacrifice some simplicity for the sake of interoperability
 }
