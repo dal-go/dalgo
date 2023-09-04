@@ -7,6 +7,13 @@ import (
 	"reflect"
 )
 
+// Inserter defines a function to insert a single record into database
+type Inserter interface {
+
+	// Insert inserts a single record in database
+	Insert(c context.Context, record Record, opts ...InsertOption) error
+}
+
 // IDGenerator defines a contract for ID generator function
 type IDGenerator = func(ctx context.Context, record Record) error
 

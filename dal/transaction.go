@@ -45,6 +45,59 @@ const (
 	TxSnapshot
 )
 
+// ROTxWorker defines a callback to be called to do work within a readonly transaction
+type ROTxWorker = func(ctx context.Context, tx ReadTransaction) error
+
+// RWTxWorker defines a callback to be called to do work within a readwrite transaction
+type RWTxWorker = func(ctx context.Context, tx ReadwriteTransaction) error
+
+// TransactionCoordinator provides methods to work with transactions
+type TransactionCoordinator interface {
+
+	// ReadTransactionCoordinator can start a readonly transaction
+	ReadTransactionCoordinator
+
+	// ReadwriteTransactionCoordinator can start a readwrite transaction
+	ReadwriteTransactionCoordinator
+}
+
+// ReadTransactionCoordinator creates a readonly transaction
+type ReadTransactionCoordinator interface {
+
+	// RunReadonlyTransaction starts readonly transaction
+	RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
+}
+
+// ReadwriteTransactionCoordinator creates a read-write transaction
+type ReadwriteTransactionCoordinator interface {
+
+	// RunReadwriteTransaction starts read-write transaction
+	RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
+}
+
+// Transaction defines an instance of DALgo transaction
+type Transaction interface {
+
+	// Options indicates parameters that were requested at time of transaction creation.
+	Options() TransactionOptions
+}
+
+// ReadTransaction defines an interface for a readonly transaction
+type ReadTransaction interface {
+	Transaction
+	ReadSession
+}
+
+// ReadwriteTransaction defines an interface for a readwrite transaction
+type ReadwriteTransaction interface {
+
+	// ID returns a unique ID of a transaction if it is supported by the underlying DB client
+	ID() string
+
+	Transaction
+	ReadwriteSession
+}
+
 // NewContextWithTransaction stores transaction and original context into a transactional context
 func NewContextWithTransaction(nonTransactionalContext context.Context, tx Transaction) context.Context {
 	nonTransactionalContext = context.WithValue(nonTransactionalContext, &nonTransactionalContextKey, nonTransactionalContext)

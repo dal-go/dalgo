@@ -1,136 +1,21 @@
 package dal
 
-import (
-	"context"
-)
-
 // Database is an interface that defines a DB provider
 type Database interface {
+
+	// ID is an identifier provided at time of Database creation
 	ID() string
-	Client() ClientInfo
-	Close() error
+
+	// Adapter provides information about underlying name to access data
+	Adapter() Adapter
+
+	// TransactionCoordinator provides shortcut methods to work with transactions
+	// without opening connection explicitly.
 	TransactionCoordinator
-	ReadSession
-}
 
-// ROTxWorker defines a callback to be called to do work within a readonly transaction
-type ROTxWorker = func(ctx context.Context, tx ReadTransaction) error
-
-// RWTxWorker defines a callback to be called to do work within a readwrite transaction
-type RWTxWorker = func(ctx context.Context, tx ReadwriteTransaction) error
-
-// TransactionCoordinator provides methods to work with transactions
-type TransactionCoordinator interface {
-
-	// ReadTransactionCoordinator can start a readonly transaction
-	ReadTransactionCoordinator
-
-	// ReadwriteTransactionCoordinator can start a readwrite transaction
-	ReadwriteTransactionCoordinator
-}
-
-// ReadTransactionCoordinator creates a readonly transaction
-type ReadTransactionCoordinator interface {
-
-	// RunReadonlyTransaction starts readonly transaction
-	RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error
-}
-
-// ReadwriteTransactionCoordinator creates a read-write transaction
-type ReadwriteTransactionCoordinator interface {
-
-	// RunReadwriteTransaction starts read-write transaction
-	RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error
-}
-
-// Transaction defines an instance of DALgo transaction
-type Transaction interface {
-
-	// Options indicates parameters that were requested at time of transaction creation.
-	Options() TransactionOptions
-}
-
-// ReadTransaction defines an interface for a readonly transaction
-type ReadTransaction interface {
-	Transaction
-	ReadSession
-}
-
-// ReadwriteTransaction defines an interface for a readwrite transaction
-type ReadwriteTransaction interface {
-
-	// ID returns a unique ID of a transaction if it is supported by the underlying DB client
-	ID() string
-
-	Transaction
-	ReadwriteSession
-}
-
-type Getter interface {
-	// Get gets a single record from database by key
-	Get(ctx context.Context, record Record) error
-}
-
-type MultiGetter interface {
-	// GetMulti gets multiples records from database by keys
-	GetMulti(ctx context.Context, records []Record) error
-}
-
-// ReadSession defines methods that query data from DB and does not modify it
-type ReadSession interface {
-	Getter
-	MultiGetter
-	QueryExecutor
-}
-
-// ReadwriteSession defines methods that can read & modify database. Some databases allow to modify data without transaction.
-type ReadwriteSession interface {
-	ReadSession
-	WriteSession
-}
-
-type Setter interface {
-	// Set sets a single record in database by key
-	Set(ctx context.Context, record Record) error
-}
-
-type MultiSetter interface {
-	// SetMulti sets multiples records in database by keys
-	SetMulti(ctx context.Context, records []Record) error
-}
-
-type Deleter interface {
-	// Delete deletes a single record from database by key
-	Delete(ctx context.Context, key *Key) error
-}
-
-type MultiDeleter interface {
-	// DeleteMulti deletes multiple records from database by keys
-	DeleteMulti(ctx context.Context, keys []*Key) error
-}
-
-type Updater interface {
-	// Update updates a single record in database by key
-	Update(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
-}
-
-type MultiUpdater interface {
-	// UpdateMulti updates multiples records in database by keys
-	UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
-}
-
-type Inserter interface {
-	// Insert inserts a single record in database
-	Insert(c context.Context, record Record, opts ...InsertOption) error
-}
-
-// WriteSession defines methods that can modify database
-type WriteSession interface {
-	Setter
-	MultiSetter
-	Deleter
-	MultiDeleter
-	Updater
-	MultiUpdater
-	Inserter
+	// Removed members:
+	// ===================================================================================
+	// Close() error - is part of a connection.
+	// Connect(ctx context.Context) (connection, error) - considered unneeded
+	// ReadSession - decided to sacrifice some simplicity for the sake of interoperability
 }

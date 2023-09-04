@@ -18,8 +18,8 @@ func TestNewClientInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clientInfo := NewClientInfo(tt.args.driver, tt.args.version)
-			assert.Equal(t, clientInfo.Driver(), tt.args.driver)
+			clientInfo := NewAdapter(tt.args.driver, tt.args.version)
+			assert.Equal(t, clientInfo.Name(), tt.args.driver)
 			assert.Equal(t, clientInfo.Version(), tt.args.version)
 		})
 	}
@@ -40,12 +40,12 @@ func TestClientInfo_Fields(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := clientInfo{
-				driver:  tt.fields.driver,
+			v := adapter{
+				name:    tt.fields.driver,
 				version: tt.fields.version,
 			}
-			if got := v.Driver(); got != tt.want.driver {
-				t.Errorf("Driver() = %v, want %v", got, tt.want)
+			if got := v.Name(); got != tt.want.driver {
+				t.Errorf("Name() = %v, want %v", got, tt.want)
 			}
 			if got := v.Version(); got != tt.want.version {
 				t.Errorf("Version() = %v, want %v", got, tt.want)
@@ -63,7 +63,7 @@ func TestClientInfo_Equals(t *testing.T) {
 		version string
 	}
 	type args struct {
-		other ClientInfo
+		other Adapter
 	}
 	tests := []struct {
 		name   string
@@ -71,15 +71,15 @@ func TestClientInfo_Equals(t *testing.T) {
 		args   args
 		want   bool
 	}{
-		{"should_pass", fields{"sql", "v1"}, args{clientInfo{driver: "sql", version: "v1"}}, true},
-		{"should_pass", fields{"firestore", "v2"}, args{clientInfo{driver: "firestore", version: "v2"}}, true},
-		{"should_pass", fields{"firestore", "v2"}, args{clientInfo{driver: "firestore", version: "v1"}}, false},
-		{"should_pass", fields{"firestore", "v2"}, args{clientInfo{driver: "sql", version: "v2"}}, false},
+		{"should_pass", fields{"sql", "v1"}, args{adapter{name: "sql", version: "v1"}}, true},
+		{"should_pass", fields{"firestore", "v2"}, args{adapter{name: "firestore", version: "v2"}}, true},
+		{"should_pass", fields{"firestore", "v2"}, args{adapter{name: "firestore", version: "v1"}}, false},
+		{"should_pass", fields{"firestore", "v2"}, args{adapter{name: "sql", version: "v2"}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := clientInfo{
-				driver:  tt.fields.driver,
+			v := adapter{
+				name:    tt.fields.driver,
 				version: tt.fields.version,
 			}
 			if got := v.Equals(tt.args.other); got != tt.want {

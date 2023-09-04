@@ -6,11 +6,11 @@ import (
 	"strings"
 )
 
-// ErrNotSupported - return this if db driver does not support requested operation.
+// ErrNotSupported - return this if db name does not support requested operation.
 // (for example no support for transactions)
 var ErrNotSupported = errors.New("not supported")
 
-// ErrNotImplementedYet - return this if db driver does not support requested operation yet.
+// ErrNotImplementedYet - return this if db name does not support requested operation yet.
 var ErrNotImplementedYet = errors.New("not implemented yet")
 
 // ErrNoMoreRecords indicates there is no more records
