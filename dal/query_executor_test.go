@@ -15,7 +15,7 @@ func TestNewQueryExecutor(t *testing.T) {
 		})
 	})
 	t.Run("should_pass", func(t *testing.T) {
-		var getReader = func(c context.Context, query Query) (Reader, error) {
+		var getReader = func(ctx context.Context, query Query) (Reader, error) {
 			return nil, nil
 		}
 		selector := NewQueryExecutor(getReader)
@@ -26,7 +26,7 @@ func TestNewQueryExecutor(t *testing.T) {
 func Test_selector_SelectReader(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
-		getReader func(c context.Context, query Query) (Reader, error)
+		getReader func(ctx context.Context, query Query) (Reader, error)
 	}
 	type args struct {
 		c     context.Context
@@ -58,7 +58,7 @@ func Test_selector_SelectReader(t *testing.T) {
 func Test_selector_QueryAllRecords(t *testing.T) {
 	t.Skip("TODO: implement test")
 	type fields struct {
-		getReader func(c context.Context, query Query) (Reader, error)
+		getReader func(ctx context.Context, query Query) (Reader, error)
 	}
 	type args struct {
 		c     context.Context
@@ -102,7 +102,7 @@ func Test_queryExecutor(t *testing.T) {
 		{
 			name: "returns_error",
 			qe: queryExecutor{
-				getReader: func(c context.Context, query Query) (reader Reader, err error) {
+				getReader: func(ctx context.Context, query Query) (reader Reader, err error) {
 					return nil, errors.New("test not implemented")
 				},
 			},
@@ -113,7 +113,7 @@ func Test_queryExecutor(t *testing.T) {
 		{
 			name: "nil_reader",
 			qe: queryExecutor{
-				getReader: func(c context.Context, query Query) (reader Reader, err error) {
+				getReader: func(ctx context.Context, query Query) (reader Reader, err error) {
 					return nil, nil
 				},
 			},
@@ -122,7 +122,7 @@ func Test_queryExecutor(t *testing.T) {
 		{
 			name: "empty_reader",
 			qe: queryExecutor{
-				getReader: func(c context.Context, query Query) (reader Reader, err error) {
+				getReader: func(ctx context.Context, query Query) (reader Reader, err error) {
 					return &EmptyReader{}, nil
 				},
 			},

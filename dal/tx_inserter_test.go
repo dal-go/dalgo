@@ -27,10 +27,10 @@ import (
 //type inserterMock struct {
 //}
 //
-//func (v inserterMock) Insert(c context.Context, record Record, opts ...InsertOption) error {
+//func (v inserterMock) Insert(ctx context.Context, record Record, opts ...InsertOption) error {
 //	options := NewInsertOptions(opts...)
 //	if idGenerator := options.IDGenerator(); idGenerator != nil {
-//		if err := idGenerator(c, record); err != nil {
+//		if err := idGenerator(ctx, record); err != nil {
 //			return err
 //		}
 //	}

@@ -1,9 +1,9 @@
 package dal
 
-// Database is an interface that defines a DB provider
-type Database interface {
+// DB is an interface that defines a database provider
+type DB interface {
 
-	// ID is an identifier provided at time of Database creation
+	// ID is an identifier provided at time of DB creation
 	ID() string
 
 	// Adapter provides information about underlying name to access data

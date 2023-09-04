@@ -13,5 +13,5 @@ type Updater interface {
 type MultiUpdater interface {
 
 	// UpdateMulti updates multiples records in database by keys
-	UpdateMulti(c context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
+	UpdateMulti(ctx context.Context, keys []*Key, updates []Update, preconditions ...Precondition) error
 }

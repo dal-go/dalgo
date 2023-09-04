@@ -12,16 +12,16 @@ type DataWrapper interface {
 }
 
 type RecordBeforeSaveHook interface {
-	BeforeSave(c context.Context, key *Key) (err error)
+	BeforeSave(ctx context.Context, key *Key) (err error)
 }
 
 type RecordAfterLoadHook interface {
-	AfterLoad(c context.Context, key *Key) (err error)
+	AfterLoad(ctx context.Context, key *Key) (err error)
 }
 
-type RecordHook = func(c context.Context, record Record) error
+type RecordHook = func(ctx context.Context, record Record) error
 
-type RecordDataHook = func(c context.Context, db Database, key *Key, data any) (err error)
+type RecordDataHook = func(ctx context.Context, db DB, key *Key, data any) (err error)
 
 type recordData struct {
 	data       any
@@ -37,16 +37,16 @@ func (v recordData) String() string {
 	return fmt.Sprintf("%v", v.data)
 }
 
-func (v recordData) BeforeSave(c context.Context, db Database, key *Key) (err error) {
+func (v recordData) BeforeSave(ctx context.Context, db DB, key *Key) (err error) {
 	if v.beforeSave != nil {
-		err = v.beforeSave(c, db, key, v.data)
+		err = v.beforeSave(ctx, db, key, v.data)
 	}
 	return
 }
 
-func (v recordData) AfterLoad(c context.Context, db Database, key *Key) (err error) {
+func (v recordData) AfterLoad(ctx context.Context, db DB, key *Key) (err error) {
 	if v.afterLoad != nil {
-		err = v.afterLoad(c, db, key, v.data)
+		err = v.afterLoad(ctx, db, key, v.data)
 	}
 	return
 }

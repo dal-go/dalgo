@@ -92,12 +92,12 @@ func Test_recordData(t *testing.T) {
 
 func TestWithHooks(t *testing.T) {
 	t.Run("WithBeforeSave", func(t *testing.T) {
-		testHook(t, WithBeforeSave, func(rd *recordData, ctx context.Context, db Database, key *Key) (err error) {
+		testHook(t, WithBeforeSave, func(rd *recordData, ctx context.Context, db DB, key *Key) (err error) {
 			return rd.BeforeSave(ctx, db, key)
 		})
 	})
 	t.Run("WithAfterLoad", func(t *testing.T) {
-		testHook(t, WithAfterLoad, func(rd *recordData, ctx context.Context, db Database, key *Key) (err error) {
+		testHook(t, WithAfterLoad, func(rd *recordData, ctx context.Context, db DB, key *Key) (err error) {
 			return rd.AfterLoad(ctx, db, key)
 		})
 	})
@@ -106,12 +106,12 @@ func TestWithHooks(t *testing.T) {
 func testHook(
 	t *testing.T,
 	hookFactory func(hook RecordDataHook) func(rd *recordData),
-	callHook func(rd *recordData, c context.Context, db Database, key *Key) (err error),
+	callHook func(rd *recordData, ctx context.Context, db DB, key *Key) (err error),
 ) {
 	originalData := "abc"
 
 	var called int
-	var hook = func(c context.Context, db Database, key *Key, data any) (err error) {
+	var hook = func(ctx context.Context, db DB, key *Key, data any) (err error) {
 		called++
 		assert.Equal(t, originalData, data)
 		return nil

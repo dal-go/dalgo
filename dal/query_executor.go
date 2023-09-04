@@ -9,7 +9,7 @@ type QueryExecutor interface {
 
 	// QueryReader returns a reader for the given query to read records 1 by 1 sequentially.
 	// The Reader.Next() method returns ErrNoMoreRecords when there are no more records.
-	QueryReader(c context.Context, query Query) (Reader, error)
+	QueryReader(ctx context.Context, query Query) (Reader, error)
 
 	// QueryAllRecords is a helper method that returns all records for the given query.
 	// It reads reader created by QueryReader until it returns ErrNoMoreRecords.
@@ -28,14 +28,14 @@ type queryExecutor struct {
 	getReader ReaderProvider
 }
 
-func (s queryExecutor) QueryReader(c context.Context, query Query) (Reader, error) {
-	return s.getReader(c, query)
+func (s queryExecutor) QueryReader(ctx context.Context, query Query) (Reader, error) {
+	return s.getReader(ctx, query)
 }
 
 // QueryAllRecords is a helper method that for a given reader returns all records as a slice.
-func (s queryExecutor) QueryAllRecords(c context.Context, query Query) (records []Record, err error) {
+func (s queryExecutor) QueryAllRecords(ctx context.Context, query Query) (records []Record, err error) {
 	var reader Reader
-	if reader, err = s.getReader(c, query); err != nil {
+	if reader, err = s.getReader(ctx, query); err != nil {
 		return
 	}
 	if reader == nil {
@@ -45,7 +45,7 @@ func (s queryExecutor) QueryAllRecords(c context.Context, query Query) (records 
 }
 
 // ReaderProvider is a function that returns a Reader for the given query.
-type ReaderProvider = func(c context.Context, query Query) (reader Reader, err error)
+type ReaderProvider = func(ctx context.Context, query Query) (reader Reader, err error)
 
 // NewQueryExecutor creates a new query executor. This is supposed to be used by dalgo DB drivers.
 func NewQueryExecutor(getReader ReaderProvider) QueryExecutor {

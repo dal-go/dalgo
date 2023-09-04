@@ -66,7 +66,7 @@ func TestCallRecordHooks(t *testing.T) {
 		{
 			name: "one_hook_with_no_error",
 			hooks: []RecordHook{
-				func(c context.Context, record Record) error {
+				func(ctx context.Context, record Record) error {
 					return nil
 				},
 			},
@@ -75,7 +75,7 @@ func TestCallRecordHooks(t *testing.T) {
 		{
 			name: "one_hook_with_error",
 			hooks: []RecordHook{
-				func(c context.Context, record Record) error {
+				func(ctx context.Context, record Record) error {
 					return errors.New("error")
 				},
 			},

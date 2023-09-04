@@ -2,15 +2,16 @@ package dal
 
 // ReadSession defines methods that query data from DB and does not modify it
 type ReadSession interface {
-	Connection
 	Getter
 	MultiGetter
 	QueryExecutor
+	// Excluded:
+	// Connection - as DB interface implements a virtual ReadSession that can't be closed.
 }
 
 // WriteSession defines methods that can modify database
 type WriteSession interface {
-	Connection
+	Connection // TODO
 	Setter
 	MultiSetter
 	Deleter

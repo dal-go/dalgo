@@ -11,7 +11,7 @@ import (
 type Inserter interface {
 
 	// Insert inserts a single record in database
-	Insert(c context.Context, record Record, opts ...InsertOption) error
+	Insert(ctx context.Context, record Record, opts ...InsertOption) error
 }
 
 // IDGenerator defines a contract for ID generator function
@@ -141,7 +141,7 @@ func WithStringID(id string) KeyOption {
 
 // InsertWithRandomID inserts a record with a random ID
 func InsertWithRandomID(
-	c context.Context,
+	ctx context.Context,
 	r Record,
 	generateID IDGenerator,
 	attempts int,
@@ -152,7 +152,7 @@ func InsertWithRandomID(
 	// We need a temp record to make sure we do not overwrite data during exists() check
 	tmp := &record{key: key}
 	for i := 1; i <= attempts; i++ {
-		if err := generateID(c, tmp); err != nil {
+		if err := generateID(ctx, tmp); err != nil {
 			return fmt.Errorf("failed to generate random value: %w", err)
 		}
 		if err := exists(key); err == nil {
