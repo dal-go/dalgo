@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestNewClientInfo(t *testing.T) {
+func TestNewAdapter(t *testing.T) {
 	type args struct {
 		driver  string
 		version string
@@ -25,7 +25,7 @@ func TestNewClientInfo(t *testing.T) {
 	}
 }
 
-func TestClientInfo_Fields(t *testing.T) {
+func TestAdapter_Fields(t *testing.T) {
 	type fields struct {
 		driver  string
 		version string
@@ -57,7 +57,7 @@ func TestClientInfo_Fields(t *testing.T) {
 	}
 }
 
-func TestClientInfo_Equals(t *testing.T) {
+func TestAdapter_Equals(t *testing.T) {
 	type fields struct {
 		driver  string
 		version string

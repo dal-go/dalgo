@@ -10,7 +10,7 @@ type Adapter interface {
 	Version() string
 }
 
-// NewAdapter creates new client info
+// NewAdapter creates new client info. Former ClientInfo.
 func NewAdapter(name, version string) Adapter {
 	return adapter{name: name, version: version}
 }

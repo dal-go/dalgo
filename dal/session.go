@@ -11,7 +11,7 @@ type ReadSession interface {
 
 // WriteSession defines methods that can modify database
 type WriteSession interface {
-	Connection // TODO
+	//Connection // TODO
 	Setter
 	MultiSetter
 	Deleter
