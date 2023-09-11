@@ -3,8 +3,6 @@ package dal
 import (
 	"context"
 	"fmt"
-	"github.com/strongo/random"
-	"reflect"
 )
 
 // Inserter defines a function to insert a single record into database
@@ -91,51 +89,6 @@ func WithIDGenerator(ctx context.Context, g IDGenerator) KeyOption {
 			panic("an attempt to set ID generator for a child that already have an ID value")
 		}
 		return g(ctx, &record{key: key})
-	}
-}
-
-var DefaultRandomStringIDLength = 16
-
-// WithRandomStringID sets ID generator to random string
-func WithRandomStringID(options ...randomStringOption) KeyOption {
-	var rso randomStringOptions
-	for _, setOption := range options {
-		setOption(&rso)
-	}
-	return func(key *Key) error {
-		key.IDKind = reflect.String
-		var ctx context.Context = nil // intentionally nil as not required by any option
-		return WithIDGenerator(ctx, func(_ context.Context, record Record) error {
-			length := rso.Length()
-			prefix := rso.Prefix()
-			key.ID = prefix + random.ID(length)
-			return nil
-		})(key)
-	}
-}
-
-//// WithParent sets Parent
-//func WithParent[T comparable](collection string, id T, options ...KeyOption) KeyOption {
-//	return func(key *Key) (err error) {
-//		options = append(options, WithID(id))
-//		key.parent, err = NewKeyWithOptions(collection, options...)
-//		return err
-//	}
-//}
-
-//// WithParentKey sets Parent key
-//func WithParentKey(parent *Key) KeyOption {
-//	return func(key *Key) error {
-//		key.parent = parent
-//		return nil
-//	}
-//}
-
-// WithStringID sets ID as a predefined string
-func WithStringID(id string) KeyOption {
-	return func(key *Key) error {
-		key.ID = id
-		return nil
 	}
 }
 

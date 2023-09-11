@@ -141,18 +141,6 @@ func (k *Key) Validate() error {
 	return nil
 }
 
-// KeyOption defines contract for key option
-type KeyOption = func(*Key) error
-
-func setKeyOptions(key *Key, options ...KeyOption) error {
-	for _, o := range options {
-		if err := o(key); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func NewKeyWithParentAndID[T comparable](parent *Key, collection string, id T) (key *Key) {
 	key = NewKeyWithID(collection, id)
 	key.parent = parent
@@ -167,18 +155,6 @@ func NewKeyWithID[T comparable](collection string, id T) (key *Key) {
 	}
 	key = &Key{collection: collection, ID: id}
 	return key
-}
-
-// NewKeyWithOptions creates a new key with an ID
-func NewKeyWithOptions(collection string, options ...KeyOption) (key *Key, err error) {
-	if collection == "" {
-		return nil, errors.New("collection is a required parameter")
-	}
-	key = &Key{collection: collection}
-	if err = setKeyOptions(key, options...); err != nil {
-		return nil, err
-	}
-	return key, err
 }
 
 func NewIncompleteKey(collection string, idKind reflect.Kind, parent *Key) *Key {
