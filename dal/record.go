@@ -84,7 +84,7 @@ func (v *record) Data() any {
 	if v.err == nil {
 		panic("an attempt to access record data before it was retrieved from database and SetError(error) called")
 	}
-	if errors.Is(v.err, NoError) {
+	if errors.Is(v.err, NoError) || IsNotFound(v.err) {
 		return v.data
 	}
 	panic(fmt.Errorf("an attempt to retrieve data from a record with an error: %w", v.err))

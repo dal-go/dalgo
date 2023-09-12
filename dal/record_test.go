@@ -277,6 +277,8 @@ func TestRecord_HasChanged(t *testing.T) {
 }
 
 func TestRecord_Data(t *testing.T) {
+	recordWithErr := &record{key: NewKeyWithID("Kind1", "k1")}
+	recordWithErr.SetError(errors.New("some_error"))
 	for _, tt := range []struct {
 		name        string
 		data        any
@@ -284,7 +286,8 @@ func TestRecord_Data(t *testing.T) {
 		shouldPanic bool
 	}{
 		{name: "panics_if_err_is_not_set", shouldPanic: true, r: &record{key: NewKeyWithID("Kind1", "k1")}},
-		{name: "panics_if_is_not_found", shouldPanic: true, r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(ErrRecordNotFound)},
+		{name: "panics_if_some_error", shouldPanic: true, r: recordWithErr},
+		{name: "pass_if_is_not_found_error", shouldPanic: false, r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(ErrRecordNotFound)},
 		{name: "nil", r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(NoError)},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
