@@ -18,9 +18,10 @@ func TestNewDataWithID(t *testing.T) {
 	}
 
 	type testCase[K comparable] struct {
-		name string
-		args args[K]
-		want DataWithID[K, *data]
+		name         string
+		args         args[K]
+		want         DataWithID[K, *data]
+		expectsPanic string
 	}
 	d1 := data{Title: "test"}
 	tests := []testCase[string]{
@@ -40,15 +41,30 @@ func TestNewDataWithID(t *testing.T) {
 				Data: &d1,
 			},
 		},
+		{
+			name: "should_panic_on_nil_key",
+			args: args[string]{
+				id:   "r1",
+				key:  nil,
+				data: &data{Title: "test"},
+			},
+			expectsPanic: "key is nil for (id=r1)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewDataWithID(tt.args.id, tt.args.key, tt.args.data)
-			assert.Equal(t, tt.want.ID, got.ID)
-			assert.Equal(t, tt.want.Key, got.Key)
-			assert.Equal(t, tt.want.Data, got.Data)
-			got.Record.SetError(nil)
-			assert.Equal(t, tt.want.Data, got.Record.Data())
+			if tt.expectsPanic != "" {
+				assert.PanicsWithValue(t, tt.expectsPanic, func() {
+					NewDataWithID(tt.args.id, tt.args.key, tt.args.data)
+				})
+			} else {
+				got := NewDataWithID(tt.args.id, tt.args.key, tt.args.data)
+				assert.Equal(t, tt.want.ID, got.ID)
+				assert.Equal(t, tt.want.Key, got.Key)
+				assert.Equal(t, tt.want.Data, got.Data)
+				got.Record.SetError(nil)
+				assert.Equal(t, tt.want.Data, got.Record.Data())
+			}
 		})
 	}
 	t.Run("should_panic_on_pointer_to_a_pointer", func(t *testing.T) {

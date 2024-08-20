@@ -12,6 +12,12 @@ type DataWithID[K comparable, D any] struct {
 }
 
 func NewDataWithID[K comparable, D any](id K, key *dal.Key, data D) DataWithID[K, D] {
+	if key == nil {
+		panic(fmt.Sprintf("key is nil for (id=%v)", id))
+	}
+	//if data == nil {
+	//	panic(fmt.Sprintf("data is nil for (id=%v, key=%v)", id, key))
+	//}
 	v := reflect.ValueOf(data)
 	kind := v.Kind()
 	switch kind {
@@ -29,7 +35,10 @@ func NewDataWithID[K comparable, D any](id K, key *dal.Key, data D) DataWithID[K
 		}
 	default:
 		t := reflect.TypeOf(data)
-		panic(fmt.Sprintf("data should be a pointer or an interface, got %v (id=%v, key=%v)", t.String(), id, key))
+		if t == nil {
+			panic(fmt.Sprintf("data is nil for (id=%v, key=%v)", id, key))
+		}
+		panic(fmt.Sprintf("data should be a pointer or an interface, got %v for (id=%v, key=%v)", t.String(), id, key))
 	}
 	return DataWithID[K, D]{
 		WithID: NewWithID(id, key, data),
