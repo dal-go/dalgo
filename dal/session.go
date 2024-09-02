@@ -19,6 +19,7 @@ type WriteSession interface {
 	Updater
 	MultiUpdater
 	Inserter
+	MultiInserter
 }
 
 // ReadwriteSession defines methods that can read & modify database. Some databases allow to modify data without transaction.

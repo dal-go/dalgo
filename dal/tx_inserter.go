@@ -5,11 +5,17 @@ import (
 	"fmt"
 )
 
-// Inserter defines a function to insert a single record into database
+// Inserter defines a function to insert a single record into a database
 type Inserter interface {
 
-	// Insert inserts a single record in database
+	// Insert inserts a single record into a database
 	Insert(ctx context.Context, record Record, opts ...InsertOption) error
+}
+
+// MultiInserter defines a function to insert multiple records into a database
+type MultiInserter interface {
+	// InsertMulti inserts multiple record into a database at once if possible, or fallback to batch of single inserts
+	InsertMulti(ctx context.Context, records []Record, opts ...InsertOption) error
 }
 
 // IDGenerator defines a contract for ID generator function
