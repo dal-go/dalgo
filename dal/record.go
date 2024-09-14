@@ -55,14 +55,14 @@ type record struct {
 // Exists returns if records exists.
 func (v *record) Exists() bool {
 	if v.err != nil {
+		if errors.Is(v.err, NoError) {
+			return true
+		}
 		if IsNotFound(v.err) {
 			return false
 		}
-		if v.err == NoError {
-			return true
-		}
 	}
-	panic("an attempt to check if record exists before it was retrieved from database and SetError(error) called")
+	panic("an attempt to check if record exists before it was retrieved from database and SetError(error) called: record.Key=" + v.Key().String())
 }
 
 // Key returns key of a record
