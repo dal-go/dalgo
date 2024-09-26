@@ -239,7 +239,7 @@ func TestRecord_Exists(t *testing.T) {
 		expected    bool
 	}{
 		{name: "panics_if_exists_not_set", r: &record{key: NewKeyWithID("Kind1", "k1")}, shouldPanic: true},
-		{name: "exists", r: (&record{key: NewKeyWithID("Kind1", "k1")}).SetError(nil), expected: true},
+		{name: "exists_if_err_set_to_nil", r: (&record{key: NewKeyWithID("Kind1", "k1")}).SetError(nil), expected: true},
 		{name: "does_not_exist", r: (&record{key: NewKeyWithID("Kind1", "k1")}).SetError(ErrRecordNotFound), expected: false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
