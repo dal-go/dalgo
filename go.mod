@@ -3,7 +3,7 @@ module github.com/dal-go/dalgo
 go 1.22
 
 require (
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/strongo/random v0.0.1
 )
 
