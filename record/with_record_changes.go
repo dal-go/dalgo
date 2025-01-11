@@ -26,11 +26,17 @@ func (v *WithRecordChanges) QueueForInsert(records ...dal.Record) {
 		if record == nil {
 			panic(fmt.Sprintf("record #%d is required", i))
 		}
-		if record.Key() == nil {
+		key := record.Key()
+		if key == nil {
 			panic(fmt.Sprintf("record #%d.Key() is required", i))
 		}
 		if record.Data() == nil {
 			panic(fmt.Sprintf("record #%d.Data() is required", i))
+		}
+		for _, queuedRecord := range v.recordsToInsert {
+			if queuedRecord.Key().Equal(key) {
+				panic(fmt.Sprintf("record with key=%s is already queued for insert", key))
+			}
 		}
 		v.recordsToInsert = append(v.recordsToInsert, record)
 	}
