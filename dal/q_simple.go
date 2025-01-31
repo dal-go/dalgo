@@ -72,6 +72,11 @@ func (s queryBuilder) WhereField(name string, operator Operator, v any) QueryBui
 	return s
 }
 
+func (s queryBuilder) WhereInArrayField(name string, v any) QueryBuilder {
+	s.conditions = append(s.conditions, Comparison{Left: Constant{Value: v}, Operator: In, Right: FieldRef{name: name}})
+	return s
+}
+
 func (s queryBuilder) SelectInto(into func() Record) Query {
 	q := s.newQuery()
 	q.into = into
