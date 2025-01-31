@@ -31,11 +31,11 @@ func (v UserCollection) Fields() []Field {
 }
 
 func (v UserCollection) CollectionRef() dal.CollectionRef {
-	return dal.CollectionRef{Name: "Users"}
+	return dal.NewRootCollectionRef("Users", "")
 }
 
 func (v UserCollection) Query() dal.QueryBuilder {
-	return dal.From(Users.CollectionRef().Name)
+	return dal.From(Users.CollectionRef())
 }
 
 func (v UserCollection) IDKind() reflect.Kind {

@@ -21,12 +21,20 @@ type QueryBuilder interface {
 
 var _ QueryBuilder = (*queryBuilder)(nil)
 
-func From(collection string, conditions ...Condition) QueryBuilder {
-	return &queryBuilder{collection: collection, conditions: conditions}
+// NewQueryBuilder creates a new QueryBuilder - it's an entry point to build a query.
+// We can use From() directly but this is easier to remember.
+func NewQueryBuilder(collection CollectionRef) QueryBuilder {
+	return &queryBuilder{collection: collection}
+}
+
+// From creates a new QueryBuilder with optional conditions.
+// We can use NewQueryBuilder() directly but this is shorter.
+func From(collection CollectionRef) QueryBuilder {
+	return NewQueryBuilder(collection)
 }
 
 type queryBuilder struct {
-	collection  string
+	collection  CollectionRef
 	offset      int
 	limit       int
 	conditions  []Condition
@@ -78,7 +86,7 @@ func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) Query {
 
 func (s queryBuilder) newQuery() theQuery {
 	q := theQuery{
-		from:        &CollectionRef{Name: s.collection},
+		from:        &s.collection,
 		limit:       s.limit,
 		orderBy:     s.orderBy,
 		offset:      s.offset,

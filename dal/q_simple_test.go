@@ -10,7 +10,7 @@ func TestSimpleQuery(t *testing.T) {
 	newRecord := func() Record {
 		return nil
 	}
-	var qb = From("test").
+	var qb = From(NewRootCollectionRef("test", "t")).
 		Where().
 		Limit(10).
 		Offset(20).
@@ -27,7 +27,7 @@ func TestSimpleQuery(t *testing.T) {
 		assert.NotNil(t, q.StartFrom())
 	}
 	t.Run("no_conditions", func(t *testing.T) {
-		qbNoConditions := From("test")
+		qbNoConditions := From(NewRootCollectionRef("test", ""))
 		q := qbNoConditions.SelectKeysOnly(reflect.String)
 		assert.Equal(t, reflect.String, q.IDKind())
 		assert.Equal(t, "test", q.From().Name)

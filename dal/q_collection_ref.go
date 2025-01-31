@@ -4,48 +4,48 @@ import "fmt"
 
 // CollectionRef points to a collection (e.g. table) in a database
 type CollectionRef struct {
-	Name   string
-	Alias  string
-	Parent *Key
+	name   string
+	alias  string
+	parent *Key
 }
 
-//func (v CollectionRef) Name() string {
-//	return v.Name
-//}
-//
-//func (v CollectionRef) Alias() string {
-//	return v.Alias
-//}
-//
-//func (v CollectionRef) Parent() *Key {
-//	return v.Parent
-//}
+func (v CollectionRef) Name() string {
+	return v.name
+}
+
+func (v CollectionRef) Alias() string {
+	return v.alias
+}
+
+func (v CollectionRef) Parent() *Key {
+	return v.parent
+}
 
 func (v CollectionRef) String() string {
-	if v.Name != "" {
-		if v.Parent == nil {
-			if v.Alias == "" {
-				return v.Name
+	if v.name != "" {
+		if v.parent == nil {
+			if v.alias == "" {
+				return v.name
 			} else {
-				return fmt.Sprintf("%s AS %s", v.Name, v.Alias)
+				return fmt.Sprintf("%s AS %s", v.name, v.alias)
 			}
 		}
 	}
 	path := v.Path()
-	if v.Alias == "" {
+	if v.alias == "" {
 		return path
 	}
-	return fmt.Sprintf("%s AS %s", path, v.Alias)
+	return fmt.Sprintf("%s AS %s", path, v.alias)
 }
 
 func (v CollectionRef) Path() string {
-	if v.Parent == nil {
-		return v.Name
+	if v.parent == nil {
+		return v.name
 	}
-	return v.Parent.String() + "/" + v.Name
+	return v.parent.String() + "/" + v.name
 }
 
-func NewCollectionRef(name string, alias string, parent *Key) CollectionRef {
+func newCollectionRef(name, alias string) CollectionRef {
 	if name == "" {
 		panic("Name is required parameter for NewCollectionRef()")
 	}
@@ -53,8 +53,17 @@ func NewCollectionRef(name string, alias string, parent *Key) CollectionRef {
 		alias = ""
 	}
 	return CollectionRef{
-		Name:   name,
-		Alias:  alias,
-		Parent: parent,
+		name:  name,
+		alias: alias,
 	}
+}
+
+func NewCollectionRef(name, alias string, parent *Key) (collectionRef CollectionRef) {
+	collectionRef = newCollectionRef(name, alias)
+	collectionRef.parent = parent
+	return
+}
+
+func NewRootCollectionRef(name, alias string) CollectionRef {
+	return newCollectionRef(name, alias)
 }
