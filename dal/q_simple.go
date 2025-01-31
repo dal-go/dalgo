@@ -13,6 +13,7 @@ type QueryBuilder interface {
 	Limit(int) QueryBuilder
 	Where(conditions ...Condition) QueryBuilder
 	WhereField(name string, operator Operator, v any) QueryBuilder
+	WhereInArrayField(name string, v any) QueryBuilder
 	OrderBy(expressions ...OrderExpression) QueryBuilder
 	SelectInto(func() Record) Query
 	SelectKeysOnly(idKind reflect.Kind) Query
