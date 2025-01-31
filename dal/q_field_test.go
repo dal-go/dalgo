@@ -108,7 +108,7 @@ func TestField(t *testing.T) {
 		args args
 		want FieldRef
 	}{
-		{name: "Field", args: args{name: "date"}, want: FieldRef{Name: "date"}},
+		{name: "Field", args: args{name: "date"}, want: FieldRef{name: "date"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

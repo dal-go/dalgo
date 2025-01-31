@@ -33,14 +33,14 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_*_from_User",
 			q: theQuery{
-				from: &CollectionRef{Name: "User"},
+				from: &CollectionRef{name: "User"},
 			},
 			want: "SELECT * FROM [User]",
 		},
 		{
 			name: "select_top_10_*_from_User",
 			q: theQuery{
-				from:  &CollectionRef{Name: "User"},
+				from:  &CollectionRef{name: "User"},
 				limit: 10,
 			},
 			want: "SELECT TOP 10 * FROM [User]",
@@ -48,7 +48,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_top_10_*_from_User_offset_20",
 			q: theQuery{
-				from:   &CollectionRef{Name: "User"},
+				from:   &CollectionRef{name: "User"},
 				limit:  10,
 				offset: 20,
 			},
@@ -57,7 +57,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_*_from_Users_where_SomeID_=_123",
 			q: theQuery{
-				from:  &CollectionRef{Name: "Users"},
+				from:  &CollectionRef{name: "Users"},
 				where: ID("SomeID", 123),
 			},
 			want: "SELECT * FROM [Users] WHERE SomeID = 123",
@@ -65,20 +65,20 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_*_from_User_where_Email_=_'test@example.com'",
 			q: theQuery{
-				from: &CollectionRef{Name: "User"},
+				from: &CollectionRef{name: "User"},
 				columns: []Column{
 					{Expression: Field("id")},
 					{Expression: Field("name")},
 					{Expression: Field("email")},
 				},
-				where: NewComparison(FieldRef{Name: "Email"}, Equal, String("test@example.com")),
+				where: NewComparison(FieldRef{name: "Email"}, Equal, String("test@example.com")),
 			},
 			want: "SELECT\n\tid,\n\tname,\n\temail\nFROM [User]\nWHERE Email = 'test@example.com'",
 		},
 		{
 			name: "select top 7 * from User",
 			q: theQuery{
-				from:  &CollectionRef{Name: "User"},
+				from:  &CollectionRef{name: "User"},
 				limit: 7,
 			},
 			want: "SELECT TOP 7 * FROM [User]",
@@ -86,7 +86,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select top 7 * from User order by Email, Created DESC",
 			q: theQuery{
-				from:  &CollectionRef{Name: "User"},
+				from:  &CollectionRef{name: "User"},
 				limit: 7,
 				orderBy: []OrderExpression{
 					Ascending(Field("Email")),
@@ -98,7 +98,7 @@ func TestSelect(t *testing.T) {
 		{ // TODO: Demo test generation
 			name: "select top 7 * from User order by Email, Created DESC group by Email, Created",
 			q: theQuery{
-				from:  &CollectionRef{Name: "User"},
+				from:  &CollectionRef{name: "User"},
 				limit: 7,
 				orderBy: []OrderExpression{
 					Ascending(Field("Email")),
@@ -154,11 +154,11 @@ func TestSelect(t *testing.T) {
 				}
 			})
 			t.Run("And", func(t *testing.T) {
-				q := tt.q.And(NewComparison(FieldRef{Name: "Email"}, Equal, String("test@example.com")))
+				q := tt.q.And(NewComparison(FieldRef{name: "Email"}, Equal, String("test@example.com")))
 				assert.NotEqual(t, tt.q, q)
 			})
 			t.Run("Or", func(t *testing.T) {
-				q := tt.q.Or(NewComparison(FieldRef{Name: "Email"}, Equal, String("test@example.com")))
+				q := tt.q.Or(NewComparison(FieldRef{name: "Email"}, Equal, String("test@example.com")))
 				assert.NotEqual(t, tt.q, q)
 			})
 		})

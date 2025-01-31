@@ -30,7 +30,7 @@ func (v FieldDefinition[T]) Type() string {
 }
 
 func (v FieldDefinition[T]) CompareTo(operator dal.Operator, expression dal.Expression) dal.Condition {
-	return dal.NewComparison(dal.FieldRef{Name: v.name}, operator, expression)
+	return dal.NewComparison(dal.Field(v.name), operator, expression)
 }
 
 func (v FieldDefinition[T]) EqualTo(value T) dal.Condition {

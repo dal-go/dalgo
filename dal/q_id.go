@@ -8,7 +8,7 @@ import (
 func ID(name string, value any) Expression {
 	return Comparison{
 		Operator: Equal,
-		Left:     FieldRef{Name: name, IsID: true},
+		Left:     FieldRef{name: name, isID: true},
 		Right:    constant.Value(value),
 	}
 }

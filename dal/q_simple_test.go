@@ -15,11 +15,11 @@ func TestSimpleQuery(t *testing.T) {
 		Limit(10).
 		Offset(20).
 		StartFrom(Cursor("cursor_1")).
-		OrderBy(orderExpression{expression: FieldRef{Name: "field_1"}})
+		OrderBy(orderExpression{expression: FieldRef{name: "field_1"}})
 
 	assertQuery := func(t *testing.T, q Query) {
 		assert.NotNil(t, q)
-		assert.Equal(t, "test", q.From().Name)
+		assert.Equal(t, "test", q.From().Name())
 		assert.NotNil(t, q.Where())
 		assert.NotNil(t, q.OrderBy())
 		assert.NotNil(t, q.Limit())
@@ -30,7 +30,7 @@ func TestSimpleQuery(t *testing.T) {
 		qbNoConditions := From(NewRootCollectionRef("test", ""))
 		q := qbNoConditions.SelectKeysOnly(reflect.String)
 		assert.Equal(t, reflect.String, q.IDKind())
-		assert.Equal(t, "test", q.From().Name)
+		assert.Equal(t, "test", q.From().Name())
 	})
 
 	t.Run("with_single_condition", func(t *testing.T) {

@@ -7,20 +7,28 @@ import (
 )
 
 type FieldRef struct {
-	Name string
-	IsID bool
+	name string
+	isID bool
+}
+
+func (f FieldRef) IsID() bool {
+	return f.isID
+}
+
+func (f FieldRef) Name() string {
+	return f.name
 }
 
 func (f FieldRef) Equal(b FieldRef) bool {
-	return f.Name == b.Name && f.IsID == b.IsID
+	return f.isID == b.isID && f.name == b.name
 }
 
 // String returns string representation of a field
 func (f FieldRef) String() string {
-	if RequiresEscaping(f.Name) {
-		return fmt.Sprintf("[%v]", f.Name)
+	if RequiresEscaping(f.name) {
+		return fmt.Sprintf("[%v]", f.name)
 	}
-	return f.Name
+	return f.name
 }
 
 // Empty string requires escaping!
@@ -32,7 +40,7 @@ func RequiresEscaping(s string) bool {
 
 // EqualTo creates equality condition for a field
 func (f FieldRef) EqualTo(v any) Condition {
-	return WhereField(f.Name, Equal, v)
+	return WhereField(f.name, Equal, v)
 }
 
 func WhereField(name string, operator Operator, v any) Condition {

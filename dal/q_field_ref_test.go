@@ -18,20 +18,20 @@ func TestFieldRef_Equal(t *testing.T) {
 		},
 		{
 			name: "same_name",
-			a:    FieldRef{Name: "n1"},
-			b:    FieldRef{Name: "n1"},
+			a:    FieldRef{name: "n1"},
+			b:    FieldRef{name: "n1"},
 			want: true,
 		},
 		{
 			name: "different_names",
-			a:    FieldRef{Name: "n1"},
-			b:    FieldRef{Name: "n2"},
+			a:    FieldRef{name: "n1"},
+			b:    FieldRef{name: "n2"},
 			want: false,
 		},
 		{
 			name: "different_isID",
-			a:    FieldRef{IsID: true},
-			b:    FieldRef{IsID: false},
+			a:    FieldRef{isID: true},
+			b:    FieldRef{isID: false},
 			want: false,
 		},
 	}
@@ -52,7 +52,7 @@ func TestFieldRef_EqualTo(t *testing.T) {
 	}{
 		{
 			name:     "empty_nil",
-			fieldRef: FieldRef{Name: "f1"},
+			fieldRef: FieldRef{name: "f1"},
 			input:    nil,
 			want:     Comparison{Left: Field("f1"), Operator: Equal, Right: Constant{Value: nilValue}},
 		},
@@ -79,12 +79,12 @@ func TestFieldRef_String(t *testing.T) {
 		},
 		{
 			name:     "no_escaping",
-			fieldRef: FieldRef{Name: "f1"},
+			fieldRef: FieldRef{name: "f1"},
 			want:     "f1",
 		},
 		{
 			name:     "with_escaping",
-			fieldRef: FieldRef{Name: "f 1"},
+			fieldRef: FieldRef{name: "f 1"},
 			want:     "[f 1]",
 		},
 	}
@@ -189,9 +189,9 @@ func TestWhereField(t *testing.T) {
 			args: args{
 				name:     "f1",
 				operator: Equal,
-				v:        FieldRef{Name: "f2"},
+				v:        FieldRef{name: "f2"},
 			},
-			want: Comparison{Left: Field("f1"), Operator: Equal, Right: FieldRef{Name: "f2"}},
+			want: Comparison{Left: Field("f1"), Operator: Equal, Right: FieldRef{name: "f2"}},
 		},
 		{
 			name: "key",

@@ -26,7 +26,7 @@ func Test_field_EqualTo(t *testing.T) {
 			args:   args{v: value},
 			want: Comparison{
 				Operator: Equal,
-				Left:     FieldRef{Name: fieldName},
+				Left:     FieldRef{name: fieldName},
 				Right:    Constant{Value: value},
 			},
 		}
@@ -40,7 +40,7 @@ func Test_field_EqualTo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := FieldRef{
-				Name: tt.fields.Name,
+				name: tt.fields.Name,
 			}
 			if got := f.EqualTo(tt.args.v); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("EqualTo(%v) = %T:%v, want %T:%v", tt.args.v, got, got, tt.want, tt.want)

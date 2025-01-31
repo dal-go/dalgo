@@ -4,7 +4,7 @@ import "fmt"
 
 // Field creates an expression that represents a FieldRef value
 func Field(name string) FieldRef {
-	return FieldRef{Name: name}
+	return FieldRef{name: name}
 }
 
 type OrderExpression interface {

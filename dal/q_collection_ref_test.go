@@ -25,11 +25,11 @@ func TestNewCollectionRef(t *testing.T) {
 		args args
 		want CollectionRef
 	}{
-		{name: "only_name", args: args{name: "some_target", alias: "", parent: nil}, want: CollectionRef{Name: "some_target", Alias: "", Parent: nil}},
-		{name: "name_and_alias", args: args{name: "some_target", alias: "st", parent: nil}, want: CollectionRef{Name: "some_target", Alias: "st", Parent: nil}},
-		{name: "same_name_and_alias", args: args{name: "some_target", alias: "some_target", parent: nil}, want: CollectionRef{Name: "some_target", Alias: "", Parent: nil}},
-		{name: "name_with_parent", args: args{name: "some_target", alias: "", parent: someParentKey}, want: CollectionRef{Name: "some_target", Alias: "", Parent: someParentKey}},
-		{name: "name_and_alias_with_parent", args: args{name: "some_target", alias: "st", parent: someParentKey}, want: CollectionRef{Name: "some_target", Alias: "st", Parent: someParentKey}},
+		{name: "only_name", args: args{name: "some_target", alias: "", parent: nil}, want: CollectionRef{name: "some_target", alias: "", parent: nil}},
+		{name: "name_and_alias", args: args{name: "some_target", alias: "st", parent: nil}, want: CollectionRef{name: "some_target", alias: "st", parent: nil}},
+		{name: "same_name_and_alias", args: args{name: "some_target", alias: "some_target", parent: nil}, want: CollectionRef{name: "some_target", alias: "", parent: nil}},
+		{name: "name_with_parent", args: args{name: "some_target", alias: "", parent: someParentKey}, want: CollectionRef{name: "some_target", alias: "", parent: someParentKey}},
+		{name: "name_and_alias_with_parent", args: args{name: "some_target", alias: "st", parent: someParentKey}, want: CollectionRef{name: "some_target", alias: "st", parent: someParentKey}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,7 +59,7 @@ func TestCollectionRef(t *testing.T) {
 		{
 			name: "name_only",
 			collectionRef: CollectionRef{
-				Name: "collection1",
+				name: "collection1",
 			},
 			expected: expected{
 				string: "collection1",
@@ -69,8 +69,8 @@ func TestCollectionRef(t *testing.T) {
 		{
 			name: "no_parent_with_alias",
 			collectionRef: CollectionRef{
-				Name:  "collection1",
-				Alias: "c1",
+				name:  "collection1",
+				alias: "c1",
 			},
 			expected: expected{
 				string: "collection1 AS c1",
@@ -80,8 +80,8 @@ func TestCollectionRef(t *testing.T) {
 		{
 			name: "single_parent",
 			collectionRef: CollectionRef{
-				Name:   "collection1",
-				Parent: &Key{collection: "collection2", ID: "id2"},
+				name:   "collection1",
+				parent: &Key{collection: "collection2", ID: "id2"},
 			},
 			expected: expected{
 				string: "collection2/id2/collection1",
@@ -91,9 +91,9 @@ func TestCollectionRef(t *testing.T) {
 		{
 			name: "single_parent_with_alias",
 			collectionRef: CollectionRef{
-				Name:   "collection1",
-				Alias:  "c1",
-				Parent: &Key{collection: "collection2", ID: "id2"},
+				name:   "collection1",
+				alias:  "c1",
+				parent: &Key{collection: "collection2", ID: "id2"},
 			},
 			expected: expected{
 				string: "collection2/id2/collection1 AS c1",
