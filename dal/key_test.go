@@ -54,13 +54,13 @@ func TestField_Validate(t *testing.T) {
 //		Parent *fields
 //	}
 //	tests := []struct {
-//		Name   string
+//		Field   string
 //		fields fields
 //		args   args
 //		want   want
 //	}{
 //		{
-//			Name: "single_parent",
+//			Field: "single_parent",
 //			fields: fields{
 //				collection: "Parent1",
 //				ID:   "p1",
@@ -78,7 +78,7 @@ func TestField_Validate(t *testing.T) {
 //			},
 //		},
 //		{
-//			Name: "two_parents",
+//			Field: "two_parents",
 //			fields: fields{
 //				collection: "Parent1",
 //				ID:   "p1",
@@ -97,7 +97,7 @@ func TestField_Validate(t *testing.T) {
 //		},
 //	}
 //	for _, tt := range tests {
-//		t.Run(tt.Name, func(t *testing.T) {
+//		t.Run(tt.Field, func(t *testing.T) {
 //			v := &Key{
 //				collection: tt.fields.collection,
 //				ID:   tt.fields.ID,

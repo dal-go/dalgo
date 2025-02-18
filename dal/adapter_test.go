@@ -45,7 +45,7 @@ func TestAdapter_Fields(t *testing.T) {
 				version: tt.fields.version,
 			}
 			if got := v.Name(); got != tt.want.driver {
-				t.Errorf("Name() = %v, want %v", got, tt.want)
+				t.Errorf("Field() = %v, want %v", got, tt.want)
 			}
 			if got := v.Version(); got != tt.want.version {
 				t.Errorf("Version() = %v, want %v", got, tt.want)

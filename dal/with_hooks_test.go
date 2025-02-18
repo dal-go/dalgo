@@ -134,7 +134,7 @@ package dal
 //			name: "beforeUpdate",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					BeforeUpdate(func(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error {
+//					BeforeUpdate(func(ctx context.Context, key *Key, updates []update, preconditions ...Precondition) error {
 //						return nil
 //					}),
 //				},

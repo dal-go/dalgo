@@ -47,7 +47,7 @@ func (v CollectionRef) Path() string {
 
 func newCollectionRef(name, alias string) CollectionRef {
 	if name == "" {
-		panic("Name is required parameter for NewCollectionRef()")
+		panic("Field is required parameter for NewCollectionRef()")
 	}
 	if alias == name {
 		alias = ""

@@ -8,7 +8,7 @@ package dal
 //type GetFunc = func(ctx context.Context, record Record) (err error)
 //type SetFunc = func(ctx context.Context, record Record) (err error)
 //type DelFunc = func(ctx context.Context, key Key) (err error)
-//type UpdateFunc = func(ctx context.Context, key *Key, updates []Update, preconditions ...Precondition) error
+//type UpdateFunc = func(ctx context.Context, key *Key, updates []update, preconditions ...Precondition) error
 
 //type HookContext struct {
 //	context.Context
@@ -25,7 +25,7 @@ package dal
 //type AfterRecordOperationHook = func(ctx HookContext, record Record, err error) error
 //type AfterRecordsOperationHook = func(ctx HookContext, records []Record, err error) error
 //
-//type BeforeUpdateHook = func(ctx HookContext, key *Key, updates []Update, preconditions ...Precondition) error
+//type BeforeUpdateHook = func(ctx HookContext, key *Key, updates []update, preconditions ...Precondition) error
 //
 //type Hooks struct {
 //	beforeGet BeforeRecordOperationHook

@@ -46,7 +46,7 @@ func IsNotFound(err error) bool {
 	return false
 }
 
-// ErrNotFoundByKey indicates error was not found by Value
+// ErrNotFoundByKey indicates error was not found by value
 type ErrNotFoundByKey interface {
 	Key() *Key
 	Cause() error
@@ -82,7 +82,7 @@ func (e errNotFoundByKey) Error() string {
 	return fmt.Sprintf("%v: not found by key=%v", e.Cause(), e.key)
 }
 
-// NewErrNotFoundByKey creates an error that indicates that entity was not found by Value
+// NewErrNotFoundByKey creates an error that indicates that entity was not found by value
 func NewErrNotFoundByKey(key *Key, cause error) error {
 	return errNotFoundByKey{key: key, cause: errNotFoundCause(cause)}
 }
