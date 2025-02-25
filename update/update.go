@@ -40,6 +40,14 @@ func ByFieldPath(fieldPath FieldPath, value any) Update {
 	return update{fieldPath: fieldPath, value: value}
 }
 
+func DeleteByFieldName(fieldName string) Update {
+	return update{fieldName: fieldName, value: DeleteField}
+}
+
+func DeleteByFieldPath(path ...string) Update {
+	return update{fieldPath: path, value: DeleteField}
+}
+
 // update defines an update of a single fieldName
 type update struct {
 	fieldName string
