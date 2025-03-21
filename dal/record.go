@@ -61,6 +61,7 @@ func (v *record) Exists() bool {
 		if IsNotFound(v.err) {
 			return false
 		}
+		panic(fmt.Errorf("an attempt to check if record exists for a record that has error: record.Key=%s; err: %s", v.Key(), v.err))
 	}
 	panic("an attempt to check if record exists before it was retrieved from database and SetError(error) called: record.Key=" + v.Key().String())
 }
