@@ -84,9 +84,9 @@ func (q theQuery) Limit() int {
 
 func (q theQuery) String() string {
 	writer := bytes.NewBuffer(make([]byte, 0, 1024))
-	writer.WriteString("SELECT")
+	_, _ = writer.WriteString("SELECT")
 	if q.limit > 0 {
-		writer.WriteString(" TOP " + strconv.Itoa(q.limit))
+		_, _ = writer.WriteString(" TOP " + strconv.Itoa(q.limit))
 	}
 
 	is1liner := len(q.columns) <= 1 &&
@@ -94,54 +94,54 @@ func (q theQuery) String() string {
 
 	switch len(q.columns) {
 	case 0:
-		writer.WriteString(" *")
+		_, _ = writer.WriteString(" *")
 	case 1:
 		_, _ = fmt.Fprint(writer, " ", q.columns[0].String())
 	default:
 		for i, col := range q.columns {
 			_, _ = fmt.Fprint(writer, "\n\t", col.String())
 			if i < len(q.columns)-1 {
-				writer.WriteString(",")
+				_, _ = writer.WriteString(",")
 			}
 		}
 	}
 
 	if q.from != nil {
 		if is1liner {
-			writer.WriteString(" ")
+			_, _ = writer.WriteString(" ")
 		} else {
-			writer.WriteString("\n")
+			_, _ = writer.WriteString("\n")
 		}
-		writer.WriteString(fmt.Sprintf("FROM [%v]", q.from.Path()))
+		_, _ = fmt.Fprintf(writer, "FROM [%v]", q.from.Path())
 	}
 	if q.where != nil {
 		if is1liner {
-			writer.WriteString(" ")
+			_, _ = writer.WriteString(" ")
 		} else {
-			writer.WriteString("\n")
+			_, _ = writer.WriteString("\n")
 		}
-		writer.WriteString("WHERE " + q.where.String())
+		_, _ = writer.WriteString("WHERE " + q.where.String())
 	}
 	if len(q.groupBy) > 0 {
-		writer.WriteString("\nGROUP BY ")
+		_, _ = writer.WriteString("\nGROUP BY ")
 		for i, expr := range q.groupBy {
 			if i > 0 {
-				writer.WriteString(", ")
+				_, _ = writer.WriteString(", ")
 			}
-			writer.WriteString(expr.String())
+			_, _ = writer.WriteString(expr.String())
 		}
 	}
 	if len(q.orderBy) > 0 {
-		writer.WriteString("\nORDER BY ")
+		_, _ = writer.WriteString("\nORDER BY ")
 		for i, expr := range q.orderBy {
 			if i > 0 {
-				writer.WriteString(", ")
+				_, _ = writer.WriteString(", ")
 			}
-			writer.WriteString(expr.String())
+			_, _ = writer.WriteString(expr.String())
 		}
 	}
 	if q.offset > 0 {
-		writer.WriteString("\nOFFSET " + strconv.Itoa(q.offset))
+		_, _ = writer.WriteString("\nOFFSET " + strconv.Itoa(q.offset))
 	}
 	return writer.String()
 }

@@ -68,7 +68,7 @@ func Test_record_Error(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "nil", fields: fields{err: nil}, wantErr: false},
-		{name: "NoError", fields: fields{err: NoError}, wantErr: false},
+		{name: "ErrNoError", fields: fields{err: ErrNoError}, wantErr: false},
 		{name: "not_found", fields: fields{err: ErrRecordNotFound}, wantErr: false}, // TODO: should it return error?
 		{name: "with_error", fields: fields{err: errors.New("some_error")}, wantErr: true},
 	}
@@ -188,7 +188,10 @@ func Test_record_SetError(t *testing.T) {
 				err:  tt.fields.err,
 			}
 			v.SetError(tt.args.err)
-			if !(tt.args.err == nil && v.err == NoError) && v.err != tt.args.err {
+			if tt.args.err == nil && v.err != nil && !errors.Is(v.err, ErrNoError) {
+				t.Errorf("expected %v, got: %v", tt.args.err, v.err)
+			}
+			if tt.args.err != nil && !errors.Is(v.err, tt.args.err) {
 				t.Errorf("expected %v, got: %v", tt.args.err, v.err)
 			}
 		})
@@ -288,7 +291,7 @@ func TestRecord_Data(t *testing.T) {
 		{name: "panics_if_err_is_not_set", shouldPanic: true, r: &record{key: NewKeyWithID("Kind1", "k1")}},
 		{name: "panics_if_some_error", shouldPanic: true, r: recordWithErr},
 		{name: "pass_if_is_not_found_error", shouldPanic: false, r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(ErrRecordNotFound)},
-		{name: "nil", r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(NoError)},
+		{name: "nil", r: (&record{key: NewKeyWithID("Kind1", "k1")}).setError(ErrNoError)},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.r.data = tt.data

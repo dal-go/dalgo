@@ -55,7 +55,7 @@ type record struct {
 // Exists returns if records exists.
 func (v *record) Exists() bool {
 	if v.err != nil {
-		if errors.Is(v.err, NoError) {
+		if errors.Is(v.err, ErrNoError) {
 			return true
 		}
 		if IsNotFound(v.err) {
@@ -85,7 +85,7 @@ func (v *record) Data() any {
 	if v.err == nil {
 		panic("an attempt to access record data before it was retrieved from database and SetError(error) called")
 	}
-	if errors.Is(v.err, NoError) || IsNotFound(v.err) {
+	if errors.Is(v.err, ErrNoError) || IsNotFound(v.err) {
 		return v.data
 	}
 	panic(fmt.Errorf("an attempt to retrieve data from a record with an error: %w", v.err))
@@ -116,7 +116,7 @@ func (v *record) Error() error {
 	if v.err == nil {
 		return nil
 	}
-	if errors.Is(v.err, NoError) {
+	if errors.Is(v.err, ErrNoError) {
 		return nil
 	}
 	if IsNotFound(v.err) { // TODO: Is it wrong?
@@ -132,7 +132,7 @@ func (v *record) SetError(err error) Record {
 
 func (v *record) setError(err error) *record {
 	if err == nil {
-		v.err = NoError
+		v.err = ErrNoError
 	} else {
 		v.err = err
 	}

@@ -23,7 +23,7 @@ type ErrDuplicateUser struct {
 	DuplicateUserIDs []string
 }
 
-var NoError = errors.New("no error")
+var ErrNoError = errors.New("no error")
 
 // Error implements error interface
 func (err ErrDuplicateUser) Error() string {

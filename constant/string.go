@@ -17,5 +17,5 @@ func Str(v string) StrConst {
 
 // String returns a string representation of the constant string value.
 func (v StrConst) String() string {
-	return fmt.Sprintf("'%s'", strings.Replace(v.value, "'", "''", -1))
+	return fmt.Sprintf("'%s'", strings.ReplaceAll(v.value, "'", "''"))
 }
