@@ -2,6 +2,7 @@ package dal
 
 import (
 	"errors"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 )
@@ -332,6 +333,54 @@ func TestNewRecordWithOnlyKey(t *testing.T) {
 			if r.Key() != tt.key {
 				t.Errorf("expected %v, got: %v", tt.key, r.Key())
 			}
+		})
+	}
+}
+
+func TestAnyRecordWithError(t *testing.T) {
+	type args struct {
+		records []Record
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "empty",
+			args: args{},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return err == nil
+			},
+		},
+		{
+			name: "2nd with error",
+			args: args{
+				records: []Record{
+					&record{key: NewKeyWithID("Kind1", "k1"), err: nil},
+					&record{key: NewKeyWithID("Kind1", "k2"), err: errors.New("some_error")},
+				},
+			},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return err != nil
+			},
+		},
+		{
+			name: "2 without errors",
+			args: args{
+				records: []Record{
+					&record{key: NewKeyWithID("Kind1", "k1"), err: nil},
+					&record{key: NewKeyWithID("Kind1", "k2"), err: nil},
+				},
+			},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return err == nil
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.wantErr(t, AnyRecordWithError(tt.args.records...))
 		})
 	}
 }

@@ -175,3 +175,13 @@ func NewRecordWithIncompleteKey(collection string, idKind reflect.Kind, data any
 //func NewRecordWithoutKey(collection string, idKind reflect.Kind, data any) Record {
 //	return NewRecordWithIncompleteKey(collection, idKind, data)
 //}
+
+func AnyRecordWithError(records ...Record) error {
+	for _, r := range records {
+		// Check for IsNotFound() is not necessary but lets do just in case
+		if err := r.Error(); err != nil && !IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
