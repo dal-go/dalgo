@@ -79,7 +79,7 @@ func Prefix(prefix string) func(options *randomStringOptions) {
 	}
 }
 
-// RandomLength sets prefix for a random string
+// RandomLength sets length for a random string
 func RandomLength(length int) func(options *randomStringOptions) {
 	return func(options *randomStringOptions) {
 		options.length = length
@@ -98,21 +98,24 @@ func WithIDGenerator(ctx context.Context, g IDGenerator) KeyOption {
 	}
 }
 
-// InsertWithRandomID inserts a record with a random ID
-func InsertWithRandomID(
+func InsertWithIdGenerator(
 	ctx context.Context,
 	r Record,
 	generateID IDGenerator,
-	attempts int,
+	maxAttempts int,
 	exists func(*Key) error,
 	insert func(Record) error,
 ) error {
 	key := r.Key()
-	// We need a temp record to make sure we do not overwrite data during exists() check
-	tmp := &record{key: key}
-	for i := 1; i <= attempts; i++ {
-		if err := generateID(ctx, tmp); err != nil {
-			return fmt.Errorf("failed to generate random value: %w", err)
+
+	for i := 1; i <= maxAttempts; i++ {
+		if err := generateID(ctx, r); err != nil {
+			return fmt.Errorf("failed to generate record key ID: %w", err)
+		}
+		if validatableWthKey, ok := r.Data().(interface{ ValidateWithKey(*Key) error }); ok {
+			if err := validatableWthKey.ValidateWithKey(key); err != nil {
+				return fmt.Errorf("failed to validate record key: %w", err)
+			}
 		}
 		if err := exists(key); err == nil {
 			continue
@@ -123,8 +126,7 @@ func InsertWithRandomID(
 			return fmt.Errorf("failed to check if record exists: %w", err)
 		}
 	}
-	r.Key().ID = nil
-	return fmt.Errorf("not able to generate unique id: %w: %d", ErrExceedsMaxNumberOfAttempts, attempts)
+	return fmt.Errorf("not able to generate unique id: %w: %d", ErrExceedsMaxNumberOfAttempts, maxAttempts)
 }
 
-var ErrExceedsMaxNumberOfAttempts = fmt.Errorf("exceeds max number of attempts")
+var ErrExceedsMaxNumberOfAttempts = fmt.Errorf("exceeds maximum number of attempts")

@@ -128,7 +128,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			}
 
 			args := tt.args
-			err := InsertWithRandomID(args.ctx, args.record, generateID, 5, exists, insert)
+			err := InsertWithIdGenerator(args.ctx, args.record, generateID, 5, exists, insert)
 			if err != nil {
 				if tt.generatorErr != nil && !errors.Is(err, tt.generatorErr) {
 					t.Errorf("expected error: %v, actual: %v", tt.generatorErr, err)
