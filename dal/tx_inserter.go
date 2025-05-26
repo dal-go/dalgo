@@ -110,8 +110,10 @@ func InsertWithIdGenerator(
 
 	for i := 1; i <= maxAttempts; i++ {
 		if err := generateID(ctx, r); err != nil {
+			key.ID = nil
 			return fmt.Errorf("failed to generate record key ID: %w", err)
 		}
+		r.SetError(nil)
 		if validatableWthKey, ok := r.Data().(interface{ ValidateWithKey(*Key) error }); ok {
 			if err := validatableWthKey.ValidateWithKey(key); err != nil {
 				return fmt.Errorf("failed to validate record key: %w", err)
@@ -122,10 +124,11 @@ func InsertWithIdGenerator(
 		} else if IsNotFound(err) {
 			return insert(r) // r shares child with tmp
 		} else {
-			r.Key().ID = nil
+			key.ID = nil
 			return fmt.Errorf("failed to check if record exists: %w", err)
 		}
 	}
+	key.ID = nil
 	return fmt.Errorf("not able to generate unique id: %w: %d", ErrExceedsMaxNumberOfAttempts, maxAttempts)
 }
 

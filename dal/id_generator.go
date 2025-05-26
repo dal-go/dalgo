@@ -14,6 +14,7 @@ type idGenerator struct {
 
 func (v *idGenerator) GenerateID(ctx context.Context, record Record) error {
 	if v.attempts++; v.attempts > v.maxAttempts {
+		record.Key().ID = nil
 		return fmt.Errorf("%w to generate a record ID: %d", ErrExceedsMaxNumberOfAttempts, v.maxAttempts)
 	}
 	return v.f(ctx, record)
