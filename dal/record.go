@@ -172,8 +172,8 @@ func NewRecordWithIncompleteKey(collection string, idKind reflect.Kind, data any
 
 // NewRecordWithoutKey creates a new record without a key
 // Obsolete, use NewRecordWithIncompleteKey instead
-//func NewRecordWithoutKey(collection string, idKind reflect.Kind, data any) Record {
-//	return NewRecordWithIncompleteKey(collection, idKind, data)
+//func NewRecordWithoutKey(recordsetSource string, idKind reflect.Kind, data any) Record {
+//	return NewRecordWithIncompleteKey(recordsetSource, idKind, data)
 //}
 
 func AnyRecordWithError(records ...Record) error {

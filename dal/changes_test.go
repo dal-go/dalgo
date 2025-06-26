@@ -145,7 +145,7 @@ func TestChanges_HasChanges(t *testing.T) {
 
 	r1changed := record{key: &Key{ID: "r1", collection: "records"}, changed: true}
 	r2changed := record{key: &Key{ID: "r2", collection: "records"}, changed: true}
-	//r2changed := record{changed: true, key: &Key{ID: "r2", collection: "records"}}
+	//r2changed := record{changed: true, key: &Key{ID: "r2", recordsetSource: "records"}}
 
 	for _, tt := range []test{
 		{
@@ -173,10 +173,10 @@ func TestChanges_HasChanges(t *testing.T) {
 }
 
 //func TestChanges_ChangedRecords(t *testing.T) {
-//	r1unchanged := record{key: &Key{ID: "r1", collection: "records"}}
-//	r2changed := record{changed: true, key: &Key{ID: "r2", collection: "records"}}
-//	r3changed := record{changed: true, key: &Key{ID: "r3", collection: "records"}}
-//	r4unchanged := record{key: &Key{ID: "r4", collection: "records"}}
+//	r1unchanged := record{key: &Key{ID: "r1", recordsetSource: "records"}}
+//	r2changed := record{changed: true, key: &Key{ID: "r2", recordsetSource: "records"}}
+//	r3changed := record{changed: true, key: &Key{ID: "r3", recordsetSource: "records"}}
+//	r4unchanged := record{key: &Key{ID: "r4", recordsetSource: "records"}}
 //
 //	records := []Record{&r1unchanged, &r2changed, &r3changed, &r4unchanged}
 //

@@ -13,8 +13,8 @@ var _ Query = (*theQuery)(nil)
 // query holds definition of a query
 type theQuery struct {
 
-	// From defines target table/collection
-	from *CollectionRef
+	// From defines target table/recordsetSource
+	from RecordsetSource
 
 	// Where defines filter condition
 	where Condition
@@ -25,15 +25,15 @@ type theQuery struct {
 	// OrderBy defines expressions to order by
 	orderBy []OrderExpression
 
-	// Columns defines what columns to return
+	// Columns define what columns to return
 	columns []Column
 
 	into func() Record
 
-	// Offset specifies number of records to skip
+	// Offset specifies the number of records to skip
 	offset int
 
-	// Limit specifies maximum number of records to be returned
+	// Limit specifies the maximum number of records to be returned
 	limit int
 
 	idKind reflect.Kind
@@ -42,7 +42,7 @@ type theQuery struct {
 	startCursor Cursor
 }
 
-func (q theQuery) From() *CollectionRef {
+func (q theQuery) From() RecordsetSource {
 	return q.from
 }
 
@@ -105,14 +105,25 @@ func (q theQuery) String() string {
 			}
 		}
 	}
-
 	if q.from != nil {
 		if is1liner {
 			_, _ = writer.WriteString(" ")
 		} else {
 			_, _ = writer.WriteString("\n")
 		}
-		_, _ = fmt.Fprintf(writer, "FROM [%v]", q.from.Path())
+		var fromStr string
+		switch from := q.from.(type) {
+		case CollectionRef:
+			fromStr = from.Path()
+			_, _ = fmt.Fprintf(writer, "FROM [%v]", from.Path())
+		case *CollectionRef:
+			fromStr = from.Path()
+		case CollectionGroupRef:
+			fromStr = from.Name()
+		case *CollectionGroupRef:
+			fromStr = from.Name()
+		}
+		_, _ = fmt.Fprintf(writer, "FROM [%v]", fromStr)
 	}
 	if q.where != nil {
 		if is1liner {

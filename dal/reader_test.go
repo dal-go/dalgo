@@ -18,8 +18,8 @@ func TestReadAll(t *testing.T) {
 		{name: "nil_reader_no_limit", reader: nil, shouldPanic: true},
 		{name: "empty_reader", reader: &EmptyReader{}, expectedRecordsCount: 0},
 		{name: "2records", reader: NewRecordsReader([]Record{
-			NewRecord(NewKeyWithID("collection", 1)),
-			NewRecord(NewKeyWithID("collection", 2)),
+			NewRecord(NewKeyWithID("recordsetSource", 1)),
+			NewRecord(NewKeyWithID("recordsetSource", 2)),
 		}), expectedRecordsCount: 2},
 		{name: "fails in next", reader: NewRecordsReader(nil), expectedErrTexts: []string{"no records"}},
 	} {

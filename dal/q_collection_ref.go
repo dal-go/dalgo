@@ -2,11 +2,16 @@ package dal
 
 import "fmt"
 
-// CollectionRef points to a collection (e.g. table) in a database
+var _ RecordsetSource = (*CollectionRef)(nil)
+
+// CollectionRef points to a recordsetSource (e.g. table) in a database
 type CollectionRef struct {
 	name   string
 	alias  string
 	parent *Key
+}
+
+func (CollectionRef) recordsetSource() {
 }
 
 func (v CollectionRef) Name() string {

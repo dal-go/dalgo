@@ -43,7 +43,7 @@ func TestField_Validate(t *testing.T) {
 //func TestKey_Child(t *testing.T) {
 //	type fields struct {
 //		level int
-//		collection  string
+//		recordsetSource  string
 //		ID    any
 //	}
 //	type args struct {
@@ -62,7 +62,7 @@ func TestField_Validate(t *testing.T) {
 //		{
 //			Field: "single_parent",
 //			fields: fields{
-//				collection: "Parent1",
+//				recordsetSource: "Parent1",
 //				ID:   "p1",
 //			},
 //			args: args{
@@ -70,26 +70,26 @@ func TestField_Validate(t *testing.T) {
 //			},
 //			want: want{
 //				fields: fields{
-//					collection:  "Kind1",
+//					recordsetSource:  "Kind1",
 //					ID:    "k1",
 //					level: 1,
 //				},
-//				Parent: &fields{collection: "Parent1", ID: "p1", level: 0},
+//				Parent: &fields{recordsetSource: "Parent1", ID: "p1", level: 0},
 //			},
 //		},
 //		{
 //			Field: "two_parents",
 //			fields: fields{
-//				collection: "Parent1",
+//				recordsetSource: "Parent1",
 //				ID:   "p1",
 //			},
 //			args: args{
 //				child: NewKeyWithID("Parent2", "p2").Child(NewKeyWithID("Kind1", "k1")),
 //			},
 //			want: want{
-//				Parent: &fields{collection: "Parent1", ID: "p1", level: 1},
+//				Parent: &fields{recordsetSource: "Parent1", ID: "p1", level: 1},
 //				fields: fields{
-//					collection:  "Kind1",
+//					recordsetSource:  "Kind1",
 //					ID:    "k1",
 //					level: 2,
 //				},
@@ -99,7 +99,7 @@ func TestField_Validate(t *testing.T) {
 //	for _, tt := range tests {
 //		t.Run(tt.Field, func(t *testing.T) {
 //			v := &Key{
-//				collection: tt.fields.collection,
+//				recordsetSource: tt.fields.recordsetSource,
 //				ID:   tt.fields.ID,
 //			}
 //			got := v.Child(tt.args.child)
@@ -113,8 +113,8 @@ func TestField_Validate(t *testing.T) {
 //				t.Error("Child().Parent != nil, want nil")
 //			}
 //			if got.Parent != nil && tt.want.Parent != nil {
-//				if got.Parent.collection != tt.want.Parent.collection {
-//					t.Errorf("Child().Parent.collection = %v, want %v", got.Parent.collection, tt.want.Parent.collection)
+//				if got.Parent.recordsetSource != tt.want.Parent.recordsetSource {
+//					t.Errorf("Child().Parent.recordsetSource = %v, want %v", got.Parent.recordsetSource, tt.want.Parent.recordsetSource)
 //				}
 //				if got.Parent.ID != tt.want.Parent.ID {
 //					t.Errorf("Child().Parent.ID = %v, want %v", got.Parent.ID, tt.want.Parent.ID)
@@ -353,7 +353,7 @@ func TestNewKeyWithID(t *testing.T) {
 		shouldPanic string
 	}{
 		{name: "valid", args: args{collection: "kind1", id: "k1"}, want: &Key{collection: "kind1", ID: "k1"}},
-		{name: "empty_collection", shouldPanic: "collection is a required parameter", args: args{collection: "", id: "k1"}, want: &Key{collection: "kind1", ID: "k1"}},
+		{name: "empty_collection", shouldPanic: "recordsetSource is a required parameter", args: args{collection: "", id: "k1"}, want: &Key{collection: "kind1", ID: "k1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

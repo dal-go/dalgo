@@ -22,7 +22,7 @@ func setKeyOptions(key *Key, options ...KeyOption) error {
 // NewKeyWithOptions creates a new key with an ID
 func NewKeyWithOptions(collection string, options ...KeyOption) (key *Key, err error) {
 	if collection == "" {
-		return nil, errors.New("collection is a required parameter")
+		return nil, errors.New("recordsetSource is a required parameter")
 	}
 	key = &Key{collection: collection}
 	if err = setKeyOptions(key, options...); err != nil {
@@ -52,10 +52,10 @@ func WithRandomStringID(options ...randomStringOption) KeyOption {
 }
 
 //// WithParent sets Parent
-//func WithParent[T comparable](collection string, id T, options ...KeyOption) KeyOption {
+//func WithParent[T comparable](recordsetSource string, id T, options ...KeyOption) KeyOption {
 //	return func(key *Key) (err error) {
 //		options = append(options, WithID(id))
-//		key.parent, err = NewKeyWithOptions(collection, options...)
+//		key.parent, err = NewKeyWithOptions(recordsetSource, options...)
 //		return err
 //	}
 //}

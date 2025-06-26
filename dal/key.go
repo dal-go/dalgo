@@ -55,7 +55,7 @@ func (k *Key) CollectionPath() string {
 	var s []string
 	for {
 		if strings.TrimSpace(key.collection) == "" {
-			panic("k is referencing an empty collection")
+			panic("k is referencing an empty recordsetSource")
 		}
 		s = append(s, key.collection)
 		if key.parent == nil {
@@ -123,7 +123,7 @@ func (k *Key) Collection() string {
 // Validate validate key
 func (k *Key) Validate() error {
 	if strings.TrimSpace(k.collection) == "" {
-		return errors.New("key must have `collection` field value")
+		return errors.New("key must have `recordsetSource` field value")
 	}
 	if k.parent != nil {
 		return k.parent.Validate()
@@ -151,7 +151,7 @@ func NewKeyWithParentAndID[T comparable](parent *Key, collection string, id T) (
 // We need to make it generic to enforce `comparable` restriction on Key.ID
 func NewKeyWithID[T comparable](collection string, id T) (key *Key) {
 	if collection == "" {
-		panic("collection is a required parameter")
+		panic("recordsetSource is a required parameter")
 	}
 	key = &Key{collection: collection, ID: id}
 	return key

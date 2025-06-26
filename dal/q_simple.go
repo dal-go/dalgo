@@ -24,8 +24,8 @@ var _ QueryBuilder = (*queryBuilder)(nil)
 
 // NewQueryBuilder creates a new QueryBuilder - it's an entry point to build a query.
 // We can use From() directly but this is easier to remember.
-func NewQueryBuilder(collection CollectionRef) QueryBuilder {
-	return &queryBuilder{collection: collection}
+func NewQueryBuilder(collection RecordsetSource) QueryBuilder {
+	return &queryBuilder{recordsetSource: collection}
 }
 
 // From creates a new QueryBuilder with optional conditions.
@@ -35,12 +35,12 @@ func From(collection CollectionRef) QueryBuilder {
 }
 
 type queryBuilder struct {
-	collection  CollectionRef
-	offset      int
-	limit       int
-	conditions  []Condition
-	orderBy     []OrderExpression
-	startCursor Cursor
+	recordsetSource RecordsetSource
+	offset          int
+	limit           int
+	conditions      []Condition
+	orderBy         []OrderExpression
+	startCursor     Cursor
 }
 
 func (s queryBuilder) StartFrom(cursor Cursor) QueryBuilder {
@@ -92,7 +92,7 @@ func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) Query {
 
 func (s queryBuilder) newQuery() theQuery {
 	q := theQuery{
-		from:        &s.collection,
+		from:        s.recordsetSource,
 		limit:       s.limit,
 		orderBy:     s.orderBy,
 		offset:      s.offset,

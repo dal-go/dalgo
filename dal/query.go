@@ -5,12 +5,12 @@ import (
 	"reflect"
 )
 
-// Query represents a query to a collection
+// Query represents a query to a recordsetSource
 type Query interface {
 	fmt.Stringer
 
-	// From defines target table/collection
-	From() *CollectionRef
+	// From defines target table/recordsetSource
+	From() RecordsetSource
 
 	// Where defines filter condition
 	Where() Condition

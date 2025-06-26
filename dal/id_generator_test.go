@@ -43,7 +43,7 @@ func TestWithRandomStringKey(t *testing.T) {
 				t.Errorf("WithRandomStringKeyPrefixedByUnixTime() insertOptions.idGen = nil")
 			}
 			data := struct{}{}
-			rec := NewRecordWithIncompleteKey("collection", reflect.String, &data)
+			rec := NewRecordWithIncompleteKey("recordsetSource", reflect.String, &data)
 			if err := idGen(context.Background(), rec); err != nil {
 				t.Fatalf("idGen returend errr: %v", err)
 			}
@@ -92,7 +92,7 @@ func TestWithRandomStringKeyPrefixedByUnixTime(t *testing.T) {
 				t.Errorf("WithRandomStringKeyPrefixedByUnixTime() insertOptions.idGen = nil")
 			}
 			data := struct{}{}
-			rec := NewRecordWithIncompleteKey("collection", reflect.String, &data)
+			rec := NewRecordWithIncompleteKey("recordsetSource", reflect.String, &data)
 			if err := idGen(context.Background(), rec); err != nil {
 				t.Fatalf("idGen returend errr: %v", err)
 			}
