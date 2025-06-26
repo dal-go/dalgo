@@ -7,7 +7,8 @@ import (
 
 func TestNewCollectionGroupRef(t *testing.T) {
 	type args struct {
-		name string
+		name  string
+		alias string
 	}
 	tests := []struct {
 		name          string
@@ -16,20 +17,20 @@ func TestNewCollectionGroupRef(t *testing.T) {
 		want          CollectionGroupRef
 	}{
 		{
-			name: "empty_name",
-			args: args{
-				name: "",
-			},
+			name:          "empty",
+			args:          args{},
 			want:          CollectionGroupRef{},
-			expectedPanic: "name of recordsetSource group reference cannot be empty",
+			expectedPanic: "name of collection group reference cannot be empty",
 		},
 		{
 			name: "should_pass",
 			args: args{
-				name: "collection_1",
+				name:  "collection_1",
+				alias: "c1",
 			},
 			want: CollectionGroupRef{
-				name: "collection_1",
+				name:  "collection_1",
+				alias: "c1",
 			},
 		},
 	}
@@ -43,7 +44,7 @@ func TestNewCollectionGroupRef(t *testing.T) {
 					}
 				}()
 			}
-			actual := NewCollectionGroupRef(tt.args.name)
+			actual := NewCollectionGroupRef(tt.args.name, tt.args.alias)
 			assert.Equal(t, tt.want, actual)
 		})
 	}
