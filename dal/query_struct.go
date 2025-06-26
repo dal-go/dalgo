@@ -115,7 +115,6 @@ func (q theQuery) String() string {
 		switch from := q.from.(type) {
 		case CollectionRef:
 			fromStr = from.Path()
-			_, _ = fmt.Fprintf(writer, "FROM [%v]", from.Path())
 		case *CollectionRef:
 			fromStr = from.Path()
 		case CollectionGroupRef:
