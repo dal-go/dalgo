@@ -55,9 +55,19 @@ func WhereField(name string, operator Operator, v any) Condition {
 		uint, uint8, uint16, uint32, uint64,
 		time.Time:
 		val = Constant{Value: v}
+	case []string, []int, []int8, []int16, []int32, []int64, []uint, []uint8, []uint16, []uint32, []uint64, []float32, []float64:
+		if operator != In {
+			panic("arrays must use with `In` operator")
+		}
+		val = Array{Value: v}
 	case Constant:
 		val = v
 	case FieldRef:
+		val = v
+	case Array:
+		if operator != In {
+			panic("arrays must use with `In` operator")
+		}
 		val = v
 	default:
 		panic(fmt.Errorf("unsupported type %T", v))

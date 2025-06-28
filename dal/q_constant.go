@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 )
 
 var _ Expression = Constant{}
@@ -27,5 +28,23 @@ func (v Constant) String() string {
 	default:
 		s, _ := json.Marshal(v.Value)
 		return string(s)
+	}
+}
+
+func NewConstant(v any) Constant {
+	switch v := v.(type) {
+	case
+		nil,
+		bool,
+		string,
+		float32, float64,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		time.Time:
+		return Constant{Value: v}
+	case Constant:
+		return v
+	default:
+		panic(fmt.Errorf("unsupported type %T", v))
 	}
 }
