@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/strongo/random"
+	"strconv"
 	"time"
 )
 
@@ -42,7 +43,51 @@ func WithRandomStringKeyPrefixedByUnixTime(randomLength, maxAttempts int) Insert
 	return func(options *insertOptions) {
 		options.idGenerator = NewIDGenerator(
 			func(ctx context.Context, record Record) error {
-				record.Key().ID = fmt.Sprintf("%d_%s", time.Now().Unix(), random.ID(randomLength))
+				record.Key().ID = fmt.Sprintf("%d_%s", time.Now().UTC().Unix(), random.ID(randomLength))
+				return nil
+			},
+			maxAttempts,
+		)
+	}
+}
+
+type TimeStampAccuracy int
+
+const (
+	TimeStampAccuracyNano TimeStampAccuracy = iota
+	TimeStampAccuracyMicrosecond
+	TimeStampAccuracyMillisecond
+	TimeStampAccuracySecond
+	TimeStampAccuracyMinute
+	TimeStampAccuracyHour
+	TimeStampAccuracyDay
+)
+
+func WithTimeStampStringID(accuracy TimeStampAccuracy, base, maxAttempts int) InsertOption {
+	return func(options *insertOptions) {
+		options.idGenerator = NewIDGenerator(
+			func(ctx context.Context, record Record) error {
+				now := time.Now().UTC()
+				var timestamp int64
+				switch accuracy {
+				case TimeStampAccuracyNano:
+					timestamp = now.UnixNano()
+				case TimeStampAccuracyMicrosecond:
+					timestamp = now.UnixMicro()
+				case TimeStampAccuracyMillisecond:
+					timestamp = now.UnixMilli()
+				case TimeStampAccuracySecond:
+					timestamp = now.Unix()
+				case TimeStampAccuracyMinute:
+					timestamp = now.Unix() / 60
+				case TimeStampAccuracyHour:
+					timestamp = now.Unix() / 60 / 60
+				case TimeStampAccuracyDay:
+					timestamp = now.Unix() / 60 / 60 / 24
+				default:
+					panic(fmt.Sprintf("invalid timeStampAccuracy: %v", accuracy))
+				}
+				record.Key().ID = strconv.FormatInt(timestamp, base)
 				return nil
 			},
 			maxAttempts,
