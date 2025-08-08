@@ -153,9 +153,9 @@ func TestIdGenerator_GenerateID(t *testing.T) {
 
 			data := struct{}{}
 			rec := NewRecordWithIncompleteKey("test", reflect.String, &data)
-			
+
 			err := generator.GenerateID(context.Background(), rec)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -240,18 +240,18 @@ func TestWithTimeStampStringID(t *testing.T) {
 			if idGen == nil {
 				t.Errorf("WithTimeStampStringID() insertOptions.idGen = nil")
 			}
-			
+
 			data := struct{}{}
 			rec := NewRecordWithIncompleteKey("test", reflect.String, &data)
 			if err := idGen(context.Background(), rec); err != nil {
 				t.Fatalf("idGen returned error: %v", err)
 			}
-			
+
 			id := rec.Key().ID.(string)
 			if id == "" {
 				t.Fatalf("generated id is empty string")
 			}
-			
+
 			// Verify the ID can be parsed as an integer in the specified base
 			if _, err := strconv.ParseInt(id, tt.base, 64); err != nil {
 				t.Errorf("generated id %s cannot be parsed as base %d integer: %v", id, tt.base, err)
@@ -266,12 +266,14 @@ func TestWithTimeStampStringID_InvalidAccuracy(t *testing.T) {
 			t.Errorf("expected panic for invalid accuracy")
 		}
 	}()
-	
+
 	var io insertOptions
 	WithTimeStampStringID(TimeStampAccuracy(999), 10, 1)(&io)
 	idGen := io.IDGenerator()
-	
+
 	data := struct{}{}
 	rec := NewRecordWithIncompleteKey("test", reflect.String, &data)
-	idGen(context.Background(), rec)
+	if err := idGen(context.Background(), rec); err != nil {
+		t.Fatalf("idGen returned error: %v", err)
+	}
 }
