@@ -12,7 +12,7 @@ import (
 
 // Record is a gateway to a database record.
 type Record interface {
-	// Key keeps a `table` Field of an entity and an ID within that table or a chain of nested keys
+	// Key keeps fields  of an entity and an ID within that table or a chain of nested keys
 	Key() *Key
 
 	// Error keeps an error for the last operation on the record. Not found is not treated as an error

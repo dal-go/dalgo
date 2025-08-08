@@ -2,8 +2,8 @@ package dal
 
 import "fmt"
 
-// Field creates an expression that represents a FieldRef value
-func Field(name string) FieldRef {
+// NewFieldRef creates an expression that represents a FieldRef value
+func NewFieldRef(name string) FieldRef {
 	return FieldRef{name: name}
 }
 
@@ -38,7 +38,7 @@ func Ascending(expression Expression) OrderExpression {
 }
 
 func AscendingField(name string) OrderExpression {
-	return Ascending(Field(name))
+	return Ascending(NewFieldRef(name))
 }
 
 func Descending(expression Expression) OrderExpression {
@@ -46,5 +46,5 @@ func Descending(expression Expression) OrderExpression {
 }
 
 func DescendingField(name string) OrderExpression {
-	return Descending(Field(name))
+	return Descending(NewFieldRef(name))
 }

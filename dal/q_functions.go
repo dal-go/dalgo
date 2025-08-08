@@ -14,7 +14,7 @@ const (
 )
 
 type function struct {
-	Name string       `json:"Field"`
+	Name string       `json:"name"`
 	Args []Expression `json:"args"`
 }
 

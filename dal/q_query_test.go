@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func Test_field_EqualTo(t *testing.T) {
+func Test_FieldRef_EqualTo(t *testing.T) {
 	const fieldName = "test_field"
 	type fields struct {
 		Name string

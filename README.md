@@ -183,6 +183,17 @@ Note that getters are populating records in place using target instance obtained
 Originally developed to support work with Google AppEngine Datastore and Firebase Firestore it takes into account its
 specifics. This works well with other key-value storages as well. Also `dalgo` supports SQL databases.
 
+### Supporting both relational and key-value databases with `Schema`
+
+While relational databases usually have primary key columns that are part of overall table columns 
+the key-value storages have key and values and key usually is not included into values as this would be unnecessary duplication.
+To support persisting dalgo records to relational DB tables we need to instruct how key is mapped to columns.
+This is achieved with the `DB.Schema() Schema` that provides methods for mapping keys to columns and for creating keys from column values.
+```go
+func (s *Schema) DataToKey(incompleteKey *Key, data any) (key *Key, err error)
+func (s *Schema) KeyToFields(key *Key, data any) (fields []ExtraField, err error)
+```
+
 ## Projects & modules that use DALgo
 
 * <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a> - framework to build chatbots

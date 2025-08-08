@@ -7,7 +7,7 @@ import (
 
 // FieldVal hold a reference to a single record within a root or nested recordset.
 type FieldVal struct {
-	Name  string `json:"Field"`
+	Name  string `json:"NewFieldRef"`
 	Value any    `json:"value"`
 }
 
