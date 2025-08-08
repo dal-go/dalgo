@@ -111,3 +111,68 @@ func TestCollectionRef(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectionRef_recordsetSource(t *testing.T) {
+	ref := NewCollectionRef("test", "t", nil)
+	// This method is a marker method, just call it to ensure coverage
+	ref.recordsetSource()
+}
+
+func TestCollectionRef_Alias(t *testing.T) {
+	tests := []struct {
+		name     string
+		ref      CollectionRef
+		expected string
+	}{
+		{
+			name:     "with alias",
+			ref:      NewCollectionRef("users", "u", nil),
+			expected: "u",
+		},
+		{
+			name:     "empty alias",
+			ref:      NewCollectionRef("users", "", nil),
+			expected: "",
+		},
+		{
+			name:     "same name and alias becomes empty",
+			ref:      NewCollectionRef("users", "users", nil),
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.ref.Alias()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCollectionRef_Parent(t *testing.T) {
+	parentKey := NewKeyWithID("parent_collection", "parent_id")
+	
+	tests := []struct {
+		name     string
+		ref      CollectionRef
+		expected *Key
+	}{
+		{
+			name:     "with parent",
+			ref:      NewCollectionRef("child", "c", parentKey),
+			expected: parentKey,
+		},
+		{
+			name:     "without parent",
+			ref:      NewCollectionRef("root", "r", nil),
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.ref.Parent()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

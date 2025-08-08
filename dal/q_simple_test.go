@@ -46,4 +46,23 @@ func TestSimpleQuery(t *testing.T) {
 		q := qb2.SelectInto(newRecord)
 		assertQuery(t, q)
 	})
+
+	t.Run("with_where_in_array_field", func(t *testing.T) {
+		qb2 := qb.WhereInArrayField("tags", "important")
+		q := qb2.SelectInto(newRecord)
+		assertQuery(t, q)
+		
+		// Verify the condition was created correctly
+		where := q.Where()
+		assert.NotNil(t, where)
+		
+		// The condition should be a Comparison with the value on the left, In operator, and field on the right
+		if comparison, ok := where.(Comparison); ok {
+			assert.Equal(t, In, comparison.Operator)
+			assert.Equal(t, Constant{Value: "important"}, comparison.Left)
+			assert.Equal(t, FieldRef{name: "tags"}, comparison.Right)
+		} else {
+			t.Errorf("Expected Comparison condition, got %T", where)
+		}
+	})
 }

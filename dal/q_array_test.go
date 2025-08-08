@@ -19,6 +19,24 @@ func TestArray_Equal(t *testing.T) {
 			want:  true,
 		},
 		{
+			name:  "both_nil",
+			array: Array{Value: nil},
+			input: Array{Value: nil},
+			want:  true,
+		},
+		{
+			name:  "one_nil_one_not",
+			array: Array{Value: nil},
+			input: Array{Value: "test"},
+			want:  false,
+		},
+		{
+			name:  "one_not_one_nil",
+			array: Array{Value: "test"},
+			input: Array{Value: nil},
+			want:  false,
+		},
+		{
 			name:  "non_slice_equal",
 			array: Array{Value: "s1"},
 			input: Array{Value: "s1"},

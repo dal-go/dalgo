@@ -49,3 +49,92 @@ func TestNewCollectionGroupRef(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectionGroupRef_recordsetSource(t *testing.T) {
+	ref := NewCollectionGroupRef("test", "t")
+	// This method is a marker method, just call it to ensure coverage
+	ref.recordsetSource()
+}
+
+func TestCollectionGroupRef_Name(t *testing.T) {
+	tests := []struct {
+		name     string
+		ref      CollectionGroupRef
+		expected string
+	}{
+		{
+			name:     "with name",
+			ref:      NewCollectionGroupRef("users", "u"),
+			expected: "users",
+		},
+		{
+			name:     "different name",
+			ref:      NewCollectionGroupRef("orders", "o"),
+			expected: "orders",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.ref.Name()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCollectionGroupRef_Alias(t *testing.T) {
+	tests := []struct {
+		name     string
+		ref      CollectionGroupRef
+		expected string
+	}{
+		{
+			name:     "with alias",
+			ref:      NewCollectionGroupRef("users", "u"),
+			expected: "u",
+		},
+		{
+			name:     "empty alias",
+			ref:      NewCollectionGroupRef("users", ""),
+			expected: "",
+		},
+		{
+			name:     "different alias",
+			ref:      NewCollectionGroupRef("orders", "ord"),
+			expected: "ord",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.ref.Alias()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCollectionGroupRef_String(t *testing.T) {
+	tests := []struct {
+		name     string
+		ref      CollectionGroupRef
+		expected string
+	}{
+		{
+			name:     "with alias",
+			ref:      NewCollectionGroupRef("users", "u"),
+			expected: `dal.CollectionGroupRef{name="users",alias="u"}`,
+		},
+		{
+			name:     "without alias",
+			ref:      NewCollectionGroupRef("users", ""),
+			expected: `dal.CollectionGroupRef{name="users"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.ref.String()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

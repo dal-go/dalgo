@@ -217,3 +217,70 @@ func TestWhereField(t *testing.T) {
 		})
 	}
 }
+
+func TestFieldRef_IsID(t *testing.T) {
+	tests := []struct {
+		name     string
+		field    FieldRef
+		expected bool
+	}{
+		{
+			name:     "is ID field",
+			field:    FieldRef{name: "id", isID: true},
+			expected: true,
+		},
+		{
+			name:     "is not ID field",
+			field:    FieldRef{name: "name", isID: false},
+			expected: false,
+		},
+		{
+			name:     "default isID value",
+			field:    FieldRef{name: "email"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.field.IsID()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFieldRef_Name(t *testing.T) {
+	tests := []struct {
+		name     string
+		field    FieldRef
+		expected string
+	}{
+		{
+			name:     "simple name",
+			field:    FieldRef{name: "username"},
+			expected: "username",
+		},
+		{
+			name:     "empty name",
+			field:    FieldRef{name: ""},
+			expected: "",
+		},
+		{
+			name:     "name with underscore",
+			field:    FieldRef{name: "user_id"},
+			expected: "user_id",
+		},
+		{
+			name:     "ID field name",
+			field:    FieldRef{name: "id", isID: true},
+			expected: "id",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.field.Name()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
