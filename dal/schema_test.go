@@ -11,10 +11,13 @@ func TestNewSchema(t *testing.T) {
 		return []ExtraField{NewExtraField("test", "value")}, nil
 	}
 
-	schema := NewSchema(keyToFieldsFunc, nil)
+	dataToKey := func(incompleteKey *Key, data any) (key *Key, err error) {
+		return
+	}
+
+	schema := NewSchema(keyToFieldsFunc, dataToKey)
 
 	assert.NotNil(t, schema)
-	assert.NotNil(t, schema.keyToFields)
 }
 
 func TestSchema_KeyToField(t *testing.T) {

@@ -9,8 +9,11 @@ type DB interface {
 	// Adapter provides information about underlying name to access data
 	Adapter() Adapter
 
+	// Schema provides schema for the DB - for example, how keys are mapped to columns
+	Schema() Schema
+
 	// TransactionCoordinator provides shortcut methods to work with transactions
-	// without opening connection explicitly.
+	// without opening a connection explicitly.
 	TransactionCoordinator
 
 	// ReadSession implements a virtual read session that opens connection/session for each read call on DB level
