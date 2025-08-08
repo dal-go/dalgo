@@ -5,7 +5,7 @@
 For mocking we use `go.uber.org/mock`.
 
 Mock packages have `mock_` prefix.
-For example all mocks for [`dal`](../dal) are in [`mock_dal`](../mock_dal) package.
+For example all mocks for [`dal`](../dal) are in [`mock_dal`](../mocks/mock_dal) package.
 
 When you need to mock use mocks provided. If no required mock found created it using `mockgen` by `go.uber.org/mock` -
-examples of usage are in [`../generate_mocks.sh`](../generate_mocks.sh). 
+examples of usage are in [`../generate_mocks.sh`](../mocks/generate_mocks.sh). 
