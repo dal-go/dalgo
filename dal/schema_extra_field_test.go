@@ -94,7 +94,7 @@ func TestField_Value(t *testing.T) {
 
 func TestField_Interface(t *testing.T) {
 	// Test that field implements ExtraField interface
-	var f ExtraField = NewExtraField("test", "value")
+	var f = NewExtraField("test", "value")
 
 	assert.NotNil(t, f)
 	assert.Equal(t, "test", f.Name())
