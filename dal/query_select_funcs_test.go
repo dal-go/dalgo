@@ -103,6 +103,33 @@ func TestSelectAll(t *testing.T) {
 	}
 }
 
+func TestSelectAll_WithOffset(t *testing.T) {
+	getRecordsReader := func() Reader {
+		return NewRecordsReader([]Record{
+			&record{key: &Key{ID: 1, collection: "test"}},
+			&record{key: &Key{ID: 2, collection: "test"}},
+			&record{key: &Key{ID: 3, collection: "test"}},
+			&record{key: &Key{ID: 4, collection: "test"}},
+		})
+	}
+	// Offset only
+	ids, err := SelectAllIDs[int](getRecordsReader(), WithOffset(2))
+	assert.NoError(t, err)
+	assert.Equal(t, []int{3, 4}, ids)
+	// Offset + limit smaller than remaining
+	ids, err = SelectAllIDs[int](getRecordsReader(), WithOffset(1), WithLimit(2))
+	assert.NoError(t, err)
+	assert.Equal(t, []int{2, 3}, ids)
+	// Offset exceeds available
+	ids, err = SelectAllIDs[int](getRecordsReader(), WithOffset(10))
+	assert.NoError(t, err)
+	assert.Equal(t, []int(nil), ids)
+	// Zero offset behaves as no offset
+	ids, err = SelectAllIDs[int](getRecordsReader(), WithOffset(0))
+	assert.NoError(t, err)
+	assert.Equal(t, []int{1, 2, 3, 4}, ids)
+}
+
 func TestWithOffset(t *testing.T) {
 	ro := new(readerOptions)
 	WithOffset(3)(ro)
