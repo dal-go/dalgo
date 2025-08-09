@@ -88,12 +88,12 @@ func TestNewTransactionOptions(t *testing.T) {
 }
 
 type mockTx struct {
+	name    string
 	options TransactionOptions
 }
 
-func (t mockTx) Options() TransactionOptions {
-	return t.options
-}
+func (t mockTx) Options() TransactionOptions { return t.options }
+func (t mockTx) Name() string                { return t.name }
 
 func TestGetTransaction(t *testing.T) {
 	tx := mockTx{options: NewTransactionOptions()}
@@ -215,4 +215,30 @@ func TestTxOptions(t *testing.T) {
 			assert.Equal(t, tt.txOptions.password, tt.txOptions.Password())
 		})
 	}
+}
+
+func TestTxWithName(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		to := new(txOptions)
+		o := TxWithName("")
+		o(to)
+		assert.Equal(t, "", to.Name())
+	})
+	t.Run("non_empty", func(t *testing.T) {
+		to := new(txOptions)
+		o := TxWithName("my-tx")
+		o(to)
+		assert.Equal(t, "my-tx", to.Name())
+	})
+	t.Run("twice_overwrite", func(t *testing.T) {
+		to := new(txOptions)
+		TxWithName("first")(to)
+		TxWithName("second")(to)
+		assert.Equal(t, "second", to.Name())
+	})
+	t.Run("with_NewTransactionOptions", func(t *testing.T) {
+		opts := NewTransactionOptions(TxWithName("builder-tx"))
+		name := opts.(txOptions).Name()
+		assert.Equal(t, "builder-tx", name)
+	})
 }

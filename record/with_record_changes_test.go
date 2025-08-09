@@ -230,6 +230,7 @@ type fakeTx struct {
 // Transaction + ReadwriteTransaction
 func (f *fakeTx) ID() string                      { return "fake-tx" }
 func (f *fakeTx) Options() dal.TransactionOptions { return dal.NewTransactionOptions() }
+func (f *fakeTx) Name() string                    { return "fake" }
 
 // ReadSession (Getter, MultiGetter, QueryExecutor)
 func (f *fakeTx) Get(ctx context.Context, record dal.Record) error                 { return nil }

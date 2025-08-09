@@ -77,7 +77,6 @@ type ReadwriteTransactionCoordinator interface {
 
 // Transaction defines an instance of DALgo transaction
 type Transaction interface {
-
 	// Options indicates parameters that were requested at time of transaction creation.
 	Options() TransactionOptions
 }
@@ -122,6 +121,10 @@ func GetNonTransactionalContext(ctx context.Context) context.Context {
 // TransactionOptions holds transaction settings
 type TransactionOptions interface {
 
+	// Name describes what will be done in transaction.
+	// This is useful for mocking transaction in tests
+	Name() string
+
 	// IsolationLevel indicates requested isolation level
 	IsolationLevel() TxIsolationLevel
 
@@ -141,6 +144,7 @@ type TransactionOptions interface {
 type TransactionOption func(options *txOptions)
 
 type txOptions struct {
+	name           string
 	isolationLevel TxIsolationLevel
 	isReadonly     bool
 	isCrossGroup   bool
@@ -149,6 +153,10 @@ type txOptions struct {
 }
 
 var _ TransactionOptions = (*txOptions)(nil)
+
+func (v txOptions) Name() string {
+	return v.name
+}
 
 // IsReadonly indicates a readonly transaction was requested
 func (v txOptions) IsReadonly() bool {
@@ -196,6 +204,13 @@ func TxWithIsolationLevel(isolationLevel TxIsolationLevel) TransactionOption {
 			panic("an attempt to request more then 1 isolation level")
 		}
 		options.isolationLevel = isolationLevel
+	}
+}
+
+// TxWithName specifies number of attempts to execute a transaction
+func TxWithName(name string) TransactionOption {
+	return func(options *txOptions) {
+		options.name = name
 	}
 }
 
