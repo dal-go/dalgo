@@ -42,6 +42,9 @@ func SelectAll[T any](reader Reader, getItem func(r Record) T, options ...Reader
 	if reader == nil {
 		panic("reader is a required parameter, got nil")
 	}
+	defer func() {
+		_ = reader.Close()
+	}()
 	ro := newReaderOptions(options...)
 	limit := ro.limit
 	if limit <= 0 {
@@ -51,17 +54,17 @@ func SelectAll[T any](reader Reader, getItem func(r Record) T, options ...Reader
 		items = make([]T, 0, limit)
 	}
 	for ; limit > 0; limit-- {
-		var record Record
-		if record, err = reader.Next(); err != nil {
+		var r Record
+		if r, err = reader.Next(); err != nil {
 			if errors.Is(err, ErrNoMoreRecords) {
 				err = nil
 			}
 			return
 		}
-		item := getItem(record)
+		item := getItem(r)
 		items = append(items, item)
 	}
-	return items, reader.Close()
+	return
 }
 
 // SelectAllIDs is a helper method that for a given reader returns all IDs as a strongly typed slice.
