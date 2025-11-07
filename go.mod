@@ -2,7 +2,7 @@ module github.com/dal-go/dalgo
 
 go 1.23
 
-toolchain go1.25.3
+toolchain go1.25.4
 
 require (
 	github.com/stretchr/testify v1.11.1
