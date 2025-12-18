@@ -4,11 +4,46 @@ import "fmt"
 
 var _ RecordsetSource = (*CollectionRef)(nil)
 
+//type ICollectionRef interface {
+//	fmt.Stringer
+//	Name() string
+//	Alias() string
+//	Parent() *Key
+//}
+//
+//var _ ICollectionRef = (*CollectionRef)(nil)
+
+func NewCollectionRef(name, alias string, parent *Key) (collectionRef CollectionRef) {
+	return newCollectionRef(name, alias, parent)
+}
+
+func NewRootCollectionRef(name, alias string) CollectionRef {
+	return newCollectionRef(name, alias, nil)
+}
+
+func newCollectionRef(name, alias string, parent *Key) CollectionRef {
+	if name == "" {
+		panic("name is required parameter for NewCollectionRef()")
+	}
+	if alias == name {
+		alias = ""
+	}
+	return CollectionRef{
+		name:   name,
+		alias:  alias,
+		parent: parent,
+	}
+}
+
 // CollectionRef points to a recordsetSource (e.g. table) in a database
 type CollectionRef struct {
 	name   string
 	alias  string
 	parent *Key
+}
+
+func (v CollectionRef) Equal(other CollectionRef, ignoreAlias bool) bool {
+	return v.name == other.name && v.parent == other.parent && (ignoreAlias || v.alias == other.alias)
 }
 
 func (CollectionRef) recordsetSource() {
@@ -48,27 +83,4 @@ func (v CollectionRef) Path() string {
 		return v.name
 	}
 	return v.parent.String() + "/" + v.name
-}
-
-func newCollectionRef(name, alias string) CollectionRef {
-	if name == "" {
-		panic("name is required parameter for NewCollectionRef()")
-	}
-	if alias == name {
-		alias = ""
-	}
-	return CollectionRef{
-		name:  name,
-		alias: alias,
-	}
-}
-
-func NewCollectionRef(name, alias string, parent *Key) (collectionRef CollectionRef) {
-	collectionRef = newCollectionRef(name, alias)
-	collectionRef.parent = parent
-	return
-}
-
-func NewRootCollectionRef(name, alias string) CollectionRef {
-	return newCollectionRef(name, alias)
 }

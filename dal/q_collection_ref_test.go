@@ -1,8 +1,9 @@
 package dal
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewCollectionRef(t *testing.T) {
@@ -151,7 +152,7 @@ func TestCollectionRef_Alias(t *testing.T) {
 
 func TestCollectionRef_Parent(t *testing.T) {
 	parentKey := NewKeyWithID("parent_collection", "parent_id")
-	
+
 	tests := []struct {
 		name     string
 		ref      CollectionRef
@@ -173,6 +174,187 @@ func TestCollectionRef_Parent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.ref.Parent()
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCollectionRef_Equal(t *testing.T) {
+	type args struct {
+		other       CollectionRef
+		ignoreAlias bool
+	}
+	tests := []struct {
+		name string
+		v    CollectionRef
+		args args
+		want bool
+	}{
+		{
+			name: "empty, ignoreAlias=true",
+			v:    CollectionRef{},
+			args: args{
+				other:       CollectionRef{},
+				ignoreAlias: true,
+			},
+			want: true,
+		},
+		{
+			name: "empty, ignoreAlias=false",
+			v:    CollectionRef{},
+			args: args{
+				other:       CollectionRef{},
+				ignoreAlias: false,
+			},
+			want: true,
+		},
+		{
+			name: "same name and alias, no parent, ignoreAlias=false",
+			v:    CollectionRef{name: "books", alias: "b"},
+			args: args{
+				other:       CollectionRef{name: "books", alias: "b"},
+				ignoreAlias: false,
+			},
+			want: true,
+		},
+		{
+			name: "same name, different alias, ignoreAlias=true",
+			v:    CollectionRef{name: "books", alias: "b1"},
+			args: args{
+				other:       CollectionRef{name: "books", alias: "b2"},
+				ignoreAlias: true,
+			},
+			want: true,
+		},
+		{
+			name: "same name, different alias, ignoreAlias=false",
+			v:    CollectionRef{name: "books", alias: "b1"},
+			args: args{
+				other:       CollectionRef{name: "books", alias: "b2"},
+				ignoreAlias: false,
+			},
+			want: false,
+		},
+		{
+			name: "different name, same alias, ignoreAlias=true",
+			v:    CollectionRef{name: "books", alias: "b"},
+			args: args{
+				other:       CollectionRef{name: "magazines", alias: "b"},
+				ignoreAlias: true,
+			},
+			want: false,
+		},
+		{
+			name: "different name, same alias, ignoreAlias=false",
+			v:    CollectionRef{name: "books", alias: "b"},
+			args: args{
+				other:       CollectionRef{name: "magazines", alias: "b"},
+				ignoreAlias: false,
+			},
+			want: false,
+		},
+		// parent-pointer-specific cases are appended below where a shared pointer can be reused
+	}
+	// Replace the placeholder complex cases with concrete ones using shared parent pointers
+	{
+		p := NewKeyWithID("parent", "1")
+		tests = append(tests,
+			struct {
+				name string
+				v    CollectionRef
+				args args
+				want bool
+			}{
+				name: "same pointer parent, same name and alias (ignoreAlias=false)",
+				v:    CollectionRef{name: "books", alias: "b", parent: p},
+				args: args{other: CollectionRef{name: "books", alias: "b", parent: p}, ignoreAlias: false},
+				want: true,
+			},
+		)
+	}
+	{
+		p := NewKeyWithID("parent", "1")
+		tests = append(tests,
+			struct {
+				name string
+				v    CollectionRef
+				args args
+				want bool
+			}{
+				name: "same pointer parent, different alias (ignoreAlias=true)",
+				v:    CollectionRef{name: "books", alias: "b1", parent: p},
+				args: args{other: CollectionRef{name: "books", alias: "b2", parent: p}, ignoreAlias: true},
+				want: true,
+			},
+		)
+	}
+	{
+		p := NewKeyWithID("parent", "1")
+		tests = append(tests,
+			struct {
+				name string
+				v    CollectionRef
+				args args
+				want bool
+			}{
+				name: "same values but different parent pointers -> not equal",
+				v:    CollectionRef{name: "books", alias: "b", parent: p},
+				args: args{other: CollectionRef{name: "books", alias: "b", parent: NewKeyWithID("parent", "1")}, ignoreAlias: false},
+				want: false,
+			},
+		)
+	}
+	{
+		tests = append(tests,
+			struct {
+				name string
+				v    CollectionRef
+				args args
+				want bool
+			}{
+				name: "one has parent, other has nil parent -> not equal",
+				v:    CollectionRef{name: "books", alias: "b", parent: NewKeyWithID("parent", "1")},
+				args: args{other: CollectionRef{name: "books", alias: "b", parent: nil}, ignoreAlias: false},
+				want: false,
+			},
+		)
+	}
+	{
+		p := NewKeyWithID("parent", "1")
+		tests = append(tests,
+			struct {
+				name string
+				v    CollectionRef
+				args args
+				want bool
+			}{
+				name: "same pointer parent, different name -> not equal",
+				v:    CollectionRef{name: "books", alias: "b", parent: p},
+				args: args{other: CollectionRef{name: "magazines", alias: "b", parent: p}, ignoreAlias: true},
+				want: false,
+			},
+		)
+	}
+	{
+		p1 := NewKeyWithID("parent", "1")
+		p2 := NewKeyWithID("parent", "2")
+		tests = append(tests,
+			struct {
+				name string
+				v    CollectionRef
+				args args
+				want bool
+			}{
+				name: "different parent pointers (different values) -> not equal",
+				v:    CollectionRef{name: "books", alias: "b", parent: p1},
+				args: args{other: CollectionRef{name: "books", alias: "b", parent: p2}, ignoreAlias: false},
+				want: false,
+			},
+		)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.v.Equal(tt.args.other, tt.args.ignoreAlias)
+			assert.Equalf(t, tt.want, got, "Equal(%v, %v)", tt.args.other, tt.args.ignoreAlias)
 		})
 	}
 }
