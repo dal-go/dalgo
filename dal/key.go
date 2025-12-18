@@ -234,3 +234,36 @@ func EqualKeys(k1 *Key, k2 *Key) bool {
 func (k *Key) Equal(key *Key) bool {
 	return EqualKeys(k, key)
 }
+
+func NewRecordWithoutKey(data any) Record {
+	if data == nil {
+		panic("data must not be nil")
+	}
+	// Accept maps with string keys by value, slices by value, or any other pointers.
+	// Panic for invalid cases (e.g., non-pointer value types other than allowed maps/slices, or pointers to maps).
+	t := reflect.TypeOf(data)
+	switch t.Kind() {
+	case reflect.Map:
+		if t.Key().Kind() != reflect.String {
+			panic("map key must be string")
+		}
+		// accept map[string]...
+	case reflect.Slice:
+		// accept any slice by value
+	case reflect.Ptr:
+		// reject pointer to map
+		switch t.Elem().Kind() {
+		case reflect.Map:
+			panic("pointer to map is not allowed; pass the map by value")
+		case reflect.Slice:
+			panic("pointer to slice is not allowed; pass the slice by value")
+		}
+		// other pointers (e.g., to struct) are allowed
+	default:
+		// other value types must not be passed by value
+		panic("data must be a pointer, map[string]..., or slice")
+	}
+	return &record{
+		data: data,
+	}
+}
