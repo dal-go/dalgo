@@ -6,8 +6,14 @@ import (
 )
 
 type Query interface {
-	Text() string
 	String() string
+
+	// Offset specifies number of records to skip
+	Offset() int
+
+	// Limit specifies maximum number of records to be returned
+	Limit() int
+
 	GetReader(ctx context.Context, db DB) (reader Reader, err error)
 	ReadRecords(ctx context.Context, db DB, o ...ReaderOption) (records []Record, err error)
 }
@@ -15,6 +21,7 @@ type Query interface {
 // TextQuery defines an interface to represent a query with text and associated arguments.
 type TextQuery interface {
 	Query
+	Text() string
 	Args() []QueryArg
 }
 
@@ -42,12 +49,6 @@ type StructuredQuery interface {
 
 	// IDKind defines the type of the ID
 	IDKind() reflect.Kind // TODO: what about composite keys?
-
-	// Offset specifies number of records to skip
-	Offset() int
-
-	// Limit specifies maximum number of records to be returned
-	Limit() int
 
 	// StartFrom specifies the startCursor/point to start from
 	StartFrom() Cursor

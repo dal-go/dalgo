@@ -7,27 +7,37 @@ var _ TextQuery = (*textQuery)(nil)
 type textQuery struct {
 	text   string
 	args   []QueryArg
+	offset int
+	limit  int
 	getKey func(data any, args []QueryArg) *Key
 }
 
-func (t textQuery) GetReader(ctx context.Context, db DB) (reader Reader, err error) {
-	return db.GetReader(ctx, t)
+func (q textQuery) Offset() int {
+	return q.offset
 }
 
-func (t textQuery) ReadRecords(ctx context.Context, db DB, o ...ReaderOption) (records []Record, err error) {
-	return db.ReadAllRecords(ctx, t, o...)
+func (q textQuery) Limit() int {
+	return q.limit
 }
 
-func (t textQuery) Text() string {
-	return t.text
+func (q textQuery) GetReader(ctx context.Context, db DB) (reader Reader, err error) {
+	return db.GetReader(ctx, q)
 }
 
-func (t textQuery) Args() []QueryArg {
-	return t.args
+func (q textQuery) ReadRecords(ctx context.Context, db DB, o ...ReaderOption) (records []Record, err error) {
+	return db.ReadAllRecords(ctx, q, o...)
 }
 
-func (t textQuery) String() string {
-	return t.text
+func (q textQuery) Text() string {
+	return q.text
+}
+
+func (q textQuery) Args() []QueryArg {
+	return q.args
+}
+
+func (q textQuery) String() string {
+	return q.text
 }
 
 type QueryArg struct {
