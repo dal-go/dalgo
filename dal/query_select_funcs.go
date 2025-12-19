@@ -120,8 +120,8 @@ func SelectAllIDs[T comparable](reader Reader, options ...ReaderOption) (ids []T
 	}, options...)
 }
 
-// SelectAllRecords is a helper method that for a given reader returns all records as a slice.
-func SelectAllRecords(reader Reader, options ...ReaderOption) (records []Record, err error) {
+// ReadAllRecords is a helper method that for a given reader returns all records as a slice.
+func ReadAllRecords(reader Reader, options ...ReaderOption) (records []Record, err error) {
 	return SelectAll[Record](reader, func(r Record) Record {
 		return r
 	}, options...)

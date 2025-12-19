@@ -2,12 +2,12 @@ package dal
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
 )
 
-var _ StructuredQuery = structuredQuery{}
 var _ StructuredQuery = (*structuredQuery)(nil)
 
 // query holds definition of a query
@@ -40,6 +40,14 @@ type structuredQuery struct {
 
 	// StartCursor specifies the startCursor/point to start from
 	startCursor Cursor
+}
+
+func (q structuredQuery) GetReader(ctx context.Context, db DB) (reader Reader, err error) {
+	return db.GetReader(ctx, q)
+}
+
+func (q structuredQuery) ReadRecords(ctx context.Context, db DB, options ...ReaderOption) (records []Record, err error) {
+	return db.ReadAllRecords(ctx, q, options...)
 }
 
 func (q structuredQuery) Text() string {

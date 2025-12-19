@@ -85,7 +85,7 @@ func TestSelectAll(t *testing.T) {
 				assertErr(t, err)
 				assert.Equal(t, tt.wantIds, gotIds)
 			})
-			t.Run("SelectAllRecords", func(t *testing.T) {
+			t.Run("ReadAllRecords", func(t *testing.T) {
 				if tt.shouldPanic {
 					defer func() {
 						if r := recover(); r == nil {
@@ -93,7 +93,7 @@ func TestSelectAll(t *testing.T) {
 						}
 					}()
 				}
-				gotRecords, err := SelectAllRecords(tt.args.reader(), WithLimit(tt.args.limit))
+				gotRecords, err := ReadAllRecords(tt.args.reader(), WithLimit(tt.args.limit))
 				assertErr(t, err)
 				if err == nil {
 					assert.NotNil(t, gotRecords)

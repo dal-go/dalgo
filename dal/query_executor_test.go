@@ -47,7 +47,7 @@ func Test_selector_SelectReader(t *testing.T) {
 			s := queryExecutor{
 				getReader: tt.fields.getReader,
 			}
-			got, err := s.QueryReader(tt.args.c, tt.args.query)
+			got, err := s.GetReader(tt.args.c, tt.args.query)
 			if !tt.wantErr(t, err, fmt.Sprintf("Select(%v, %v)", tt.args.c, tt.args.query)) {
 				return
 			}
@@ -79,7 +79,7 @@ func Test_selector_QueryAllRecords(t *testing.T) {
 			s := queryExecutor{
 				getReader: tt.fields.getReader,
 			}
-			gotRecords, err := s.QueryAllRecords(tt.args.c, tt.args.query)
+			gotRecords, err := s.ReadAllRecords(tt.args.c, tt.args.query)
 			if !tt.wantErr(t, err, fmt.Sprintf("SelectAll(%v)", tt.args.c)) {
 				return
 			}
@@ -136,26 +136,26 @@ func Test_queryExecutor(t *testing.T) {
 				if tt.shouldPanic {
 					defer func() {
 						if r := recover(); r == nil {
-							t.Errorf("QueryAllRecords() should have panicked!")
+							t.Errorf("ReadAllRecords() should have panicked!")
 						}
 					}()
 				}
 				got, err := execut()
-				if tt.wantErr(t, err, fmt.Sprintf("QueryReader(%v, %v)", tt.args.c, tt.args.query)) {
+				if tt.wantErr(t, err, fmt.Sprintf("GetReader(%v, %v)", tt.args.c, tt.args.query)) {
 					return
 				}
 				if err == nil {
 					assert.Nil(t, got)
 				}
 			}
-			t.Run("QueryAllRecords", func(t *testing.T) {
+			t.Run("ReadAllRecords", func(t *testing.T) {
 				runTest(t, func() (any, error) {
-					return tt.qe.QueryAllRecords(tt.args.c, tt.args.query)
+					return tt.qe.ReadAllRecords(tt.args.c, tt.args.query)
 				})
 			})
-			t.Run("QueryReader", func(t *testing.T) {
+			t.Run("GetReader", func(t *testing.T) {
 				runTest(t, func() (any, error) {
-					return tt.qe.QueryReader(tt.args.c, tt.args.query)
+					return tt.qe.GetReader(tt.args.c, tt.args.query)
 				})
 			})
 		})

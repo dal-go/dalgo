@@ -7,11 +7,11 @@ import (
 // QueryExecutor is a query executor that returns a reader + related helper methods.
 type QueryExecutor interface {
 
-	// QueryReader returns a reader for the given query to read records 1 by 1 sequentially.
+	// GetReader returns a reader for the given query to read records 1 by 1 sequentially.
 	// The Reader.Next() method returns ErrNoMoreRecords when there are no more records.
-	QueryReader(ctx context.Context, query Query) (Reader, error)
+	GetReader(ctx context.Context, query Query) (Reader, error)
 
-	// QueryAllRecords is a helper method that returns all records for the given query.
+	// ReadAllRecords is a helper method that returns all records for the given query.
 	// It reads reader created by QueryReader until it returns ErrNoMoreRecords.
 	// If you are interested only in IDs, use like:
 	//
@@ -19,7 +19,7 @@ type QueryExecutor interface {
 	//      // handle err
 	//		var ids []int
 	//		ids, err = dal.SelectAllIDs[int](reader)
-	QueryAllRecords(ctx context.Context, query Query) (records []Record, err error)
+	ReadAllRecords(ctx context.Context, query Query, o ...ReaderOption) (records []Record, err error)
 }
 
 var _ QueryExecutor = (*queryExecutor)(nil)
@@ -28,12 +28,16 @@ type queryExecutor struct {
 	getReader ReaderProvider
 }
 
-func (s queryExecutor) QueryReader(ctx context.Context, query Query) (Reader, error) {
+func (s queryExecutor) GetReader(ctx context.Context, query Query) (Reader, error) {
 	return s.getReader(ctx, query)
 }
 
 // QueryAllRecords is a helper method that for a given reader returns all records as a slice.
-func (s queryExecutor) QueryAllRecords(ctx context.Context, query Query) (records []Record, err error) {
+func (s queryExecutor) ReadAllRecords(
+	ctx context.Context, query Query, options ...ReaderOption,
+) (
+	records []Record, err error,
+) {
 	var reader Reader
 	if reader, err = s.getReader(ctx, query); err != nil {
 		return
@@ -41,7 +45,7 @@ func (s queryExecutor) QueryAllRecords(ctx context.Context, query Query) (record
 	if reader == nil {
 		panic("reader is nil")
 	}
-	return SelectAllRecords(reader)
+	return ReadAllRecords(reader, options...)
 }
 
 // ReaderProvider is a function that returns a Reader for the given query.

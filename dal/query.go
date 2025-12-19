@@ -1,12 +1,15 @@
 package dal
 
 import (
+	"context"
 	"reflect"
 )
 
 type Query interface {
 	Text() string
 	String() string
+	GetReader(ctx context.Context, db DB) (reader Reader, err error)
+	ReadRecords(ctx context.Context, db DB, o ...ReaderOption) (records []Record, err error)
 }
 
 // TextQuery defines an interface to represent a query with text and associated arguments.

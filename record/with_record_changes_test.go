@@ -232,6 +232,8 @@ type fakeTx struct {
 	deleted []*dal.Key
 }
 
+var _ dal.ReadwriteTransaction = (*fakeTx)(nil)
+
 // Transaction + ReadwriteTransaction
 func (f *fakeTx) ID() string                      { return "fake-tx" }
 func (f *fakeTx) Options() dal.TransactionOptions { return dal.NewTransactionOptions() }
@@ -241,10 +243,10 @@ func (f *fakeTx) Name() string                    { return "fake" }
 func (f *fakeTx) Get(_ context.Context, _ dal.Record) error          { return nil }
 func (f *fakeTx) Exists(_ context.Context, _ *dal.Key) (bool, error) { return false, nil }
 func (f *fakeTx) GetMulti(_ context.Context, _ []dal.Record) error   { return nil }
-func (f *fakeTx) QueryReader(_ context.Context, _ dal.Query) (dal.Reader, error) {
+func (f *fakeTx) GetReader(_ context.Context, _ dal.Query) (dal.Reader, error) {
 	return nil, nil
 }
-func (f *fakeTx) QueryAllRecords(_ context.Context, _ dal.Query) ([]dal.Record, error) {
+func (f *fakeTx) ReadAllRecords(_ context.Context, _ dal.Query, _ ...dal.ReaderOption) ([]dal.Record, error) {
 	return nil, nil
 }
 
