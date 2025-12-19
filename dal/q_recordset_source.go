@@ -35,9 +35,7 @@ func (f *from) NewQuery() *QueryBuilder {
 			RecordsetSource: join.RecordsetSource,
 			on:              make([]Condition, len(join.on)),
 		}
-		for j, on := range join.on {
-			f2.joins[i].on[j] = on
-		}
+		copy(f2.joins[i].on, join.on)
 	}
 	return NewQueryBuilder(f2)
 }

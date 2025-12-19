@@ -33,9 +33,9 @@ func TestFrom_Join_Joins_NewQuery_DeepCopy(t *testing.T) {
 		t.Fatalf("expected 1 join, got %d", len(got))
 	}
 	// Reassign element in returned slice; original should not change
-	origFirstName := f.joins[0].RecordsetSource.Name()
+	origFirstName := f.joins[0].Name()
 	got[0] = JoinedSource{RecordsetSource: NewRootCollectionRef("changed", ""), on: []Condition{cmp("x", "y")}}
-	if f.joins[0].RecordsetSource.Name() != origFirstName {
+	if f.joins[0].Name() != origFirstName {
 		t.Fatalf("Joins must return a copy of slice; reassigning element in returned slice should not affect original")
 	}
 
