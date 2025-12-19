@@ -14,9 +14,8 @@ type Query interface {
 
 // TextQuery defines an interface to represent a query with text and associated arguments.
 type TextQuery interface {
-	Text() string
+	Query
 	Args() []QueryArg
-	String() string
 }
 
 // StructuredQuery represents a query to a recordsetSource
