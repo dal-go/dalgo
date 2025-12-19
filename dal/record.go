@@ -35,13 +35,6 @@ type Record interface {
 
 	// MarkAsChanged & HasChanged are methods of convenience
 	MarkAsChanged()
-
-	//// SetDataTo sets DataTo handler
-	//SetDataTo(dataTo func(target any) error)
-
-	//// DataTo deserializes record data into a struct. Throws panic if called before `Get`.
-	//// Uses a handler set by SetDataTo.
-	//DataTo(target any) error
 }
 
 type record struct {
