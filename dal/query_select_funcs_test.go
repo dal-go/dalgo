@@ -145,3 +145,26 @@ func TestWithLimit(t *testing.T) {
 	ro.limit = 0
 	assert.Equal(t, readerOptions{}, *ro)
 }
+
+// errOnFirstNextReader returns a non-ErrNoMoreRecords error on first Next()
+type errOnFirstNextReader struct{ called bool }
+
+func (e *errOnFirstNextReader) Next() (Record, error) {
+	if !e.called {
+		e.called = true
+		return nil, errors.New("next failed")
+	}
+	return nil, ErrNoMoreRecords
+}
+func (e *errOnFirstNextReader) Cursor() (string, error) { return "", nil }
+func (e *errOnFirstNextReader) Close() error            { return nil }
+
+func TestSelectAll_WithOffsetError(t *testing.T) {
+	// When offset > 0 and Next returns a non-ErrNoMoreRecords error while skipping,
+	// SelectAll should return that error.
+	r := &errOnFirstNextReader{}
+	_, err := SelectAllIDs[int](r, WithOffset(1))
+	if err == nil || err.Error() != "next failed" {
+		t.Fatalf("expected 'next failed' error, got: %v", err)
+	}
+}

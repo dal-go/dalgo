@@ -1,9 +1,10 @@
 package dal
 
 import (
+	"testing"
+
 	"github.com/dal-go/dalgo/constant"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestSelect(t *testing.T) {
@@ -33,14 +34,14 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_*_from_User",
 			q: structuredQuery{
-				from: &CollectionRef{name: "User"},
+				from: From(&CollectionRef{name: "User"}),
 			},
 			want: "SELECT * FROM [User]",
 		},
 		{
 			name: "select_top_10_*_from_User",
 			q: structuredQuery{
-				from:  &CollectionRef{name: "User"},
+				from:  From(&CollectionRef{name: "User"}),
 				limit: 10,
 			},
 			want: "SELECT TOP 10 * FROM [User]",
@@ -48,7 +49,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_top_10_*_from_User_offset_20",
 			q: structuredQuery{
-				from:   &CollectionRef{name: "User"},
+				from:   From(&CollectionRef{name: "User"}),
 				limit:  10,
 				offset: 20,
 			},
@@ -57,7 +58,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_*_from_Users_where_SomeID_=_123",
 			q: structuredQuery{
-				from:  &CollectionRef{name: "Users"},
+				from:  From(&CollectionRef{name: "Users"}),
 				where: ID("SomeID", 123),
 			},
 			want: "SELECT * FROM [Users] WHERE SomeID = 123",
@@ -65,7 +66,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select_*_from_User_where_Email_=_'test@example.com'",
 			q: structuredQuery{
-				from: &CollectionRef{name: "User"},
+				from: From(&CollectionRef{name: "User"}),
 				columns: []Column{
 					{Expression: Field("id")},
 					{Expression: Field("name")},
@@ -78,7 +79,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select top 7 * from User",
 			q: structuredQuery{
-				from:  &CollectionRef{name: "User"},
+				from:  From(&CollectionRef{name: "User"}),
 				limit: 7,
 			},
 			want: "SELECT TOP 7 * FROM [User]",
@@ -86,7 +87,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select top 7 * from User order by Email, Created DESC",
 			q: structuredQuery{
-				from:  &CollectionRef{name: "User"},
+				from:  From(&CollectionRef{name: "User"}),
 				limit: 7,
 				orderBy: []OrderExpression{
 					Ascending(Field("Email")),
@@ -98,7 +99,7 @@ func TestSelect(t *testing.T) {
 		{ // TODO: Demo test generation
 			name: "select top 7 * from User order by Email, Created DESC group by Email, Created",
 			q: structuredQuery{
-				from:  &CollectionRef{name: "User"},
+				from:  From(&CollectionRef{name: "User"}),
 				limit: 7,
 				orderBy: []OrderExpression{
 					Ascending(Field("Email")),

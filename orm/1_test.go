@@ -1,8 +1,9 @@
 package orm
 
 import (
-	"github.com/dal-go/dalgo/dal"
 	"reflect"
+
+	"github.com/dal-go/dalgo/dal"
 )
 
 var _ Collection = (*UserCollection)(nil)
@@ -34,8 +35,8 @@ func (v UserCollection) CollectionRef() dal.CollectionRef {
 	return dal.NewRootCollectionRef("Users", "")
 }
 
-func (v UserCollection) Query() dal.QueryBuilder {
-	return dal.From(Users.CollectionRef())
+func (v UserCollection) Query() dal.IQueryBuilder {
+	return dal.From(Users.CollectionRef()).NewQuery()
 }
 
 func (v UserCollection) IDKind() reflect.Kind {

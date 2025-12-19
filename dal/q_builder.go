@@ -3,107 +3,107 @@ package dal
 import "reflect"
 
 type SingleSource interface {
-	Where(conditions ...Condition) QueryBuilder
+	Where(conditions ...Condition) IQueryBuilder
 }
 
 type Cursor string
 
-type QueryBuilder interface {
-	Offset(int) QueryBuilder
-	Limit(int) QueryBuilder
-	Where(conditions ...Condition) QueryBuilder
-	WhereField(name string, operator Operator, v any) QueryBuilder
-	WhereInArrayField(name string, v any) QueryBuilder
-	OrderBy(expressions ...OrderExpression) QueryBuilder
+type IQueryBuilder interface {
+	Clone() IQueryBuilder
+	Offset(int) IQueryBuilder
+	Limit(int) IQueryBuilder
+	Where(conditions ...Condition) IQueryBuilder
+	WhereField(name string, operator Operator, v any) IQueryBuilder
+	WhereInArrayField(name string, v any) IQueryBuilder
+	OrderBy(expressions ...OrderExpression) IQueryBuilder
 	SelectInto(func() Record) StructuredQuery
 	SelectKeysOnly(idKind reflect.Kind) StructuredQuery
-	StartFrom(cursor Cursor) QueryBuilder
+	StartFrom(cursor Cursor) IQueryBuilder
 }
 
-var _ QueryBuilder = (*queryBuilder)(nil)
+var _ IQueryBuilder = (*QueryBuilder)(nil)
 
-// NewQueryBuilder creates a new QueryBuilder - it's an entry point to build a query.
+// NewQueryBuilder creates a new IQueryBuilder - it's an entry point to build a query.
 // We can use From() directly but this is easier to remember.
-func NewQueryBuilder(collection RecordsetSource) QueryBuilder {
-	return &queryBuilder{recordsetSource: collection}
+func NewQueryBuilder(from FromSource) *QueryBuilder {
+	return &QueryBuilder{q: structuredQuery{from: from}}
 }
 
-// From creates a new QueryBuilder with optional conditions.
+// From creates a new IQueryBuilder with optional conditions.
 // We can use NewQueryBuilder() directly but this is shorter.
-func From(collection CollectionRef) QueryBuilder {
-	return NewQueryBuilder(collection)
+func From(source RecordsetSource) FromSource {
+	return &from{RecordsetSource: source}
 }
 
-type queryBuilder struct {
-	recordsetSource RecordsetSource
-	offset          int
-	limit           int
-	conditions      []Condition
-	orderBy         []OrderExpression
-	startCursor     Cursor
+type QueryBuilder struct {
+	q structuredQuery
+	//recordsetSource RecordsetSource
+	//offset          int
+	//limit           int
+	conditions []Condition
+	//orderBy         []OrderExpression
+	//startCursor     Cursor
 }
 
-func (s queryBuilder) StartFrom(cursor Cursor) QueryBuilder {
-	s.startCursor = cursor
+func (s *QueryBuilder) Clone() IQueryBuilder {
+	s2 := *s
+	return &s2
+}
+
+func (s *QueryBuilder) StartFrom(cursor Cursor) IQueryBuilder {
+	s.q.startCursor = cursor
 	return s
 }
 
-func (s queryBuilder) Offset(i int) QueryBuilder {
-	s.offset = i
+func (s *QueryBuilder) Offset(i int) IQueryBuilder {
+	s.q.offset = i
 	return s
 }
 
-func (s queryBuilder) Limit(i int) QueryBuilder {
-	s.limit = i
+func (s *QueryBuilder) Limit(i int) IQueryBuilder {
+	s.q.limit = i
 	return s
 }
 
-func (s queryBuilder) OrderBy(expressions ...OrderExpression) QueryBuilder {
-	s.orderBy = append(s.orderBy, expressions...)
+func (s *QueryBuilder) OrderBy(expressions ...OrderExpression) IQueryBuilder {
+	s.q.orderBy = append(s.q.orderBy, expressions...)
 	return s
 }
 
-func (s queryBuilder) Where(conditions ...Condition) QueryBuilder {
+func (s *QueryBuilder) Where(conditions ...Condition) IQueryBuilder {
 	s.conditions = append(s.conditions, conditions...)
 	return s
 }
 
-func (s queryBuilder) WhereField(name string, operator Operator, v any) QueryBuilder {
+func (s *QueryBuilder) WhereField(name string, operator Operator, v any) IQueryBuilder {
 	s.conditions = append(s.conditions, WhereField(name, operator, v))
 	return s
 }
 
-func (s queryBuilder) WhereInArrayField(name string, v any) QueryBuilder {
+func (s *QueryBuilder) WhereInArrayField(name string, v any) IQueryBuilder {
 	s.conditions = append(s.conditions, Comparison{Left: Constant{Value: v}, Operator: In, Right: FieldRef{name: name}})
 	return s
 }
 
-func (s queryBuilder) SelectInto(into func() Record) StructuredQuery {
+func (s *QueryBuilder) SelectInto(into func() Record) StructuredQuery {
 	q := s.newQuery()
 	q.into = into
 	return q
 }
 
-func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) StructuredQuery {
+func (s *QueryBuilder) SelectKeysOnly(idKind reflect.Kind) StructuredQuery {
 	q := s.newQuery()
 	q.idKind = idKind
 	return q
 }
 
-func (s queryBuilder) newQuery() structuredQuery {
-	q := structuredQuery{
-		from:        s.recordsetSource,
-		limit:       s.limit,
-		orderBy:     s.orderBy,
-		offset:      s.offset,
-		startCursor: s.startCursor,
-	}
+func (s *QueryBuilder) newQuery() structuredQuery {
 	switch len(s.conditions) {
 	case 0: // no conditions
 	case 1:
-		q.where = s.conditions[0]
+		s.q.where = s.conditions[0]
 	default:
-		q.where = GroupCondition{conditions: s.conditions, operator: And}
+		s.q.where = GroupCondition{conditions: s.conditions, operator: And}
 	}
-	return q
+	return s.q
 }

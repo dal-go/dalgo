@@ -20,8 +20,8 @@ type TextQuery interface {
 type StructuredQuery interface {
 	Query
 
-	// From defines target table/recordsetSource
-	From() RecordsetSource
+	// From - defines target table/recordsetSource
+	From() FromSource
 
 	// Where defines filter condition
 	Where() Condition

@@ -14,7 +14,7 @@ var _ StructuredQuery = (*structuredQuery)(nil)
 type structuredQuery struct {
 
 	// From defines target table/recordsetSource
-	from RecordsetSource
+	from FromSource
 
 	// Where defines filter condition
 	where Condition
@@ -46,7 +46,7 @@ func (q structuredQuery) Text() string {
 	return q.String()
 }
 
-func (q structuredQuery) From() RecordsetSource {
+func (q structuredQuery) From() FromSource {
 	return q.from
 }
 
@@ -116,7 +116,7 @@ func (q structuredQuery) String() string {
 			_, _ = writer.WriteString("\n")
 		}
 		var fromStr string
-		switch from := q.from.(type) {
+		switch from := q.from.Base().(type) {
 		case CollectionRef:
 			fromStr = from.Path()
 		case *CollectionRef:

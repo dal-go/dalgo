@@ -1,25 +1,26 @@
 package dal
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestSimpleQuery(t *testing.T) {
+func TestQueryBuilder(t *testing.T) {
 	newRecord := func() Record {
 		return nil
 	}
-	var qb = From(NewRootCollectionRef("test", "t")).
+	var qb = From(NewRootCollectionRef("test", "t")).NewQuery().
 		Where().
 		Limit(10).
 		Offset(20).
-		StartFrom(Cursor("cursor_1")).
+		StartFrom("cursor_1").
 		OrderBy(orderExpression{expression: FieldRef{name: "field_1"}})
 
 	assertQuery := func(t *testing.T, q StructuredQuery) {
 		assert.NotNil(t, q)
-		assert.Equal(t, "test", q.From().Name())
+		assert.Equal(t, "test", q.From().Base().Name())
 		assert.NotNil(t, q.Where())
 		assert.NotNil(t, q.OrderBy())
 		assert.NotNil(t, q.Limit())
@@ -27,20 +28,20 @@ func TestSimpleQuery(t *testing.T) {
 		assert.NotNil(t, q.StartFrom())
 	}
 	t.Run("no_conditions", func(t *testing.T) {
-		qbNoConditions := From(NewRootCollectionRef("test", ""))
+		qbNoConditions := From(NewRootCollectionRef("test", "")).NewQuery()
 		q := qbNoConditions.SelectKeysOnly(reflect.String)
 		assert.Equal(t, reflect.String, q.IDKind())
-		assert.Equal(t, "test", q.From().Name())
+		assert.Equal(t, "test", q.From().Base().Name())
 	})
 
 	t.Run("with_single_condition", func(t *testing.T) {
-		qb2 := qb.WhereField("field_2", Equal, "value_2")
+		qb2 := qb.Clone().WhereField("field_2", Equal, "value_2")
 		q := qb2.SelectInto(newRecord)
 		assertQuery(t, q)
 	})
 
 	t.Run("with_multiple_conditions", func(t *testing.T) {
-		qb2 := qb.
+		qb2 := qb.Clone().
 			WhereField("field_2", Equal, "value_2").
 			WhereField("field_3", Equal, "value_3")
 		q := qb2.SelectInto(newRecord)
@@ -48,7 +49,7 @@ func TestSimpleQuery(t *testing.T) {
 	})
 
 	t.Run("with_where_in_array_field", func(t *testing.T) {
-		qb2 := qb.WhereInArrayField("tags", "important")
+		qb2 := qb.Clone().WhereInArrayField("tags", "important")
 		q := qb2.SelectInto(newRecord)
 		assertQuery(t, q)
 
