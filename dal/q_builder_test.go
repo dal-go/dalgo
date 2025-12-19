@@ -17,7 +17,7 @@ func TestSimpleQuery(t *testing.T) {
 		StartFrom(Cursor("cursor_1")).
 		OrderBy(orderExpression{expression: FieldRef{name: "field_1"}})
 
-	assertQuery := func(t *testing.T, q Query) {
+	assertQuery := func(t *testing.T, q StructuredQuery) {
 		assert.NotNil(t, q)
 		assert.Equal(t, "test", q.From().Name())
 		assert.NotNil(t, q.Where())
@@ -51,11 +51,11 @@ func TestSimpleQuery(t *testing.T) {
 		qb2 := qb.WhereInArrayField("tags", "important")
 		q := qb2.SelectInto(newRecord)
 		assertQuery(t, q)
-		
+
 		// Verify the condition was created correctly
 		where := q.Where()
 		assert.NotNil(t, where)
-		
+
 		// The condition should be a Comparison with the value on the left, In operator, and field on the right
 		if comparison, ok := where.(Comparison); ok {
 			assert.Equal(t, In, comparison.Operator)

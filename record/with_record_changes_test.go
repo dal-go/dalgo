@@ -3,24 +3,29 @@ package record
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/update"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 type fakeRecord struct {
 	key  *dal.Key
 	data any
+	err  error
 }
 
-func (f *fakeRecord) Key() *dal.Key                 { return f.key }
-func (f *fakeRecord) Error() error                  { return nil }
-func (f *fakeRecord) Exists() bool                  { return false }
-func (f *fakeRecord) SetError(err error) dal.Record { return f }
-func (f *fakeRecord) Data() any                     { return f.data }
-func (f *fakeRecord) HasChanged() bool              { return false }
-func (f *fakeRecord) MarkAsChanged()                {}
+func (f *fakeRecord) Key() *dal.Key { return f.key }
+func (f *fakeRecord) Error() error  { return nil }
+func (f *fakeRecord) Exists() bool  { return false }
+func (f *fakeRecord) SetError(err error) dal.Record {
+	f.err = err
+	return f
+}
+func (f *fakeRecord) Data() any        { return f.data }
+func (f *fakeRecord) HasChanged() bool { return false }
+func (f *fakeRecord) MarkAsChanged()   {}
 
 func TestWithRecordChanges_ApplyChanges(t *testing.T) {
 	type fields struct {
@@ -233,40 +238,43 @@ func (f *fakeTx) Options() dal.TransactionOptions { return dal.NewTransactionOpt
 func (f *fakeTx) Name() string                    { return "fake" }
 
 // ReadSession (Getter, MultiGetter, QueryExecutor)
-func (f *fakeTx) Get(ctx context.Context, record dal.Record) error                 { return nil }
-func (f *fakeTx) Exists(ctx context.Context, key *dal.Key) (bool, error)           { return false, nil }
-func (f *fakeTx) GetMulti(ctx context.Context, records []dal.Record) error         { return nil }
-func (f *fakeTx) QueryReader(ctx context.Context, q dal.Query) (dal.Reader, error) { return nil, nil }
-func (f *fakeTx) QueryAllRecords(ctx context.Context, q dal.Query) ([]dal.Record, error) {
+func (f *fakeTx) Get(_ context.Context, _ dal.Record) error          { return nil }
+func (f *fakeTx) Exists(_ context.Context, _ *dal.Key) (bool, error) { return false, nil }
+func (f *fakeTx) GetMulti(_ context.Context, _ []dal.Record) error   { return nil }
+func (f *fakeTx) QueryReader(_ context.Context, _ dal.Query) (dal.Reader, error) {
+	return nil, nil
+}
+func (f *fakeTx) QueryAllRecords(_ context.Context, _ dal.Query) ([]dal.Record, error) {
 	return nil, nil
 }
 
 // WriteSession (Setter, MultiSetter, Deleter, MultiDeleter, Updater, MultiUpdater, Inserter, MultiInserter)
-func (f *fakeTx) Set(ctx context.Context, record dal.Record) error         { return nil }
-func (f *fakeTx) SetMulti(ctx context.Context, records []dal.Record) error { return nil }
-func (f *fakeTx) Delete(ctx context.Context, key *dal.Key) error           { return nil }
-func (f *fakeTx) DeleteMulti(ctx context.Context, keys []*dal.Key) error {
+func (f *fakeTx) Set(_ context.Context, _ dal.Record) error        { return nil }
+func (f *fakeTx) SetMulti(_ context.Context, _ []dal.Record) error { return nil }
+func (f *fakeTx) Delete(_ context.Context, _ *dal.Key) error       { return nil }
+func (f *fakeTx) DeleteMulti(_ context.Context, keys []*dal.Key) error {
 	f.deleted = append(f.deleted, keys...)
 	return f.deleteErr
 }
-func (f *fakeTx) Update(ctx context.Context, key *dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+func (f *fakeTx) Update(_ context.Context, key *dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+	_ = preconditions
 	f.updated = append(f.updated, struct {
 		key     *dal.Key
 		updates []update.Update
 	}{key: key, updates: updates})
 	return f.updateErr
 }
-func (f *fakeTx) UpdateRecord(ctx context.Context, record dal.Record, updates []update.Update, preconditions ...dal.Precondition) error {
+func (f *fakeTx) UpdateRecord(_ context.Context, _ dal.Record, _ []update.Update, _ ...dal.Precondition) error {
 	return f.updateErr
 }
-func (f *fakeTx) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+func (f *fakeTx) UpdateMulti(_ context.Context, _ []*dal.Key, _ []update.Update, _ ...dal.Precondition) error {
 	return nil
 }
-func (f *fakeTx) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
+func (f *fakeTx) Insert(_ context.Context, record dal.Record, _ ...dal.InsertOption) error {
 	f.inserted = append(f.inserted, record)
 	return f.insertErr
 }
-func (f *fakeTx) InsertMulti(ctx context.Context, records []dal.Record, opts ...dal.InsertOption) error {
+func (f *fakeTx) InsertMulti(_ context.Context, records []dal.Record, _ ...dal.InsertOption) error {
 	f.inserted = append(f.inserted, records...)
 	return f.insertErr
 }
@@ -324,8 +332,11 @@ func TestWithRecordChanges_ApplyChanges_UpdateError(t *testing.T) {
 	wr := &WithRecordChanges{RecordsToUpdate: []*Updates{{Record: rec, Updates: []update.Update{update.ByFieldName("a", 2)}}}}
 	tx := &fakeTx{updateErr: errors.New("upderr")}
 	err := wr.ApplyChanges(ctx, tx)
+	assert.NotNil(t, err)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to update record test/id1: upderr")
+	if err != nil {
+		assert.Contains(t, err.Error(), "failed to update record test/id1: upderr")
+	}
 }
 
 func TestWithRecordChanges_ApplyChanges_DeleteError(t *testing.T) {

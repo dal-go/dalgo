@@ -1,11 +1,5 @@
 package dal
 
-type TextQuery interface {
-	Text() string
-	Args() []QueryArg
-	String() string
-}
-
 var _ TextQuery = (*textQuery)(nil)
 
 type textQuery struct {

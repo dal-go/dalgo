@@ -15,8 +15,8 @@ type QueryBuilder interface {
 	WhereField(name string, operator Operator, v any) QueryBuilder
 	WhereInArrayField(name string, v any) QueryBuilder
 	OrderBy(expressions ...OrderExpression) QueryBuilder
-	SelectInto(func() Record) Query
-	SelectKeysOnly(idKind reflect.Kind) Query
+	SelectInto(func() Record) StructuredQuery
+	SelectKeysOnly(idKind reflect.Kind) StructuredQuery
 	StartFrom(cursor Cursor) QueryBuilder
 }
 
@@ -78,20 +78,20 @@ func (s queryBuilder) WhereInArrayField(name string, v any) QueryBuilder {
 	return s
 }
 
-func (s queryBuilder) SelectInto(into func() Record) Query {
+func (s queryBuilder) SelectInto(into func() Record) StructuredQuery {
 	q := s.newQuery()
 	q.into = into
 	return q
 }
 
-func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) Query {
+func (s queryBuilder) SelectKeysOnly(idKind reflect.Kind) StructuredQuery {
 	q := s.newQuery()
 	q.idKind = idKind
 	return q
 }
 
-func (s queryBuilder) newQuery() theQuery {
-	q := theQuery{
+func (s queryBuilder) newQuery() structuredQuery {
+	q := structuredQuery{
 		from:        s.recordsetSource,
 		limit:       s.limit,
 		orderBy:     s.orderBy,

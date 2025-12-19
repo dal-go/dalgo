@@ -9,12 +9,12 @@ import (
 func TestSelect(t *testing.T) {
 	tests := []struct {
 		name string
-		q    theQuery
+		q    structuredQuery
 		want string
 	}{
 		{
 			name: "select_1",
-			q: theQuery{
+			q: structuredQuery{
 				columns: []Column{
 					{Expression: constant.Int(1)},
 				},
@@ -23,7 +23,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			name: "select_'abc'_AS_first_col",
-			q: theQuery{
+			q: structuredQuery{
 				columns: []Column{
 					{Expression: constant.Str("abc"), Alias: "first_col"},
 				},
@@ -32,14 +32,14 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			name: "select_*_from_User",
-			q: theQuery{
+			q: structuredQuery{
 				from: &CollectionRef{name: "User"},
 			},
 			want: "SELECT * FROM [User]",
 		},
 		{
 			name: "select_top_10_*_from_User",
-			q: theQuery{
+			q: structuredQuery{
 				from:  &CollectionRef{name: "User"},
 				limit: 10,
 			},
@@ -47,7 +47,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			name: "select_top_10_*_from_User_offset_20",
-			q: theQuery{
+			q: structuredQuery{
 				from:   &CollectionRef{name: "User"},
 				limit:  10,
 				offset: 20,
@@ -56,7 +56,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			name: "select_*_from_Users_where_SomeID_=_123",
-			q: theQuery{
+			q: structuredQuery{
 				from:  &CollectionRef{name: "Users"},
 				where: ID("SomeID", 123),
 			},
@@ -64,7 +64,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			name: "select_*_from_User_where_Email_=_'test@example.com'",
-			q: theQuery{
+			q: structuredQuery{
 				from: &CollectionRef{name: "User"},
 				columns: []Column{
 					{Expression: Field("id")},
@@ -77,7 +77,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			name: "select top 7 * from User",
-			q: theQuery{
+			q: structuredQuery{
 				from:  &CollectionRef{name: "User"},
 				limit: 7,
 			},
@@ -85,7 +85,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			name: "select top 7 * from User order by Email, Created DESC",
-			q: theQuery{
+			q: structuredQuery{
 				from:  &CollectionRef{name: "User"},
 				limit: 7,
 				orderBy: []OrderExpression{
@@ -97,7 +97,7 @@ func TestSelect(t *testing.T) {
 		},
 		{ // TODO: Demo test generation
 			name: "select top 7 * from User order by Email, Created DESC group by Email, Created",
-			q: theQuery{
+			q: structuredQuery{
 				from:  &CollectionRef{name: "User"},
 				limit: 7,
 				orderBy: []OrderExpression{

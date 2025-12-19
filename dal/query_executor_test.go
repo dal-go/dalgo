@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewQueryExecutor(t *testing.T) {
@@ -30,7 +31,7 @@ func Test_selector_SelectReader(t *testing.T) {
 	}
 	type args struct {
 		c     context.Context
-		query theQuery
+		query structuredQuery
 	}
 	tests := []struct {
 		name    string
@@ -62,7 +63,7 @@ func Test_selector_QueryAllRecords(t *testing.T) {
 	}
 	type args struct {
 		c     context.Context
-		query theQuery
+		query structuredQuery
 	}
 	tests := []struct {
 		name        string
@@ -90,7 +91,7 @@ func Test_selector_QueryAllRecords(t *testing.T) {
 func Test_queryExecutor(t *testing.T) {
 	type args struct {
 		c     context.Context
-		query Query
+		query StructuredQuery
 	}
 	tests := []struct {
 		name        string

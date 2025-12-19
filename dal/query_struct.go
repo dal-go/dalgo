@@ -7,11 +7,11 @@ import (
 	"strconv"
 )
 
-var _ Query = theQuery{}
-var _ Query = (*theQuery)(nil)
+var _ StructuredQuery = structuredQuery{}
+var _ StructuredQuery = (*structuredQuery)(nil)
 
 // query holds definition of a query
-type theQuery struct {
+type structuredQuery struct {
 
 	// From defines target table/recordsetSource
 	from RecordsetSource
@@ -42,47 +42,51 @@ type theQuery struct {
 	startCursor Cursor
 }
 
-func (q theQuery) From() RecordsetSource {
+func (q structuredQuery) Text() string {
+	return q.String()
+}
+
+func (q structuredQuery) From() RecordsetSource {
 	return q.from
 }
 
-func (q theQuery) Where() Condition {
+func (q structuredQuery) Where() Condition {
 	return q.where
 }
 
-func (q theQuery) GroupBy() []Expression {
+func (q structuredQuery) GroupBy() []Expression {
 	return q.groupBy[:]
 }
 
-func (q theQuery) OrderBy() []OrderExpression {
+func (q structuredQuery) OrderBy() []OrderExpression {
 	return q.orderBy[:]
 }
 
-func (q theQuery) Columns() []Column {
+func (q structuredQuery) Columns() []Column {
 	return q.columns[:]
 }
 
-func (q theQuery) Into() func() Record {
+func (q structuredQuery) Into() func() Record {
 	return q.into
 }
 
-func (q theQuery) IDKind() reflect.Kind {
+func (q structuredQuery) IDKind() reflect.Kind {
 	return q.idKind
 }
 
-func (q theQuery) StartFrom() Cursor {
+func (q structuredQuery) StartFrom() Cursor {
 	return q.startCursor
 }
 
-func (q theQuery) Offset() int {
+func (q structuredQuery) Offset() int {
 	return q.offset
 }
 
-func (q theQuery) Limit() int {
+func (q structuredQuery) Limit() int {
 	return q.limit
 }
 
-func (q theQuery) String() string {
+func (q structuredQuery) String() string {
 	writer := bytes.NewBuffer(make([]byte, 0, 1024))
 	_, _ = writer.WriteString("SELECT")
 	if q.limit > 0 {
@@ -156,11 +160,11 @@ func (q theQuery) String() string {
 	return writer.String()
 }
 
-var _ fmt.Stringer = (*theQuery)(nil)
+var _ fmt.Stringer = (*structuredQuery)(nil)
 
 // And creates a new query by adding a condition to a predefined query
-func (q theQuery) groupWithConditions(operator Operator, conditions ...Condition) theQuery {
-	qry := theQuery{from: q.from}
+func (q structuredQuery) groupWithConditions(operator Operator, conditions ...Condition) structuredQuery {
+	qry := structuredQuery{from: q.from}
 	and := GroupCondition{operator: operator, conditions: make([]Condition, len(conditions)+1)}
 	and.conditions[0] = q.where
 	for i, condition := range conditions {
@@ -171,11 +175,11 @@ func (q theQuery) groupWithConditions(operator Operator, conditions ...Condition
 }
 
 // And creates an inherited query by adding AND conditions
-func (q theQuery) And(conditions ...Condition) theQuery {
+func (q structuredQuery) And(conditions ...Condition) structuredQuery {
 	return q.groupWithConditions(And, conditions...)
 }
 
 // Or creates an inherited query by adding OR conditions
-func (q theQuery) Or(conditions ...Condition) theQuery {
+func (q structuredQuery) Or(conditions ...Condition) structuredQuery {
 	return q.groupWithConditions(Or, conditions...)
 }

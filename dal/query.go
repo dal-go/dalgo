@@ -1,13 +1,24 @@
 package dal
 
 import (
-	"fmt"
 	"reflect"
 )
 
-// Query represents a query to a recordsetSource
 type Query interface {
-	fmt.Stringer
+	Text() string
+	String() string
+}
+
+// TextQuery defines an interface to represent a query with text and associated arguments.
+type TextQuery interface {
+	Text() string
+	Args() []QueryArg
+	String() string
+}
+
+// StructuredQuery represents a query to a recordsetSource
+type StructuredQuery interface {
+	Query
 
 	// From defines target table/recordsetSource
 	From() RecordsetSource
