@@ -3,6 +3,7 @@ package dal
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -14,7 +15,7 @@ var ErrNotSupported = errors.New("not supported")
 var ErrNotImplementedYet = errors.New("not implemented yet")
 
 // ErrNoMoreRecords indicates there is no more records
-var ErrNoMoreRecords = errors.New("no more errors")
+var ErrNoMoreRecords = fmt.Errorf("%w: no more errors", io.EOF)
 
 // ErrDuplicateUser indicates there is a duplicate user // TODO: move to strongo/app?
 type ErrDuplicateUser struct {

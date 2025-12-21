@@ -3,6 +3,7 @@ package dal
 import (
 	"errors"
 	"fmt"
+	"io"
 )
 
 // ReaderOption configures how SelectAll reads from the Reader (e.g., limit, offset).
@@ -93,7 +94,7 @@ func SelectAll[T any](reader Reader, getItem func(r Record) T, options ...Reader
 		for {
 			r, e := reader.Next()
 			if e != nil {
-				if errors.Is(e, ErrNoMoreRecords) {
+				if errors.Is(e, io.EOF) {
 					return items, nil
 				}
 				return items, e
