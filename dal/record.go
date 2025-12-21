@@ -160,6 +160,7 @@ func NewRecordWithIncompleteKey(collection string, idKind reflect.Kind, data any
 	return &record{
 		key:  NewIncompleteKey(collection, idKind, nil),
 		data: data,
+		err:  ErrNoError,
 	}
 }
 
