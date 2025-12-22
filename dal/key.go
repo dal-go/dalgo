@@ -257,8 +257,9 @@ func NewRecordWithoutKey(data any) Record {
 			panic("pointer to map is not allowed; pass the map by value")
 		case reflect.Slice:
 			panic("pointer to slice is not allowed; pass the slice by value")
+		default:
+			// other pointers (e.g., to struct) are allowed
 		}
-		// other pointers (e.g., to struct) are allowed
 	default:
 		// other value types must not be passed by value
 		panic("data must be a pointer, map[string]..., or slice")

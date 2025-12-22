@@ -66,9 +66,8 @@ func (v CollectionRef) String() string {
 		if v.parent == nil {
 			if v.alias == "" {
 				return v.name
-			} else {
-				return fmt.Sprintf("%s AS %s", v.name, v.alias)
 			}
+			return fmt.Sprintf("%s AS %s", v.name, v.alias)
 		}
 	}
 	path := v.Path()

@@ -32,7 +32,7 @@ func (s queryExecutor) GetReader(ctx context.Context, query Query) (Reader, erro
 	return s.getReader(ctx, query)
 }
 
-// QueryAllRecords is a helper method that for a given reader returns all records as a slice.
+// ReadAllRecords is a helper method that for a given reader returns all records as a slice.
 func (s queryExecutor) ReadAllRecords(
 	ctx context.Context, query Query, options ...ReaderOption,
 ) (

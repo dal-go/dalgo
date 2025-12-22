@@ -116,14 +116,14 @@ func TestNewConstant(t *testing.T) {
 		},
 		{
 			name:      "float64",
-			input:     float64(3.14159),
-			want:      float64(3.14159),
+			input:     3.14159,
+			want:      3.14159,
 			wantPanic: false,
 		},
 		{
 			name:      "int",
-			input:     int(42),
-			want:      int(42),
+			input:     42,
+			want:      42,
 			wantPanic: false,
 		},
 		{

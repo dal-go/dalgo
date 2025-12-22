@@ -89,7 +89,7 @@ func NewErrNotFoundByKey(key *Key, cause error) error {
 }
 
 func errNotFoundCause(cause error) error {
-	if cause == nil || cause == ErrRecordNotFound {
+	if cause == nil || cause.(any) == ErrRecordNotFound.(any) {
 		return ErrRecordNotFound
 	}
 	return fmt.Errorf("%w: %v", ErrRecordNotFound, cause)

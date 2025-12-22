@@ -36,26 +36,31 @@ func TestWithRandomStringKey(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var io insertOptions
-			WithRandomStringKey(tt.args.length, tt.args.maxAttempts)(&io)
-			idGen := io.IDGenerator()
-			if idGen == nil {
-				t.Errorf("WithRandomStringKeyPrefixedByUnixTime() insertOptions.idGen = nil")
-			}
-			data := struct{}{}
-			rec := NewRecordWithIncompleteKey("recordsetSource", reflect.String, &data)
-			if err := idGen(context.Background(), rec); err != nil {
-				t.Fatalf("idGen returend errr: %v", err)
-			}
-			id := rec.Key().ID.(string)
-			if id == "" {
-				t.Fatalf("generated id is empty string")
-			}
+			id := getID(t, tt.args.length, tt.args.maxAttempts, WithRandomStringKey)
 			if len(id) != tt.args.length {
 				t.Errorf("length of generated id expected to be %d, got %d", tt.args.length, len(id))
 			}
 		})
 	}
+}
+
+func getID(t *testing.T, idLen, maxAttempts int, f func(length, maxAttempts int) InsertOption) string {
+	var io insertOptions
+	f(idLen, maxAttempts)(&io)
+	idGen := io.IDGenerator()
+	if idGen == nil {
+		t.Errorf("WithRandomStringKeyPrefixedByUnixTime() insertOptions.idGen = nil")
+	}
+	data := struct{}{}
+	rec := NewRecordWithIncompleteKey("recordsetSource", reflect.String, &data)
+	if err := idGen(context.Background(), rec); err != nil {
+		t.Fatalf("idGen returend errr: %v", err)
+	}
+	id := rec.Key().ID.(string)
+	if id == "" {
+		t.Fatalf("generated id is empty string")
+	}
+	return id
 }
 
 func TestWithRandomStringKeyPrefixedByUnixTime(t *testing.T) {
@@ -85,18 +90,7 @@ func TestWithRandomStringKeyPrefixedByUnixTime(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var io insertOptions
-			WithRandomStringKeyPrefixedByUnixTime(tt.args.length, tt.args.maxAttempts)(&io)
-			idGen := io.IDGenerator()
-			if idGen == nil {
-				t.Errorf("WithRandomStringKeyPrefixedByUnixTime() insertOptions.idGen = nil")
-			}
-			data := struct{}{}
-			rec := NewRecordWithIncompleteKey("recordsetSource", reflect.String, &data)
-			if err := idGen(context.Background(), rec); err != nil {
-				t.Fatalf("idGen returend errr: %v", err)
-			}
-			id := rec.Key().ID.(string)
+			id := getID(t, tt.args.length, tt.args.maxAttempts, WithRandomStringKeyPrefixedByUnixTime)
 			if id == "" {
 				t.Fatalf("generated id is empty string")
 			}

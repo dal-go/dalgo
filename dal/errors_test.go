@@ -65,7 +65,11 @@ func TestErrNotSupported(t *testing.T) {
 
 func TestNewRollbackError(t *testing.T) {
 	err := NewRollbackError(errors.New("some rollback error"), errors.New("some original error"))
-	rollbackErr, isRollbackError := err.(rollbackError)
+	//if !errors.Is(err, rollbackError{}) {
+	//	t.Errorf("NewRollbackError() error = %v, wantErr %T", err, rollbackError{})
+	//}
+	var rollbackErr rollbackError
+	isRollbackError := errors.As(err, &rollbackErr)
 	assert.True(t, true, isRollbackError)
 	assert.NotNil(t, rollbackErr)
 	assert.True(t, strings.Contains(err.Error(), "some rollback error"))

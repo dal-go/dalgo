@@ -156,6 +156,31 @@ func TestTxWithIsolationLevel(t *testing.T) {
 			shouldPanic:       false,
 		},
 		{
+			name:              "TxReadUncommitted",
+			txIsolationLevel1: TxReadUncommitted,
+			shouldPanic:       false,
+		},
+		{
+			name:              "TxRepeatableRead",
+			txIsolationLevel1: TxRepeatableRead,
+			shouldPanic:       false,
+		},
+		{
+			name:              "TxSerializable",
+			txIsolationLevel1: TxSerializable,
+			shouldPanic:       false,
+		},
+		{
+			name:              "TxSnapshot",
+			txIsolationLevel1: TxSnapshot,
+			shouldPanic:       false,
+		},
+		{
+			name:              "TxChaos",
+			txIsolationLevel1: TxChaos,
+			shouldPanic:       false,
+		},
+		{
 			name:              "twice_same",
 			txIsolationLevel1: TxReadCommitted,
 			txIsolationLevel2: TxReadCommitted,
