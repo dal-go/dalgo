@@ -119,13 +119,14 @@ func InsertWithIdGenerator(
 				return fmt.Errorf("failed to validate record key: %w", err)
 			}
 		}
-		if err := exists(key); err == nil {
-			continue
-		} else if IsNotFound(err) {
-			return insert(r) // r shares child with tmp
+
+		if err := exists(key); err != nil {
+			if IsNotFound(err) {
+				return insert(r) // r shares child with tmp
+			}
+			key.ID = nil
+			return fmt.Errorf("failed to check if record exists: %w", err)
 		}
-		key.ID = nil
-		return fmt.Errorf("failed to check if record exists: %w", err)
 	}
 	key.ID = nil
 	return fmt.Errorf("not able to generate unique id: %w: %d", ErrExceedsMaxNumberOfAttempts, maxAttempts)
