@@ -16,7 +16,7 @@ func (rs *ColumnarRecordset) Name() string {
 
 func (rs *ColumnarRecordset) NewRow() Row {
 	row := &columnarRow{i: rs.rowsCount}
-	for _, c := range rs.columns.cols {
+	for _, c := range rs.cols {
 		_ = c.Add(c.DefaultValue())
 	}
 	rs.rowsCount++
