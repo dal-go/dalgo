@@ -19,6 +19,10 @@ func TestColumnarRecordset(t *testing.T) {
 		if rs == nil {
 			t.Fatal("NewColumnarRecordset() returned nil")
 		}
+		rs.name = "test_rs"
+	})
+	t.Run("Name", func(t *testing.T) {
+		assert.Equal(t, "test_rs", rs.Name())
 	})
 	t.Run("initial RowsCount", func(t *testing.T) {
 		if rowsCount := rs.RowsCount(); rowsCount > 0 {
@@ -65,4 +69,32 @@ func TestColumnarRecordset(t *testing.T) {
 
 	testNewRow("Anna", 19)
 	testNewRow("Bob", 23)
+
+	t.Run("GetRow_out_of_range", func(t *testing.T) {
+		assert.Nil(t, rs.GetRow(100))
+	})
+
+	t.Run("GetValueByName", func(t *testing.T) {
+		row := rs.GetRow(0)
+		val, err := row.GetValueByName("FirstName", rs)
+		assert.NoError(t, err)
+		assert.Equal(t, "Anna", val)
+
+		_, err = row.GetValueByName("Unknown", rs)
+		assert.Error(t, err)
+	})
+
+	t.Run("SetValueByName", func(t *testing.T) {
+		row := rs.GetRow(0)
+		err := row.SetValueByName("FirstName", "Ann", rs)
+		assert.NoError(t, err)
+		val, _ := row.GetValueByName("FirstName", rs)
+		assert.Equal(t, "Ann", val)
+	})
+
+	t.Run("GetValueByIndex_out_of_range", func(t *testing.T) {
+		row := rs.GetRow(0)
+		_, err := row.GetValueByIndex(100, rs)
+		assert.Error(t, err)
+	})
 }

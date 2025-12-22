@@ -4,22 +4,66 @@ import (
 	"testing"
 )
 
-func TestNewColumn(t *testing.T) {
+func TestColumn(t *testing.T) {
 	t.Run("string", func(t *testing.T) {
-		testNewCol(t, "string")
+		testCol(t, "string", "abc", "def")
 	})
 	t.Run("int", func(t *testing.T) {
-		testNewCol[int](t, 0)
+		testCol[int](t, 0, 1, 2)
 	})
 }
 
-func testNewCol[T any](t *testing.T, defaultValue T) {
+func testCol[T any](t *testing.T, defaultValue T, v1, v2 T) {
 	const colName = "test_col_name"
 	col := NewColumn[T](colName, defaultValue)
 	if col == nil {
-		t.Error("got nil, want NewColumn[T]")
+		t.Fatal("got nil, want NewColumn[T]")
 	}
 	if name := col.Name(); name != colName {
 		t.Errorf("got name=%q, want %q", name, colName)
+	}
+
+	if val := col.DefaultValue(); val != any(defaultValue) {
+		t.Errorf("got DefaultValue=%v, want %v", val, defaultValue)
+	}
+
+	if err := col.Add(any(v1)); err != nil {
+		t.Errorf("Add failed: %v", err)
+	}
+	if err := col.Add(any(v2)); err != nil {
+		t.Errorf("Add failed: %v", err)
+	}
+
+	if val, err := col.GetValue(0); err != nil {
+		t.Errorf("GetValue(0) failed: %v", err)
+	} else if val != any(v1) {
+		t.Errorf("GetValue(0) returned %v, want %v", val, v1)
+	}
+
+	if err := col.SetValue(0, any(v2)); err != nil {
+		t.Errorf("SetValue(0) failed: %v", err)
+	}
+	if val, err := col.GetValue(0); err != nil {
+		t.Errorf("GetValue(0) failed: %v", err)
+	} else if val != any(v2) {
+		t.Errorf("GetValue(0) returned %v, want %v", val, v2)
+	}
+
+	if col.IsBitmap() {
+		t.Error("IsBitmap() returned true, want false")
+	}
+
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("ValueType() did not panic")
+			}
+		}()
+		_ = col.ValueType()
+	}()
+
+	err := col.Add(struct{}{})
+	if err == nil {
+		t.Error("Add(wrong_type) should fail")
 	}
 }
