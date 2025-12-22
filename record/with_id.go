@@ -2,6 +2,7 @@ package record
 
 import (
 	"fmt"
+
 	"github.com/dal-go/dalgo/dal"
 )
 

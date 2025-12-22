@@ -3,9 +3,10 @@ package dal
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewErrNotFoundByKey(t *testing.T) {

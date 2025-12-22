@@ -2,9 +2,10 @@ package dal
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewRecord(t *testing.T) {

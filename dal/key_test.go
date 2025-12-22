@@ -3,9 +3,10 @@ package dal
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestField_Validate(t *testing.T) {

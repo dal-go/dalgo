@@ -1,9 +1,10 @@
 package record
 
 import (
+	"testing"
+
 	"github.com/dal-go/dalgo/dal"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewDataWithID(t *testing.T) {
@@ -83,35 +84,35 @@ func TestNewDataWithID(t *testing.T) {
 			NewDataWithID("r1", dal.NewKeyWithID("r1", "SomeCollection"), d3)
 		})
 	})
-	
+
 	t.Run("should_panic_on_nil_pointer", func(t *testing.T) {
 		assert.Panics(t, func() {
 			var d *data = nil
 			NewDataWithID("r1", dal.NewKeyWithID("r1", "SomeCollection"), d)
 		})
 	})
-	
+
 	t.Run("should_panic_on_nil_interface", func(t *testing.T) {
 		assert.Panics(t, func() {
 			var d any = nil
 			NewDataWithID("r1", dal.NewKeyWithID("r1", "SomeCollection"), d)
 		})
 	})
-	
+
 	t.Run("should_panic_on_non_pointer_data", func(t *testing.T) {
 		assert.Panics(t, func() {
 			d := data{Title: "test"}
 			NewDataWithID("r1", dal.NewKeyWithID("r1", "SomeCollection"), d)
 		})
 	})
-	
+
 	t.Run("should_panic_on_pointer_to_non_struct_non_map", func(t *testing.T) {
 		assert.Panics(t, func() {
 			s := "test"
 			NewDataWithID("r1", dal.NewKeyWithID("r1", "SomeCollection"), &s)
 		})
 	})
-	
+
 	t.Run("should_work_with_map", func(t *testing.T) {
 		m := map[string]any{"title": "test"}
 		result := NewDataWithID("r1", dal.NewKeyWithID("r1", "SomeCollection"), &m)

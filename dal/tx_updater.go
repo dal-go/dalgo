@@ -2,6 +2,7 @@ package dal
 
 import (
 	"context"
+
 	"github.com/dal-go/dalgo/update"
 )
 

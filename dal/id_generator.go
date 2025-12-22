@@ -3,9 +3,10 @@ package dal
 import (
 	"context"
 	"fmt"
-	"github.com/strongo/random"
 	"strconv"
 	"time"
+
+	"github.com/strongo/random"
 )
 
 type idGenerator struct {

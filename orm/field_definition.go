@@ -1,9 +1,10 @@
 package orm
 
 import (
-	"github.com/dal-go/dalgo/dal"
 	"reflect"
 	"strings"
+
+	"github.com/dal-go/dalgo/dal"
 )
 
 type FieldDefinition[T any] struct {

@@ -3,9 +3,10 @@ package dal
 import (
 	"context"
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type testValidateData struct {

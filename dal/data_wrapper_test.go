@@ -3,8 +3,9 @@ package dal
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMakeRecordData(t *testing.T) {

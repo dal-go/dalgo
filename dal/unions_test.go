@@ -1,9 +1,10 @@
 package dal
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestArrayUnion_Name(t *testing.T) {

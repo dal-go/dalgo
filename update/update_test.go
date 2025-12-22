@@ -1,9 +1,10 @@
 package update
 
 import (
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdate_Validate(t *testing.T) {
@@ -200,7 +201,7 @@ func TestUpdate_Validate_EdgeCases(t *testing.T) {
 			errMsg:  "both FieldVal and fieldPath are provided",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.update.Validate()
@@ -217,11 +218,11 @@ func TestUpdate_Validate_EdgeCases(t *testing.T) {
 func TestSentinelValues(t *testing.T) {
 	// Test that sentinel values are distinct
 	assert.NotEqual(t, DeleteField, ServerTimestamp)
-	
+
 	// Test using sentinel values in updates
 	deleteUpdate := update{fieldName: "field", value: DeleteField}
 	timestampUpdate := update{fieldName: "field", value: ServerTimestamp}
-	
+
 	assert.Equal(t, DeleteField, deleteUpdate.Value())
 	assert.Equal(t, ServerTimestamp, timestampUpdate.Value())
 }

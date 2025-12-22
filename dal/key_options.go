@@ -3,8 +3,9 @@ package dal
 import (
 	"context"
 	"errors"
-	"github.com/strongo/random"
 	"reflect"
+
+	"github.com/strongo/random"
 )
 
 // KeyOption defines contract for key option

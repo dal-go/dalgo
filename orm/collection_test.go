@@ -1,9 +1,10 @@
 package orm
 
 import (
+	"testing"
+
 	"github.com/dal-go/dalgo/dal"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestFieldDefinitionEqualTo(t *testing.T) {

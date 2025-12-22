@@ -3,10 +3,11 @@ package dal
 import (
 	"context"
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 //type foo struct {

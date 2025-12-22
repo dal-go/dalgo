@@ -2,8 +2,9 @@ package record
 
 import (
 	"fmt"
-	"github.com/dal-go/dalgo/dal"
 	"reflect"
+
+	"github.com/dal-go/dalgo/dal"
 )
 
 type DataWithID[K comparable, D any] struct {
