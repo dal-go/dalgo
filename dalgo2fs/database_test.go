@@ -2,6 +2,7 @@ package dalgo2fs
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -155,7 +156,7 @@ func TestDatabase_Methods(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
-		if mockRecord.Error() != dal.ErrNotSupported {
+		if !errors.Is(mockRecord.Error(), dal.ErrNotSupported) {
 			t.Errorf("expected dal.ErrNotSupported, got %v", mockRecord.Error())
 		}
 	})
@@ -232,7 +233,7 @@ func TestDatabase_Methods(t *testing.T) {
 
 	t.Run("GetRecordsReader", func(t *testing.T) {
 		reader, err := db.GetRecordsReader(context.Background(), nil)
-		if err != dal.ErrNotSupported {
+		if !errors.Is(err, dal.ErrNotSupported) {
 			t.Errorf("expected dal.ErrNotSupported, got %v", err)
 		}
 		if reader != nil {
@@ -242,7 +243,7 @@ func TestDatabase_Methods(t *testing.T) {
 
 	t.Run("GetRecordsetReader", func(t *testing.T) {
 		reader, err := db.GetRecordsetReader(context.Background(), nil, nil)
-		if err != dal.ErrNotSupported {
+		if !errors.Is(err, dal.ErrNotSupported) {
 			t.Errorf("expected dal.ErrNotSupported, got %v", err)
 		}
 		if reader != nil {
