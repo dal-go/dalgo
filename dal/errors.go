@@ -17,6 +17,8 @@ var ErrNotImplementedYet = errors.New("not implemented yet")
 // ErrNoMoreRecords indicates there is no more records
 var ErrNoMoreRecords = fmt.Errorf("%w: no more errors", io.EOF)
 
+var ErrLimitReached = fmt.Errorf("%w: limit reached", ErrNoMoreRecords)
+
 // ErrDuplicateUser indicates there is a duplicate user // TODO: move to strongo/app?
 type ErrDuplicateUser struct {
 	// TODO: Should it be moved out of this package to strongo/app/user?

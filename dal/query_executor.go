@@ -14,7 +14,7 @@ type QueryExecutor interface {
 	GetRecordsReader(ctx context.Context, query Query) (RecordsReader, error)
 
 	// GetRecordsetReader returns a RecordsetReader for the given query, allowing sequential read of records into the provided recordset.
-	GetRecordsetReader(ctx context.Context, query Query, rs *recordset.Recordset) (RecordsetReader, error)
+	GetRecordsetReader(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error)
 }
 
 var _ QueryExecutor = (DB)(nil)

@@ -31,7 +31,7 @@ type structuredQuery struct {
 	columns []Column
 
 	intoRecord    func() Record
-	intoRecordset *recordset.Recordset
+	intoRecordset recordset.Recordset
 
 	// Offset specifies the number of records to skip
 	offset int
@@ -45,12 +45,12 @@ type structuredQuery struct {
 	startCursor Cursor
 }
 
-func (q structuredQuery) GetRecordsReader(ctx context.Context, db DB) (reader RecordsReader, err error) {
-	return db.GetRecordsReader(ctx, q)
+func (q structuredQuery) GetRecordsReader(ctx context.Context, qe QueryExecutor) (reader RecordsReader, err error) {
+	return qe.GetRecordsReader(ctx, q)
 }
 
-func (q structuredQuery) GetRecordsetReader(ctx context.Context, db DB) (reader RecordsetReader, err error) {
-	return db.GetRecordsetReader(ctx, q, q.intoRecordset)
+func (q structuredQuery) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (reader RecordsetReader, err error) {
+	return qe.GetRecordsetReader(ctx, q, q.intoRecordset)
 }
 
 func (q structuredQuery) Text() string {

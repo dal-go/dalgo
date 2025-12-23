@@ -115,7 +115,7 @@ func (mr *MockDBMockRecorder) GetRecordsReader(ctx, query any) *gomock.Call {
 }
 
 // GetRecordsetReader mocks base method.
-func (m *MockDB) GetRecordsetReader(ctx context.Context, query dal.Query, rs *recordset.Recordset) (dal.RecordsetReader, error) {
+func (m *MockDB) GetRecordsetReader(ctx context.Context, query dal.Query, rs recordset.Recordset) (dal.RecordsetReader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRecordsetReader", ctx, query, rs)
 	ret0, _ := ret[0].(dal.RecordsetReader)

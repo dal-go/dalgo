@@ -140,7 +140,7 @@ func (mr *MockReadTransactionMockRecorder) GetRecordsReader(ctx, query any) *gom
 }
 
 // GetRecordsetReader mocks base method.
-func (m *MockReadTransaction) GetRecordsetReader(ctx context.Context, query dal.Query, rs *recordset.Recordset) (dal.RecordsetReader, error) {
+func (m *MockReadTransaction) GetRecordsetReader(ctx context.Context, query dal.Query, rs recordset.Recordset) (dal.RecordsetReader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRecordsetReader", ctx, query, rs)
 	ret0, _ := ret[0].(dal.RecordsetReader)
@@ -279,7 +279,7 @@ func (mr *MockReadwriteTransactionMockRecorder) GetRecordsReader(ctx, query any)
 }
 
 // GetRecordsetReader mocks base method.
-func (m *MockReadwriteTransaction) GetRecordsetReader(ctx context.Context, query dal.Query, rs *recordset.Recordset) (dal.RecordsetReader, error) {
+func (m *MockReadwriteTransaction) GetRecordsetReader(ctx context.Context, query dal.Query, rs recordset.Recordset) (dal.RecordsetReader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRecordsetReader", ctx, query, rs)
 	ret0, _ := ret[0].(dal.RecordsetReader)

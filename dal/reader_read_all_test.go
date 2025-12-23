@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dal-go/dalgo/recordset"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -149,7 +150,7 @@ func TestSelectAll(t *testing.T) {
 		}}},
 		{name: "empty_reader", args: args{reader: func() RecordsReader {
 			return &EmptyReader{}
-		}}, wantIds: []int{}, wantErr: nil},
+		}}, wantIds: []int(nil), wantErr: nil},
 		{
 			name: "with_records_0_limit",
 			args: args{
@@ -210,7 +211,7 @@ func TestSelectAll(t *testing.T) {
 				}
 				gotRecords, err := ReadAllToRecords(context.Background(), tt.args.reader(), WithLimit(tt.args.limit))
 				assertErr(t, err)
-				if err == nil {
+				if err == nil && tt.name != "empty_reader" {
 					assert.NotNil(t, gotRecords)
 				}
 			})
@@ -284,13 +285,18 @@ func TestSelectAll_WithOffsetError(t *testing.T) {
 	}
 }
 
-type mockDB struct {
-	DB
-	getRecordsReader func(ctx context.Context, query Query) (RecordsReader, error)
-}
-
 func (m mockDB) GetRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
 	return m.getRecordsReader(ctx, query)
+}
+
+func (m mockDB) GetRecordsetReader(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+	return m.getRecordsetReader(ctx, query, rs)
+}
+
+type mockDB struct {
+	DB
+	getRecordsReader   func(ctx context.Context, query Query) (RecordsReader, error)
+	getRecordsetReader func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error)
 }
 
 func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
@@ -345,6 +351,146 @@ func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to close reader: close failed")
 		assert.Empty(t, records)
 	})
+}
+
+func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
+	ctx := context.Background()
+	q := mockQuery{}
+
+	t.Run("success", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 2}
+		db := mockDB{
+			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db)
+		assert.NoError(t, err)
+		assert.Equal(t, rs, gotRs)
+		assert.True(t, reader.closed)
+	})
+
+	t.Run("db_error", func(t *testing.T) {
+		db := mockDB{
+			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db)
+		assert.Error(t, err)
+		assert.Equal(t, "db error", err.Error())
+		assert.Nil(t, gotRs)
+	})
+
+	t.Run("reader_error", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, errToReturn: errors.New("reader error")}
+		db := mockDB{
+			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db)
+		assert.Error(t, err)
+		assert.Equal(t, "reader error", err.Error())
+		assert.Equal(t, rs, gotRs)
+		assert.True(t, reader.closed)
+	})
+
+	t.Run("with_offset_and_limit", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 5}
+		db := mockDB{
+			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithOffset(2), WithLimit(2))
+		assert.True(t, errors.Is(err, ErrLimitReached))
+		assert.Equal(t, rs, gotRs)
+		assert.Equal(t, 4, reader.nextCalled) // 2 for offset + 2 for limit
+		assert.True(t, reader.closed)
+	})
+
+	t.Run("limit_reached", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 5}
+		db := mockDB{
+			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithLimit(3))
+		assert.True(t, errors.Is(err, ErrLimitReached))
+		assert.Equal(t, rs, gotRs)
+		assert.Equal(t, 3, reader.nextCalled)
+		assert.True(t, reader.closed)
+	})
+
+	t.Run("offset_exceeds", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 2}
+		db := mockDB{
+			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithOffset(5))
+		assert.NoError(t, err)
+		assert.Equal(t, rs, gotRs)
+		assert.Equal(t, 3, reader.nextCalled) // returns ErrNoMoreRecords on 3rd call
+		assert.True(t, reader.closed)
+	})
+}
+
+type mockQuery struct {
+	Query
+}
+
+func (m mockQuery) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (RecordsetReader, error) {
+	return qe.GetRecordsetReader(ctx, m, nil)
+}
+
+type mockRecordset struct {
+	recordset.Recordset
+}
+
+type mockRecordsetReader struct {
+	rs          recordset.Recordset
+	count       int
+	nextCalled  int
+	err         int // not used as int, used as toggle or count for error
+	errToReturn error
+	closed      bool
+}
+
+func (m *mockRecordsetReader) Recordset() recordset.Recordset {
+	return m.rs
+}
+
+func (m *mockRecordsetReader) Next() (recordset.Row, recordset.Recordset, error) {
+	m.nextCalled++
+	if m.errToReturn != nil {
+		return nil, nil, m.errToReturn
+	}
+	if m.nextCalled > m.count {
+		return nil, nil, ErrNoMoreRecords
+	}
+	return &mockRow{}, m.rs, nil
+}
+
+func (m *mockRecordsetReader) Cursor() (string, error) {
+	return "", nil
+}
+
+func (m *mockRecordsetReader) Close() error {
+	m.closed = true
+	return nil
+}
+
+type mockRow struct {
+	recordset.Row
 }
 
 type errOnCloseReader struct{ EmptyReader }

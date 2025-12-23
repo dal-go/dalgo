@@ -14,8 +14,8 @@ type Query interface {
 	// Limit specifies the maximum number of records to be returned
 	Limit() int
 
-	GetRecordsReader(ctx context.Context, db DB) (reader RecordsReader, err error)
-	GetRecordsetReader(ctx context.Context, db DB) (reader RecordsetReader, err error)
+	GetRecordsReader(ctx context.Context, qe QueryExecutor) (reader RecordsReader, err error)
+	GetRecordsetReader(ctx context.Context, qe QueryExecutor) (reader RecordsetReader, err error)
 }
 
 // TextQuery defines an interface to represent a query with text and associated arguments.
