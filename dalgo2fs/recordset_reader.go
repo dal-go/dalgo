@@ -111,5 +111,5 @@ func (r *dirReader) Next() (row recordset.Row, rs recordset.Recordset, err error
 		}
 	}
 	r.nextIndex++
-	return row, r.rs, nil
+	return
 }
