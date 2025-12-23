@@ -53,14 +53,9 @@ func testCol[T any](t *testing.T, defaultValue T, v1, v2 T) {
 		t.Error("IsBitmap() returned true, want false")
 	}
 
-	func() {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("ValueType() did not panic")
-			}
-		}()
-		_ = col.ValueType()
-	}()
+	if col.ValueType() == nil {
+		t.Error("ValueType() returned nil")
+	}
 
 	err := col.Add(struct{}{})
 	if err == nil {
