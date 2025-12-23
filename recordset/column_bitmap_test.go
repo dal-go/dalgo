@@ -6,7 +6,9 @@ import (
 )
 
 func TestNewBitmapColumn(t *testing.T) {
-	col := NewBitmapColumn[string]("test", 0)
+	col := NewBitmapColumn[string]("test", 0, func() string {
+		return ""
+	})
 	if col.Name() != "test" {
 		t.Errorf("expected name test, got %s", col.Name())
 	}
@@ -19,7 +21,9 @@ func TestNewBitmapColumn(t *testing.T) {
 }
 
 func TestColumnBitmap_GetValue(t *testing.T) {
-	col := NewBitmapColumn[string]("test", 0)
+	col := NewBitmapColumn[string]("test", 0, func() string {
+		return ""
+	})
 	val, err := col.GetValue(0)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -39,7 +43,9 @@ func TestColumnBitmap_GetValue(t *testing.T) {
 }
 
 func TestColumnBitmap_SetValue(t *testing.T) {
-	col := NewBitmapColumn[string]("test", 0)
+	col := NewBitmapColumn[string]("test", 0, func() string {
+		return ""
+	})
 	err := col.SetValue(1, "a")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -68,7 +74,9 @@ func TestColumnBitmap_SetValue(t *testing.T) {
 }
 
 func TestColumnBitmap_Add(t *testing.T) {
-	col := NewBitmapColumn[string]("test", 0)
+	col := NewBitmapColumn[string]("test", 0, func() string {
+		return ""
+	})
 	err := col.Add("a")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

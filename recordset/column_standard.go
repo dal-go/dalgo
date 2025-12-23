@@ -33,3 +33,9 @@ func (c *column[T]) Add(value T) error {
 	c.values = append(c.values, value)
 	return nil
 }
+
+func (c *column[T]) Values() []T {
+	values := make([]T, len(c.values))
+	copy(values, c.values)
+	return values
+}

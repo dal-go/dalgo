@@ -68,6 +68,9 @@ DALgo defines abstract interfaces and helpers methods to work with databases in 
 
 Here is modules that bridge DALgo to specific APIs:
 
+- ### [**dalgo2fs**](./dalgo2fs)
+  a dalgo adapter to OS file system.
+
 - ### [**dalgo2sql**](https://github.com/dal-go/dalgo2sql)
   for [database/sql](https://pkg.go.dev/database/sql) - a generic interface around SQL (or SQL-like) databases.
 

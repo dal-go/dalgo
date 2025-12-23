@@ -17,6 +17,7 @@ func (m mockColumn) GetValue(_ int) (any, error) { return nil, fmt.Errorf("error
 func (m mockColumn) SetValue(_ int, _ any) error { return nil }
 func (m mockColumn) ValueType() reflect.Type     { return nil }
 func (m mockColumn) IsBitmap() bool              { return false }
+func (m mockColumn) Values() []any               { return nil }
 
 type mockRecordset struct {
 	ColumnAccessor

@@ -16,6 +16,9 @@ func (c *columnBool) GetValue(row int) (value bool, err error) {
 }
 
 func (c *columnBool) SetValue(row int, value bool) (err error) {
+	if row >= c.rowsCount {
+		c.rowsCount = row + 1
+	}
 	if value {
 		c.values.Add(uint32(row))
 	} else {
@@ -47,4 +50,12 @@ func NewBoolColumn(name string) Column[bool] {
 		},
 		values: roaring.New(),
 	}
+}
+
+func (c *columnBool) Values() []bool {
+	result := make([]bool, c.rowsCount)
+	for i := 0; i < c.rowsCount; i++ {
+		result[i] = c.values.Contains(uint32(i))
+	}
+	return result
 }

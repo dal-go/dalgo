@@ -3,6 +3,8 @@ package recordset
 type columnBase[T any] struct {
 	name       string
 	defaultVal func() T
+	ColumnOptions
+	rowsCount int
 }
 
 func (c *columnBase[T]) Name() string {

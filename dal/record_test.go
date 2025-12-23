@@ -144,7 +144,7 @@ func Test_record_Key(t *testing.T) {
 //				data: tt.fields.data,
 //				err:  tt.fields.err,
 //			}
-//			v.SetData(tt.args.data)
+//			v.setData(tt.args.data)
 //			if v.data != tt.args.data {
 //				t.Errorf("expected %v, got: %v", tt.args.data, v.data)
 //			}

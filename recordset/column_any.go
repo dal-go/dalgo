@@ -5,39 +5,56 @@ import (
 	"reflect"
 )
 
-var _ Column[any] = &colAny[string]{}
+var _ Column[any] = &UntypedColWrapper[string]{}
 
-type colAny[T any] struct {
+func UntypedCol[T any](c Column[T]) Column[any] {
+	return UntypedColWrapper[T]{column: c}
+}
+
+type UntypedColWrapper[T any] struct {
 	column Column[T]
 }
 
-func (c colAny[T]) Name() string {
+func (c UntypedColWrapper[T]) TypedColumn() Column[T] {
+	return c.column
+}
+
+func (c UntypedColWrapper[T]) Name() string {
 	return c.column.Name()
 }
 
-func (c colAny[T]) Add(value any) error {
+func (c UntypedColWrapper[T]) Add(value any) error {
 	if v, ok := value.(T); ok {
 		return c.column.Add(v)
 	}
 	return fmt.Errorf("cannot add value of type %T to column %s", value, c.Name())
 }
 
-func (c colAny[T]) GetValue(row int) (value any, err error) {
+func (c UntypedColWrapper[T]) GetValue(row int) (value any, err error) {
 	return c.column.GetValue(row)
 }
 
-func (c colAny[T]) DefaultValue() (value any) {
+func (c UntypedColWrapper[T]) DefaultValue() (value any) {
 	return c.column.DefaultValue()
 }
 
-func (c colAny[T]) SetValue(row int, value any) (err error) {
+func (c UntypedColWrapper[T]) SetValue(row int, value any) (err error) {
 	return c.column.SetValue(row, value.(T))
 }
 
-func (c colAny[T]) ValueType() reflect.Type {
+func (c UntypedColWrapper[T]) ValueType() reflect.Type {
 	return c.column.ValueType()
 }
 
-func (c colAny[T]) IsBitmap() bool {
+func (c UntypedColWrapper[T]) IsBitmap() bool {
 	return c.column.IsBitmap()
+}
+
+func (c UntypedColWrapper[T]) Values() []any {
+	values := c.column.Values()
+	result := make([]any, len(values))
+	for i, v := range values {
+		result[i] = v
+	}
+	return result
 }

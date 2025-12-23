@@ -11,14 +11,19 @@ type bitmapValue[T comparable] struct {
 	rows *roaring.Bitmap
 }
 
-func NewBitmapColumn[T comparable](name string, initialCapacity int) Column[T] {
+func NewBitmapColumn[T comparable](name string, initialCapacity int, getDefaultVal func() T) Column[T] {
 	return &columnBitmap[T]{
-		columnBase: columnBase[T]{name: name},
-		values:     make([]bitmapValue[T], initialCapacity),
+		columnBase: columnBase[T]{
+			name:       name,
+			defaultVal: getDefaultVal,
+		},
+
+		values: make([]bitmapValue[T], initialCapacity),
 	}
 }
 
 type columnBitmap[T comparable] struct {
+	rowsCount int
 	columnBase[T]
 	values []bitmapValue[T]
 }
@@ -63,15 +68,19 @@ func (c *columnBitmap[T]) IsBitmap() bool {
 }
 
 func (c *columnBitmap[T]) Add(value T) error {
-	// Find max row index
-	maxRow := -1
-	for _, val := range c.values {
-		if !val.rows.IsEmpty() {
-			last := int(val.rows.Maximum())
-			if last > maxRow {
-				maxRow = last
+	c.rowsCount++
+	return c.SetValue(c.rowsCount-1, value)
+}
+
+func (c *columnBitmap[T]) Values() []T {
+	result := make([]T, c.rowsCount)
+	for i := 0; i < c.rowsCount; i++ {
+		for _, val := range c.values {
+			if val.rows.Contains(uint32(i)) {
+				result[i] = val.v
+				break
 			}
 		}
 	}
-	return c.SetValue(maxRow+1, value)
+	return result
 }
