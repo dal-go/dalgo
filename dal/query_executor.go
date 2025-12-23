@@ -4,22 +4,22 @@ import (
 	"context"
 )
 
-// QueryExecutor is a query executor that returns a reader + related helper methods.
+// QueryExecutor is a query executor that returns a reader and have few helper methods.
 type QueryExecutor interface {
 
 	// GetReader returns a reader for the given query to read records 1 by 1 sequentially.
 	// The Reader.Next() method returns ErrNoMoreRecords when there are no more records.
 	GetReader(ctx context.Context, query Query) (Reader, error)
 
-	// ReadAllRecords is a helper method that returns all records for the given query.
-	// It reads reader created by QueryReader until it returns ErrNoMoreRecords.
+	// ReadAllToRecords is a helper method that returns all records for the given query as slide of Record.
+	// It reads the reader created by QueryReader until it returns ErrNoMoreRecords.
 	// If you are interested only in IDs, use like:
 	//
 	//		reader, err := queryExecutor.SelectReader(ctx)
 	//      // handle err
 	//		var ids []int
 	//		ids, err = dal.SelectAllIDs[int](reader)
-	ReadAllRecords(ctx context.Context, query Query, o ...ReaderOption) (records []Record, err error)
+	ReadAllToRecords(ctx context.Context, query Query, o ...ReaderOption) (records []Record, err error)
 }
 
 var _ QueryExecutor = (*queryExecutor)(nil)
@@ -32,8 +32,8 @@ func (s queryExecutor) GetReader(ctx context.Context, query Query) (Reader, erro
 	return s.getReader(ctx, query)
 }
 
-// ReadAllRecords is a helper method that for a given reader returns all records as a slice.
-func (s queryExecutor) ReadAllRecords(
+// ReadAllToRecords is a helper method that for a given reader returns all records as a slice.
+func (s queryExecutor) ReadAllToRecords(
 	ctx context.Context, query Query, options ...ReaderOption,
 ) (
 	records []Record, err error,
@@ -45,7 +45,7 @@ func (s queryExecutor) ReadAllRecords(
 	if reader == nil {
 		panic("reader is nil")
 	}
-	return ReadAllRecords(reader, options...)
+	return ReadAllToRecords(ctx, reader, options...)
 }
 
 // ReaderProvider is a function that returns a Reader for the given query.

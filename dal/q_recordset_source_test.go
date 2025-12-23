@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -88,14 +89,14 @@ func (e *errReader) Close() error                                { e.closed = tr
 func TestSelectAll_ErrorPaths(t *testing.T) {
 	// Case 1: Next returns some non-ErrNoMoreRecords error; that error should be returned
 	nextErr := errors.New("boom")
-	_, err := SelectAllIDs[int](&errReader{nextErr: nextErr}, WithLimit(5))
+	_, err := SelectAllIDs[int](context.Background(), &errReader{nextErr: nextErr}, WithLimit(5))
 	if !errors.Is(err, nextErr) {
 		t.Fatalf("expected next error to propagate, got: %v", err)
 	}
 
 	// Case 2: No prior error, Close returns error which should be wrapped and returned
 	e := &errReader{nextErr: ErrNoMoreRecords, closeErr: errors.New("close failed")}
-	_, err = SelectAllIDs[int](e)
+	_, err = SelectAllIDs[int](context.Background(), e)
 	if err == nil || !errors.Is(err, e.closeErr) {
 		t.Fatalf("expected close error to be returned when no prior error, got: %v", err)
 	}

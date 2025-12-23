@@ -79,7 +79,7 @@ func Test_selector_QueryAllRecords(t *testing.T) {
 			s := queryExecutor{
 				getReader: tt.fields.getReader,
 			}
-			gotRecords, err := s.ReadAllRecords(tt.args.c, tt.args.query)
+			gotRecords, err := s.ReadAllToRecords(tt.args.c, tt.args.query)
 			if !tt.wantErr(t, err, fmt.Sprintf("SelectAll(%v)", tt.args.c)) {
 				return
 			}
@@ -136,7 +136,7 @@ func Test_queryExecutor(t *testing.T) {
 				if tt.shouldPanic {
 					defer func() {
 						if r := recover(); r == nil {
-							t.Errorf("ReadAllRecords() should have panicked!")
+							t.Errorf("ReadAllToRecords() should have panicked!")
 						}
 					}()
 				}
@@ -148,9 +148,9 @@ func Test_queryExecutor(t *testing.T) {
 					assert.Nil(t, got)
 				}
 			}
-			t.Run("ReadAllRecords", func(t *testing.T) {
+			t.Run("ReadAllToRecords", func(t *testing.T) {
 				runTest(t, func() (any, error) {
-					return tt.qe.ReadAllRecords(tt.args.c, tt.args.query)
+					return tt.qe.ReadAllToRecords(tt.args.c, tt.args.query)
 				})
 			})
 			t.Run("GetReader", func(t *testing.T) {

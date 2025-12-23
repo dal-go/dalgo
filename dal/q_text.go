@@ -25,7 +25,7 @@ func (q textQuery) GetReader(ctx context.Context, db DB) (reader Reader, err err
 }
 
 func (q textQuery) ReadRecords(ctx context.Context, db DB, o ...ReaderOption) (records []Record, err error) {
-	return db.ReadAllRecords(ctx, q, o...)
+	return db.ReadAllToRecords(ctx, q, o...)
 }
 
 func (q textQuery) Text() string {

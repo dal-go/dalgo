@@ -47,7 +47,7 @@ func (q structuredQuery) GetReader(ctx context.Context, db DB) (reader Reader, e
 }
 
 func (q structuredQuery) ReadRecords(ctx context.Context, db DB, options ...ReaderOption) (records []Record, err error) {
-	return db.ReadAllRecords(ctx, q, options...)
+	return db.ReadAllToRecords(ctx, q, options...)
 }
 
 func (q structuredQuery) Text() string {

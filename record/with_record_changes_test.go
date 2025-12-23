@@ -246,7 +246,7 @@ func (f *fakeTx) GetMulti(_ context.Context, _ []dal.Record) error   { return ni
 func (f *fakeTx) GetReader(_ context.Context, _ dal.Query) (dal.Reader, error) {
 	return nil, nil
 }
-func (f *fakeTx) ReadAllRecords(_ context.Context, _ dal.Query, _ ...dal.ReaderOption) ([]dal.Record, error) {
+func (f *fakeTx) ReadAllToRecords(_ context.Context, _ dal.Query, _ ...dal.ReaderOption) ([]dal.Record, error) {
 	return nil, nil
 }
 
