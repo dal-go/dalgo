@@ -7,14 +7,14 @@ import (
 	"io"
 )
 
-// SelectAll reads records from the provided Reader and converts each Record to T using getItem.
+// SelectAll reads records from the provided RecordsReader and converts each Record to T using getItem.
 // Behavior and caveats:
 // - Panics if reader is nil (existing behavior).
 // - Respects WithOffset by discarding the first offset records.
-// - If WithLimit <= 0, reads until Reader.Next() returns ErrNoMoreRecords.
+// - If WithLimit <= 0, reads until RecordsReader.Next() returns ErrNoMoreRecords.
 // - Ensures reader.Close() is called; if Close returns an error and no prior error occurred, that error is returned.
 // - Any panic inside getItem will propagate to the caller.
-func SelectAll[T any](ctx context.Context, reader Reader, getItem func(r Record) T, options ...ReaderOption) (items []T, err error) {
+func SelectAll[T any](ctx context.Context, reader RecordsReader, getItem func(r Record) T, options ...ReaderOption) (items []T, err error) {
 	if reader == nil {
 		panic("reader is a required parameter, got nil")
 	}
@@ -98,14 +98,14 @@ func SelectAll[T any](ctx context.Context, reader Reader, getItem func(r Record)
 
 // SelectAllIDs is a helper method that for a given reader returns all IDs as a strongly typed slice.
 // Note: This will panic at runtime if the underlying ID types are not assignable to T.
-func SelectAllIDs[T comparable](ctx context.Context, reader Reader, options ...ReaderOption) (ids []T, err error) {
+func SelectAllIDs[T comparable](ctx context.Context, reader RecordsReader, options ...ReaderOption) (ids []T, err error) {
 	return SelectAll[T](ctx, reader, func(r Record) T {
 		return r.Key().ID.(T)
 	}, options...)
 }
 
 // ReadAllToRecords is a helper method that for a given reader returns all records as a slice.
-func ReadAllToRecords(ctx context.Context, reader Reader, options ...ReaderOption) (records []Record, err error) {
+func ReadAllToRecords(ctx context.Context, reader RecordsReader, options ...ReaderOption) (records []Record, err error) {
 	return SelectAll[Record](ctx, reader, func(r Record) Record {
 		return r
 	}, options...)

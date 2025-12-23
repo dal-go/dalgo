@@ -2,59 +2,21 @@ package dal
 
 import (
 	"context"
+
+	"github.com/dal-go/dalgo/recordset"
 )
 
 // QueryExecutor is a query executor that returns a reader and have few helper methods.
 type QueryExecutor interface {
 
-	// GetReader returns a reader for the given query to read records 1 by 1 sequentially.
-	// The Reader.Next() method returns ErrNoMoreRecords when there are no more records.
-	GetReader(ctx context.Context, query Query) (Reader, error)
+	// GetRecordsReader returns a reader for the given query to read records 1 by 1 sequentially.
+	// The RecordsReader.Next() method returns ErrNoMoreRecords when there are no more records.
+	GetRecordsReader(ctx context.Context, query Query) (RecordsReader, error)
 
-	// ReadAllToRecords is a helper method that returns all records for the given query as slide of Record.
-	// It reads the reader created by QueryReader until it returns ErrNoMoreRecords.
-	// If you are interested only in IDs, use like:
-	//
-	//		reader, err := queryExecutor.SelectReader(ctx)
-	//      // handle err
-	//		var ids []int
-	//		ids, err = dal.SelectAllIDs[int](reader)
-	ReadAllToRecords(ctx context.Context, query Query, o ...ReaderOption) (records []Record, err error)
+	// GetRecordsetReader returns a RecordsetReader for the given query, allowing sequential read of records into the provided recordset.
+	GetRecordsetReader(ctx context.Context, query Query, rs *recordset.Recordset) (RecordsetReader, error)
 }
 
-var _ QueryExecutor = (*queryExecutor)(nil)
-
-type queryExecutor struct {
-	getReader ReaderProvider
-}
-
-func (s queryExecutor) GetReader(ctx context.Context, query Query) (Reader, error) {
-	return s.getReader(ctx, query)
-}
-
-// ReadAllToRecords is a helper method that for a given reader returns all records as a slice.
-func (s queryExecutor) ReadAllToRecords(
-	ctx context.Context, query Query, options ...ReaderOption,
-) (
-	records []Record, err error,
-) {
-	var reader Reader
-	if reader, err = s.getReader(ctx, query); err != nil {
-		return
-	}
-	if reader == nil {
-		panic("reader is nil")
-	}
-	return ReadAllToRecords(ctx, reader, options...)
-}
-
-// ReaderProvider is a function that returns a Reader for the given query.
-type ReaderProvider = func(ctx context.Context, query Query) (reader Reader, err error)
-
-// NewQueryExecutor creates a new query executor. This is supposed to be used by dalgo DB drivers.
-func NewQueryExecutor(getReader ReaderProvider) QueryExecutor {
-	if getReader == nil {
-		panic("getReader is a required parameter, got nil")
-	}
-	return &queryExecutor{getReader: getReader}
-}
+var _ QueryExecutor = (DB)(nil)
+var _ QueryExecutor = (ReadSession)(nil)
+var _ QueryExecutor = (ReadTransaction)(nil)

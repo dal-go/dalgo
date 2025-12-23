@@ -11,7 +11,7 @@ import (
 func TestReadAllToRecords(t *testing.T) {
 	for _, tt := range []struct {
 		name                 string
-		reader               Reader
+		reader               RecordsReader
 		shouldPanic          bool
 		expectedRecordsCount int
 		expectedErrTexts     []string
@@ -89,7 +89,7 @@ func TestRecordsReader(t *testing.T) {
 	t.Run("Next", func(t *testing.T) {
 		for _, tt := range []struct {
 			name             string
-			reader           Reader
+			reader           RecordsReader
 			expectedErr      error
 			expectedErrTexts []string
 		}{
@@ -123,7 +123,7 @@ func TestRecordsReader(t *testing.T) {
 
 func TestSelectAll(t *testing.T) {
 	type args struct {
-		reader func() Reader
+		reader func() RecordsReader
 		limit  int
 	}
 	type testCase[T comparable] struct {
@@ -134,7 +134,7 @@ func TestSelectAll(t *testing.T) {
 		wantErr     error
 	}
 
-	getRecordsReader := func() Reader {
+	getRecordsReader := func() RecordsReader {
 		return NewRecordsReader([]Record{
 			&record{key: &Key{ID: 1, collection: "test"}},
 			&record{key: &Key{ID: 2, collection: "test"}},
@@ -144,10 +144,10 @@ func TestSelectAll(t *testing.T) {
 	}
 
 	tests := []testCase[int]{
-		{name: "nil_reader", shouldPanic: true, args: args{reader: func() Reader {
+		{name: "nil_reader", shouldPanic: true, args: args{reader: func() RecordsReader {
 			return nil
 		}}},
-		{name: "empty_reader", args: args{reader: func() Reader {
+		{name: "empty_reader", args: args{reader: func() RecordsReader {
 			return &EmptyReader{}
 		}}, wantIds: []int{}, wantErr: nil},
 		{
@@ -219,7 +219,7 @@ func TestSelectAll(t *testing.T) {
 }
 
 func TestSelectAll_WithOffset(t *testing.T) {
-	getRecordsReader := func() Reader {
+	getRecordsReader := func() RecordsReader {
 		return NewRecordsReader([]Record{
 			&record{key: &Key{ID: 1, collection: "test"}},
 			&record{key: &Key{ID: 2, collection: "test"}},

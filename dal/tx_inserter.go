@@ -5,16 +5,16 @@ import (
 	"fmt"
 )
 
-// Inserter defines a function to insert a single record into a database
+// Inserter defines a function to insert a single record intoRecord a database
 type Inserter interface {
 
-	// Insert inserts a single record into a database
+	// Insert inserts a single record intoRecord a database
 	Insert(ctx context.Context, record Record, opts ...InsertOption) error
 }
 
-// MultiInserter defines a function to insert multiple records into a database
+// MultiInserter defines a function to insert multiple records intoRecord a database
 type MultiInserter interface {
-	// InsertMulti inserts multiple record into a database at once if possible, or fallback to batch of single inserts
+	// InsertMulti inserts multiple record intoRecord a database at once if possible, or fallback to batch of single inserts
 	InsertMulti(ctx context.Context, records []Record, opts ...InsertOption) error
 }
 

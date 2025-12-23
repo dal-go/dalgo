@@ -1,6 +1,6 @@
 package dal
 
-var _ Reader = (*EmptyReader)(nil)
+var _ RecordsReader = (*EmptyReader)(nil)
 
 type EmptyReader struct{}
 

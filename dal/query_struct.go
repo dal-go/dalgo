@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+
+	"github.com/dal-go/dalgo/recordset"
 )
 
 var _ StructuredQuery = (*structuredQuery)(nil)
@@ -28,7 +30,8 @@ type structuredQuery struct {
 	// Columns define what columns to return
 	columns []Column
 
-	into func() Record
+	intoRecord    func() Record
+	intoRecordset *recordset.Recordset
 
 	// Offset specifies the number of records to skip
 	offset int
@@ -42,12 +45,12 @@ type structuredQuery struct {
 	startCursor Cursor
 }
 
-func (q structuredQuery) GetReader(ctx context.Context, db DB) (reader Reader, err error) {
-	return db.GetReader(ctx, q)
+func (q structuredQuery) GetRecordsReader(ctx context.Context, db DB) (reader RecordsReader, err error) {
+	return db.GetRecordsReader(ctx, q)
 }
 
-func (q structuredQuery) ReadRecords(ctx context.Context, db DB, options ...ReaderOption) (records []Record, err error) {
-	return db.ReadAllToRecords(ctx, q, options...)
+func (q structuredQuery) GetRecordsetReader(ctx context.Context, db DB) (reader RecordsetReader, err error) {
+	return db.GetRecordsetReader(ctx, q, q.intoRecordset)
 }
 
 func (q structuredQuery) Text() string {
@@ -74,8 +77,11 @@ func (q structuredQuery) Columns() []Column {
 	return q.columns[:]
 }
 
-func (q structuredQuery) Into() func() Record {
-	return q.into
+func (q structuredQuery) IntoRecord() Record {
+	if q.intoRecord == nil {
+		return nil
+	}
+	return q.intoRecord()
 }
 
 func (q structuredQuery) IDKind() reflect.Kind {

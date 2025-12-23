@@ -6,7 +6,7 @@ import (
 )
 
 // DataWrapper is a wrapper for data transfer objects (DTOs).
-// TODO: document intended usage or consider removing as it makes implementation of Reader more complex.
+// TODO: document intended usage or consider removing as it makes implementation of RecordsReader more complex.
 type DataWrapper interface {
 	Data() any
 }

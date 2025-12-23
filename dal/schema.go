@@ -27,7 +27,7 @@ func (s *SchemaBase) DataToKey(incompleteKey *Key, data any) (key *Key, err erro
 	return s.dataToKey(incompleteKey, data)
 }
 
-// KeyToFields maps key into DB fields.
+// KeyToFields maps key intoRecord DB fields.
 // This is needed as relational DBs usually have key column(s) that are part of the record set,
 // while key-value DBs can have key and data separated and data would not include the key.
 func (s *SchemaBase) KeyToFields(key *Key, data any) (fields []ExtraField, err error) {

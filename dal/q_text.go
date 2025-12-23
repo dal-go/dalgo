@@ -1,6 +1,10 @@
 package dal
 
-import "context"
+import (
+	"context"
+
+	"github.com/dal-go/dalgo/recordset"
+)
 
 var _ TextQuery = (*textQuery)(nil)
 
@@ -10,6 +14,11 @@ type textQuery struct {
 	offset int
 	limit  int
 	getKey func(data any, args []QueryArg) *Key
+	rs     *recordset.Recordset
+}
+
+func (q textQuery) GetRecordsetReader(ctx context.Context, db DB) (reader RecordsetReader, err error) {
+	return db.GetRecordsetReader(ctx, q, q.rs)
 }
 
 func (q textQuery) Offset() int {
@@ -20,12 +29,8 @@ func (q textQuery) Limit() int {
 	return q.limit
 }
 
-func (q textQuery) GetReader(ctx context.Context, db DB) (reader Reader, err error) {
-	return db.GetReader(ctx, q)
-}
-
-func (q textQuery) ReadRecords(ctx context.Context, db DB, o ...ReaderOption) (records []Record, err error) {
-	return db.ReadAllToRecords(ctx, q, o...)
+func (q textQuery) GetRecordsReader(ctx context.Context, db DB) (reader RecordsReader, err error) {
+	return db.GetRecordsReader(ctx, q)
 }
 
 func (q textQuery) Text() string {

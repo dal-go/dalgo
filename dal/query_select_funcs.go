@@ -1,6 +1,6 @@
 package dal
 
-// ReaderOption configures how SelectAll reads from the Reader (e.g., limit, offset).
+// ReaderOption configures how SelectAll reads from the RecordsReader (e.g., limit, offset).
 type ReaderOption = func(ro *ReaderOptions)
 
 type ReaderOptions struct {

@@ -62,16 +62,16 @@ func (v *record) Data() any {
 //	v.dataTo = dataTo
 //}
 //
-//// DataTo marshals record data into target
+//// DataTo marshals record data intoRecord target
 //func (v record) DataTo(target any) error {
 //	if target == nil {
-//		panic("not possible to marshall data into a nil value")
+//		panic("not possible to marshall data intoRecord a nil value")
 //	}
 //	if v.dataTo == nil {
 //		panic(fmt.Sprintf("method DataTo(%T) is called before data retrieval", target))
 //	}
 //	if err := v.dataTo(target); err != nil {
-//		return fmt.Errorf("failed to marshal record data into %T: %w", target, err)
+//		return fmt.Errorf("failed to marshal record data intoRecord %T: %w", target, err)
 //	}
 //	v.data = target
 //	return nil

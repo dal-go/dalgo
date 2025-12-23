@@ -1,6 +1,10 @@
 package dal
 
-import "reflect"
+import (
+	"reflect"
+
+	"github.com/dal-go/dalgo/recordset"
+)
 
 type SingleSource interface {
 	Where(conditions ...Condition) IQueryBuilder
@@ -16,7 +20,8 @@ type IQueryBuilder interface {
 	WhereField(name string, operator Operator, v any) IQueryBuilder
 	WhereInArrayField(name string, v any) IQueryBuilder
 	OrderBy(expressions ...OrderExpression) IQueryBuilder
-	SelectInto(func() Record) StructuredQuery
+	SelectIntoRecord(func() Record) StructuredQuery
+	SelectIntoRecordset(rs *recordset.Recordset) StructuredQuery
 	SelectKeysOnly(idKind reflect.Kind) StructuredQuery
 	StartFrom(cursor Cursor) IQueryBuilder
 }
@@ -26,7 +31,11 @@ var _ IQueryBuilder = (*QueryBuilder)(nil)
 // NewQueryBuilder creates a new IQueryBuilder - it's an entry point to build a query.
 // We can use From() directly but this is easier to remember.
 func NewQueryBuilder(from FromSource) *QueryBuilder {
-	return &QueryBuilder{q: structuredQuery{from: from}}
+	return &QueryBuilder{
+		q: structuredQuery{
+			from: from,
+		},
+	}
 }
 
 // From creates a new IQueryBuilder with optional conditions.
@@ -85,9 +94,15 @@ func (s *QueryBuilder) WhereInArrayField(name string, v any) IQueryBuilder {
 	return s
 }
 
-func (s *QueryBuilder) SelectInto(into func() Record) StructuredQuery {
+func (s *QueryBuilder) SelectIntoRecord(into func() Record) StructuredQuery {
 	q := s.newQuery()
-	q.into = into
+	q.intoRecord = into
+	return q
+}
+
+func (s *QueryBuilder) SelectIntoRecordset(rs *recordset.Recordset) StructuredQuery {
+	q := s.newQuery()
+	q.intoRecordset = rs
 	return q
 }
 

@@ -5,9 +5,9 @@ import (
 	"strconv"
 )
 
-var _ Reader = (*recordsReader)(nil)
+var _ RecordsReader = (*recordsReader)(nil)
 
-func NewRecordsReader(records []Record) Reader {
+func NewRecordsReader(records []Record) RecordsReader {
 	return &recordsReader{records: records, current: -1}
 }
 

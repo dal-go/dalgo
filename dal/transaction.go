@@ -35,7 +35,7 @@ const (
 	TxRepeatableRead
 
 	// TxSerializable - A range lock is placed on the DataSet, preventing other users
-	// from updating or inserting rows into the dataset until the transaction is complete.
+	// from updating or inserting rows intoRecord the dataset until the transaction is complete.
 	TxSerializable
 
 	// TxSnapshot - Reduces blocking by storing a version of data that one application can read
@@ -97,7 +97,7 @@ type ReadwriteTransaction interface {
 	ReadwriteSession
 }
 
-// NewContextWithTransaction stores transaction and original context into a transactional context
+// NewContextWithTransaction stores transaction and original context intoRecord a transactional context
 func NewContextWithTransaction(nonTransactionalContext context.Context, tx Transaction) context.Context {
 	nonTransactionalContext = context.WithValue(nonTransactionalContext, &nonTransactionalContextKey, nonTransactionalContext)
 	return context.WithValue(nonTransactionalContext, &transactionContextKey, tx)

@@ -36,7 +36,7 @@ func TestQueryBuilder(t *testing.T) {
 
 	t.Run("with_single_condition", func(t *testing.T) {
 		qb2 := qb.Clone().WhereField("field_2", Equal, "value_2")
-		q := qb2.SelectInto(newRecord)
+		q := qb2.SelectIntoRecord(newRecord)
 		assertQuery(t, q)
 	})
 
@@ -44,13 +44,13 @@ func TestQueryBuilder(t *testing.T) {
 		qb2 := qb.Clone().
 			WhereField("field_2", Equal, "value_2").
 			WhereField("field_3", Equal, "value_3")
-		q := qb2.SelectInto(newRecord)
+		q := qb2.SelectIntoRecord(newRecord)
 		assertQuery(t, q)
 	})
 
 	t.Run("with_where_in_array_field", func(t *testing.T) {
 		qb2 := qb.Clone().WhereInArrayField("tags", "important")
-		q := qb2.SelectInto(newRecord)
+		q := qb2.SelectIntoRecord(newRecord)
 		assertQuery(t, q)
 
 		// Verify the condition was created correctly

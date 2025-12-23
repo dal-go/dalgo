@@ -130,12 +130,12 @@ func TestSelect(t *testing.T) {
 			t.Run("Columns", func(t *testing.T) {
 				assert.Equal(t, tt.q.columns, tt.q.Columns())
 			})
-			t.Run("Into", func(t *testing.T) {
-				if tt.q.into == nil {
-					assert.Nil(t, tt.q.Into())
+			t.Run("IntoRecord", func(t *testing.T) {
+				if tt.q.intoRecord == nil {
+					assert.Nil(t, tt.q.IntoRecord())
 					return
 				}
-				assert.Equal(t, tt.q.into(), tt.q.Into()())
+				assert.Equal(t, tt.q.intoRecord(), tt.q.IntoRecord())
 			})
 			t.Run("IDKind", func(t *testing.T) {
 				assert.Equal(t, tt.q.idKind, tt.q.IDKind())
