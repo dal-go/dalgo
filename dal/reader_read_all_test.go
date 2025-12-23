@@ -283,3 +283,72 @@ func TestSelectAll_WithOffsetError(t *testing.T) {
 		t.Fatalf("expected 'next failed' error, got: %v", err)
 	}
 }
+
+type mockDB struct {
+	DB
+	getRecordsReader func(ctx context.Context, query Query) (RecordsReader, error)
+}
+
+func (m mockDB) GetRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
+	return m.getRecordsReader(ctx, query)
+}
+
+func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
+	ctx := context.Background()
+	query := (Query)(nil)
+
+	t.Run("success", func(t *testing.T) {
+		db := mockDB{
+			getRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
+				return NewRecordsReader([]Record{
+					NewRecord(NewKeyWithID("test", 1)),
+				}), nil
+			},
+		}
+		records, err := ExecuteQueryAndReadAllToRecords(ctx, query, db)
+		assert.NoError(t, err)
+		assert.Len(t, records, 1)
+	})
+
+	t.Run("db_error", func(t *testing.T) {
+		db := mockDB{
+			getRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		records, err := ExecuteQueryAndReadAllToRecords(ctx, query, db)
+		assert.Error(t, err)
+		assert.Equal(t, "db error", err.Error())
+		assert.Nil(t, records)
+	})
+
+	t.Run("reader_error", func(t *testing.T) {
+		db := mockDB{
+			getRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
+				return &errOnFirstNextReader{}, nil
+			},
+		}
+		records, err := ExecuteQueryAndReadAllToRecords(ctx, query, db)
+		assert.Error(t, err)
+		assert.Equal(t, "next failed", err.Error())
+		assert.Empty(t, records)
+	})
+
+	t.Run("close_error", func(t *testing.T) {
+		db := mockDB{
+			getRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
+				return &errOnCloseReader{}, nil
+			},
+		}
+		records, err := ExecuteQueryAndReadAllToRecords(ctx, query, db)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to close reader: close failed")
+		assert.Empty(t, records)
+	})
+}
+
+type errOnCloseReader struct{ EmptyReader }
+
+func (e *errOnCloseReader) Close() error {
+	return errors.New("close failed")
+}

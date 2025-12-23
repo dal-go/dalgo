@@ -110,3 +110,12 @@ func ReadAllToRecords(ctx context.Context, reader RecordsReader, options ...Read
 		return r
 	}, options...)
 }
+
+func ExecuteQueryAndReadAllToRecords(ctx context.Context, query Query, db DB, options ...ReaderOption) (records []Record, err error) {
+	var reader RecordsReader
+	reader, err = db.GetRecordsReader(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	return ReadAllToRecords(ctx, reader, options...)
+}
