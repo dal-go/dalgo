@@ -1,11 +1,12 @@
 module github.com/dal-go/dalgo
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.25.5
 
 require (
 	github.com/RoaringBitmap/roaring v1.9.4
+	github.com/RoaringBitmap/roaring/v2 v2.14.4
 	github.com/stretchr/testify v1.11.1
 	github.com/strongo/random v0.0.1
 	go.uber.org/mock v0.6.0
