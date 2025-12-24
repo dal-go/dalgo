@@ -19,7 +19,7 @@ func NewDirReader(name string, columns ...recordset.Column[any]) (reader dal.Rec
 	r := dirReader{
 		entries: entries,
 		rs: recordset.NewColumnarRecordset(
-			columns...,
+			name, columns...,
 		),
 	}
 	nameCol := r.rs.GetColumnByName(ColumnFileName)

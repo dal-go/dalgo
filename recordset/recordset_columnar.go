@@ -36,8 +36,9 @@ func (rs *ColumnarRecordset) RowsCount() int {
 
 var _ Recordset = (*ColumnarRecordset)(nil)
 
-func NewColumnarRecordset(cols ...Column[any]) *ColumnarRecordset {
+func NewColumnarRecordset(name string, cols ...Column[any]) *ColumnarRecordset {
 	return &ColumnarRecordset{
+		name:    name,
 		columns: columns{cols: cols},
 	}
 }

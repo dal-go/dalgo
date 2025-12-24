@@ -10,8 +10,9 @@ import (
 
 func TestColumnarRecordset(t *testing.T) {
 	var rs *ColumnarRecordset
+	const rsName = "TestColumnarRecordset_User"
 	t.Run("NewColumnarRecordset", func(t *testing.T) {
-		rs = NewColumnarRecordset(
+		rs = NewColumnarRecordset(rsName,
 			NewColumn[string]("FirstName", ""),
 			NewColumn[int]("Age", 0),
 			NewColumn[time.Time]("DateOfBirth", time.Time{}),
@@ -19,10 +20,9 @@ func TestColumnarRecordset(t *testing.T) {
 		if rs == nil {
 			t.Fatal("NewColumnarRecordset() returned nil")
 		}
-		rs.name = "test_rs"
 	})
 	t.Run("Name", func(t *testing.T) {
-		assert.Equal(t, "test_rs", rs.Name())
+		assert.Equal(t, rsName, rs.Name())
 	})
 	t.Run("initial RowsCount", func(t *testing.T) {
 		if rowsCount := rs.RowsCount(); rowsCount > 0 {
