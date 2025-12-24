@@ -37,7 +37,7 @@ func (t transaction) GetRecordsReader(_ context.Context, _ dal.Query) (dal.Recor
 	return nil, dal.ErrNotImplementedYet
 }
 
-func (t transaction) GetRecordsetReader(_ context.Context, _ dal.Query, _ *recordset.Recordset) (dal.RecordsetReader, error) {
+func (t transaction) GetRecordsetReader(_ context.Context, _ dal.Query, _ recordset.Recordset) (dal.RecordsetReader, error) {
 	return nil, dal.ErrNotImplementedYet
 }
 

@@ -18,7 +18,7 @@ type RecordsReader interface {
 	Next() (Record, error)
 }
 
-// RecordsetReader reads records one by one into *recordset.Recordset
+// RecordsetReader reads records one by one into recordset.Recordset
 type RecordsetReader interface {
 	Reader
 	Recordset() recordset.Recordset

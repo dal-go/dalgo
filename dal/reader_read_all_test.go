@@ -460,9 +460,9 @@ type mockRecordsetReader struct {
 	rs          recordset.Recordset
 	count       int
 	nextCalled  int
-	err         int // not used as int, used as toggle or count for error
 	errToReturn error
 	closed      bool
+	//err         int // not used as int, used as toggle or count for error
 }
 
 func (m *mockRecordsetReader) Recordset() recordset.Recordset {

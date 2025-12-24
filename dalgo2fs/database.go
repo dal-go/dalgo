@@ -96,6 +96,6 @@ func (d database) GetRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsR
 	return nil, dal.ErrNotSupported
 }
 
-func (d database) GetRecordsetReader(_ context.Context, _ dal.Query, _ *recordset.Recordset) (dal.RecordsetReader, error) {
+func (d database) GetRecordsetReader(_ context.Context, _ dal.Query, _ recordset.Recordset) (dal.RecordsetReader, error) {
 	return nil, dal.ErrNotSupported
 }
