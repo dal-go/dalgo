@@ -115,18 +115,23 @@ func (mr *MockDBMockRecorder) GetRecordsReader(ctx, query any) *gomock.Call {
 }
 
 // GetRecordsetReader mocks base method.
-func (m *MockDB) GetRecordsetReader(ctx context.Context, query dal.Query, rs recordset.Recordset) (dal.RecordsetReader, error) {
+func (m *MockDB) GetRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRecordsetReader", ctx, query, rs)
+	varargs := []any{ctx, query}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetRecordsetReader", varargs...)
 	ret0, _ := ret[0].(dal.RecordsetReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetRecordsetReader indicates an expected call of GetRecordsetReader.
-func (mr *MockDBMockRecorder) GetRecordsetReader(ctx, query, rs any) *gomock.Call {
+func (mr *MockDBMockRecorder) GetRecordsetReader(ctx, query any, options ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordsetReader", reflect.TypeOf((*MockDB)(nil).GetRecordsetReader), ctx, query, rs)
+	varargs := append([]any{ctx, query}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordsetReader", reflect.TypeOf((*MockDB)(nil).GetRecordsetReader), varargs...)
 }
 
 // ID mocks base method.

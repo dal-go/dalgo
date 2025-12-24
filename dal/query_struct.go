@@ -30,8 +30,8 @@ type structuredQuery struct {
 	// Columns define what columns to return
 	columns []Column
 
-	intoRecord    func() Record
-	intoRecordset recordset.Recordset
+	intoRecord       func() Record
+	recordsetOptions []recordset.Option
 
 	// Offset specifies the number of records to skip
 	offset int
@@ -50,7 +50,7 @@ func (q structuredQuery) GetRecordsReader(ctx context.Context, qe QueryExecutor)
 }
 
 func (q structuredQuery) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (reader RecordsetReader, err error) {
-	return qe.GetRecordsetReader(ctx, q, q.intoRecordset)
+	return qe.GetRecordsetReader(ctx, q, q.recordsetOptions...)
 }
 
 func (q structuredQuery) Text() string {

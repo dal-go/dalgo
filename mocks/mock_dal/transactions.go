@@ -140,18 +140,23 @@ func (mr *MockReadTransactionMockRecorder) GetRecordsReader(ctx, query any) *gom
 }
 
 // GetRecordsetReader mocks base method.
-func (m *MockReadTransaction) GetRecordsetReader(ctx context.Context, query dal.Query, rs recordset.Recordset) (dal.RecordsetReader, error) {
+func (m *MockReadTransaction) GetRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRecordsetReader", ctx, query, rs)
+	varargs := []any{ctx, query}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetRecordsetReader", varargs...)
 	ret0, _ := ret[0].(dal.RecordsetReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetRecordsetReader indicates an expected call of GetRecordsetReader.
-func (mr *MockReadTransactionMockRecorder) GetRecordsetReader(ctx, query, rs any) *gomock.Call {
+func (mr *MockReadTransactionMockRecorder) GetRecordsetReader(ctx, query any, options ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordsetReader", reflect.TypeOf((*MockReadTransaction)(nil).GetRecordsetReader), ctx, query, rs)
+	varargs := append([]any{ctx, query}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordsetReader", reflect.TypeOf((*MockReadTransaction)(nil).GetRecordsetReader), varargs...)
 }
 
 // Options mocks base method.
@@ -279,18 +284,23 @@ func (mr *MockReadwriteTransactionMockRecorder) GetRecordsReader(ctx, query any)
 }
 
 // GetRecordsetReader mocks base method.
-func (m *MockReadwriteTransaction) GetRecordsetReader(ctx context.Context, query dal.Query, rs recordset.Recordset) (dal.RecordsetReader, error) {
+func (m *MockReadwriteTransaction) GetRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRecordsetReader", ctx, query, rs)
+	varargs := []any{ctx, query}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetRecordsetReader", varargs...)
 	ret0, _ := ret[0].(dal.RecordsetReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetRecordsetReader indicates an expected call of GetRecordsetReader.
-func (mr *MockReadwriteTransactionMockRecorder) GetRecordsetReader(ctx, query, rs any) *gomock.Call {
+func (mr *MockReadwriteTransactionMockRecorder) GetRecordsetReader(ctx, query any, options ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordsetReader", reflect.TypeOf((*MockReadwriteTransaction)(nil).GetRecordsetReader), ctx, query, rs)
+	varargs := append([]any{ctx, query}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordsetReader", reflect.TypeOf((*MockReadwriteTransaction)(nil).GetRecordsetReader), varargs...)
 }
 
 // ID mocks base method.

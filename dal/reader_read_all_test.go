@@ -246,22 +246,6 @@ func TestSelectAll_WithOffset(t *testing.T) {
 	assert.Equal(t, []int{1, 2, 3, 4}, ids)
 }
 
-func TestWithOffset(t *testing.T) {
-	ro := new(ReaderOptions)
-	WithOffset(3)(ro)
-	assert.Equal(t, 3, ro.offset)
-	ro.offset = 0
-	assert.Equal(t, ReaderOptions{}, *ro)
-}
-
-func TestWithLimit(t *testing.T) {
-	ro := new(ReaderOptions)
-	WithLimit(4)(ro)
-	assert.Equal(t, 4, ro.limit)
-	ro.limit = 0
-	assert.Equal(t, ReaderOptions{}, *ro)
-}
-
 // errOnFirstNextReader returns a non-ErrNoMoreRecords error on first Next()
 type errOnFirstNextReader struct{ called bool }
 

@@ -21,7 +21,7 @@ type IQueryBuilder interface {
 	WhereInArrayField(name string, v any) IQueryBuilder
 	OrderBy(expressions ...OrderExpression) IQueryBuilder
 	SelectIntoRecord(func() Record) StructuredQuery
-	SelectIntoRecordset(rs recordset.Recordset) StructuredQuery
+	SelectIntoRecordset(options ...recordset.Option) StructuredQuery
 	SelectKeysOnly(idKind reflect.Kind) StructuredQuery
 	StartFrom(cursor Cursor) IQueryBuilder
 }
@@ -100,9 +100,9 @@ func (s *QueryBuilder) SelectIntoRecord(into func() Record) StructuredQuery {
 	return q
 }
 
-func (s *QueryBuilder) SelectIntoRecordset(rs recordset.Recordset) StructuredQuery {
+func (s *QueryBuilder) SelectIntoRecordset(options ...recordset.Option) StructuredQuery {
 	q := s.newQuery()
-	q.intoRecordset = rs
+	q.recordsetOptions = options
 	return q
 }
 

@@ -9,16 +9,16 @@ import (
 var _ TextQuery = (*textQuery)(nil)
 
 type textQuery struct {
-	text   string
-	args   []QueryArg
-	offset int
-	limit  int
-	getKey func(data any, args []QueryArg) *Key
-	rs     recordset.Recordset
+	text             string
+	args             []QueryArg
+	offset           int
+	limit            int
+	getKey           func(data any, args []QueryArg) *Key
+	recordsetOptions []recordset.Option
 }
 
 func (q textQuery) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (reader RecordsetReader, err error) {
-	return qe.GetRecordsetReader(ctx, q, q.rs)
+	return qe.GetRecordsetReader(ctx, q, q.recordsetOptions...)
 }
 
 func (q textQuery) Offset() int {
