@@ -33,11 +33,11 @@ func (t transaction) GetMulti(_ context.Context, _ []dal.Record) error {
 	return dal.ErrNotImplementedYet
 }
 
-func (t transaction) GetRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsReader, error) {
+func (t transaction) ExecuteQueryToRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsReader, error) {
 	return nil, dal.ErrNotImplementedYet
 }
 
-func (t transaction) GetRecordsetReader(_ context.Context, _ dal.Query, _ recordset.Recordset) (dal.RecordsetReader, error) {
+func (t transaction) ExecuteQueryToRecordsetReader(_ context.Context, _ dal.Query, _ ...recordset.Option) (dal.RecordsetReader, error) {
 	return nil, dal.ErrNotImplementedYet
 }
 

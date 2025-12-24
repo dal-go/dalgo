@@ -92,10 +92,10 @@ func (d database) GetMulti(ctx context.Context, records []dal.Record) error {
 	return nil
 }
 
-func (d database) GetRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsReader, error) {
+func (d database) ExecuteQueryToRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsReader, error) {
 	return nil, dal.ErrNotSupported
 }
 
-func (d database) GetRecordsetReader(_ context.Context, _ dal.Query, _ recordset.Recordset) (dal.RecordsetReader, error) {
+func (d database) ExecuteQueryToRecordsetReader(_ context.Context, _ dal.Query, _ ...recordset.Option) (dal.RecordsetReader, error) {
 	return nil, dal.ErrNotSupported
 }

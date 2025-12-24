@@ -100,9 +100,9 @@ func (mr *MockDBMockRecorder) GetMulti(ctx, records any) *gomock.Call {
 }
 
 // GetRecordsReader mocks base method.
-func (m *MockDB) GetRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
+func (m *MockDB) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRecordsReader", ctx, query)
+	ret := m.ctrl.Call(m, "ExecuteQueryToRecordsReader", ctx, query)
 	ret0, _ := ret[0].(dal.RecordsReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -111,17 +111,17 @@ func (m *MockDB) GetRecordsReader(ctx context.Context, query dal.Query) (dal.Rec
 // GetRecordsReader indicates an expected call of GetRecordsReader.
 func (mr *MockDBMockRecorder) GetRecordsReader(ctx, query any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordsReader", reflect.TypeOf((*MockDB)(nil).GetRecordsReader), ctx, query)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteQueryToRecordsReader", reflect.TypeOf((*MockDB)(nil).ExecuteQueryToRecordsReader), ctx, query)
 }
 
 // GetRecordsetReader mocks base method.
-func (m *MockDB) GetRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
+func (m *MockDB) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, query}
 	for _, a := range options {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "GetRecordsetReader", varargs...)
+	ret := m.ctrl.Call(m, "ExecuteQueryToRecordsetReader", varargs...)
 	ret0, _ := ret[0].(dal.RecordsetReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -131,7 +131,7 @@ func (m *MockDB) GetRecordsetReader(ctx context.Context, query dal.Query, option
 func (mr *MockDBMockRecorder) GetRecordsetReader(ctx, query any, options ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, query}, options...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordsetReader", reflect.TypeOf((*MockDB)(nil).GetRecordsetReader), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteQueryToRecordsetReader", reflect.TypeOf((*MockDB)(nil).ExecuteQueryToRecordsetReader), varargs...)
 }
 
 // ID mocks base method.

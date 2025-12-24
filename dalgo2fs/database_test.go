@@ -231,8 +231,8 @@ func TestDatabase_Methods(t *testing.T) {
 		}
 	})
 
-	t.Run("GetRecordsReader", func(t *testing.T) {
-		reader, err := db.GetRecordsReader(context.Background(), nil)
+	t.Run("ExecuteQueryToRecordsReader", func(t *testing.T) {
+		reader, err := db.ExecuteQueryToRecordsReader(context.Background(), nil)
 		if !errors.Is(err, dal.ErrNotSupported) {
 			t.Errorf("expected dal.ErrNotSupported, got %v", err)
 		}
@@ -241,8 +241,8 @@ func TestDatabase_Methods(t *testing.T) {
 		}
 	})
 
-	t.Run("GetRecordsetReader", func(t *testing.T) {
-		reader, err := db.GetRecordsetReader(context.Background(), nil, nil)
+	t.Run("ExecuteQueryToRecordsetReader", func(t *testing.T) {
+		reader, err := db.ExecuteQueryToRecordsetReader(context.Background(), nil, nil)
 		if !errors.Is(err, dal.ErrNotSupported) {
 			t.Errorf("expected dal.ErrNotSupported, got %v", err)
 		}

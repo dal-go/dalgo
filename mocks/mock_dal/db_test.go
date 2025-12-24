@@ -138,7 +138,7 @@ func TestMockDB_QueryReader(t *testing.T) {
 	t.Run("query reader success", func(t *testing.T) {
 		mockDB.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, nil)
 
-		reader, err := mockDB.GetRecordsReader(ctx, nil)
+		reader, err := mockDB.ExecuteQueryToRecordsReader(ctx, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, reader)
 	})
@@ -147,7 +147,7 @@ func TestMockDB_QueryReader(t *testing.T) {
 		expectedErr := errors.New("query reader error")
 		mockDB.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, expectedErr)
 
-		reader, err := mockDB.GetRecordsReader(ctx, nil)
+		reader, err := mockDB.ExecuteQueryToRecordsReader(ctx, nil)
 		assert.Error(t, err)
 		assert.Nil(t, reader)
 		assert.Equal(t, expectedErr, err)

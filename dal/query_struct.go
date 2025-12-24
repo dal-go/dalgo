@@ -46,11 +46,11 @@ type structuredQuery struct {
 }
 
 func (q structuredQuery) GetRecordsReader(ctx context.Context, qe QueryExecutor) (reader RecordsReader, err error) {
-	return qe.GetRecordsReader(ctx, q)
+	return qe.ExecuteQueryToRecordsReader(ctx, q)
 }
 
 func (q structuredQuery) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (reader RecordsetReader, err error) {
-	return qe.GetRecordsetReader(ctx, q, q.recordsetOptions...)
+	return qe.ExecuteQueryToRecordsetReader(ctx, q, q.recordsetOptions...)
 }
 
 func (q structuredQuery) Text() string {

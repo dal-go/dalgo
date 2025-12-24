@@ -244,10 +244,10 @@ func (f *fakeTx) Name() string                    { return "fake" }
 func (f *fakeTx) Get(_ context.Context, _ dal.Record) error          { return nil }
 func (f *fakeTx) Exists(_ context.Context, _ *dal.Key) (bool, error) { return false, nil }
 func (f *fakeTx) GetMulti(_ context.Context, _ []dal.Record) error   { return nil }
-func (f *fakeTx) GetRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsReader, error) {
+func (f *fakeTx) ExecuteQueryToRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsReader, error) {
 	return nil, nil
 }
-func (f *fakeTx) GetRecordsetReader(_ context.Context, _ dal.Query, _ recordset.Recordset) (dal.RecordsetReader, error) {
+func (f *fakeTx) ExecuteQueryToRecordsetReader(_ context.Context, _ dal.Query, _ ...recordset.Option) (dal.RecordsetReader, error) {
 	return nil, nil
 }
 func (f *fakeTx) ReadAllToRecords(_ context.Context, _ dal.Query, _ ...dal.ReaderOption) ([]dal.Record, error) {

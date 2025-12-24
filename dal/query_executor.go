@@ -9,12 +9,12 @@ import (
 // QueryExecutor is a query executor that returns a reader and have few helper methods.
 type QueryExecutor interface {
 
-	// GetRecordsReader returns a reader for the given query to read records 1 by 1 sequentially.
+	// ExecuteQueryToRecordsReader returns a reader for the given query to read records 1 by 1 sequentially.
 	// The RecordsReader.Next() method returns ErrNoMoreRecords when there are no more records.
-	GetRecordsReader(ctx context.Context, query Query) (RecordsReader, error)
+	ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error)
 
-	// GetRecordsetReader returns a RecordsetReader for the given query, allowing sequential read of records into the provided recordset.
-	GetRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error)
+	// ExecuteQueryToRecordsetReader returns a RecordsetReader for the given query, allowing sequential read of records into the provided recordset.
+	ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error)
 }
 
 var _ QueryExecutor = (DB)(nil)

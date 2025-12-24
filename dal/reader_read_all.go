@@ -117,7 +117,7 @@ func ReadAllToRecords(ctx context.Context, reader RecordsReader, options ...Read
 
 func ExecuteQueryAndReadAllToRecords(ctx context.Context, query Query, qe QueryExecutor, options ...ReaderOption) (records []Record, err error) {
 	var reader RecordsReader
-	if reader, err = qe.GetRecordsReader(ctx, query); err != nil {
+	if reader, err = qe.ExecuteQueryToRecordsReader(ctx, query); err != nil {
 		return nil, err
 	}
 	return ReadAllToRecords(ctx, reader, options...)

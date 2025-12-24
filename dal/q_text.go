@@ -18,7 +18,7 @@ type textQuery struct {
 }
 
 func (q textQuery) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (reader RecordsetReader, err error) {
-	return qe.GetRecordsetReader(ctx, q, q.recordsetOptions...)
+	return qe.ExecuteQueryToRecordsetReader(ctx, q, q.recordsetOptions...)
 }
 
 func (q textQuery) Offset() int {
@@ -30,7 +30,7 @@ func (q textQuery) Limit() int {
 }
 
 func (q textQuery) GetRecordsReader(ctx context.Context, qe QueryExecutor) (reader RecordsReader, err error) {
-	return qe.GetRecordsReader(ctx, q)
+	return qe.ExecuteQueryToRecordsReader(ctx, q)
 }
 
 func (q textQuery) Text() string {

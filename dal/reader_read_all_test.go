@@ -269,18 +269,18 @@ func TestSelectAll_WithOffsetError(t *testing.T) {
 	}
 }
 
-func (m mockDB) GetRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
-	return m.getRecordsReader(ctx, query)
+func (m mockDB) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
+	return m.executeQueryToRecordsReader(ctx, query)
 }
 
-func (m mockDB) GetRecordsetReader(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
-	return m.getRecordsetReader(ctx, query, rs)
+func (m mockDB) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	return m.executeQueryToRecordsetReader(ctx, query, options...)
 }
 
 type mockDB struct {
 	DB
-	getRecordsReader   func(ctx context.Context, query Query) (RecordsReader, error)
-	getRecordsetReader func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error)
+	executeQueryToRecordsReader   func(ctx context.Context, query Query) (RecordsReader, error)
+	executeQueryToRecordsetReader func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error)
 }
 
 func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
@@ -289,7 +289,7 @@ func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		db := mockDB{
-			getRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
+			executeQueryToRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
 				return NewRecordsReader([]Record{
 					NewRecord(NewKeyWithID("test", 1)),
 				}), nil
@@ -302,7 +302,7 @@ func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
 
 	t.Run("db_error", func(t *testing.T) {
 		db := mockDB{
-			getRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
+			executeQueryToRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -314,7 +314,7 @@ func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
 
 	t.Run("reader_error", func(t *testing.T) {
 		db := mockDB{
-			getRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
+			executeQueryToRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
 				return &errOnFirstNextReader{}, nil
 			},
 		}
@@ -326,7 +326,7 @@ func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
 
 	t.Run("close_error", func(t *testing.T) {
 		db := mockDB{
-			getRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
+			executeQueryToRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
 				return &errOnCloseReader{}, nil
 			},
 		}
@@ -345,7 +345,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		rs := &mockRecordset{}
 		reader := &mockRecordsetReader{rs: rs, count: 2}
 		db := mockDB{
-			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 				return reader, nil
 			},
 		}
@@ -357,7 +357,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 
 	t.Run("db_error", func(t *testing.T) {
 		db := mockDB{
-			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -371,7 +371,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		rs := &mockRecordset{}
 		reader := &mockRecordsetReader{rs: rs, errToReturn: errors.New("reader error")}
 		db := mockDB{
-			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 				return reader, nil
 			},
 		}
@@ -386,7 +386,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		rs := &mockRecordset{}
 		reader := &mockRecordsetReader{rs: rs, count: 5}
 		db := mockDB{
-			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 				return reader, nil
 			},
 		}
@@ -401,7 +401,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		rs := &mockRecordset{}
 		reader := &mockRecordsetReader{rs: rs, count: 5}
 		db := mockDB{
-			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 				return reader, nil
 			},
 		}
@@ -416,7 +416,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		rs := &mockRecordset{}
 		reader := &mockRecordsetReader{rs: rs, count: 2}
 		db := mockDB{
-			getRecordsetReader: func(ctx context.Context, query Query, rs recordset.Recordset) (RecordsetReader, error) {
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 				return reader, nil
 			},
 		}
@@ -430,10 +430,11 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 
 type mockQuery struct {
 	Query
+	recordsetOptions []recordset.Option
 }
 
 func (m mockQuery) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (RecordsetReader, error) {
-	return qe.GetRecordsetReader(ctx, m, nil)
+	return qe.ExecuteQueryToRecordsetReader(ctx, m, m.recordsetOptions...)
 }
 
 type mockRecordset struct {
