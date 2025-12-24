@@ -1,6 +1,9 @@
 package recordset
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+)
 
 var _ Column[string] = (*column[string])(nil)
 var _ Column[int] = (*column[int])(nil)
@@ -17,6 +20,9 @@ func (c *column[T]) SetValue(row int, value T) (err error) {
 }
 
 func (c *column[T]) GetValue(row int) (value T, err error) {
+	if row < 0 || row >= len(c.values) {
+		return value, fmt.Errorf("row %d out of range for %d rows", row, len(c.values))
+	}
 	return c.values[row], nil
 }
 

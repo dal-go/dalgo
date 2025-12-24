@@ -9,6 +9,7 @@ type Column[T any] interface {
 	DefaultValue() T
 	GetValue(row int) (value T, err error)
 	SetValue(row int, value T) (err error)
+	DbType() string
 	ValueType() reflect.Type
 	IsBitmap() bool
 	Add(value T) error

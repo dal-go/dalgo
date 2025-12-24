@@ -22,6 +22,9 @@ func (c UntypedColWrapper[T]) TypedColumn() Column[T] {
 func (c UntypedColWrapper[T]) Name() string {
 	return c.column.Name()
 }
+func (c UntypedColWrapper[T]) DbType() string {
+	return c.column.DbType()
+}
 
 func (c UntypedColWrapper[T]) Add(value any) error {
 	if v, ok := value.(T); ok {

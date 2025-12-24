@@ -379,7 +379,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		}
 		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db)
 		assert.Error(t, err)
-		assert.Equal(t, "db error", err.Error())
+		assert.Equal(t, "failed to get the recordset reader: db error", err.Error())
 		assert.Nil(t, gotRs)
 	})
 
@@ -393,7 +393,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		}
 		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db)
 		assert.Error(t, err)
-		assert.Equal(t, "reader error", err.Error())
+		assert.Equal(t, "failed to get next record: reader error", err.Error())
 		assert.Equal(t, rs, gotRs)
 		assert.True(t, reader.closed)
 	})

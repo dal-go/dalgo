@@ -7,10 +7,12 @@ import (
 )
 
 type mockColumn struct {
-	name string
+	name   string
+	dbType string
 }
 
 func (m mockColumn) Name() string                { return m.name }
+func (m mockColumn) DbType() string              { return m.dbType }
 func (m mockColumn) DefaultValue() any           { return nil }
 func (m mockColumn) Add(_ any) error             { return nil }
 func (m mockColumn) GetValue(_ int) (any, error) { return nil, fmt.Errorf("error") }
@@ -32,8 +34,10 @@ func (m mockRecordset) RowsCount() int   { return 0 }
 func TestDataError(t *testing.T) {
 	col := mockColumn{name: "err_col"}
 	rs := mockRecordset{
-		ColumnAccessor: &columns{cols: []Column[any]{col}},
-		name:           "mock_rs",
+		ColumnAccessor: &columns{cols: []Column[any]{
+			col,
+		}},
+		name: "mock_rs",
 	}
 	row := &columnarRow{i: 0}
 	_, err := row.Data(rs)

@@ -10,7 +10,9 @@ type columnBase[T any] struct {
 func (c *columnBase[T]) Name() string {
 	return c.name
 }
-
+func (c *columnBase[T]) DbType() string {
+	return c.dbType
+}
 func (c *columnBase[T]) DefaultValue() T {
 	return c.defaultVal()
 }

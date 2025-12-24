@@ -40,8 +40,8 @@ func (c *columnBool) Add(value bool) error {
 	return c.SetValue(int(c.values.GetCardinality()-1), value)
 }
 
-func NewBoolColumn(name string) Column[bool] {
-	return &columnBool{
+func NewBoolColumn(name string, options ...ColumnOption) Column[bool] {
+	c := columnBool{
 		columnBase: columnBase[bool]{
 			name: name,
 			defaultVal: func() bool {
@@ -50,6 +50,10 @@ func NewBoolColumn(name string) Column[bool] {
 		},
 		values: roaring.New(),
 	}
+	for _, o := range options {
+		o(&c.ColumnOptions)
+	}
+	return &c
 }
 
 func (c *columnBool) Values() []bool {

@@ -126,7 +126,7 @@ func ExecuteQueryAndReadAllToRecords(ctx context.Context, query Query, qe QueryE
 func ExecuteQueryAndReadAllToRecordset(ctx context.Context, query Query, qe QueryExecutor, options ...ReaderOption) (rs recordset.Recordset, err error) {
 	var reader RecordsetReader
 	if reader, err = query.GetRecordsetReader(ctx, qe); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get the recordset reader: %w", err)
 	}
 	defer func() {
 		if closeErr := reader.Close(); closeErr != nil && err == nil {
@@ -151,7 +151,7 @@ func ExecuteQueryAndReadAllToRecordset(ctx context.Context, query Query, qe Quer
 			if errors.Is(e, ErrNoMoreRecords) {
 				return rs, nil
 			}
-			return rs, e
+			return rs, fmt.Errorf("failed to skip a record: %w", e)
 		}
 		offset--
 	}
@@ -169,7 +169,7 @@ func ExecuteQueryAndReadAllToRecordset(ctx context.Context, query Query, qe Quer
 				if errors.Is(e, ErrNoMoreRecords) || errors.Is(e, io.EOF) {
 					return rs, nil
 				}
-				return rs, e
+				return rs, fmt.Errorf("failed to get next record: %w", e)
 			}
 		}
 	} else {
@@ -186,7 +186,7 @@ func ExecuteQueryAndReadAllToRecordset(ctx context.Context, query Query, qe Quer
 				if errors.Is(e, ErrNoMoreRecords) || errors.Is(e, io.EOF) {
 					return rs, nil
 				}
-				return rs, e
+				return rs, fmt.Errorf("failed to get next record: %w", e)
 			}
 			rowsCount++
 			if rowsCount >= ro.limit {
