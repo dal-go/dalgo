@@ -619,6 +619,70 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		assert.True(t, errors.Is(err, context.Canceled))
 	})
 
+	t.Run("SelectAll_CloseErrorWithPriorError", func(t *testing.T) {
+		reader := &mockRecordsReader{count: 1, errToReturn: errors.New("prior error"), closeErr: errors.New("close error")}
+		err := SelectAll(context.Background(), reader, func(r Record) {})
+		assert.Error(t, err)
+		assert.Equal(t, "prior error", err.Error())
+	})
+
+	t.Run("ExecuteQueryAndReadAllToRecordset_SkipError", func(t *testing.T) {
+		reader := &mockRecordsetReader{count: 0, errToReturn: errors.New("skip error")}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		_, err := ExecuteQueryAndReadAllToRecordset(context.Background(), q, db, WithOffset(1))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to skip a record: skip error")
+	})
+
+	t.Run("ExecuteQueryAndReadAllToRecordset_ContextCancelled_NoLimit_Loop", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		// We want to cancel AFTER the first check but before the Next() is called or something.
+		// Actually, if we use a mock reader that blocks or just cancel it, it should hit the branch.
+		cancel()
+		reader := &mockRecordsetReader{count: 5}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		_, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithLimit(0))
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, context.Canceled))
+	})
+
+	t.Run("ExecuteQueryAndReadAllToRecordset_EOF_Unlimited", func(t *testing.T) {
+		reader := &mockRecordsetReader{count: 0, errToReturn: io.EOF}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		_, err := ExecuteQueryAndReadAllToRecordset(context.Background(), q, db, WithLimit(0))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ExecuteQueryAndReadAllToRecordset_EOF_Limited", func(t *testing.T) {
+		reader := &mockRecordsetReader{count: 0, errToReturn: io.EOF}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		_, err := ExecuteQueryAndReadAllToRecordset(context.Background(), q, db, WithLimit(5))
+		assert.NoError(t, err)
+	})
+
+	t.Run("SelectAll_Limited_NoMoreRecords", func(t *testing.T) {
+		reader := &mockRecordsReader{count: 2}
+		err := SelectAll(context.Background(), reader, func(r Record) {}, WithLimit(5))
+		assert.NoError(t, err)
+		assert.Equal(t, 3, reader.nextCalled) // 1, 2, then ErrNoMoreRecords
+	})
+
 	t.Run("ExecuteQueryAndReadAllToRecordset_ContextCancelled_Offset", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -628,9 +692,21 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 				return reader, nil
 			},
 		}
-		_, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithOffset(2))
+		_, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithOffset(1))
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, context.Canceled))
+	})
+
+	t.Run("ExecuteQueryAndReadAllToRecordset_NextError_Limited", func(t *testing.T) {
+		reader := &mockRecordsetReader{count: 0, errToReturn: errors.New("next error")}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		_, err := ExecuteQueryAndReadAllToRecordset(context.Background(), q, db, WithLimit(5))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get next record: next error")
 	})
 }
 

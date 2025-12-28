@@ -47,6 +47,7 @@ func (v CollectionRef) Equal(other CollectionRef, ignoreAlias bool) bool {
 }
 
 func (CollectionRef) recordsetSource() {
+	_ = 0 // marker statement
 }
 
 func (v CollectionRef) Name() string {

@@ -10,6 +10,7 @@ type CollectionGroupRef struct {
 }
 
 func (CollectionGroupRef) recordsetSource() {
+	_ = 0 // marker statement
 }
 
 func (v CollectionGroupRef) Name() string {
