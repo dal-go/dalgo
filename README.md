@@ -6,7 +6,7 @@
 
 [![Build, Test, Vet, Lint](https://github.com/dal-go/dalgo/actions/workflows/ci.yml/badge.svg)](https://github.com/dal-go/dalgo/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dal-go/dalgo)](https://goreportcard.com/report/github.com/dal-go/dalgo)
-[![Coverage Status](https://coveralls.io/repos/github/dal-go/dalgo/badge.svg?branch=main&kill-cache=2)](https://coveralls.io/github/dal-go/dalgo?branch=main)
+[![Coverage Status](https://coveralls.io/repos/github/dal-go/dalgo/badge.svg?branch=main&kill-cache=3)](https://coveralls.io/github/dal-go/dalgo?branch=main)
 [![Version](https://img.shields.io/github/v/tag/dal-go/dalgo?filter=v*.*.*&logo=Go)](https://github.com/dal-go/dalgo/tags)
 [![GoDoc](https://godoc.org/github.com/dal-go/dalgo?status.svg)](https://godoc.org/github.com/dal-go/dalgo)
 [![Sourcegraph](https://sourcegraph.com/github.com/dal-go/dalgo/-/badge.svg)](https://sourcegraph.com/github.com/dal-go/dalgo?badge)
