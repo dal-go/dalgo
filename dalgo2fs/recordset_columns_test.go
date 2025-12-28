@@ -48,3 +48,10 @@ func TestNewFileInfoColumns(t *testing.T) {
 		assert.NotNil(t, col)
 	}
 }
+
+func TestFileColumns_Methods(t *testing.T) {
+	col := NewFileExtColumn()
+	assert.Equal(t, "STRING", col.DbType())
+	_ = col.Add(".txt")
+	assert.Equal(t, ".txt", col.Values()[0])
+}

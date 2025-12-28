@@ -66,4 +66,9 @@ func TestQueryBuilder(t *testing.T) {
 			t.Errorf("Expected Comparison condition, got %T", where)
 		}
 	})
+
+	t.Run("SelectIntoRecordset", func(t *testing.T) {
+		q := qb.Clone().SelectIntoRecordset()
+		assert.NotNil(t, q)
+	})
 }

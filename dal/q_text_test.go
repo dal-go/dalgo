@@ -49,6 +49,15 @@ func TestNewTextQuery_Basic(t *testing.T) {
 	}
 }
 
+func TestTextQuery_Methods(t *testing.T) {
+	tq := &textQuery{
+		offset: 10,
+		limit:  20,
+	}
+	assert.Equal(t, 10, tq.Offset())
+	assert.Equal(t, 20, tq.Limit())
+}
+
 func TestTextQuery_NoArgs(t *testing.T) {
 	tq := NewTextQuery("DELETE FROM t WHERE 1=1", func(data any, args []QueryArg) *Key { return nil })
 	assert.NotNil(t, tq)

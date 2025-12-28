@@ -62,6 +62,19 @@ func TestColumnBool_SetValue(t *testing.T) {
 	}
 }
 
+func TestColumnBool_Values(t *testing.T) {
+	col := NewBoolColumn("test")
+	_ = col.Add(true)
+	_ = col.Add(false)
+	values := col.Values()
+	if len(values) != 2 {
+		t.Errorf("expected 2 values, got %d", len(values))
+	}
+	if values[0] != true || values[1] != false {
+		t.Errorf("unexpected values: %v", values)
+	}
+}
+
 func TestColumnBool_Add(t *testing.T) {
 	col := NewBoolColumn("test")
 	err := col.Add(true)

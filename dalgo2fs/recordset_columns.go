@@ -25,7 +25,7 @@ func NewIsDirColumn() recordset.Column[bool] {
 func NewFileExtColumn() recordset.Column[string] {
 	return recordset.NewBitmapColumn[string](ColumnFileExt, 0, func() string {
 		return ""
-	})
+	}, recordset.ColDbType("STRING"))
 }
 
 func NewFileSizeColumn() recordset.Column[int64] {

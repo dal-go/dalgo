@@ -56,4 +56,18 @@ func testCol[T comparable](t *testing.T, defaultValue T, v1, v2 T) {
 	if col.ValueType() == nil {
 		t.Error("ValueType() returned nil")
 	}
+
+	t.Run("GetValue_out_of_range", func(t *testing.T) {
+		_, err := col.GetValue(100)
+		if err == nil {
+			t.Error("expected error for GetValue(100)")
+		}
+	})
+
+	t.Run("Values", func(t *testing.T) {
+		v := col.Values()
+		if len(v) != 2 {
+			t.Errorf("got len(Values)=%d, want 2", len(v))
+		}
+	})
 }

@@ -1,11 +1,25 @@
 package dal
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dal-go/dalgo/constant"
+	"github.com/dal-go/dalgo/recordset"
 	"github.com/stretchr/testify/assert"
 )
+
+type mockQueryExecutor struct {
+	QueryExecutor
+}
+
+func (m mockQueryExecutor) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
+	return nil, nil
+}
+
+func (m mockQueryExecutor) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	return nil, nil
+}
 
 func TestSelect(t *testing.T) {
 	tests := []struct {
@@ -161,6 +175,15 @@ func TestSelect(t *testing.T) {
 			t.Run("Or", func(t *testing.T) {
 				q := tt.q.Or(NewComparison(FieldRef{name: "Email"}, Equal, String("test@example.com")))
 				assert.NotEqual(t, tt.q, q)
+			})
+			t.Run("GetRecordsReader", func(t *testing.T) {
+				_, _ = tt.q.GetRecordsReader(context.Background(), mockQueryExecutor{})
+			})
+			t.Run("GetRecordsetReader", func(t *testing.T) {
+				_, _ = tt.q.GetRecordsetReader(context.Background(), mockQueryExecutor{})
+			})
+			t.Run("Text", func(t *testing.T) {
+				_ = tt.q.Text()
 			})
 		})
 	}

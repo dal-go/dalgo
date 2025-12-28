@@ -125,4 +125,22 @@ func TestDirReader_Next_SkipDirs(t *testing.T) {
 		_, _, err := reader2.Next()
 		assert.Equal(t, dal.ErrNoMoreRecords, err)
 	})
+
+	t.Run("FilteredFileInfoColumns", func(t *testing.T) {
+		tmpDir3, _ := os.MkdirTemp("", "dalgo2fs_filtered_cols")
+		defer func() {
+			_ = os.RemoveAll(tmpDir3)
+		}()
+		_ = os.WriteFile(filepath.Join(tmpDir3, "file.txt"), []byte("test"), 0644)
+
+		// Use a subset of columns to trigger more branches in Next
+		reader3, _ := NewDirReader(tmpDir3,
+			recordset.UntypedCol(NewFileNameColumn()),
+			recordset.UntypedCol(NewFileSizeColumn()),
+			recordset.UntypedCol(NewFileModifiedColumn()),
+		)
+		row, _, err := reader3.Next()
+		assert.NoError(t, err)
+		assert.NotNil(t, row)
+	})
 }

@@ -95,3 +95,18 @@ func TestColumnBitmap_Add(t *testing.T) {
 		t.Errorf("expected b, got %v", val)
 	}
 }
+
+func TestColumnBitmap_Values(t *testing.T) {
+	col := NewBitmapColumn[string]("test", 0, func() string {
+		return ""
+	})
+	_ = col.Add("a")
+	_ = col.Add("b")
+	values := col.Values()
+	if len(values) != 2 {
+		t.Errorf("expected 2 values, got %d", len(values))
+	}
+	if values[0] != "a" || values[1] != "b" {
+		t.Errorf("unexpected values: %v", values)
+	}
+}

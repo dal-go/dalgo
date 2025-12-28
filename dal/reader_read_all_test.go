@@ -426,6 +426,36 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		assert.Equal(t, 3, reader.nextCalled) // returns ErrNoMoreRecords on 3rd call
 		assert.True(t, reader.closed)
 	})
+
+	t.Run("context_cancelled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 5}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		_, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db)
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, context.Canceled))
+	})
+
+	t.Run("context_cancelled_during_offset", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 5}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		_, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithOffset(2))
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, context.Canceled))
+	})
 }
 
 type mockQuery struct {

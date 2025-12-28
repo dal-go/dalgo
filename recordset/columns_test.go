@@ -37,4 +37,11 @@ func TestColumns(t *testing.T) {
 		assert.Equal(t, 1, cols.GetColumnIndex("c2"))
 		assert.Equal(t, -1, cols.GetColumnIndex("c3"))
 	})
+
+	t.Run("Columns", func(t *testing.T) {
+		c := cols.Columns()
+		assert.Equal(t, 2, len(c))
+		assert.Equal(t, cols.cols[0], c[0])
+		assert.Equal(t, cols.cols[1], c[1])
+	})
 }

@@ -11,8 +11,8 @@ type bitmapValue[T comparable] struct {
 	rows *roaring.Bitmap
 }
 
-func NewBitmapColumn[T comparable](name string, initialCapacity int, getDefaultVal func() T) Column[T] {
-	return &columnBitmap[T]{
+func NewBitmapColumn[T comparable](name string, initialCapacity int, getDefaultVal func() T, options ...ColumnOption) Column[T] {
+	c := columnBitmap[T]{
 		columnBase: columnBase[T]{
 			name:       name,
 			defaultVal: getDefaultVal,
@@ -20,6 +20,10 @@ func NewBitmapColumn[T comparable](name string, initialCapacity int, getDefaultV
 
 		values: make([]bitmapValue[T], initialCapacity),
 	}
+	for _, o := range options {
+		o(&c.ColumnOptions)
+	}
+	return &c
 }
 
 type columnBitmap[T comparable] struct {
