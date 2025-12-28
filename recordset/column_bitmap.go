@@ -3,7 +3,7 @@ package recordset
 import (
 	"reflect"
 
-	"github.com/RoaringBitmap/roaring"
+	"github.com/RoaringBitmap/roaring/v2"
 )
 
 type bitmapValue[T comparable] struct {
