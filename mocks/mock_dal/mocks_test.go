@@ -33,10 +33,20 @@ func TestMocks(t *testing.T) {
 		_ = m.GetMulti(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil, nil)
 		_ = m.ID()
 		_ = m.RunReadonlyTransaction(ctx, nil)
 		_ = m.RunReadwriteTransaction(ctx, nil)
 		_ = m.Schema()
+	})
+
+	t.Run("MockReader", func(t *testing.T) {
+		m := NewMockReader(ctrl)
+		m.EXPECT().Close().Return(nil).AnyTimes()
+		m.EXPECT().Cursor().Return("", nil).AnyTimes()
+
+		_ = m.Close()
+		_, _ = m.Cursor()
 	})
 
 	t.Run("MockRecordsReader", func(t *testing.T) {
@@ -83,6 +93,7 @@ func TestMocks(t *testing.T) {
 		_ = m.GetMulti(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil, nil)
 		_ = m.Options()
 	})
 
@@ -112,6 +123,7 @@ func TestMocks(t *testing.T) {
 		_ = m.GetMulti(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil, nil)
 		_ = m.ID()
 		_ = m.Insert(ctx, nil)
 		_ = m.InsertMulti(ctx, nil)
@@ -136,6 +148,7 @@ func TestMocks(t *testing.T) {
 		_ = m.GetMulti(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil, nil)
 	})
 
 	t.Run("MockWriteSession", func(t *testing.T) {
@@ -185,6 +198,7 @@ func TestMocks(t *testing.T) {
 		_ = m.GetMulti(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
 		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil, nil)
 		_ = m.Insert(ctx, nil)
 		_ = m.InsertMulti(ctx, nil)
 		_ = m.Set(ctx, nil)
