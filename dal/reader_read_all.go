@@ -22,7 +22,8 @@ func SelectAll(ctx context.Context, reader RecordsReader, addItem func(r Record)
 	}
 	// Ensure Close is called and its error is propagated if no earlier error.
 	defer func() {
-		if closeErr := reader.Close(); closeErr != nil && err == nil {
+		closeErr := reader.Close()
+		if err == nil && closeErr != nil {
 			err = fmt.Errorf("failed to close reader: %w", closeErr)
 		}
 	}()
@@ -129,7 +130,8 @@ func ExecuteQueryAndReadAllToRecordset(ctx context.Context, query Query, qe Quer
 		return nil, fmt.Errorf("failed to get the recordset reader: %w", err)
 	}
 	defer func() {
-		if closeErr := reader.Close(); closeErr != nil && err == nil {
+		closeErr := reader.Close()
+		if err == nil && closeErr != nil {
 			err = fmt.Errorf("failed to close reader: %w", closeErr)
 		}
 	}()

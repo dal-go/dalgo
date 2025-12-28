@@ -147,9 +147,13 @@ func TestSelect(t *testing.T) {
 			t.Run("IntoRecord", func(t *testing.T) {
 				if tt.q.intoRecord == nil {
 					assert.Nil(t, tt.q.IntoRecord())
-					return
+				} else {
+					assert.Equal(t, tt.q.intoRecord(), tt.q.IntoRecord())
 				}
-				assert.Equal(t, tt.q.intoRecord(), tt.q.IntoRecord())
+			})
+			t.Run("IntoRecord_coverage", func(t *testing.T) {
+				q := structuredQuery{intoRecord: func() Record { return nil }}
+				assert.Nil(t, q.IntoRecord())
 			})
 			t.Run("IDKind", func(t *testing.T) {
 				assert.Equal(t, tt.q.idKind, tt.q.IDKind())
@@ -184,9 +188,6 @@ func TestSelect(t *testing.T) {
 			})
 			t.Run("Text", func(t *testing.T) {
 				_ = tt.q.Text()
-			})
-			t.Run("IntoRecord", func(t *testing.T) {
-				_ = tt.q.IntoRecord()
 			})
 		})
 	}

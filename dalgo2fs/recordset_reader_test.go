@@ -85,17 +85,51 @@ func TestDirReader_Next_Error(t *testing.T) {
 	})
 }
 
-func TestDirReader_Next_EOF(t *testing.T) {
-	reader, _ := NewDirReader("./test-fs-db")
-	// Drain it
-	for {
-		_, _, err := reader.Next()
-		if err != nil {
-			break
+type mockDirEntry struct {
+	os.DirEntry
+	name  string
+	isDir bool
+	err   error
+}
+
+func (m mockDirEntry) Name() string {
+	return m.name
+}
+
+func (m mockDirEntry) IsDir() bool {
+	return m.isDir
+}
+
+func (m mockDirEntry) Info() (os.FileInfo, error) {
+	return nil, m.err
+}
+
+func TestDirReader_Next_Coverage(t *testing.T) {
+	t.Run("FollowedByMoreDirs", func(t *testing.T) {
+		r := &dirReader{
+			entries: []os.DirEntry{
+				mockDirEntry{name: "dir1", isDir: true},
+				mockDirEntry{name: "dir2", isDir: true},
+			},
 		}
-	}
-	_, _, err := reader.Next()
-	assert.Equal(t, dal.ErrNoMoreRecords, err)
+		_, _, err := r.Next()
+		assert.Equal(t, dal.ErrNoMoreRecords, err)
+	})
+
+	t.Run("InfoError", func(t *testing.T) {
+		sizeCol := NewFileSizeColumn()
+		rs := recordset.NewColumnarRecordset("test", recordset.UntypedCol(sizeCol))
+		r := &dirReader{
+			rs: rs,
+			entries: []os.DirEntry{
+				mockDirEntry{name: "file1", isDir: false, err: errors.New("info error")},
+			},
+			sizeCol: sizeCol,
+		}
+		_, _, err := r.Next()
+		assert.Error(t, err)
+		assert.Equal(t, "info error", err.Error())
+	})
 }
 
 func TestDirReader_Next_SkipDirs(t *testing.T) {
