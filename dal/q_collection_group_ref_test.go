@@ -55,6 +55,7 @@ func TestCollectionGroupRef_recordsetSource(t *testing.T) {
 	ref := NewCollectionGroupRef("test", "t")
 	// This method is a marker method, just call it to ensure coverage
 	ref.recordsetSource()
+	_ = (RecordsetSource)(ref)
 }
 
 func TestCollectionGroupRef_Name(t *testing.T) {

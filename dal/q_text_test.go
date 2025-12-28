@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -56,6 +57,13 @@ func TestTextQuery_Methods(t *testing.T) {
 	}
 	assert.Equal(t, 10, tq.Offset())
 	assert.Equal(t, 20, tq.Limit())
+
+	t.Run("GetRecordsetReader", func(t *testing.T) {
+		_, _ = tq.GetRecordsetReader(context.Background(), mockQueryExecutor{})
+	})
+	t.Run("GetRecordsReader", func(t *testing.T) {
+		_, _ = tq.GetRecordsReader(context.Background(), mockQueryExecutor{})
+	})
 }
 
 func TestTextQuery_NoArgs(t *testing.T) {

@@ -3,6 +3,7 @@ package dal
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 )
 
@@ -100,4 +101,11 @@ func TestSelectAll_ErrorPaths(t *testing.T) {
 	if err == nil || !errors.Is(err, e.closeErr) {
 		t.Fatalf("expected close error to be returned when no prior error, got: %v", err)
 	}
+
+	t.Run("io_eof", func(t *testing.T) {
+		_, err := SelectAllIDs[int](context.Background(), &errReader{nextErr: io.EOF})
+		if err != nil {
+			t.Fatalf("expected nil error for io.EOF, got: %v", err)
+		}
+	})
 }

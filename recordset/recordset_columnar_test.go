@@ -97,4 +97,12 @@ func TestColumnarRecordset(t *testing.T) {
 		_, err := row.GetValueByIndex(100, rs)
 		assert.Error(t, err)
 	})
+
+	t.Run("SetValueByIndex", func(t *testing.T) {
+		row := rs.GetRow(0)
+		err := row.SetValueByIndex(0, "Anna-Updated", rs)
+		assert.NoError(t, err)
+		val, _ := row.GetValueByIndex(0, rs)
+		assert.Equal(t, "Anna-Updated", val)
+	})
 }

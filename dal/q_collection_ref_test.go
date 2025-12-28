@@ -117,6 +117,7 @@ func TestCollectionRef_recordsetSource(t *testing.T) {
 	ref := NewCollectionRef("test", "t", nil)
 	// This method is a marker method, just call it to ensure coverage
 	ref.recordsetSource()
+	_ = (RecordsetSource)(ref)
 }
 
 func TestCollectionRef_Alias(t *testing.T) {

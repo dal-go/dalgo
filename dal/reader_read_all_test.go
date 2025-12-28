@@ -3,6 +3,7 @@ package dal
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/dal-go/dalgo/recordset"
@@ -442,9 +443,18 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		assert.True(t, errors.Is(err, context.Canceled))
 	})
 
-	t.Run("context_cancelled_during_offset", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
+	t.Run("offset_failed", func(t *testing.T) {
+		reader := &mockRecordsetReader{errToReturn: errors.New("test error")}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		_, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithOffset(5))
+		assert.Error(t, err)
+	})
+
+	t.Run("limit_reached", func(t *testing.T) {
 		rs := &mockRecordset{}
 		reader := &mockRecordsetReader{rs: rs, count: 5}
 		db := mockDB{
@@ -452,9 +462,62 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 				return reader, nil
 			},
 		}
-		_, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithOffset(2))
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithLimit(2))
 		assert.Error(t, err)
-		assert.True(t, errors.Is(err, context.Canceled))
+		assert.True(t, errors.Is(err, ErrLimitReached))
+		assert.Equal(t, rs, gotRs)
+	})
+
+	t.Run("no_limit_no_more_records", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 2}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db)
+		assert.NoError(t, err)
+		assert.Equal(t, rs, gotRs)
+	})
+
+	t.Run("no_limit_eof", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 2, errToReturn: io.EOF}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db)
+		assert.NoError(t, err)
+		assert.Equal(t, rs, gotRs)
+	})
+
+	t.Run("limit_reached_eof", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 5, errToReturn: io.EOF}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithLimit(10))
+		assert.NoError(t, err)
+		assert.Equal(t, rs, gotRs)
+	})
+
+	t.Run("limit_reached_no_more_records", func(t *testing.T) {
+		rs := &mockRecordset{}
+		reader := &mockRecordsetReader{rs: rs, count: 5}
+		db := mockDB{
+			executeQueryToRecordsetReader: func(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+				return reader, nil
+			},
+		}
+		gotRs, err := ExecuteQueryAndReadAllToRecordset(ctx, q, db, WithLimit(10))
+		assert.NoError(t, err)
+		assert.Equal(t, rs, gotRs)
 	})
 }
 
@@ -486,7 +549,7 @@ func (m *mockRecordsetReader) Recordset() recordset.Recordset {
 
 func (m *mockRecordsetReader) Next() (recordset.Row, recordset.Recordset, error) {
 	m.nextCalled++
-	if m.errToReturn != nil {
+	if m.errToReturn != nil && m.nextCalled > m.count {
 		return nil, nil, m.errToReturn
 	}
 	if m.nextCalled > m.count {

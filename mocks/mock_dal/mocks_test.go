@@ -1,0 +1,196 @@
+package mock_dal
+
+import (
+	"context"
+	"testing"
+
+	"github.com/dal-go/dalgo/dal"
+	"go.uber.org/mock/gomock"
+)
+
+func TestMocks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+
+	t.Run("MockDB", func(t *testing.T) {
+		m := NewMockDB(ctrl)
+		m.EXPECT().Adapter().Return(dal.NewAdapter("test", "v1")).AnyTimes()
+		m.EXPECT().Exists(ctx, gomock.Any()).Return(false, nil).AnyTimes()
+		m.EXPECT().Get(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().GetRecordsetReader(ctx, gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().ID().Return("").AnyTimes()
+		m.EXPECT().RunReadonlyTransaction(ctx, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().RunReadwriteTransaction(ctx, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Schema().Return(dal.NewSchema(nil, nil)).AnyTimes()
+
+		_ = m.Adapter()
+		_, _ = m.Exists(ctx, nil)
+		_ = m.Get(ctx, nil)
+		_ = m.GetMulti(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_ = m.ID()
+		_ = m.RunReadonlyTransaction(ctx, nil)
+		_ = m.RunReadwriteTransaction(ctx, nil)
+		_ = m.Schema()
+	})
+
+	t.Run("MockRecordsReader", func(t *testing.T) {
+		m := NewMockRecordsReader(ctrl)
+		m.EXPECT().Close().Return(nil).AnyTimes()
+		m.EXPECT().Cursor().Return("", nil).AnyTimes()
+		m.EXPECT().Next().Return(nil, nil).AnyTimes()
+
+		_ = m.Close()
+		_, _ = m.Cursor()
+		_, _ = m.Next()
+	})
+
+	t.Run("MockRecordsetReader", func(t *testing.T) {
+		m := NewMockRecordsetReader(ctrl)
+		m.EXPECT().Close().Return(nil).AnyTimes()
+		m.EXPECT().Cursor().Return("", nil).AnyTimes()
+		m.EXPECT().Next().Return(nil, nil, nil).AnyTimes()
+		m.EXPECT().Recordset().Return(nil).AnyTimes()
+
+		_ = m.Close()
+		_, _ = m.Cursor()
+		_, _, _ = m.Next()
+		_ = m.Recordset()
+	})
+
+	t.Run("MockTransaction", func(t *testing.T) {
+		m := NewMockTransaction(ctrl)
+		m.EXPECT().Options().Return(dal.NewTransactionOptions()).AnyTimes()
+		_ = m.Options()
+	})
+
+	t.Run("MockReadTransaction", func(t *testing.T) {
+		m := NewMockReadTransaction(ctrl)
+		m.EXPECT().Exists(ctx, gomock.Any()).Return(false, nil).AnyTimes()
+		m.EXPECT().Get(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().GetRecordsetReader(ctx, gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().Options().Return(dal.NewTransactionOptions()).AnyTimes()
+
+		_, _ = m.Exists(ctx, nil)
+		_ = m.Get(ctx, nil)
+		_ = m.GetMulti(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_ = m.Options()
+	})
+
+	t.Run("MockReadwriteTransaction", func(t *testing.T) {
+		m := NewMockReadwriteTransaction(ctrl)
+		m.EXPECT().Delete(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().DeleteMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Exists(ctx, gomock.Any()).Return(false, nil).AnyTimes()
+		m.EXPECT().Get(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().GetRecordsetReader(ctx, gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().ID().Return("").AnyTimes()
+		m.EXPECT().Insert(ctx, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().InsertMulti(ctx, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Options().Return(dal.NewTransactionOptions()).AnyTimes()
+		m.EXPECT().Set(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().SetMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Update(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().UpdateMulti(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().UpdateRecord(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+		_ = m.Delete(ctx, nil)
+		_ = m.DeleteMulti(ctx, nil)
+		_, _ = m.Exists(ctx, nil)
+		_ = m.Get(ctx, nil)
+		_ = m.GetMulti(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_ = m.ID()
+		_ = m.Insert(ctx, nil)
+		_ = m.InsertMulti(ctx, nil)
+		_ = m.Options()
+		_ = m.Set(ctx, nil)
+		_ = m.SetMulti(ctx, nil)
+		_ = m.Update(ctx, nil, nil)
+		_ = m.UpdateMulti(ctx, nil, nil)
+		_ = m.UpdateRecord(ctx, nil, nil)
+	})
+
+	t.Run("MockReadSession", func(t *testing.T) {
+		m := NewMockReadSession(ctrl)
+		m.EXPECT().Exists(ctx, gomock.Any()).Return(false, nil).AnyTimes()
+		m.EXPECT().Get(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().GetRecordsetReader(ctx, gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+		_, _ = m.Exists(ctx, nil)
+		_ = m.Get(ctx, nil)
+		_ = m.GetMulti(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+	})
+
+	t.Run("MockWriteSession", func(t *testing.T) {
+		m := NewMockWriteSession(ctrl)
+		m.EXPECT().Delete(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().DeleteMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Insert(ctx, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().InsertMulti(ctx, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Set(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().SetMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Update(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().UpdateMulti(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().UpdateRecord(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+		_ = m.Delete(ctx, nil)
+		_ = m.DeleteMulti(ctx, nil)
+		_ = m.Insert(ctx, nil)
+		_ = m.InsertMulti(ctx, nil)
+		_ = m.Set(ctx, nil)
+		_ = m.SetMulti(ctx, nil)
+		_ = m.Update(ctx, nil, nil)
+		_ = m.UpdateMulti(ctx, nil, nil)
+		_ = m.UpdateRecord(ctx, nil, nil)
+	})
+
+	t.Run("MockReadwriteSession", func(t *testing.T) {
+		m := NewMockReadwriteSession(ctrl)
+		m.EXPECT().Delete(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().DeleteMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Exists(ctx, gomock.Any()).Return(false, nil).AnyTimes()
+		m.EXPECT().Get(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().GetRecordsetReader(ctx, gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+		m.EXPECT().Insert(ctx, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().InsertMulti(ctx, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Set(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().SetMulti(ctx, gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().Update(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().UpdateMulti(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		m.EXPECT().UpdateRecord(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+		_ = m.Delete(ctx, nil)
+		_ = m.DeleteMulti(ctx, nil)
+		_, _ = m.Exists(ctx, nil)
+		_ = m.Get(ctx, nil)
+		_ = m.GetMulti(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsReader(ctx, nil)
+		_, _ = m.ExecuteQueryToRecordsetReader(ctx, nil)
+		_ = m.Insert(ctx, nil)
+		_ = m.InsertMulti(ctx, nil)
+		_ = m.Set(ctx, nil)
+		_ = m.SetMulti(ctx, nil)
+		_ = m.Update(ctx, nil, nil)
+		_ = m.UpdateMulti(ctx, nil, nil)
+		_ = m.UpdateRecord(ctx, nil, nil)
+	})
+}

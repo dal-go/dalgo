@@ -185,6 +185,9 @@ func TestSelect(t *testing.T) {
 			t.Run("Text", func(t *testing.T) {
 				_ = tt.q.Text()
 			})
+			t.Run("IntoRecord", func(t *testing.T) {
+				_ = tt.q.IntoRecord()
+			})
 		})
 	}
 }

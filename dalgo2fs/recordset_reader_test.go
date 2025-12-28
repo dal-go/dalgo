@@ -138,9 +138,15 @@ func TestDirReader_Next_SkipDirs(t *testing.T) {
 			recordset.UntypedCol(NewFileNameColumn()),
 			recordset.UntypedCol(NewFileSizeColumn()),
 			recordset.UntypedCol(NewFileModifiedColumn()),
+			recordset.UntypedCol(NewIsDirColumn()),
+			recordset.UntypedCol(NewFileExtColumn()),
 		)
 		row, _, err := reader3.Next()
 		assert.NoError(t, err)
 		assert.NotNil(t, row)
+
+		val, err := row.GetValueByName(ColumnFileExt, reader3.Recordset())
+		assert.NoError(t, err)
+		assert.Equal(t, ".txt", val)
 	})
 }

@@ -21,3 +21,12 @@ func TestFormat(t *testing.T) {
 		t.Errorf("expected 'formatted', got '%s'", options.format(nil))
 	}
 }
+
+func TestColDbType(t *testing.T) {
+	option := ColDbType("STRING")
+	options := &ColumnOptions{}
+	option(options)
+	if options.dbType != "STRING" {
+		t.Errorf("expected 'STRING', got '%s'", options.dbType)
+	}
+}
