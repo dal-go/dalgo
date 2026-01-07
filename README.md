@@ -228,11 +228,11 @@ func (s *Schema) KeyToFields(key *Key, data any) (fields []ExtraField, err error
 
 ## Projects & modules that use DALgo
 
-* <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a> - framework to build chatbots
+- <a href="https://github.com/strongo/bots-framework">`strongo/bots-framework`</a> - framework to build chatbots
   in Go language.
+- [datatug-cli](https://github.com/datatug/datatug-cli) - Context-aware data viewer & collaborative query manager for effortless exploration of related data — CLI + Web UI
 
-[More dependants](https://sourcegraph.com/search?q=context%3Aglobal+github.com%2Fdal-go%2Fdalgo&patternType=standard&sm=1&groupBy=repo)
-can be found using SourceGraph search.
+Submit a PR for adding a link here if you use `DALgo` in your open source project.
 
 ## [Contributing](CONTRIBUTING.md)
 
