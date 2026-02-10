@@ -2,7 +2,7 @@ module github.com/dal-go/dalgo
 
 go 1.24.0
 
-toolchain go1.25.7
+toolchain go1.26.0
 
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.14.4
