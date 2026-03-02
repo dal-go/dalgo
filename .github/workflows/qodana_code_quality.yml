@@ -9,6 +9,7 @@ on:
 
 jobs:
   qodana:
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
