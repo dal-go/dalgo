@@ -31,6 +31,7 @@ func NewDB(dirPath string) (db dal.DB, err error) {
 }
 
 type database struct {
+	dal.NoConcurrency
 	path string
 	dir  os.FileInfo
 }

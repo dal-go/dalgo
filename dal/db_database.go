@@ -20,6 +20,11 @@ type DB interface {
 	// TODO: consider to sacrifice some simplicity for the sake of interoperability?
 	ReadSession
 
+	// ConcurrencyAware reports whether this backend supports concurrent
+	// open connections. Drivers should embed NoConcurrency or
+	// ConcurrencyAvailable in their concrete type to satisfy this.
+	ConcurrencyAware
+
 	// Removed members:
 	// ===================================================================================
 	// Close() error - is part of a connection.

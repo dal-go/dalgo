@@ -75,3 +75,10 @@ func TestConcurrencyAvailable_EmbeddingSatisfiesInterface(t *testing.T) {
 	var c ConcurrencyAware = s
 	assert.True(t, c.SupportsConcurrentConnections())
 }
+
+// Compile-time assertion: any value satisfying dal.DB must also satisfy
+// dal.ConcurrencyAware. Per REQ:embedded-in-db AC-1.
+//
+// We assert this at the interface level: (DB)(nil) is a typed nil, and
+// the assignment forces the compiler to check method-set compatibility.
+var _ ConcurrencyAware = (DB)(nil)
