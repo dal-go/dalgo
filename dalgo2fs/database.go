@@ -31,6 +31,8 @@ func NewDB(dirPath string) (db dal.DB, err error) {
 }
 
 type database struct {
+	// dal.NoConcurrency: file-backed store concurrency is unproven;
+	// the conservative default is correct until stress-tested.
 	dal.NoConcurrency
 	path string
 	dir  os.FileInfo

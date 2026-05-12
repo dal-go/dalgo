@@ -81,4 +81,7 @@ func TestConcurrencyAvailable_EmbeddingSatisfiesInterface(t *testing.T) {
 //
 // We assert this at the interface level: (DB)(nil) is a typed nil, and
 // the assignment forces the compiler to check method-set compatibility.
+// Go's interface satisfaction is structural, so no concrete DB needs to
+// be exercised — if the DB interface ever loses its ConcurrencyAware
+// embedding, this line fails to compile.
 var _ ConcurrencyAware = (DB)(nil)

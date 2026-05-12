@@ -142,6 +142,8 @@ This Feature adds:
 | `dal/concurrency.go` (new) | Defines `ConcurrencyAware` interface, `NoConcurrency` struct, `ConcurrencyAvailable` struct, godoc. |
 | `dal/db_database.go` | Embed `ConcurrencyAware` into the `DB` interface. One-line change. |
 | `dal/concurrency_test.go` (new) | Tests covering the ACs above with mock `DB` implementations. |
+| `dalgo2fs/database.go` | Cascading update: the in-tree `database` struct embeds `dal.NoConcurrency` so it continues to satisfy `dal.DB` after the interface gains the new method. |
+| `mocks/mock_dal/db.go` | Cascading update: regenerated via `mockgen` so `MockDB` exposes `SupportsConcurrentConnections()`. The two mock-package test files (`mocks/mock_dal/db_test.go`, `mocks/mock_dal/mocks_test.go`) get matching recorder-method renames. |
 
 No other DALgo packages are touched.
 
