@@ -17,18 +17,18 @@ Consumers of DALgo today must hard-code per-engine knowledge to decide whether t
 
 ## Recommended Direction
 
-Add a single optional capability interface to DALgo: 'dal.ConcurrencyAware' with one method 'SupportsConcurrentConnections() bool'. Drivers opt in by implementing it on their Database (or Connection) type. Callers do a type assertion: 'if a, ok := db.(dal.ConcurrencyAware); ok && a.SupportsConcurrentConnections() { … }'. Drivers that don't implement the interface are treated as 'unknown', which conservative callers should treat as 'no'. Reference implementations in MVP: dalgo2sql returns false for SQLite, true for PostgreSQL; dalgo2ingitdb returns false until stress-tested. The interface lives in 'dal/' (not a sub-package) because it's a single method that's broadly applicable, not a feature family — analogous to io.Closer being in 'io' rather than 'io/closer'.
+Add a one-method capability interface `dal.ConcurrencyAware { SupportsConcurrentConnections() bool }` to DALgo and **embed it into the live `dal.DB` interface** alongside the existing `TransactionCoordinator` and `ReadSession` compositions. Every `DB` implementation therefore answers the question — there is no "unknown" state. Two reusable zero-value embeddable structs in `dal/` — `NoConcurrency` (returns false) and `ConcurrencyAvailable` (returns true) — let drivers opt into the conservative or permissive answer with a single embedded field and no method body. The previously-considered "opt-in via type assertion" pattern (Go-stdlib style) was reconsidered at Feature-spec time: the dalgo `DB` interface already embeds capability-like interfaces as required composition, every driver has a concurrency answer to give (it is not an optional feature), and the embed pattern dissolves the helper-function question by removing the type assertion. Reference implementations in MVP: dalgo2sql returns false for SQLite, true for PostgreSQL; dalgo2ingitdb returns false until stress-tested. The interface lives in `dal/` (not a sub-package) because it is a single method, broadly applicable, and there is no second capability today to justify a sibling package.
 
 ## Alternatives Considered
 
 - **General `Capabilities() map[string]bool` (or struct).** Rejected — there is one capability today. A map invites adding capabilities ad-hoc with string keys (no compile-time check) and over-generalizes ahead of need. If a second capability appears, add a second interface (`dal.TransactionAware`, etc.); Go-style capability interfaces compose without a registry.
 - **Static lookup table in the consumer.** ("I know SQLite doesn't, I know Postgres does.") Lost because every consumer would maintain its own table — defeating the abstraction. The consumer-side table is exactly what this Idea removes.
 - **Read capability from a connection URL scheme.** ("`sqlite://...` → false, `postgres://...` → true.") Rejected — the URL scheme is a transport concern, not a capability one. SQLite over WAL with a single connection has different semantics than SQLite in WAL-shared mode; the URL doesn't tell you which.
-- **Make `ConcurrencyAware` a required method on `dal.Database`.** Rejected — touches every existing driver. Capability interfaces should be opt-in; non-implementers default to "unknown."
+- **Opt-in capability interface (Go-stdlib `Hijacker`-style).** Originally recommended at Idea-time; revisited at Feature-spec time and rejected because (a) dalgo's `DB` interface already embeds capability-like interfaces as required composition, (b) every driver has a concurrency answer ("unknown" is a fake state), and (c) opt-in introduces a helper-function question that embedding dissolves. See Feature `concurrency-capability` for the full reasoning.
 
 ## MVP Scope
 
-Land 'dal.ConcurrencyAware' (one method, one line in the interface) in dal-go/dalgo. Implement on dalgo2sql/sqlite (false), dalgo2sql/postgres (true), and dalgo2ingitdb (false). Document the 'doesn't implement = unknown = treat as no' convention in the godoc on the interface. Verification: datatug-cli's --parallel-streams logic compiles against the new interface and behaves correctly for the three MVP backends.
+Land `dal.ConcurrencyAware` plus its two embeddable helper structs (`NoConcurrency`, `ConcurrencyAvailable`) in dal-go/dalgo; embed `ConcurrencyAware` into `dal.DB`. Update in-tree mocks under `mocks/` to embed `NoConcurrency` as the conservative default. Implement on dalgo2sql/sqlite (false), dalgo2sql/postgres (true), and dalgo2ingitdb (false) — driver-side adoption is a follow-up per-repo. Godoc covers: the contract, the stability guarantee, the deliberate absence of read/write asymmetry, and the embed-helper pattern. Verification in dalgo: in-package Go tests against mock `DB` types that embed each helper struct. Downstream verification: datatug-cli's `--parallel-streams` logic compiles against the new interface and behaves correctly for the three MVP backends once each driver adopts.
 
 ## Not Doing (and Why)
 
@@ -43,7 +43,7 @@ Land 'dal.ConcurrencyAware' (one method, one line in the interface) in dal-go/da
 |------|------------|-----------------|
 | Must-be-true | A single boolean ("supports concurrent connections — yes/no") is sufficient information for current and near-future consumers to make sound concurrency decisions. | Trace the cross-engine-db-copy `--parallel-streams` logic end-to-end with the boolean; confirm it produces the right cap for SQLite, Postgres, and inGitDB. |
 | Must-be-true | Consumers that need to make a concurrency decision can reach the `Database` (or `Connection`) handle at the moment of decision, so a type assertion is feasible. | Audit the cross-engine-db-copy decision point; confirm `db` is in scope where worker pool size is chosen. |
-| Should-be-true | Treating "interface not implemented" as "unknown, default to no" is a safe default and matches consumer expectations. | Document the convention prominently in godoc; review with maintainer for any consumer that would prefer "unknown = yes." |
+| Should-be-true (INVALIDATED at Feature-spec time) | ~~Treating "interface not implemented" as "unknown, default to no" is a safe default.~~ Embedding into `dal.DB` makes every implementation answer — there is no "unknown" state. | n/a — superseded by Feature decision. |
 | Should-be-true | Drivers' answers are stable for the lifetime of a `Database` value (i.e. the answer doesn't change between calls on the same handle). | Verify on Postgres and SQLite — neither's mode flips at runtime per-connection without a fresh handle. |
 | Might-be-true | A second capability (`TransactionAware`, `BatchAware`, …) will appear soon enough to justify a shared design. | Defer; each capability is its own interface; we don't pre-design a registry. |
 | Might-be-true | Read-vs-write asymmetry (SQLite-style "concurrent readers, serialized writers") will become a real consumer ask. | Defer; refine the interface (or add a sibling) only when a consumer needs the distinction. |
@@ -62,10 +62,12 @@ Land 'dal.ConcurrencyAware' (one method, one line in the interface) in dal-go/da
 
 ## Open Questions
 
-- **Interface name.** `ConcurrencyAware` reads cleanly but does not name the *thing* being queried. Alternatives: `ConcurrentConnectionsSupporter` (verbose), `Concurrent` (terse, lossy). Pick at Feature-spec time.
-- **Hang on `Database` or `Connection`?** Both are reasonable. `Database` is the more common consumer entry point; `Connection` is more precise (a `Database` could in principle have differently-configured connections). Default to `Database` unless a real consumer needs per-connection granularity.
-- **Default for unknown.** Godoc convention is "not implemented = treat as no." Should the package ship a `dal.SupportsConcurrentConnections(db) bool` helper that encapsulates the type assertion AND the default, so consumers don't replicate the convention?
-- **Read vs write asymmetry.** Defer per Not-Doing, but worth a single godoc paragraph explaining why the boolean intentionally doesn't distinguish.
+All four original questions were resolved when this Idea was promoted to the Feature spec at [`spec/features/concurrency-capability/`](../features/concurrency-capability/README.md):
+
+- ~~Interface name~~ → `ConcurrencyAware` (kept).
+- ~~`Database` vs `Connection`~~ → `dal.DB` (live interface; `dal.Connection` is dead commented-out code).
+- ~~Helper function~~ → Not needed. Embedding into `DB` removes the type assertion; helper structs `NoConcurrency`/`ConcurrencyAvailable` cover the embed-it-for-me case.
+- ~~Read/write asymmetry godoc~~ → Required by Feature REQ `godoc`.
 
 ---
 *This document follows the https://specscore.md/idea-specification*
