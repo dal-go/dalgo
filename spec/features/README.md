@@ -8,7 +8,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 
 | Feature | Status | Summary |
 |---|---|---|
-| [concurrency-capability](concurrency-capability/README.md) | Approved | Add `dal.ConcurrencyAware` capability interface embedded in `dal.DB`, plus `NoConcurrency`/`ConcurrencyAvailable` embeddable helper structs, so consumers can size worker pools without engine-specific knowledge. |
+| [concurrency-capability](concurrency-capability/README.md) | Implemented | Add `dal.ConcurrencyAware` capability interface embedded in `dal.DB`, plus `NoConcurrency`/`ConcurrencyAvailable` embeddable helper structs, so consumers can size worker pools without engine-specific knowledge. |
 
 ## Outstanding Questions
 

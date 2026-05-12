@@ -1,6 +1,6 @@
 # Feature: Concurrency Capability
 
-**Status:** Approved
+**Status:** Implemented
 **Source Idea:** [`concurrency-capability`](../../ideas/concurrency-capability.md)
 
 ## Summary

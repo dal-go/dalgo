@@ -7,7 +7,7 @@ verifiable tasks with clear acceptance criteria and dependency ordering.
 
 | Plan | Feature | Status |
 |------|---------|--------|
-| [2026-05-12-concurrency-capability](2026-05-12-concurrency-capability.md) | concurrency-capability | Ready |
+| [2026-05-12-concurrency-capability](2026-05-12-concurrency-capability.md) | concurrency-capability | Done |
 
 ## Outstanding Questions
 
