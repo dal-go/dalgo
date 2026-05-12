@@ -56,3 +56,22 @@ func TestNoConcurrency_EmbeddingSatisfiesInterface(t *testing.T) {
 	var c ConcurrencyAware = s
 	assert.False(t, c.SupportsConcurrentConnections())
 }
+
+func TestConcurrencyAvailable_ReturnsTrue(t *testing.T) {
+	var c ConcurrencyAvailable
+	assert.True(t, c.SupportsConcurrentConnections())
+}
+
+func TestConcurrencyAvailable_SatisfiesInterface(t *testing.T) {
+	var _ ConcurrencyAware = ConcurrencyAvailable{}
+}
+
+func TestConcurrencyAvailable_EmbeddingSatisfiesInterface(t *testing.T) {
+	// Per REQ:concurrency-available-helper AC-2.
+	type stubWithConcurrencyAvailable struct {
+		ConcurrencyAvailable
+	}
+	var s stubWithConcurrencyAvailable
+	var c ConcurrencyAware = s
+	assert.True(t, c.SupportsConcurrentConnections())
+}

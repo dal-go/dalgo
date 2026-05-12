@@ -47,3 +47,23 @@ type NoConcurrency struct{}
 func (NoConcurrency) SupportsConcurrentConnections() bool {
 	return false
 }
+
+// ConcurrencyAvailable is a zero-value embeddable struct that satisfies
+// [ConcurrencyAware] by reporting that concurrent connections ARE
+// supported. Drivers whose backend tolerates multiple concurrent
+// connections (such as a server-side RDBMS like PostgreSQL) should
+// embed ConcurrencyAvailable to inherit the permissive answer with
+// no method body of their own:
+//
+//	type PostgresDB struct {
+//		dal.ConcurrencyAvailable
+//		// ...
+//	}
+//
+// See [ConcurrencyAware] for the full contract.
+type ConcurrencyAvailable struct{}
+
+// SupportsConcurrentConnections always returns true.
+func (ConcurrencyAvailable) SupportsConcurrentConnections() bool {
+	return true
+}
