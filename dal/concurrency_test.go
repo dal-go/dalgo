@@ -36,3 +36,23 @@ func TestConcurrencyAware_MethodIsStable(t *testing.T) {
 		assert.Equal(t, first, c.SupportsConcurrentConnections(), "call %d", i)
 	}
 }
+
+func TestNoConcurrency_ReturnsFalse(t *testing.T) {
+	var n NoConcurrency
+	assert.False(t, n.SupportsConcurrentConnections())
+}
+
+func TestNoConcurrency_SatisfiesInterface(t *testing.T) {
+	var _ ConcurrencyAware = NoConcurrency{}
+}
+
+func TestNoConcurrency_EmbeddingSatisfiesInterface(t *testing.T) {
+	// Per REQ:no-concurrency-helper AC-2, embedding NoConcurrency must
+	// be sufficient for a struct to satisfy ConcurrencyAware.
+	type stubWithNoConcurrency struct {
+		NoConcurrency
+	}
+	var s stubWithNoConcurrency
+	var c ConcurrencyAware = s
+	assert.False(t, c.SupportsConcurrentConnections())
+}

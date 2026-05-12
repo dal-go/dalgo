@@ -27,3 +27,23 @@ type ConcurrencyAware interface {
 	// stability and asymmetry contract.
 	SupportsConcurrentConnections() bool
 }
+
+// NoConcurrency is a zero-value embeddable struct that satisfies
+// [ConcurrencyAware] by reporting that concurrent connections are
+// NOT supported. Drivers whose backend serializes connections (such
+// as a single-writer SQLite, an unproven file-backed store, or a
+// test stub) should embed NoConcurrency to inherit the conservative
+// answer with no method body of their own:
+//
+//	type SQLiteDB struct {
+//		dal.NoConcurrency
+//		// ...
+//	}
+//
+// See [ConcurrencyAware] for the full contract.
+type NoConcurrency struct{}
+
+// SupportsConcurrentConnections always returns false.
+func (NoConcurrency) SupportsConcurrentConnections() bool {
+	return false
+}
