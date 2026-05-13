@@ -2,7 +2,7 @@
 
 > [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fdbschema%2Findex-def) — graph, discussions, approvals
 
-**Status:** Approved
+**Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
 **Parent Feature:** [`dbschema`](../README.md)
 

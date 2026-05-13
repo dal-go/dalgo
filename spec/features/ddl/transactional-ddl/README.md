@@ -2,7 +2,7 @@
 
 > [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Ftransactional-ddl) — graph, discussions, approvals
 
-**Status:** Approved
+**Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
 **Parent Feature:** [`ddl`](../README.md)
 
