@@ -2,7 +2,7 @@
 
 > [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Fapplier) — graph, discussions, approvals
 
-**Status:** Approved
+**Status:** Implemented
 **Source Idea:** —
 **Parent Feature:** [`ddl`](../README.md)
 
