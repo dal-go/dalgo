@@ -1,6 +1,8 @@
 package ddl
 
 import (
+	"context"
+
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/dbschema"
 )
@@ -21,6 +23,13 @@ import (
 // Drivers MUST silently ignore semantically-mismatched options.
 type AlterOp interface {
 	alterOp() // sealed marker
+	// ApplyTo dispatches this AlterOp to the matching ApplyXxx method
+	// on the given Applier, passing the op's stored fields and resolved
+	// Options. Returns the Applier's error verbatim. Used by driver-side
+	// SchemaModifier.AlterCollection implementations to handle a slice
+	// of AlterOp values without type-switching on unexported concrete
+	// types.
+	ApplyTo(ctx context.Context, a Applier) error
 }
 
 // ---- Field-level AlterOps ----
@@ -31,6 +40,10 @@ type addFieldOp struct {
 }
 
 func (addFieldOp) alterOp() {}
+
+func (o addFieldOp) ApplyTo(ctx context.Context, a Applier) error {
+	return a.ApplyAddField(ctx, o.field, o.options)
+}
 
 // AddField returns an AlterOp that adds a field to the collection.
 // IfNotExists makes it idempotent (existing field of same name = no-op).
@@ -46,6 +59,10 @@ type dropFieldOp struct {
 
 func (dropFieldOp) alterOp() {}
 
+func (o dropFieldOp) ApplyTo(ctx context.Context, a Applier) error {
+	return a.ApplyDropField(ctx, o.name, o.options)
+}
+
 // DropField returns an AlterOp that drops a field by name.
 // IfExists makes it idempotent (missing field = no-op). IfNotExists
 // is meaningless and silently ignored.
@@ -60,6 +77,10 @@ type modifyFieldOp struct {
 }
 
 func (modifyFieldOp) alterOp() {}
+
+func (o modifyFieldOp) ApplyTo(ctx context.Context, a Applier) error {
+	return a.ApplyModifyField(ctx, o.name, o.newDef, o.options)
+}
 
 // ModifyField returns an AlterOp that replaces an existing field's
 // definition with newDef. The driver diffs old vs new and emits the
@@ -81,6 +102,10 @@ type renameFieldOp struct {
 
 func (renameFieldOp) alterOp() {}
 
+func (o renameFieldOp) ApplyTo(ctx context.Context, a Applier) error {
+	return a.ApplyRenameField(ctx, o.oldName, o.newName, o.options)
+}
+
 // RenameField returns an AlterOp that renames a field from oldName
 // to newName.
 //
@@ -100,6 +125,10 @@ type addIndexOp struct {
 
 func (addIndexOp) alterOp() {}
 
+func (o addIndexOp) ApplyTo(ctx context.Context, a Applier) error {
+	return a.ApplyAddIndex(ctx, o.index, o.options)
+}
+
 // AddIndex returns an AlterOp that creates an index on the
 // collection. On engines that support combined ALTER TABLE ... ADD
 // INDEX syntax (MySQL), the driver MAY fold this into a single
@@ -117,6 +146,10 @@ type dropIndexOp struct {
 }
 
 func (dropIndexOp) alterOp() {}
+
+func (o dropIndexOp) ApplyTo(ctx context.Context, a Applier) error {
+	return a.ApplyDropIndex(ctx, o.name, o.options)
+}
 
 // DropIndex returns an AlterOp that drops an index by name.
 // IfExists makes it idempotent (missing index = no-op). IfNotExists

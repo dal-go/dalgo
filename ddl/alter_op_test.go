@@ -17,11 +17,19 @@ func TestAlterOp_InterfaceExists(t *testing.T) {
 
 func TestAlterOp_HasUnexportedMarker(t *testing.T) {
 	// Per REQ:alter-op-interface AC-2.
+	// Interface now has two methods: the unexported sealing marker and
+	// the exported ApplyTo added by REQ:alter-op-interface-extended.
 	typ := reflect.TypeOf((*AlterOp)(nil)).Elem()
 	assert.Equal(t, reflect.Interface, typ.Kind())
-	assert.Equal(t, 1, typ.NumMethod(), "expected exactly one method on AlterOp")
-	method := typ.Method(0)
-	assert.NotEmpty(t, method.PkgPath, "method %q should be unexported", method.Name)
+	var unexported []reflect.Method
+	for i := 0; i < typ.NumMethod(); i++ {
+		m := typ.Method(i)
+		if m.PkgPath != "" {
+			unexported = append(unexported, m)
+		}
+	}
+	assert.Len(t, unexported, 1, "expected exactly one unexported (sealing) method on AlterOp")
+	assert.NotEmpty(t, unexported[0].PkgPath, "sealing method should be unexported")
 }
 
 func TestAddField_Constructs(t *testing.T) {
