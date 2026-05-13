@@ -8,6 +8,7 @@ verifiable tasks with clear acceptance criteria and dependency ordering.
 | Plan | Feature | Status |
 |------|---------|--------|
 | [2026-05-12-concurrency-capability](2026-05-12-concurrency-capability.md) | concurrency-capability | Done |
+| [2026-05-13-dbschema-ddl](2026-05-13-dbschema-ddl.md) | dbschema + ddl | Ready |
 
 ## Outstanding Questions
 
