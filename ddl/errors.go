@@ -5,16 +5,6 @@ import (
 	"strings"
 )
 
-// AlterOp is the sealed interface for collection-altering operations.
-// Defined here as a TEMPORARY type alias so PartialSuccessError can
-// reference it in this task. Task 11 REPLACES this with the real
-// sealed interface (`type AlterOp interface { alterOp() }`) plus six
-// concrete constructors.
-//
-// NOTE TO IMPLEMENTER OF TASK 11: delete this `type AlterOp = ...`
-// alias from this file; the real declaration lives in alter_op.go.
-type AlterOp = interface{}
-
 // PartialSuccessError is the typed error returned by AlterCollection
 // (and any future batched DDL call) when a non-transactional driver
 // succeeds at some sub-operations and fails at others.
