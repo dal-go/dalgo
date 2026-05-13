@@ -33,6 +33,7 @@ DALgo has no portable way to create or drop collections, primary keys, or indexe
 | [options/](options/README.md) | Functional-options pattern: `Option`, `Options`, `IfNotExists()`, `IfExists()` — apply to `CreateCollection`/`DropCollection` AND to all six AlterOp constructors. Drivers silently ignore mismatched options (e.g. `IfExists()` on an Add* op). |
 | [operations/](operations/README.md) | Top-level helper functions for the three `SchemaModifier` methods. Each type-asserts against `SchemaModifier`; non-implementers cause `*dbschema.NotSupportedError`. |
 | [errors/](errors/README.md) | `PartialSuccessError` typed error returned when a non-transactional driver partway-fails a batch. |
+| [applier/](applier/README.md) | Visitor-pattern `Applier` interface + `ApplyTo(ctx, applier) error` method on each `AlterOp` concrete type. Lets driver-side schema modifiers dispatch AlterOps without reflection or unexported-type access. |
 
 The shared `NotSupportedError` typed error lives in [`dbschema/errors/`](../dbschema/errors/README.md) (used by both read and write sides); `ddl` imports it.
 
