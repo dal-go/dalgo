@@ -60,7 +60,7 @@ Land `dal.ConcurrencyAware` plus its two embeddable helper structs (`NoConcurren
 - **Downstream consumer (informational; Synchestra manages `promotes_to`):**
   - [`datatug/datatug-cli` Idea `cross-engine-db-copy`](https://github.com/datatug/datatug-cli/blob/main/spec/ideas/cross-engine-db-copy.md) — `--parallel-streams` defaults to `runtime.NumCPU() - 1` but caps to 1 when either side returns `false` from `ConcurrencyAware.SupportsConcurrentConnections()`. This is the consumer driving the Idea.
 
-## Open Questions
+## Outstanding Questions
 
 All four original questions were resolved when this Idea was promoted to the Feature spec at [`spec/features/concurrency-capability/`](../features/concurrency-capability/README.md):
 

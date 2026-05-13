@@ -1,5 +1,7 @@
 # Feature: Concurrency Capability
 
+> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fconcurrency-capability) — graph, discussions, approvals
+
 **Status:** Implemented
 **Source Idea:** [`concurrency-capability`](../../ideas/concurrency-capability.md)
 
