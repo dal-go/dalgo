@@ -22,7 +22,7 @@ func NewDataWithID[K comparable, D any](id K, key *dal.Key, data D) DataWithID[K
 	v := reflect.ValueOf(data)
 	kind := v.Kind()
 	switch kind {
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		if v.IsNil() {
 			t := reflect.TypeOf(data)
 			panic(fmt.Sprintf("data of type %v is nil for (id=%v, key=%v)", t.String(), id, key))

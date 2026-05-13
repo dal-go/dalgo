@@ -98,13 +98,13 @@ func TestSchemaReader_InterfaceExists(t *testing.T) {
 
 func TestConstraintDef_Compiles(t *testing.T) {
 	// Per REQ:supporting-types AC-1.
-	var c ConstraintDef = ConstraintDef{Name: "uq_email", Type: "unique"}
+	c := ConstraintDef{Name: "uq_email", Type: "unique"}
 	_ = c
 }
 
 func TestReferrer_Compiles(t *testing.T) {
 	// Per REQ:supporting-types AC-1.
-	var r Referrer = Referrer{
+	r := Referrer{
 		Collection: dal.CollectionRef{},
 		Fields:     []dal.FieldName{"user_id"},
 	}
@@ -127,8 +127,8 @@ func TestDescribeCollection_Dispatches(t *testing.T) {
 	result, err := DescribeCollection(context.Background(), db, ref)
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, "DescribeCollection", db.recordingReader.lastOp)
-	assert.Equal(t, ref, db.recordingReader.lastArg)
+	assert.Equal(t, "DescribeCollection", db.lastOp)
+	assert.Equal(t, ref, db.lastArg)
 }
 
 func TestDescribeCollection_NotImplementer(t *testing.T) {

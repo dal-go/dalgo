@@ -250,7 +250,7 @@ func NewRecordWithoutKey(data any) Record {
 		// accept map[string]...
 	case reflect.Slice:
 		// accept any slice by value
-	case reflect.Ptr:
+	case reflect.Pointer:
 		// reject pointer to map
 		switch t.Elem().Kind() {
 		case reflect.Map:

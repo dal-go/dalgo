@@ -34,7 +34,7 @@ func TestAlterOp_HasUnexportedMarker(t *testing.T) {
 
 func TestAddField_Constructs(t *testing.T) {
 	// Per REQ:add-field-constructor AC-1.
-	var op AlterOp = AddField(dbschema.FieldDef{Name: "email", Type: dbschema.String})
+	op := AddField(dbschema.FieldDef{Name: "email", Type: dbschema.String})
 	assert.NotNil(t, op)
 }
 
@@ -50,7 +50,7 @@ func TestAddField_PreservesField(t *testing.T) {
 
 func TestDropField_Constructs(t *testing.T) {
 	// Per REQ:drop-field-constructor AC-1.
-	var op AlterOp = DropField("legacy_user_code", IfExists())
+	op := DropField("legacy_user_code", IfExists())
 	assert.NotNil(t, op)
 	concrete, ok := op.(dropFieldOp)
 	assert.True(t, ok)
@@ -60,7 +60,7 @@ func TestDropField_Constructs(t *testing.T) {
 
 func TestModifyField_Constructs(t *testing.T) {
 	// Per REQ:modify-field-constructor AC-1.
-	var op AlterOp = ModifyField("created_at", dbschema.FieldDef{Name: "created_at", Type: dbschema.Time, Nullable: false})
+	op := ModifyField("created_at", dbschema.FieldDef{Name: "created_at", Type: dbschema.Time, Nullable: false})
 	assert.NotNil(t, op)
 	concrete, ok := op.(modifyFieldOp)
 	assert.True(t, ok)
@@ -70,7 +70,7 @@ func TestModifyField_Constructs(t *testing.T) {
 
 func TestRenameField_Constructs(t *testing.T) {
 	// Per REQ:rename-field-constructor AC-1.
-	var op AlterOp = RenameField("user_name", "username")
+	op := RenameField("user_name", "username")
 	assert.NotNil(t, op)
 	concrete, ok := op.(renameFieldOp)
 	assert.True(t, ok)
@@ -81,7 +81,7 @@ func TestRenameField_Constructs(t *testing.T) {
 func TestAddIndex_Constructs(t *testing.T) {
 	// Per REQ:add-index-constructor AC-1.
 	idx := dbschema.IndexDef{Name: "ix_users_email", Collection: "users", Fields: []dal.FieldName{"email"}, Unique: true}
-	var op AlterOp = AddIndex(idx, IfNotExists())
+	op := AddIndex(idx, IfNotExists())
 	assert.NotNil(t, op)
 	concrete, ok := op.(addIndexOp)
 	assert.True(t, ok)
@@ -91,7 +91,7 @@ func TestAddIndex_Constructs(t *testing.T) {
 
 func TestDropIndex_Constructs(t *testing.T) {
 	// Per REQ:drop-index-constructor AC-1.
-	var op AlterOp = DropIndex("ix_users_legacy", IfExists())
+	op := DropIndex("ix_users_legacy", IfExists())
 	assert.NotNil(t, op)
 	concrete, ok := op.(dropIndexOp)
 	assert.True(t, ok)

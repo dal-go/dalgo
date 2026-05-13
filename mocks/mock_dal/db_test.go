@@ -233,3 +233,11 @@ func TestMockDB_RunReadwriteTransaction(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestMockDB_SupportsConcurrentConnections(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockDB := NewMockDB(ctrl)
+	mockDB.EXPECT().SupportsConcurrentConnections().Return(true)
+	assert.True(t, mockDB.SupportsConcurrentConnections())
+}
