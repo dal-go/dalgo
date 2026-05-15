@@ -9,8 +9,10 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | Idea | Status | Date | Owner | Promotes To |
 |------|--------|------|-------|-------------|
 | [concurrency-capability](concurrency-capability.md) | Approved | 2026-05-12 | alex | — |
+| [dal-records-reader-iter-seq](dal-records-reader-iter-seq.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
+| [recordops](recordops.md) | Approved | 2026-05-15 | alex | — |
 
 ## Outstanding Questions
 
