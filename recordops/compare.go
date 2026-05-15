@@ -178,13 +178,41 @@ func compareMap(bv, cv reflect.Value, cfg options) []FieldValue {
 			}
 		case bk.IsValid() && !ck.IsValid():
 			// Present in baseline, absent from candidate.
+			// Under WithAbsentEqualsNil, a nil-like baseline value collapses to no delta.
+			if cfg.absentEqualsNil && isNilLike(bk) {
+				continue
+			}
 			deltas = append(deltas, FieldValue{Name: k, Absent: true})
 		case !bk.IsValid() && ck.IsValid():
 			// Absent from baseline, present in candidate.
+			// Under WithAbsentEqualsNil, a nil-like candidate value collapses to no delta.
+			if cfg.absentEqualsNil && isNilLike(ck) {
+				continue
+			}
 			deltas = append(deltas, FieldValue{Name: k, Value: ck.Interface()})
 		}
 	}
 	return deltas
+}
+
+// isNilLike returns true for values that should be treated as "nil" under
+// WithAbsentEqualsNil: invalid (untyped nil), interface holding nil, or a
+// nilable kind (pointer/interface/map/slice/chan/func) whose IsNil() is true.
+// Untyped non-nil scalars (0, "", false) are NOT nil-like.
+func isNilLike(v reflect.Value) bool {
+	if !v.IsValid() {
+		return true
+	}
+	iv := v.Interface()
+	if iv == nil {
+		return true
+	}
+	rv := reflect.ValueOf(iv)
+	switch rv.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func:
+		return rv.IsNil()
+	}
+	return false
 }
 
 func unionKeys(a, b reflect.Value) []string {
