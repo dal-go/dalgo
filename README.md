@@ -74,6 +74,9 @@ Here is modules that bridge DALgo to specific APIs:
 - ### [**dalgo2sql**](https://github.com/dal-go/dalgo2sql)
   for [database/sql](https://pkg.go.dev/database/sql) - a generic interface around SQL (or SQL-like) databases.
 
+- ### [**dalgo2sqlite**](https://github.com/dal-go/dalgo2sqlite)
+  SQLite-specific driver: `dbschema`, DDL and `ConcurrencyAware` operations on top of [**dalgo2sql**](https://github.com/dal-go/dalgo2sql).
+
 - ### [**dalgo2firestore**](https://github.com/dal-go/dalgo2firestore)
   for [Firestore](https://pkg.go.dev/cloud.google.com/go/firestore) -
   a NoSQL document database that lets you easily
@@ -84,6 +87,9 @@ Here is modules that bridge DALgo to specific APIs:
 
 - ### [**dalgo2git**](https://github.com/dal-go/dalgo2git)
   A simple storage to file system versioned by GIT. It uses [**dalgo2files**](https://github.com/dal-go/dalgo2files).
+
+- ### [**dalgo2ingitdb**](https://github.com/ingitdb/ingitdb-cli/tree/main/pkg/dalgo2ingitdb)
+  Adapter for [inGitDB](https://github.com/ingitdb) - a Git-native database with branchable, mergeable data. Lives in the `ingitdb-cli` repository.
 
 - ### [**dalgo2datastore**](https://github.com/dal-go/dalgo2datastore)
   for [Google Cloud Datastore](https://pkg.go.dev/cloud.google.com/go/datastore) -
