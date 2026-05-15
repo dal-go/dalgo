@@ -19,7 +19,7 @@ import (
 // Data() value. Task 4's classify path calls Data() on both sides, so a nil
 // Record would panic. The data value is deterministic per ID so two records
 // with the same ID compare Matched.
-func mkRec[K comparable](id K, _ any) record.WithID[K] {
+func mkRec[K comparable](id K) record.WithID[K] {
 	key := dal.NewKeyWithID("Things", fmt.Sprintf("%v", id))
 	rec := dal.NewRecordWithData(key, map[string]any{"id": fmt.Sprintf("%v", id)})
 	rec.SetError(nil)
@@ -37,16 +37,16 @@ func collect[K comparable](t *testing.T, seq iter.Seq2[IDDiff[K], error]) []IDDi
 }
 
 func TestDiff_NoCandidates(t *testing.T) {
-	baseline := SliceToSeq([]record.WithID[string]{mkRec("a", nil)})
+	baseline := SliceToSeq([]record.WithID[string]{mkRec("a")})
 	got := collect(t, Diff[string](baseline, nil))
 	assert.Empty(t, got)
 }
 
 func TestDiff_AddedDetected(t *testing.T) {
-	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1", nil)})
+	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1")})
 	cand := SliceToSeq([]record.WithID[string]{
-		mkRec("u1", nil),
-		mkRec("u2", nil),
+		mkRec("u1"),
+		mkRec("u2"),
 	})
 	got := collect(t, Diff[string](baseline, []RecordSeq[string]{cand}))
 	require.Len(t, got, 1)
@@ -56,7 +56,7 @@ func TestDiff_AddedDetected(t *testing.T) {
 }
 
 func TestDiff_RemovedDetected(t *testing.T) {
-	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1", nil)})
+	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1")})
 	cand := SliceToSeq([]record.WithID[string]{})
 	got := collect(t, Diff[string](baseline, []RecordSeq[string]{cand}))
 	require.Len(t, got, 1)
@@ -65,9 +65,9 @@ func TestDiff_RemovedDetected(t *testing.T) {
 }
 
 func TestDiff_MultiCandidateParallelIndex(t *testing.T) {
-	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1", nil), mkRec("u2", nil)})
-	c0 := SliceToSeq([]record.WithID[string]{mkRec("u1", nil)})
-	c1 := SliceToSeq([]record.WithID[string]{mkRec("u1", nil), mkRec("u2", nil), mkRec("u3", nil)})
+	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1"), mkRec("u2")})
+	c0 := SliceToSeq([]record.WithID[string]{mkRec("u1")})
+	c1 := SliceToSeq([]record.WithID[string]{mkRec("u1"), mkRec("u2"), mkRec("u3")})
 	c2 := SliceToSeq([]record.WithID[string]{})
 
 	got := collect(t, Diff[string](baseline, []RecordSeq[string]{c0, c1, c2}))
@@ -98,7 +98,7 @@ func TestDiff_MultiCandidateParallelIndex(t *testing.T) {
 }
 
 func TestDiff_DuplicateIDRejected(t *testing.T) {
-	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1", nil), mkRec("u1", nil)})
+	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1"), mkRec("u1")})
 	cand := SliceToSeq([]record.WithID[string]{})
 	var lastErr error
 	for _, err := range Diff[string](baseline, []RecordSeq[string]{cand}) {
@@ -112,7 +112,7 @@ func TestDiff_DuplicateIDRejected(t *testing.T) {
 }
 
 func TestDiff_UnsortedRejected(t *testing.T) {
-	baseline := SliceToSeq([]record.WithID[string]{mkRec("a", nil), mkRec("c", nil), mkRec("b", nil)})
+	baseline := SliceToSeq([]record.WithID[string]{mkRec("a"), mkRec("c"), mkRec("b")})
 	cand := SliceToSeq([]record.WithID[string]{})
 	var lastErr error
 	for _, err := range Diff[string](baseline, []RecordSeq[string]{cand}) {
@@ -139,11 +139,11 @@ func TestDiffFunc_NilLess(t *testing.T) {
 }
 
 func TestDiff_DelegatesToDiffFunc(t *testing.T) {
-	baseline1 := SliceToSeq([]record.WithID[string]{mkRec("a", nil), mkRec("c", nil)})
-	cand1 := SliceToSeq([]record.WithID[string]{mkRec("a", nil), mkRec("b", nil)})
+	baseline1 := SliceToSeq([]record.WithID[string]{mkRec("a"), mkRec("c")})
+	cand1 := SliceToSeq([]record.WithID[string]{mkRec("a"), mkRec("b")})
 
-	baseline2 := SliceToSeq([]record.WithID[string]{mkRec("a", nil), mkRec("c", nil)})
-	cand2 := SliceToSeq([]record.WithID[string]{mkRec("a", nil), mkRec("b", nil)})
+	baseline2 := SliceToSeq([]record.WithID[string]{mkRec("a"), mkRec("c")})
+	cand2 := SliceToSeq([]record.WithID[string]{mkRec("a"), mkRec("b")})
 
 	viaDiff := collect(t, Diff[string](baseline1, []RecordSeq[string]{cand1}))
 	viaFunc := collect(t, DiffFunc[string](baseline2, []RecordSeq[string]{cand2}, func(a, b string) bool { return a < b }))
@@ -155,8 +155,8 @@ func TestDiffFunc_UUIDKeys(t *testing.T) {
 	type uuid = [16]byte
 	u1 := uuid{0x01}
 	u2 := uuid{0x02}
-	baseline := SliceToSeq([]record.WithID[uuid]{mkRec(u1, nil)})
-	cand := SliceToSeq([]record.WithID[uuid]{mkRec(u2, nil)})
+	baseline := SliceToSeq([]record.WithID[uuid]{mkRec(u1)})
+	cand := SliceToSeq([]record.WithID[uuid]{mkRec(u2)})
 
 	less := func(a, b uuid) bool { return bytes.Compare(a[:], b[:]) < 0 }
 	got := collect(t, DiffFunc[uuid](baseline, []RecordSeq[uuid]{cand}, less))
@@ -170,7 +170,7 @@ func TestDiffFunc_UUIDKeys(t *testing.T) {
 func TestDiff_UpstreamErrorPropagated(t *testing.T) {
 	errBoom := errors.New("boom")
 	baseline := func(yield func(record.WithID[string], error) bool) {
-		if !yield(mkRec("a", nil), nil) {
+		if !yield(mkRec("a"), nil) {
 			return
 		}
 		yield(record.WithID[string]{}, errBoom)
@@ -190,9 +190,9 @@ func TestDiff_UpstreamErrorPropagated(t *testing.T) {
 
 // Sanity: id ordering across multi-candidate merge.
 func TestDiff_IDOrdering(t *testing.T) {
-	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1", nil), mkRec("u4", nil)})
-	c0 := SliceToSeq([]record.WithID[string]{mkRec("u2", nil), mkRec("u3", nil)})
-	c1 := SliceToSeq([]record.WithID[string]{mkRec("u3", nil), mkRec("u5", nil)})
+	baseline := SliceToSeq([]record.WithID[string]{mkRec("u1"), mkRec("u4")})
+	c0 := SliceToSeq([]record.WithID[string]{mkRec("u2"), mkRec("u3")})
+	c1 := SliceToSeq([]record.WithID[string]{mkRec("u3"), mkRec("u5")})
 
 	got := collect(t, Diff[string](baseline, []RecordSeq[string]{c0, c1}))
 	ids := make([]string, len(got))

@@ -149,18 +149,8 @@ func TestCompare_KindMismatch(t *testing.T) {
 }
 
 // TestCompare_IncomparablePanicRecovered — REQ field-comparison AC-3: panics
-// during comparison are recovered and surfaced as ErrIncomparableField. A
-// struct field whose type contains a non-empty function value causes
-// reflect.DeepEqual to return false (no panic), so to exercise the recover
-// path we construct a map whose values reflect.DeepEqual cannot compare
-// without panicking — a map[string]any keyed value that is a typed
-// uncomparable struct triggers a panic only via reflect.Value.Interface on
-// unexported fields, which the comparator avoids. The reliable trigger we
-// have is a record whose Data() itself panics: passing a typed-nil *record.
+// during comparison are recovered and surfaced as ErrIncomparableField.
 func TestCompare_IncomparablePanicRecovered(t *testing.T) {
-	// A dal.Record whose Data() panics. We use a typed-nil *record: the
-	// interface is non-nil (so the cand != nil branch holds in classify),
-	// but invoking Data() dereferences a nil pointer.
 	base := mkDataRec(t, testUser{FirstName: "Alex"})
 	cand := panicRecord{}
 	deltas, err := compareRecords("u1", base, cand, options{})
@@ -169,8 +159,7 @@ func TestCompare_IncomparablePanicRecovered(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrIncomparableField), "want ErrIncomparableField, got %v", err)
 }
 
-// panicRecord is a dal.Record whose Data() panics. Used to exercise the
-// comparator's recover path.
+// panicRecord.Data() panics — exercises the compareRecords recover path.
 type panicRecord struct{}
 
 func (panicRecord) Key() *dal.Key             { return nil }

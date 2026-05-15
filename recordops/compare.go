@@ -65,7 +65,7 @@ func baselineFields(baseRec dal.Record, perCandidateDeltas [][]FieldValue, cfg o
 	if len(deltaNames) == 0 {
 		return nil
 	}
-	trimmed := all[:0]
+	trimmed := make([]FieldValue, 0, len(deltaNames))
 	for _, fv := range all {
 		if _, ok := deltaNames[fv.Name]; ok {
 			trimmed = append(trimmed, fv)
@@ -76,6 +76,8 @@ func baselineFields(baseRec dal.Record, perCandidateDeltas [][]FieldValue, cfg o
 
 // extractAllFields returns the full field list for a record. Used for the
 // baseline snapshot (default mode) and for the Extra-candidate Fields list.
+// Called by both baselineFields and classify (for the Extra branch in
+// diff.go) — do not add trimming logic here; trimming belongs in callers.
 func extractAllFields(rec dal.Record) []FieldValue {
 	v := deref(reflect.ValueOf(rec.Data()))
 	switch bucket(v) {
@@ -154,6 +156,7 @@ func compareStruct(bv, cv reflect.Value, cfg options) []FieldValue {
 			deltas = append(deltas, FieldValue{Name: f.Name, Value: cf})
 		}
 	}
+	// Sort by Name for deterministic renderer output (matches compareMap).
 	sort.Slice(deltas, func(i, j int) bool { return deltas[i].Name < deltas[j].Name })
 	return deltas
 }
