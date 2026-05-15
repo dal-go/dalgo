@@ -98,10 +98,10 @@ type FieldValue struct {
 type RecordStatus int8
 
 const (
-    Missing RecordStatus = iota  // baseline has ID; this candidate doesn't
-    Extra                         // this candidate has ID; baseline doesn't
-    Matched                       // both have ID; all fields equal
-    Changed                       // both have ID; at least one field differs
+    Missing RecordStatus = iota  // this candidate lacks the surfaced ID (regardless of baseline). The ID can be surfaced because another candidate has it.
+    Extra                         // this candidate has the ID; baseline doesn't
+    Matched                       // both this candidate AND baseline have the ID; all fields equal
+    Changed                       // both this candidate AND baseline have the ID; at least one field differs
 )
 ```
 
