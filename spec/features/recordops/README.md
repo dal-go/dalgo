@@ -21,7 +21,7 @@ Listed in implementation order (MVP first):
 
 | Feature | Status | Summary |
 |---|---|---|
-| [diff/](diff/README.md) | Draft | `Diff` (for `cmp.Ordered` keys) + `DiffFunc` (for any `comparable` key with an explicit `less`, e.g., `[16]byte` UUIDs) — one baseline vs. N candidates via K-way merge over ID-sorted `iter.Seq2` streams, returning `iter.Seq2[IDDiff[K], error]` with parallel-indexed `Candidates`; baseline-as-single-source-of-truth shape; four renderers (git-style YAML, by-ID YAML, plain YAML, JSON); bridge helpers `SliceToSeq` and `ReaderToSeq` for adapting in-memory slices and `dal.RecordsReader`. |
+| [diff/](diff/README.md) | Implemented | `Diff` (for `cmp.Ordered` keys) + `DiffFunc` (for any `comparable` key with an explicit `less`, e.g., `[16]byte` UUIDs) — one baseline vs. N candidates via K-way merge over ID-sorted `iter.Seq2` streams, returning `iter.Seq2[IDDiff[K], error]` with parallel-indexed `Candidates`; baseline-as-single-source-of-truth shape; four renderers (git-style YAML, by-ID YAML, plain YAML, JSON); bridge helpers `SliceToSeq` and `ReaderToSeq` for adapting in-memory slices and `dal.RecordsReader`. |
 
 Future children, deferred until a real consumer asks (each becomes its own sibling Feature):
 
