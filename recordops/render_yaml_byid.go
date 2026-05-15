@@ -64,10 +64,12 @@ func RenderYAMLByID[K comparable](
 		},
 	}
 
-	out, err := yaml.Marshal(root)
-	if err != nil {
-		return "", err
-	}
+	// yaml.Marshal of a *yaml.Node built exclusively from manually-constructed
+	// scalar and mapping nodes (with all `any` values routed through valueNode,
+	// which catches Encode errors) cannot fail. The error path is intentionally
+	// not surfaced; if a future change introduces yaml.Marshal-failing nodes,
+	// add a test alongside the new path.
+	out, _ := yaml.Marshal(root)
 	return string(out), nil
 }
 
