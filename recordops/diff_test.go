@@ -4,20 +4,26 @@ package recordops
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"iter"
 	"reflect"
 	"testing"
 
+	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// mkRec constructs a record.WithID literal. Note: record.NewWithID(id, nil, data)
-// panics for nil key because dal.NewRecordWithData requires a non-nil key. The
-// Task 3 stub comparator just stringifies Record, so leaving Record nil is fine.
+// mkRec constructs a record.WithID carrying a real dal.Record with a stable
+// Data() value. Task 4's classify path calls Data() on both sides, so a nil
+// Record would panic. The data value is deterministic per ID so two records
+// with the same ID compare Matched.
 func mkRec[K comparable](id K, _ any) record.WithID[K] {
-	return record.WithID[K]{ID: id}
+	key := dal.NewKeyWithID("Things", fmt.Sprintf("%v", id))
+	rec := dal.NewRecordWithData(key, map[string]any{"id": fmt.Sprintf("%v", id)})
+	rec.SetError(nil)
+	return record.WithID[K]{ID: id, Record: rec}
 }
 
 func collect[K comparable](t *testing.T, seq iter.Seq2[IDDiff[K], error]) []IDDiff[K] {

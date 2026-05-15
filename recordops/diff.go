@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"iter"
 
-	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/record"
 )
 
@@ -226,39 +225,34 @@ func assembleIDDiff[K comparable](
 }
 
 // classify returns the CandidateState for one (baseline, candidate) pair.
-// Task 3 placeholder: produces correct Status but empty Fields when Changed.
-// Task 4 wires in compareRecords for field-level deltas.
+// "Both present" delegates to compareRecords for field-level deltas.
 func classify[K comparable](base, cand *record.WithID[K], cfg options) (CandidateState, error) {
-	_ = cfg
 	switch {
 	case cand == nil:
 		// candidate lacks this ID (whether baseline has it or another
 		// candidate surfaced it) → Missing from this candidate's view.
 		return CandidateState{Status: Missing}, nil
 	case base == nil:
-		// candidate-only → Extra. Fields populated in Task 4.
-		return CandidateState{Status: Extra}, nil
+		// candidate-only → Extra. Emit candidate's full field list.
+		return CandidateState{Status: Extra, Fields: extractAllFields(cand.Record)}, nil
 	default:
-		// Both present. Task 3 stub: surface-level equality via fmt.Sprintf.
-		// Real per-field comparison lands in Task 4.
-		if recordEqualStub(base.Record, cand.Record) {
+		deltas, err := compareRecords(base.ID, base.Record, cand.Record, cfg)
+		if err != nil {
+			return CandidateState{}, err
+		}
+		if len(deltas) == 0 {
 			return CandidateState{Status: Matched}, nil
 		}
-		return CandidateState{Status: Changed}, nil
+		return CandidateState{Status: Changed, Fields: deltas}, nil
 	}
 }
 
-func recordEqualStub(a, b dal.Record) bool {
-	// Stub: cheap surface-level equality. Replaced in Task 4.
-	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
-}
-
 func buildBaselineSnapshot[K comparable](base record.WithID[K], cs []CandidateState, cfg options) *RecordSnapshot {
-	_ = base
-	_ = cs
-	_ = cfg
-	// Task 3 placeholder: empty snapshot. Real field extraction in Task 4.
-	return &RecordSnapshot{}
+	perCandidateDeltas := make([][]FieldValue, len(cs))
+	for i, c := range cs {
+		perCandidateDeltas[i] = c.Fields
+	}
+	return &RecordSnapshot{Fields: baselineFields(base.Record, perCandidateDeltas, cfg)}
 }
 
 func shouldEmit[K comparable](d IDDiff[K], cfg options) bool {
