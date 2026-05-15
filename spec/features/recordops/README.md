@@ -2,7 +2,7 @@
 
 > [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Frecordops) — graph, discussions, approvals
 
-**Status:** Approved
+**Status:** Implemented
 **Source Idea:** [`recordops`](../../ideas/recordops.md)
 
 ## Summary
