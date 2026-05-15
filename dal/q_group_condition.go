@@ -23,5 +23,9 @@ func (v GroupCondition) String() string {
 	for i, condition := range v.conditions {
 		s[i] = condition.String()
 	}
-	return fmt.Sprintf("(%v)", strings.Join(s, string(v.operator)))
+	// Surround the operator with spaces so emitted SQL fragments like
+	// `(a = 1 AND b = 2)` are well-formed for text-passthrough drivers.
+	// Empty group (no conditions) collapses to "()" — the join produces
+	// the empty string, and the parens come from the Sprintf wrap.
+	return fmt.Sprintf("(%v)", strings.Join(s, " "+string(v.operator)+" "))
 }

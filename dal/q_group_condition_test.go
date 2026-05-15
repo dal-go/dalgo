@@ -19,7 +19,28 @@ func TestGroupCondition(t *testing.T) {
 				String("a"),
 				String("b"),
 			},
-		}, expectedString: "('a'=='b')"},
+		}, expectedString: "('a' == 'b')"},
+		{name: "AND-2items", gc: GroupCondition{
+			operator: And,
+			conditions: []Condition{
+				String("a"),
+				String("b"),
+			},
+		}, expectedString: "('a' AND 'b')"},
+		{name: "OR-3items", gc: GroupCondition{
+			operator: Or,
+			conditions: []Condition{
+				String("a"),
+				String("b"),
+				String("c"),
+			},
+		}, expectedString: "('a' OR 'b' OR 'c')"},
+		{name: "AND-1item", gc: GroupCondition{
+			operator: And,
+			conditions: []Condition{
+				String("a"),
+			},
+		}, expectedString: "('a')"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Run("String", func(t *testing.T) {
