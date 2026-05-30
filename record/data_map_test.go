@@ -85,3 +85,81 @@ func TestMapToData_RoundTrip(t *testing.T) {
 		}
 	})
 }
+
+type embeddedInnerForMap struct {
+	Inner string `json:"inner" db:"inner_col"`
+}
+
+type embeddedOuterForMap struct {
+	embeddedInnerForMap
+	Outer string `json:"outer"`
+}
+
+type commaJSONTag struct {
+	Name string `json:",omitempty"` // empty name → key falls back to field name
+}
+
+func TestDataToMap_NilMarshalAndShape(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		m, err := DataToMap(nil)
+		if err != nil || m != nil {
+			t.Fatalf("DataToMap(nil) = %v, %v; want nil, nil", m, err)
+		}
+	})
+	t.Run("marshal_error", func(t *testing.T) {
+		if _, err := DataToMap(make(chan int)); err == nil {
+			t.Fatal("want marshal error for a chan value")
+		}
+	})
+	t.Run("not_a_json_object", func(t *testing.T) {
+		if _, err := DataToMap([]int{1, 2}); err == nil {
+			t.Fatal("want error converting a non-object to map[string]any")
+		}
+	})
+}
+
+func TestMapToData_Errors(t *testing.T) {
+	t.Run("nil_src", func(t *testing.T) {
+		var got embeddedOuterForMap
+		if err := MapToData(&got, nil); err != nil {
+			t.Fatalf("MapToData(&struct, nil) = %v; want nil", err)
+		}
+	})
+	t.Run("marshal_error", func(t *testing.T) {
+		err := MapToData(&struct{ X int }{}, map[string]any{"x": make(chan int)})
+		if err == nil {
+			t.Fatal("want marshal error for a chan value in src")
+		}
+	})
+	t.Run("unmarshal_error_non_struct_target", func(t *testing.T) {
+		// *int is not a struct: fieldTagRenames returns nil and unmarshalling a
+		// JSON object into *int fails.
+		if err := MapToData(new(int), map[string]any{"x": 1}); err == nil {
+			t.Fatal("want unmarshal error for object into *int")
+		}
+	})
+}
+
+func TestDataToMap_EmbeddedAndCommaTag(t *testing.T) {
+	t.Run("anonymous_embedded_db_tag", func(t *testing.T) {
+		m, err := DataToMap(embeddedOuterForMap{embeddedInnerForMap{Inner: "i"}, "o"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m["inner_col"] != "i" {
+			t.Errorf("embedded field db tag not applied: %v", m)
+		}
+		if m["outer"] != "o" {
+			t.Errorf("outer: %v", m)
+		}
+	})
+	t.Run("comma_only_json_tag_falls_back_to_field_name", func(t *testing.T) {
+		m, err := DataToMap(commaJSONTag{Name: "n"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m["Name"] != "n" {
+			t.Errorf("comma-only json tag should fall back to field name: %v", m)
+		}
+	})
+}

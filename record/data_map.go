@@ -36,9 +36,6 @@ func DataToMap(data any) (map[string]any, error) {
 		return nil, fmt.Errorf("record: convert data of type %T to map: %w", data, err)
 	}
 	for _, r := range fieldTagRenames(reflect.TypeOf(data)) {
-		if r.from == r.to {
-			continue
-		}
 		if v, ok := m[r.from]; ok {
 			m[r.to] = v
 			delete(m, r.from)
@@ -63,9 +60,6 @@ func MapToData(target any, src map[string]any) error {
 		remapped = map[string]any{}
 	}
 	for _, r := range fieldTagRenames(reflect.TypeOf(target)) {
-		if r.from == r.to {
-			continue
-		}
 		if v, ok := remapped[r.to]; ok {
 			remapped[r.from] = v
 			delete(remapped, r.to)
