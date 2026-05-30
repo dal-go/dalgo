@@ -1,0 +1,20 @@
+#!/bin/sh
+# To setup git hooks run:
+#   > git config core.hooksPath .git-hooks || echo 'Not in a git repo'
+echo "Running .git-hooks/pre-push..."
+
+# Enforce 100% test coverage, matching CI (min_test_coverage_percent: 100).
+cover_file=$(mktemp)
+trap 'rm -f "$cover_file"' EXIT
+
+if ! go test -covermode=atomic -coverprofile="$cover_file" ./...; then
+  echo "pre-push: tests failed"
+  exit 1
+fi
+
+total=$(go tool cover -func="$cover_file" | awk '/^total:/ {print $3}')
+echo "Total coverage: $total"
+if [ "$total" != "100.0%" ]; then
+  echo "Coverage $total is below required 100%"
+  exit 1
+fi
