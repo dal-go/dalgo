@@ -23,6 +23,7 @@ DALgo provides official adapters for various databases:
 | **dalgo2datastore** | Google Cloud Datastore | `github.com/dal-go/dalgo2datastore` | Legacy Google NoSQL |
 | **dalgo2sql** | SQL databases | `github.com/dal-go/dalgo2sql` | PostgreSQL, MySQL, SQLite, MSSQL |
 | **dalgo2fs** | File system | Built-in: `./dalgo2fs` | Local file storage |
+| **dalgo2memory** | Memory | Built-in: `./dalgo2memory` | Tests, examples, local development |
 | **dalgo2files** | File system | `github.com/dal-go/dalgo2files` | Simple file storage |
 | **dalgo2git** | Git repository | `github.com/dal-go/dalgo2git` | Version-controlled storage |
 | **dalgo2badger** | BadgerDB | `github.com/dal-go/dalgo2badger` | Embedded KV store |
@@ -601,13 +602,14 @@ func (db *MyDatabase) Get(ctx context.Context, record dal.Record) error {
 DALgo provides an end-to-end test suite for adapters:
 
 ```go
-// https://github.com/dal-go/dalgo-end2end-tests
+// https://github.com/dal-go/dalgo/end2end
 
 package mydb_test
 
 import (
     "testing"
-    "github.com/dal-go/dalgo-end2end-tests"
+
+    "github.com/dal-go/dalgo/end2end"
     "github.com/dal-go/dalgo/dal"
 )
 
@@ -616,7 +618,7 @@ func TestMyAdapter(t *testing.T) {
     defer cleanupTestDatabase(t, db)
     
     // Run standard test suite
-    dalgotest.TestDatabase(t, db)
+    end2end.TestDalgoDB(t, db, nil, false)
 }
 
 func setupTestDatabase(t *testing.T) dal.DB {
