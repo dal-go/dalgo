@@ -1,6 +1,6 @@
 # Feature: ddl SchemaModifier Interface
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Fschema-modifier) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/schema-modifier?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/schema-modifier?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/schema-modifier?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/schema-modifier?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -71,7 +71,7 @@ The interface has exactly three methods with the signatures above. Drivers imple
 | `ddl/modifier.go` | `SchemaModifier` interface declaration + godoc. |
 | `ddl/modifier_test.go` | Compile-time-style tests verifying the interface shape. |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

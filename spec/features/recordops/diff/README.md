@@ -1,6 +1,6 @@
 # Feature: `recordops` — Diff
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Frecordops%2Fdiff) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops/diff?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops/diff?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops/diff?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops/diff?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`recordops`](../../../ideas/recordops.md)
@@ -724,7 +724,7 @@ From the source Idea:
 | Might-be-true: `WithOnlyChangedFields()` will become the more common consumer choice. | Carried as the default-include design tenet; the option is in scope (REQ `options`). |
 | Might-be-true: `iter.Seq2`-based error propagation is ergonomic. | Carried via REQ `input-streams` AC-4 + the renderers' stream-error tests. |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

@@ -1,6 +1,6 @@
 # Feature: ddl Applier (Visitor for AlterOp Dispatch)
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Fapplier) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/applier?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/applier?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/applier?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/applier?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** —
@@ -223,7 +223,7 @@ No source Idea exists. The implicit assumptions this Feature commits to:
 | Should-be-true | The visitor pattern is the right shape for this dispatch problem (vs. a generic `Apply(op AlterOp) error` method that type-switches internally) | Carried; the visitor pattern's appeal is that the driver writes one method per op and the compiler checks all six are present. The generic `Apply` alternative pushes type assertion into the driver, which is exactly what we're solving. |
 | Might-be-true | Future AlterOp additions (if any) will continue to follow this pattern | Deferred; if proven wrong, the Applier interface can be replaced (it's not sealed externally — but in practice drivers implement it, which is the surface that matters). |
 
-## Outstanding Questions
+## Open Questions
 
 - **`ctx context.Context` as first parameter vs. struct-stored.** The Feature pins `ctx` as the FIRST parameter of every `Apply*` method (and of `ApplyTo`). Rationale: idiomatic for a published interface other packages will implement; matches stdlib patterns (e.g. `database/sql.DB.QueryContext`); makes test stubs trivial; aligns with Go vet's `contextcheck`. The alternative — storing `ctx` on the driver's adapter struct and having Apply methods take no ctx — is a recognized pattern for short-lived adapters (the `sqliteAlterApplier` sketch in `dalgo2sqlite/spec/plans/2026-05-13-dbschema-ddl-coverage.md` uses it). When the dalgo2sqlite plan executes Tasks 20–21, its `sqliteAlterApplier` struct MUST be updated to match this spec's contract (ctx-in-signature). The plan's pre-flight sketch is illustrative and predates this spec; reconciliation is a plan-time concern.
 - **Variadic `...Option` vs resolved `Options` in `Apply*` method signatures.** The Feature pins the resolved-`Options` form. Rationale: each concrete op already calls `ResolveOptions(opts...)` once at construction and stores the result, so the driver sees the resolved view. Open question: should the dispatch instead pass `[]Option` (raw) so the Applier can re-extract or wrap? Plan-time decision: stick with resolved `Options` value unless a real consumer needs the raw form.

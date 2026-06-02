@@ -1,6 +1,6 @@
 # Feature: dbschema CollectionDef
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fdbschema%2Fcollection-def) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/collection-def?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/collection-def?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/collection-def?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/collection-def?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -62,7 +62,7 @@ The package does NOT validate that `PrimaryKey` or `Indexes` reference fields ac
 | `dbschema/collection_def.go` | `CollectionDef` struct + godoc. |
 | `dbschema/collection_def_test.go` | Tests covering the ACs above. |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

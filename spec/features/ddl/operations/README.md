@@ -1,6 +1,6 @@
 # Feature: ddl Top-Level Operations
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Foperations) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/operations?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/operations?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/operations?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/operations?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -90,7 +90,7 @@ When `db.(ddl.SchemaModifier)` fails (the concrete type does NOT implement `Sche
 | `ddl/operations.go` | The three top-level helper functions + godoc. |
 | `ddl/operations_test.go` | Tests with two stub `dal.DB` types (one satisfies `SchemaModifier`, one does not). |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

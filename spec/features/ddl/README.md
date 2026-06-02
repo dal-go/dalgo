@@ -1,6 +1,6 @@
 # Feature: Schema Modification (DDL) Execution Surface (`ddl`)
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../ideas/dalgo-schema-modification.md)
@@ -186,7 +186,7 @@ External `dal.DB` implementations do NOT need to update; DDL support is
 opt-in per driver.
 ```
 
-## Outstanding Questions
+## Open Questions
 
 - **Backend identification source.** Resolved at Feature-spec time: helpers populate `Backend` from `db.Adapter().Name()` if `db.Adapter()` returns a non-nil `dal.Adapter`; otherwise leave `Backend` empty. See [`operations/`](operations/README.md) `REQ:not-supported-on-non-implementer` AC-2 and AC-3 for the contract.
 - **Option misuse handling.** If a caller passes `IfNotExists()` to `DropCollection` (or `IfExists()` to `CreateCollection`), drivers MUST silently ignore the mismatched option per [`options/`](options/README.md) REQ. Plan decides whether to add a test-level lint warning.

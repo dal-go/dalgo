@@ -1,6 +1,6 @@
 # Feature: ddl PartialSuccessError
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Ferrors) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/errors?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/errors?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/errors?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/errors?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -84,7 +84,7 @@ Drivers that DO guarantee transactional DDL (`SupportsTransactionalDDL` returns 
 | `ddl/errors.go` | `PartialSuccessError` struct + `Error()` + `Unwrap()` + godoc. |
 | `ddl/errors_test.go` | Tests covering the ACs above. |
 
-## Outstanding Questions
+## Open Questions
 
 - **Multiple failures.** If a non-transactional driver attempts every op regardless of earlier failures, multiple ops may fail. The MVP shape only records the FIRST failure (`FirstFailed`) and folds the rest into the driver-specific `Cause`. Refining to a `Failures []FailureRecord` slice is a follow-up if a real driver needs to surface multi-failure detail.
 - **Relationship to `dal.ErrNotSupported`.** If the underlying `Cause` is `dal.ErrNotSupported` (e.g. SQLite can't drop a column), `errors.Is(err, dal.ErrNotSupported)` returns `true` via `Unwrap`. Consumers can therefore use a coarse not-supported check across all DDL paths.

@@ -1,6 +1,6 @@
 # Feature: `recordops` package
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Frecordops) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`recordops`](../../ideas/recordops.md)
@@ -47,7 +47,7 @@ These tenets bind every child Feature added under `recordops/`:
 - **Re-exporting helpers at the dalgo root.** Consumers import `github.com/dal-go/dalgo/recordops` explicitly.
 - **Columnar `recordset.Recordset` support.** Distinct shape; if/when a consumer needs it, a sibling package (e.g., `recordsetops`) is the right answer — not retrofitting `recordops`.
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

@@ -1,6 +1,6 @@
 # Feature: dbschema Types (`Type`, `Precision`)
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fdbschema%2Ftypes) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/types?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/types?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/types?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/types?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -61,7 +61,7 @@ The package MUST export `type Precision struct { Total, Scale int }`. `Total` is
 | `dbschema/type.go` | `Type` enum constants, `String()` method, `Precision` struct. |
 | `dbschema/type_test.go` | Tests covering the ACs above. |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

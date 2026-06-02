@@ -127,7 +127,7 @@ datatug-cli's `dalgo2sql/sqlite_emit.go` shim is removed; datatug-cli's `replace
   - None upstream. This is the leaf Idea — sibling work cascades downstream from it.
   - **Downstream consumers waiting on this:** `dal-go/dalgo2sql`'s `emitSQL` shim removal; `datatug/datatug-cli`'s LIMIT-N test infrastructure consolidation; future PostgreSQL DALgo driver.
 
-## Outstanding Questions
+## Open Questions
 
 - **Dialect propagation mechanism: constructor option vs auto-detect from SQL driver name vs both.** The plan picks "constructor option, defaults to ANSI". An alternative is to auto-detect from the `database/sql` driver name passed to `dalgo2sql.NewDatabase` (e.g. `"sqlite3"` → `dialect.SQLite`, `"postgres"` → `dialect.Postgres`, `"sqlserver"` → `dialect.TSQL`). Auto-detect is friendlier but introduces a string-keyed map at the dalgo2sql boundary that could go stale. Plan-time decision: probably "explicit option, but provide `dalgo2sql.AutoDialect(driverName)` as a convenience that returns the right Dialect for known names".
 - **Where does `Dialect` live?** Option A: `dal-go/dalgo/dal/dialect/` (in core, ships with every dalgo install — recommended). Option B: `dal-go/dalgo-dialects` (separate module, drivers depend on the dialects they need). Plan picks A for ergonomic reasons (one import, no version skew across modules); B is the answer if dalgo core wants to stay zero-dependency.

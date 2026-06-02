@@ -1,6 +1,6 @@
 # Feature: dbschema DefaultExpr (Sealed Interface)
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fdbschema%2Fdefault-expr) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/default-expr?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/default-expr?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/default-expr?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/default-expr?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -69,7 +69,7 @@ The package MUST export `type DefaultCurrentTimestamp struct{}` that satisfies `
 | `dbschema/default_expr.go` | `DefaultExpr` sealed interface, `DefaultLiteral`, `DefaultCurrentTimestamp`. |
 | `dbschema/default_expr_test.go` | Tests covering the ACs above. |
 
-## Outstanding Questions
+## Open Questions
 
 - **Cross-engine "current timestamp" precision.** SQLite returns timestamps at second resolution by default; PostgreSQL at microsecond; some inGitDB layouts may store ISO-8601 strings. The Feature does not pin precision — drivers translate as their engine allows. Worth a godoc paragraph.
 

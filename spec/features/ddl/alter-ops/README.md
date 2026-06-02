@@ -1,6 +1,6 @@
 # Feature: ddl AlterOp (Composable Alteration Operations)
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Falter-ops) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/alter-ops?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/alter-ops?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/alter-ops?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/alter-ops?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -156,7 +156,7 @@ Drops an existing index by name. Drivers translate to engine-specific `DROP INDE
 | `ddl/alter_op_test.go` | Tests covering the ACs above. |
 | `ddl/testdata/external_sealing/` | A standalone Go package used by AC-3 to verify sealing via subprocess `go build`. |
 
-## Outstanding Questions
+## Open Questions
 
 - **Granular per-attribute ops** (`ChangeFieldType`, `SetFieldDefault`, `DropFieldDefault`) — explicitly deferred per Q20 lock. If real consumers want them, they're additive (new constructor functions; interface unchanged).
 - **Per-`AlterOp` idempotency mismatched options.** `IfNotExists()` on `DropField`/`DropIndex` and `IfExists()` on `AddField`/`AddIndex` are semantically meaningless. Drivers MUST silently ignore them per the REQs above. On `ModifyField`/`RenameField`, BOTH `IfNotExists()` and `IfExists()` are no-ops by the same rule.
