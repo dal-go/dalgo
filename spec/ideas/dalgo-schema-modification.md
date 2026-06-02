@@ -106,7 +106,7 @@ A focused PR on dal-go/dalgo adding the DDL surface (table create/drop, primary 
   - None upstream. This is the foundational change.
 - **Downstream consumer:** [`datatug/datatug-cli` Idea `cross-engine-db-copy`](https://github.com/datatug/datatug-cli/blob/main/spec/ideas/cross-engine-db-copy.md) is the driving consumer and the one that validates the surface. (Synchestra will manage `promotes_to`; do not edit manually.)
 
-## Outstanding Questions
+## Open Questions
 
 
 ---

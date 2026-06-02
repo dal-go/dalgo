@@ -1,6 +1,6 @@
 # Feature: ddl Options (`IfNotExists`, `IfExists`)
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Foptions) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/options?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/options?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/options?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/options?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -87,7 +87,7 @@ Drivers MUST silently ignore the mismatched option rather than error — the mea
 | `ddl/options.go` | `Option`, `Options`, `IfNotExists`, `IfExists` + godoc. |
 | `ddl/options_test.go` | Tests covering the ACs above. |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

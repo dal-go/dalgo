@@ -78,6 +78,8 @@ type ReadwriteTransactionCoordinator interface {
 // Transaction defines an instance of DALgo transaction
 type Transaction interface {
 	// Options indicates parameters that were requested at time of transaction creation.
+	// The message field is mutable during execution via TransactionOptions.SetMessage();
+	// implementations should return options by shared reference so the update is observed.
 	Options() TransactionOptions
 }
 
@@ -121,9 +123,15 @@ func GetNonTransactionalContext(ctx context.Context) context.Context {
 // TransactionOptions holds transaction settings
 type TransactionOptions interface {
 
-	// Name describes what will be done in transaction.
-	// This is useful for mocking transaction in tests
-	Name() string
+	// Message returns an optional human-readable message describing the transaction.
+	// Backends may surface it (e.g. dalgo2ingitdb uses it as a git commit message)
+	// or include it in logs. It returns an empty string when no message was set.
+	Message() string
+
+	// SetMessage sets (replaces) the transaction message. It can be used at
+	// transaction start via TxWithMessage, or during transaction execution.
+	// It is available on both readonly and read-write transactions.
+	SetMessage(message string)
 
 	// IsolationLevel indicates requested isolation level
 	IsolationLevel() TxIsolationLevel
@@ -144,7 +152,7 @@ type TransactionOptions interface {
 type TransactionOption func(options *txOptions)
 
 type txOptions struct {
-	name           string
+	message        string
 	isolationLevel TxIsolationLevel
 	isReadonly     bool
 	isCrossGroup   bool
@@ -154,8 +162,12 @@ type txOptions struct {
 
 var _ TransactionOptions = (*txOptions)(nil)
 
-func (v txOptions) Name() string {
-	return v.name
+func (v txOptions) Message() string {
+	return v.message
+}
+
+func (v *txOptions) SetMessage(message string) {
+	v.message = message
 }
 
 // IsReadonly indicates a readonly transaction was requested
@@ -188,7 +200,7 @@ func NewTransactionOptions(opts ...TransactionOption) TransactionOptions {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	return options
+	return &options
 }
 
 // TxWithIsolationLevel requests transaction with required isolation level
@@ -207,10 +219,12 @@ func TxWithIsolationLevel(isolationLevel TxIsolationLevel) TransactionOption {
 	}
 }
 
-// TxWithName specifies number of attempts to execute a transaction
-func TxWithName(name string) TransactionOption {
+// TxWithMessage sets a human-readable message on the transaction.
+// The message can be read back via TransactionOptions.Message() and replaced
+// during transaction execution via TransactionOptions.SetMessage().
+func TxWithMessage(message string) TransactionOption {
 	return func(options *txOptions) {
-		options.name = name
+		options.message = message
 	}
 }
 

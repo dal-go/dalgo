@@ -1,6 +1,6 @@
 # Feature: dbschema IndexDef
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fdbschema%2Findex-def) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/index-def?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/index-def?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/index-def?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/index-def?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -52,7 +52,7 @@ type IndexDef struct {
 | `dbschema/index_def.go` | `IndexDef` struct + godoc. |
 | `dbschema/index_def_test.go` | Tests covering the ACs above. |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

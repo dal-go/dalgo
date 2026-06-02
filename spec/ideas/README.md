@@ -13,8 +13,9 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
 | [recordops](recordops.md) | Approved | 2026-05-15 | alex | — |
+| [transaction-message](transaction-message.md) | Approved | 2026-06-02 | alex | — |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

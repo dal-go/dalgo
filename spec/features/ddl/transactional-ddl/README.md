@@ -1,6 +1,6 @@
 # Feature: ddl TransactionalDDL Capability
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fddl%2Ftransactional-ddl) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/transactional-ddl?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/transactional-ddl?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/transactional-ddl?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/transactional-ddl?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -86,7 +86,7 @@ The helper performs `db.(ddl.TransactionalDDL)`; on success it returns the resul
 | `ddl/transactional.go` | `TransactionalDDL` interface + `SupportsTransactionalDDL(db)` helper + godoc. |
 | `ddl/transactional_test.go` | Tests covering the ACs above. |
 
-## Outstanding Questions
+## Open Questions
 
 - **Granularity.** This capability is binary: a driver either does or doesn't guarantee transactional DDL across batches. Real engines have nuance (PostgreSQL is transactional for most DDL but not all; MySQL is NOT transactional for DDL even though it has transactions). The MVP picks the simpler shape and trusts drivers to return `false` when they cannot uphold the contract for ALL batched ops. Refining to "transactional for SOME ops but not others" is a follow-up if a real driver needs it.
 

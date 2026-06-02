@@ -1,6 +1,6 @@
 # Feature: Concurrency Capability
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fconcurrency-capability) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/concurrency-capability?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/concurrency-capability?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/concurrency-capability?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/concurrency-capability?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`concurrency-capability`](../../ideas/concurrency-capability.md)
@@ -220,7 +220,7 @@ From the source Idea:
 | Might-be-true: second capability arrives soon | Deferred; no shared registry built ahead of need. |
 | Might-be-true: read/write asymmetry becomes a real ask | Deferred; documented in godoc per REQ `godoc`. |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

@@ -1,6 +1,6 @@
 # Feature: dbschema NotSupportedError
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fdbschema%2Ferrors) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/errors?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/errors?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/errors?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/errors?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -82,7 +82,7 @@ The `ddl` package MUST import and reuse `dbschema.NotSupportedError` (not define
 | `dbschema/errors.go` | `NotSupportedError` struct + `Error()` + `Unwrap()` + godoc. |
 | `dbschema/errors_test.go` | Tests covering the ACs above. |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

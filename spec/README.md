@@ -4,6 +4,6 @@ This directory contains the specification for [DALgo](https://github.com/dal-go/
 
 The specification format follows [SpecScore](https://specscore.md).
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.

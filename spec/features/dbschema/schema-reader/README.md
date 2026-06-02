@@ -1,6 +1,6 @@
 # Feature: dbschema SchemaReader (Introspection Capability)
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fdbschema%2Fschema-reader) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/schema-reader?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/schema-reader?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/schema-reader?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema/schema-reader?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../../ideas/dalgo-schema-modification.md)
@@ -151,7 +151,7 @@ Per-engine introspection logic that today lives in `datatug-cli/pkg/schemers/sql
 
 Each driver's reader implements `dbschema.SchemaReader` (Tier 1) and MAY return engine-specific extension types via additional reader methods (Tier 2).
 
-## Outstanding Questions
+## Open Questions
 
 - **`ConstraintDef` shape.** The Tier-1 struct is minimal — three fields. At Feature-spec time it's unclear whether all required constraint metadata is captured. Likely needs refinement once the SQL Tier-2 extension is drafted. Defer.
 - **`ListCollections` parent-key semantics.** SQL catalog/schema vs Firestore parent document — both fit the `parent *dal.Key` shape but with different semantics. The interface is generic; godoc must spell out each backend's interpretation.

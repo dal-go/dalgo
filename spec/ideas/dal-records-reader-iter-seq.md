@@ -51,7 +51,7 @@ Scope: deciding the migration shape (sibling method vs. wholesale replacement vs
 - **Existing Features affected:** none
 - **Dependencies:** none
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 

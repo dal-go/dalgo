@@ -89,12 +89,10 @@ func TestNewTransactionOptions(t *testing.T) {
 }
 
 type mockTx struct {
-	name    string
 	options TransactionOptions
 }
 
 func (t mockTx) Options() TransactionOptions { return t.options }
-func (t mockTx) Name() string                { return t.name }
 
 func TestGetTransaction(t *testing.T) {
 	tx := mockTx{options: NewTransactionOptions()}
@@ -243,28 +241,35 @@ func TestTxOptions(t *testing.T) {
 	}
 }
 
-func TestTxWithName(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		to := new(txOptions)
-		o := TxWithName("")
-		o(to)
-		assert.Equal(t, "", to.Name())
+func TestTxWithMessage(t *testing.T) {
+	t.Run("empty_by_default", func(t *testing.T) {
+		opts := NewTransactionOptions()
+		assert.Equal(t, "", opts.Message())
 	})
-	t.Run("non_empty", func(t *testing.T) {
-		to := new(txOptions)
-		o := TxWithName("my-tx")
-		o(to)
-		assert.Equal(t, "my-tx", to.Name())
+	t.Run("option_sets_message", func(t *testing.T) {
+		opts := NewTransactionOptions(TxWithMessage("commit subject"))
+		assert.Equal(t, "commit subject", opts.Message())
 	})
-	t.Run("twice_overwrite", func(t *testing.T) {
-		to := new(txOptions)
-		TxWithName("first")(to)
-		TxWithName("second")(to)
-		assert.Equal(t, "second", to.Name())
+	t.Run("setmessage_overwrites", func(t *testing.T) {
+		opts := NewTransactionOptions(TxWithMessage("first"))
+		opts.SetMessage("second")
+		assert.Equal(t, "second", opts.Message())
 	})
-	t.Run("with_NewTransactionOptions", func(t *testing.T) {
-		opts := NewTransactionOptions(TxWithName("builder-tx"))
-		name := opts.(txOptions).Name()
-		assert.Equal(t, "builder-tx", name)
+}
+
+// TestTxMessageSharedReferenceRoundTrip verifies that a runtime SetMessage is
+// observable via a separately obtained Options() — i.e. Options() returns the
+// shared reference, not a copy — on both read-write and readonly transactions.
+func TestTxMessageSharedReferenceRoundTrip(t *testing.T) {
+	t.Run("read_write", func(t *testing.T) {
+		tx := mockTx{options: NewTransactionOptions(TxWithMessage("init"))}
+		tx.Options().SetMessage("final")
+		assert.Equal(t, "final", tx.Options().Message())
+	})
+	t.Run("readonly", func(t *testing.T) {
+		tx := mockTx{options: NewTransactionOptions(TxWithReadonly())}
+		assert.True(t, tx.Options().IsReadonly())
+		tx.Options().SetMessage("read by module X")
+		assert.Equal(t, "read by module X", tx.Options().Message())
 	})
 }

@@ -1,6 +1,6 @@
 # Feature: Schema Description Vocabulary & Read Capability (`dbschema`)
 
-> [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures%2Fdbschema) — graph, discussions, approvals
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema?op=request-change) |
 
 **Status:** Implemented
 **Source Idea:** [`dalgo-schema-modification`](../../ideas/dalgo-schema-modification.md)
@@ -96,7 +96,7 @@ From the source Idea (now scope-expanded to cover reader + writer + three-tier c
 | Schema-info types have multiple consumers (DDL, browsers, query builders) | Validated; supports the engine-neutral Tier 1 + reader interface design. |
 | Existing datatug schemer is battle-tested and worth upstream-ing | Validated by code review of `pkg/datatug-core/schemer/` and `pkg/schemers/*`. |
 
-## Outstanding Questions
+## Open Questions
 
 - **Whether `ListCollections` should accept a richer scope object** than `parent *dal.Key` (e.g. catalog+schema pair for SQL). Tier-1 keeps it minimal; Tier-2 SQL extensions MAY add richer methods. Plan time decides if the Tier-1 surface needs adjustment.
 - **Whether `Referrer.Fields` is sufficient** or whether reciprocal foreign-key metadata (cascade actions, deferred-vs-immediate) needs Tier-1 representation. Defer to plan time.

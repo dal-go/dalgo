@@ -95,7 +95,7 @@ No CLI, no schema-aware diffing, no `DiffMap` entrypoint, no patch application.
 - **Existing Features affected:** none.
 - **Dependencies:** [[dal-records-reader-iter-seq]] (informational only — recordops works without it via the bridge).
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 
