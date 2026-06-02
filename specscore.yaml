@@ -2,3 +2,12 @@
 
 project:
   title: DALgo
+
+gates:
+  specify:
+    reviewers:
+      - type: ai
+        name: spec-reviewer
+        prompt: .specscore/reviewers/spec.md
+      - type: human
+        name: owner-approval
