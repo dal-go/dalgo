@@ -10,8 +10,9 @@ verifiable tasks with clear acceptance criteria and dependency ordering.
 | [2026-05-12-concurrency-capability](2026-05-12-concurrency-capability.md) | concurrency-capability | Done |
 | [2026-05-13-dbschema-ddl](2026-05-13-dbschema-ddl.md) | dbschema + ddl | Done |
 | [2026-05-15-recordops-diff](2026-05-15-recordops-diff.md) | recordops + recordops/diff | Done |
+| [2026-06-02-transaction-message](2026-06-02-transaction-message.md) | transaction-message | Approved |
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 
