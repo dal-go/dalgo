@@ -45,7 +45,7 @@ func singleDeleteTest(t *testing.T, db dal.DB, key *dal.Key) {
 	ctx := context.Background()
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.Delete(ctx, key)
-	}, dal.TxWithName("singleDeleteTest"))
+	}, dal.TxWithMessage("singleDeleteTest"))
 	require.NoError(t, err)
 }
 
@@ -77,6 +77,6 @@ func singleCreateWithPredefinedIDTest(ctx context.Context, t *testing.T, db dal.
 	record := dal.NewRecordWithData(key, &data)
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.Insert(ctx, record)
-	}, dal.TxWithName("singleCreateWithPredefinedIDTest"))
+	}, dal.TxWithMessage("singleCreateWithPredefinedIDTest"))
 	require.NoError(t, err)
 }

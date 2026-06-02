@@ -122,7 +122,7 @@ func TestEndToEnd(t *testing.T) {
 		txOptions := dal.NewTransactionOptions(options...)
 		//tx.EXPECT().Options().Return(txOptions)
 
-		txName := txOptions.Name()
+		txName := txOptions.Message()
 		//t.Log("RW tx:", txName)
 		switch txName {
 		case "SELECT * FROM Cities: no_limit":
@@ -179,7 +179,7 @@ func TestEndToEnd(t *testing.T) {
 		txOptions := dal.NewTransactionOptions(options...)
 		//tx.EXPECT().Options().Return(txOptions)
 
-		txName := txOptions.Name()
+		txName := txOptions.Message()
 		//t.Log("RO tx:", txName)
 		switch txName {
 		case "SELECT ID FROM Cities; limit=0":

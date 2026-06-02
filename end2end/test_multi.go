@@ -14,7 +14,7 @@ import (
 func deleteAllRecords(ctx context.Context, t *testing.T, db dal.DB, keys []*dal.Key) {
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.DeleteMulti(ctx, keys)
-	}, dal.TxWithName("deleteAllRecords"))
+	}, dal.TxWithMessage("deleteAllRecords"))
 	require.NoErrorf(t, err, "DeleteMulti(ctx, keys) for %v records", len(keys))
 }
 
@@ -73,7 +73,7 @@ func getMulti2existing2missingRecords(t *testing.T, db dal.DB, k1r1Key, k1r2Key 
 	ctx := context.Background()
 	require.NoError(t, db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 		return tx.GetMulti(ctx, records)
-	}, dal.TxWithName("getMulti2existing2missingRecords")))
+	}, dal.TxWithMessage("getMulti2existing2missingRecords")))
 	recordsMustExist(t, records[:2])
 	recordsMustNotExist(t, records[2:])
 	require.Equal(t, "k1r1str", data[0].StringProp)
@@ -95,7 +95,7 @@ func get3NonExistingRecords(t *testing.T, db dal.DB) {
 
 	require.NoError(t, db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 		return tx.GetMulti(ctx, records)
-	}, dal.TxWithName("get3NonExistingRecords")))
+	}, dal.TxWithMessage("get3NonExistingRecords")))
 	recordsMustNotExist(t, records)
 
 }
@@ -113,7 +113,7 @@ func setMulti(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *dal.Key) {
 	ctx := context.Background()
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.SetMulti(ctx, records)
-	}, dal.TxWithName("setMulti"))
+	}, dal.TxWithMessage("setMulti"))
 	require.NoError(t, err)
 }
 
@@ -127,7 +127,7 @@ func cleanupDelete(t *testing.T, db dal.DB, allKeys []*dal.Key) {
 	}
 	require.NoError(t, db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 		return tx.GetMulti(ctx, records)
-	}, dal.TxWithName("verify_cleanupDelete")))
+	}, dal.TxWithMessage("verify_cleanupDelete")))
 	recordsMustNotExist(t, records)
 }
 
@@ -150,7 +150,7 @@ func update2records(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *dal.Key)
 	ctx := context.Background()
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.UpdateMulti(ctx, []*dal.Key{k1r1Key, k1r2Key}, updates)
-	}, dal.TxWithName("update2records"))
+	}, dal.TxWithMessage("update2records"))
 	if errors.Is(err, dal.ErrNotSupported) {
 		t.Log(err)
 		return
@@ -159,7 +159,7 @@ func update2records(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *dal.Key)
 	records := newRecords()
 	require.NoError(t, db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 		return tx.GetMulti(ctx, records)
-	}, dal.TxWithName("getMultiNewRecords")))
+	}, dal.TxWithMessage("getMultiNewRecords")))
 	recordsMustExist(t, records)
 	asserRecord := func(i int, expected string) {
 		require.Equal(t, expected, records[i].Data().(*TestData).StringProp, "record #%d key: %v", i+1, records[i].Key())
@@ -209,7 +209,7 @@ func getMulti3existingRecords(t *testing.T, allKeys []*dal.Key, db dal.DB) {
 		ctx := context.Background()
 		require.NoError(t, db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 			return tx.GetMulti(ctx, records)
-		}, dal.TxWithName("using_records_with_data")))
+		}, dal.TxWithMessage("using_records_with_data")))
 		recordsMustExist(t, records)
 		assetProps(t)
 	})
