@@ -13,6 +13,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
 | [recordops](recordops.md) | Approved | 2026-05-15 | alex | — |
+| [recordset-computed-columns](recordset-computed-columns.md) | Implementing | 2026-06-02 | alex | recordset-computed-columns |
 | [transaction-message](transaction-message.md) | Approved | 2026-06-02 | alex | — |
 
 ## Open Questions
