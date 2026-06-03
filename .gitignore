@@ -19,3 +19,6 @@
 **/coverage.html
 **/coverage.out
 .output.txt
+
+# SpecStudio local event journal
+.specscore/events.jsonl

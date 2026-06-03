@@ -34,7 +34,7 @@ Delete `TxWithName` and `TransactionOptions.Name()` (interface declaration and `
 
 In `dal/transaction_test.go`, give the mock transaction an `Options()` that returns the shared `*txOptions` it was constructed with. Add tests that seed the message via `TxWithMessage("init")`, call `tx.Options().SetMessage("final")`, and assert a separately obtained `tx.Options().Message()` returns `"final"` — proving `Options()` returns the shared reference, not a copy — exercised on both a read-write and a readonly transaction, and asserting that setting a message on a readonly transaction does not error. Depends on Task 1's shared-reference `NewTransactionOptions`.
 
-## Outstanding Questions
+## Open Questions
 
 None at this time.
 
