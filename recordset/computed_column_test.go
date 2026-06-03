@@ -119,8 +119,7 @@ func TestComputedColumn(t *testing.T) {
 
 	// input-excludes-computed
 	t.Run("input-excludes-computed", func(t *testing.T) {
-		var recorded *fakeEvaluator
-		recorded = &fakeEvaluator{eval: func(stored map[string]any) (any, error) {
+		recorded := &fakeEvaluator{eval: func(stored map[string]any) (any, error) {
 			return stored["first"].(string) + " " + stored["last"].(string), nil
 		}}
 		greet := &fakeEvaluator{eval: func(map[string]any) (any, error) { return "hi", nil }}
