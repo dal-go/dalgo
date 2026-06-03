@@ -15,6 +15,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [ddl](ddl/README.md) | Implemented | Umbrella for the schema-modification execution surface (new top-level `ddl` package). 3-method `SchemaModifier` capability interface (`CreateCollection`, `DropCollection`, `AlterCollection`); composable `AlterOp` model with six constructors (`AddField`, `DropField`, `ModifyField`, `RenameField`, `AddIndex`, `DropIndex`) — all accept `Option` for opt-in idempotency; `TransactionalDDL` capability for atomicity advertisement; `PartialSuccessError` for non-transactional partial failures. Imports `dbschema` for types AND for the shared `NotSupportedError`. |
 | [recordops](recordops/README.md) | Implemented | Umbrella for the `recordops` package — pure, dependency-free analytical / inspection helpers over dalgo record collections. MVP introduces one child: [diff](recordops/diff/README.md) — one baseline vs. N candidates via K-way merge over ID-sorted `iter.Seq2` streams, with four renderers (git-style YAML, by-ID YAML, plain YAML, JSON) and bridge helpers `SliceToSeq` + `ReaderToSeq`. |
 | [transaction-message](transaction-message/README.md) | Approved | — |
+| [recordset-computed-columns](recordset-computed-columns/README.md) | Approved | — |
 
 ## Open Questions
 
