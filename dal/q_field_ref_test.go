@@ -35,12 +35,36 @@ func TestFieldRef_Equal(t *testing.T) {
 			b:    FieldRef{isID: false},
 			want: false,
 		},
+		{
+			name: "different_source",
+			a:    FieldRef{source: "u", name: "id"},
+			b:    FieldRef{source: "o", name: "id"},
+			want: false,
+		},
+		{
+			name: "same_source",
+			a:    FieldRef{source: "u", name: "id"},
+			b:    FieldRef{source: "u", name: "id"},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, tt.a.Equal(tt.b))
 		})
 	}
+}
+
+func TestNewFieldRef_Source(t *testing.T) {
+	qualified := NewFieldRef("o", "userId")
+	assert.Equal(t, "o", qualified.Source())
+	assert.Equal(t, "userId", qualified.Name())
+	assert.Equal(t, "o.userId", qualified.String())
+
+	base := NewFieldRef("", "name")
+	assert.Equal(t, "", base.Source(), "empty src denotes the From base")
+	assert.Equal(t, "name", base.Name())
+	assert.Equal(t, "name", base.String(), "unqualified field renders as today")
 }
 
 func TestFieldRef_EqualTo(t *testing.T) {

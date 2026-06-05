@@ -7,8 +7,9 @@ import (
 )
 
 type FieldRef struct {
-	name string
-	isID bool
+	source string
+	name   string
+	isID   bool
 }
 
 func (f FieldRef) IsID() bool {
@@ -19,16 +20,26 @@ func (f FieldRef) Name() string {
 	return f.name
 }
 
+// Source returns the recordset qualifier of the field. An empty source
+// denotes the single From base recordset.
+func (f FieldRef) Source() string {
+	return f.source
+}
+
 func (f FieldRef) Equal(b FieldRef) bool {
-	return f.isID == b.isID && f.name == b.name
+	return f.source == b.source && f.isID == b.isID && f.name == b.name
 }
 
 // String returns string representation of a field
 func (f FieldRef) String() string {
+	name := f.name
 	if RequiresEscaping(f.name) {
-		return fmt.Sprintf("[%v]", f.name)
+		name = fmt.Sprintf("[%v]", f.name)
 	}
-	return f.name
+	if f.source != "" {
+		return f.source + "." + name
+	}
+	return name
 }
 
 // Empty string requires escaping!
