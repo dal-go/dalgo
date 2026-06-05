@@ -2,9 +2,11 @@ package dal
 
 import "fmt"
 
-// NewFieldRef creates an expression that represents a FieldRef value
-func NewFieldRef(name string) FieldRef {
-	return FieldRef{name: name}
+// NewFieldRef creates an expression that represents a FieldRef value.
+// source qualifies the field with its recordset; an empty source denotes
+// the single From base recordset.
+func NewFieldRef(source, name string) FieldRef {
+	return FieldRef{source: source, name: name}
 }
 
 type OrderExpression interface {
@@ -38,7 +40,7 @@ func Ascending(expression Expression) OrderExpression {
 }
 
 func AscendingField(name string) OrderExpression {
-	return Ascending(NewFieldRef(name))
+	return Ascending(NewFieldRef("", name))
 }
 
 func Descending(expression Expression) OrderExpression {
@@ -46,5 +48,5 @@ func Descending(expression Expression) OrderExpression {
 }
 
 func DescendingField(name string) OrderExpression {
-	return Descending(NewFieldRef(name))
+	return Descending(NewFieldRef("", name))
 }

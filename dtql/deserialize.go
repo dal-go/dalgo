@@ -109,7 +109,7 @@ func exprFromYAML(e exprYAML) (dal.Expression, error) {
 	}
 	switch {
 	case e.Field != "":
-		return dal.NewFieldRef(e.Field), nil
+		return dal.NewFieldRef("", e.Field), nil
 	case e.Value != nil:
 		return dal.Constant{Value: e.Value}, nil
 	default: // e.Values != nil

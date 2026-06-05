@@ -12,6 +12,20 @@ func cmp(left, right any) Comparison {
 	return NewComparison(Constant{Value: left}, Equal, Constant{Value: right})
 }
 
+func TestJoinedSource_JoinType(t *testing.T) {
+	inner := JoinedSource{RecordsetSource: NewRootCollectionRef("orders", ""), joinType: JoinInner}
+	left := JoinedSource{RecordsetSource: NewRootCollectionRef("orders", ""), joinType: JoinLeft}
+	if inner.JoinType() != JoinInner {
+		t.Errorf("expected JoinInner, got %q", inner.JoinType())
+	}
+	if left.JoinType() != JoinLeft {
+		t.Errorf("expected JoinLeft, got %q", left.JoinType())
+	}
+	if inner.JoinType() == left.JoinType() {
+		t.Errorf("INNER and LEFT join types must be distinguishable")
+	}
+}
+
 func TestFrom_Join_Joins_NewQuery_DeepCopy(t *testing.T) {
 	// Prepare base source
 	base := NewRootCollectionRef("users", "")

@@ -8,7 +8,8 @@ func (f FieldName) String() string {
 	return string(f)
 }
 
-// Field creates a FieldRef with the given name
+// Field creates an unqualified FieldRef with the given name (empty source,
+// i.e. the single From base recordset). Use NewFieldRef to qualify by source.
 func Field(name string) FieldRef {
-	return NewFieldRef(name)
+	return NewFieldRef("", name)
 }

@@ -17,6 +17,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [transaction-message](transaction-message/README.md) | Approved | — |
 | [recordset-computed-columns](recordset-computed-columns/README.md) | Approved | — |
 | [dtql](dtql/README.md) | Approved | — |
+| [query-joins](query-joins/README.md) | Approved | — |
 
 ## Open Questions
 
