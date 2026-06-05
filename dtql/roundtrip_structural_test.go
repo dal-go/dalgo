@@ -6,8 +6,10 @@ import (
 	"github.com/dal-go/dalgo/dal"
 )
 
-func TestStructuralRoundTrip(t *testing.T) {
-	cases := map[string]dal.StructuredQuery{
+// roundTripCases is the representative in-scope query set shared by the
+// structural and canonical round-trip tests.
+func roundTripCases() map[string]dal.StructuredQuery {
+	return map[string]dal.StructuredQuery{
 		"from only": fakeQuery{from: rootFrom()},
 		"from with alias": fakeQuery{
 			from: dal.From(dal.NewRootCollectionRef("users", "u")),
@@ -62,8 +64,10 @@ func TestStructuralRoundTrip(t *testing.T) {
 		},
 		"nested groups": fullQuery(),
 	}
+}
 
-	for name, q := range cases {
+func TestStructuralRoundTrip(t *testing.T) {
+	for name, q := range roundTripCases() {
 		t.Run(name, func(t *testing.T) {
 			data, err := Serialize(q)
 			if err != nil {
