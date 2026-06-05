@@ -41,6 +41,10 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 	joinKey := sourceKey(join)
 	known := map[string]bool{"": true, baseKey: true, joinKey: true}
 
+	if err := validateOrderSources(q.OrderBy(), known); err != nil {
+		return nil, err
+	}
+
 	baseRows, err := s.loadRows(base.Name())
 	if err != nil {
 		return nil, err
@@ -83,7 +87,7 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 		}
 	}
 
-	sort.SliceStable(filtered, func(i, j int) bool { return filtered[i].baseID < filtered[j].baseID })
+	orderJoinedRows(filtered, q.OrderBy())
 
 	if limit := q.Limit(); limit > 0 && limit < len(filtered) {
 		filtered = filtered[:limit]
@@ -108,6 +112,55 @@ func sourceKey(rs dal.RecordsetSource) string {
 		return a
 	}
 	return rs.Name()
+}
+
+// validateOrderSources rejects an ORDER BY FieldRef whose non-empty Source()
+// names no recordset in the query, before sorting (the sort callback cannot
+// return an error). A non-FieldRef key is not an error here — it is skipped
+// during the sort.
+func validateOrderSources(orderBy []dal.OrderExpression, known map[string]bool) error {
+	for _, oe := range orderBy {
+		f, ok := oe.Expression().(dal.FieldRef)
+		if !ok {
+			continue
+		}
+		if src := f.Source(); src != "" && !known[src] {
+			return fmt.Errorf("dalgo2memory: ORDER BY field %q references unknown source %q", f.Name(), src)
+		}
+	}
+	return nil
+}
+
+// orderBySources is the shared ORDER BY comparator for both the single-source
+// and join paths. It stably sorts rows by the ORDER BY expressions in declared
+// order, resolving each FieldRef key against sourcesOf(row) (empty Source() ->
+// the "" entry; non-empty -> the matching source), honoring Descending() per
+// key, skipping non-FieldRef keys, with idOf(row) as the final tiebreak.
+func orderBySources[T any](rows []T, orderBy []dal.OrderExpression, sourcesOf func(T) map[string]map[string]any, idOf func(T) string) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		si, sj := sourcesOf(rows[i]), sourcesOf(rows[j])
+		for _, oe := range orderBy {
+			f, ok := oe.Expression().(dal.FieldRef)
+			if !ok {
+				continue
+			}
+			c := compare(si[f.Source()][f.Name()], sj[f.Source()][f.Name()])
+			if oe.Descending() {
+				c = -c
+			}
+			if c != 0 {
+				return c < 0
+			}
+		}
+		return idOf(rows[i]) < idOf(rows[j])
+	})
+}
+
+// orderJoinedRows orders join result rows via the shared comparator.
+func orderJoinedRows(rows []joinedRow, orderBy []dal.OrderExpression) {
+	orderBySources(rows, orderBy,
+		func(r joinedRow) map[string]map[string]any { return r.sources },
+		func(r joinedRow) string { return r.baseID })
 }
 
 func (s session) loadRows(collectionName string) ([]memoryRow, error) {
