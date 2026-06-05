@@ -1,6 +1,6 @@
 # Idea: Source-qualified, multi-key ORDER BY resolution in dalgo2memory
 
-**Status:** Draft
+**Status:** Approved
 **Date:** 2026-06-05
 **Owner:** alex
 **Promotes To:** —
