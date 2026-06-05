@@ -1,6 +1,6 @@
 # Plan: Source-qualified, multi-key ORDER BY resolution in dalgo2memory
 
-**Status:** Under Review
+**Status:** Approved
 **Source Feature:** qualified-orderby-resolution
 **Date:** 2026-06-05
 **Owner:** alex
