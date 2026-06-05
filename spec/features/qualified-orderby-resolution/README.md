@@ -41,7 +41,7 @@ An `ORDER BY` `FieldRef` whose non-empty `Source()` names no recordset in the qu
 
 #### REQ: non-field-order-key
 
-An `ORDER BY` expression that is not a `FieldRef` (e.g. a constant or computed expression) MUST NOT cause a crash; it contributes nothing to ordering and the rows retain the deterministic tiebreak order, mirroring the current single-source behavior.
+An `ORDER BY` expression that is not a `FieldRef` (e.g. a constant or computed expression) MUST NOT cause a crash; it is skipped as an ordering key, and the remaining keys (and finally the base-id tiebreak) still apply.
 
 ### Unification
 
@@ -63,17 +63,29 @@ Single-source and join queries MUST share one ordering implementation. A single-
 **When** the query is executed
 **Then** rows are ordered by `u.id` ascending, and within equal `u.id` by `o.amount` descending.
 
-### AC: deterministic-tiebreak-by-base-id (verifies REQ:deterministic-tiebreak)
+### AC: tiebreak-no-order-by (verifies REQ:deterministic-tiebreak)
 
-**Given** a join query with no `ORDER BY` (or whose keys all compare equal)
+**Given** a join query with no `ORDER BY`
 **When** it is executed
 **Then** the rows are returned in ascending base-record-id order, deterministically across runs.
+
+### AC: tiebreak-all-keys-equal (verifies REQ:deterministic-tiebreak)
+
+**Given** a join query ordered by a key whose value is equal across all result rows
+**When** it is executed
+**Then** the rows fall back to ascending base-record-id order.
 
 ### AC: unresolvable-order-source-errors (verifies REQ:unresolvable-order-source-errors)
 
 **Given** a join query with `ORDER BY z.foo` where `z` names neither recordset
 **When** it is executed
 **Then** it returns a descriptive error naming the unresolved source and yields no result rows.
+
+### AC: single-source-unresolvable-order-source (verifies REQ:unresolvable-order-source-errors)
+
+**Given** a single-source query whose `ORDER BY` key has a non-empty `Source()` that matches neither the base recordset's alias nor its name
+**When** it is executed
+**Then** it returns a descriptive error and yields no result rows (the same rule as joins).
 
 ### AC: non-field-order-key-ignored (verifies REQ:non-field-order-key)
 
@@ -109,7 +121,7 @@ Table tests in `dalgo2memory`: a join ordered by a qualified numeric key and by 
 
 ## Rehearse Integration
 
-All six ACs are testable through pure Go execution over in-memory collections, so they map directly to `dalgo2memory` table tests (see `## Testing Strategy`). Per-AC Rehearse stub files are deferred to the Plan, where each AC becomes a concrete `*_test.go` case; the rehearsal surface is the Go test suite.
+All eight ACs are testable through pure Go execution over in-memory collections, so they map directly to `dalgo2memory` table tests (see `## Testing Strategy`). Per-AC Rehearse stub files are deferred to the Plan, where each AC becomes a concrete `*_test.go` case; the rehearsal surface is the Go test suite.
 
 ## Out of Scope
 
@@ -125,7 +137,7 @@ From the source Idea `qualified-orderby-resolution`:
 
 - **Carried (Must):** the join `WHERE` per-source resolver backs `ORDER BY` too, with no new aliasing machinery — validated by `AC:join-orders-by-qualified-key`.
 - **Carried (Must):** unifying single-source ordering into the source-aware comparator does not change existing single-source results — validated by `AC:single-source-order-unchanged`.
-- **Carried (Should):** `compare()` plus key-by-key short-circuit gives deterministic multi-key order — validated by `AC:orders-by-multiple-keys` and `AC:deterministic-tiebreak-by-base-id`.
+- **Carried (Should):** `compare()` plus key-by-key short-circuit gives deterministic multi-key order — validated by `AC:orders-by-multiple-keys`, `AC:tiebreak-no-order-by`, and `AC:tiebreak-all-keys-equal`.
 - **Resolved (was Should/open question):** an `ORDER BY` key naming no recordset **errors** (not silent fallback) — now `REQ:unresolvable-order-source-errors`; the same rule resolves the Idea's single-source non-matching-source open question (non-base source → error).
 - **Deferred (Might):** whether consumers need multi-key now — this Feature commits to multi-key regardless, as the comparator cost is the same.
 
