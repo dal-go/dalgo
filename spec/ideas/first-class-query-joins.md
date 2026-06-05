@@ -1,6 +1,6 @@
 # Idea: First-class INNER/LEFT joins in dal's query model
 
-**Status:** Draft
+**Status:** Approved
 **Date:** 2026-06-05
 **Owner:** alexander.trakhimenok
 **Promotes To:** —
