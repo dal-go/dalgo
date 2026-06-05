@@ -1,6 +1,6 @@
 # Idea: Column selection in the query builder, projected by dalgo2memory
 
-**Status:** Draft
+**Status:** Approved
 **Date:** 2026-06-05
 **Owner:** alex
 **Promotes To:** —
