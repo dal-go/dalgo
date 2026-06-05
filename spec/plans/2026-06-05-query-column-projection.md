@@ -1,6 +1,6 @@
 # Plan: Column selection in the query builder, projected by dalgo2memory
 
-**Status:** Implementing
+**Status:** Completed
 **Source Feature:** query-column-projection
 **Date:** 2026-06-05
 **Owner:** alex
@@ -35,6 +35,7 @@ When `q.Columns()` is non-empty, project each result row of both `ExecuteQueryTo
 
 **Verifies:** query-column-projection#ac:unknown-column-source-errors, query-column-projection#ac:non-field-column-errors
 **Depends-On:** 2
+**Status:** done
 
 Validate the selected columns before producing rows: a column whose `FieldRef` names a non-empty source matching no recordset, or whose expression is not a `FieldRef`, returns a descriptive error and no rows — consistent with the `WHERE`/`ORDER BY` unresolvable-source behavior.
 

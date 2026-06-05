@@ -273,6 +273,9 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err := validateOrderSources(q.OrderBy(), known); err != nil {
 		return nil, err
 	}
+	if err := validateColumns(q.Columns(), known); err != nil {
+		return nil, err
+	}
 	rows := make([]memoryRow, 0, len(collection))
 	for id, b := range collection {
 		var data map[string]any

@@ -44,6 +44,9 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 	if err := validateOrderSources(q.OrderBy(), known); err != nil {
 		return nil, err
 	}
+	if err := validateColumns(q.Columns(), known); err != nil {
+		return nil, err
+	}
 
 	baseRows, err := s.loadRows(base.Name())
 	if err != nil {

@@ -75,6 +75,31 @@ func TestJoin_ProjectionQualified(t *testing.T) {
 	}
 }
 
+// AC non-field-column-errors: a selected column whose expression is not a
+// FieldRef produces a descriptive error and no rows.
+func TestSingleSource_NonFieldColumnErrors(t *testing.T) {
+	db, ctx := seedPeople(t)
+	q := dal.From(dal.NewRootCollectionRef("people", "")).NewQuery().SelectColumns(
+		dal.Column{Expression: dal.Constant{Value: 1}},
+	)
+	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+	require.Nil(t, reader)
+	require.ErrorContains(t, err, "not a field reference")
+}
+
+// AC unknown-column-source-errors: a selected column qualified with a source
+// naming no recordset produces a descriptive error and no rows.
+func TestJoin_UnknownColumnSourceErrors(t *testing.T) {
+	db, ctx := seedUsersOrders(t)
+	join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+	q := dal.From(usersAlias()).Join(join).NewQuery().SelectColumns(
+		dal.Column{Expression: dal.NewFieldRef("x", "id")},
+	)
+	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+	require.Nil(t, reader)
+	require.ErrorContains(t, err, "unknown source")
+}
+
 // AC empty-columns-unchanged: an empty Columns() leaves the full-record path
 // untouched.
 func TestSingleSource_EmptyColumnsUnchanged(t *testing.T) {
