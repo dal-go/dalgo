@@ -14,6 +14,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
 | [first-class-query-joins](first-class-query-joins.md) | Specified | 2026-06-05 | alexander.trakhimenok | query-joins |
 | [qualified-orderby-resolution](qualified-orderby-resolution.md) | Specified | 2026-06-05 | alex | qualified-orderby-resolution |
+| [query-column-projection](query-column-projection.md) | Draft | 2026-06-05 | alex | — |
 | [recordops](recordops.md) | Approved | 2026-05-15 | alex | — |
 | [recordset-computed-columns](recordset-computed-columns.md) | Specified | 2026-06-02 | alex | recordset-computed-columns |
 | [transaction-message](transaction-message.md) | Approved | 2026-06-02 | alex | — |
