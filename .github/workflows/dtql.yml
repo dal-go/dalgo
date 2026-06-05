@@ -1,0 +1,31 @@
+name: DTQL
+
+# DTQL-specific checks: the JSON Schema must stay fresh relative to the Go types
+# (regenerate-and-diff), the example documents must deserialize and validate
+# against the schema, and the schema/examples/index are published to
+# https://dal-go.github.io/dtql/.
+
+on:
+  push:
+    branches-ignore:
+      - renovate/**
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+
+  schema-fresh:
+    name: Schema is fresh (regenerate-and-diff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Regenerate schema from Go types
+        run: go run ./dtql/cmd/gen-schema
+      - name: Fail if the committed schema is stale
+        run: git diff --exit-code dtql/schema
+      - name: Run DTQL tests (schema freshness, examples deserialize + validate)
+        run: go test ./dtql/...

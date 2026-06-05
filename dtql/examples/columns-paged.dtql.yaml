@@ -1,0 +1,13 @@
+from:
+  name: products
+  alias: p
+columns:
+  - field: name
+  - field: price
+    as: amount
+orderBy:
+  - field: name
+  - field: price
+    desc: true
+limit: 25
+offset: 50

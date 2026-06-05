@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DTQL — YAML serialization of dalgo's StructuredQuery</title>
+  <style>
+    :root { --fg: #1b1f23; --muted: #57606a; --accent: #0969da; --bg: #ffffff; --code-bg: #f6f8fa; --border: #d0d7de; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--fg); background: var(--bg); line-height: 1.6; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+    h1 { font-size: 1.9rem; margin: 0 0 .4rem; }
+    h2 { font-size: 1.3rem; margin-top: 2.4rem; border-bottom: 1px solid var(--border); padding-bottom: .35rem; }
+    .tagline { color: var(--muted); font-size: 1.05rem; margin: 0; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: .9rem; }
+    pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; overflow-x: auto; }
+    code { background: var(--code-bg); border-radius: 4px; padding: .1rem .35rem; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+    th, td { border: 1px solid var(--border); padding: .5rem .7rem; text-align: left; vertical-align: top; }
+    th { background: var(--code-bg); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; margin: 1rem 0; }
+    .card { border: 1px solid var(--border); border-radius: 6px; padding: .85rem 1rem; }
+    .card a { font-weight: 600; }
+    .card p { margin: .25rem 0 0; color: var(--muted); font-size: .85rem; }
+    footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>DTQL</h1>
+      <p class="tagline">A 1:1, lossless, human-readable <strong>YAML serialization</strong> of dalgo's
+        <code>dal.StructuredQuery</code> for the core relational read-only subset.</p>
+    </header>
+
+    <p>DTQL is plain YAML over the existing <code>dal</code> query model — no bespoke grammar, no
+      hand-written parser. It is produced and consumed by the
+      <a href="https://github.com/dal-go/dalgo/tree/main/dtql"><code>github.com/dal-go/dalgo/dtql</code></a>
+      package, which proves a lossless round-trip in both directions.</p>
+
+    <h2>Artifacts</h2>
+    <div class="cards">
+      <div class="card">
+        <a href="./schema.json">schema.json</a>
+        <p>JSON Schema (draft 2020-12). Canonical <code>$id</code>.</p>
+      </div>
+      <div class="card">
+        <a href="./schema.yaml">schema.yaml</a>
+        <p>The same schema, YAML serialization.</p>
+      </div>
+      <div class="card">
+        <a href="./examples/">examples/</a>
+        <p>Validated example DTQL documents.</p>
+      </div>
+    </div>
+    <p>The schema is <strong>generated from the Go types</strong> (the single source of truth);
+      its canonical identifier is <code>https://dal-go.github.io/dtql/schema.json</code>.</p>
+
+    <h2>Node → YAML mapping</h2>
+    <table>
+      <thead><tr><th><code>dal</code> node</th><th>YAML representation</th></tr></thead>
+      <tbody>
+        <tr><td>From over root <code>CollectionRef</code></td><td><code>from: { name, alias? }</code></td></tr>
+        <tr><td><code>Column</code></td><td>item under <code>columns:</code> — an expression plus optional <code>as:</code></td></tr>
+        <tr><td><code>Comparison</code></td><td><code>{ op, left, right }</code></td></tr>
+        <tr><td><code>GroupCondition</code> (And)</td><td><code>{ and: [ … ] }</code></td></tr>
+        <tr><td><code>GroupCondition</code> (Or)</td><td><code>{ or: [ … ] }</code></td></tr>
+        <tr><td><code>OrderExpression</code></td><td>item under <code>orderBy:</code> — an expression plus optional <code>desc: true</code></td></tr>
+        <tr><td><code>FieldRef</code></td><td><code>{ field: &lt;name&gt; }</code></td></tr>
+        <tr><td><code>Constant</code></td><td><code>{ value: &lt;scalar&gt; }</code></td></tr>
+        <tr><td><code>Array</code></td><td><code>{ values: [ &lt;scalar&gt;, … ] }</code></td></tr>
+        <tr><td><code>Operator</code></td><td><code>==</code>, <code>In</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>&lt;</code>, <code>&lt;=</code></td></tr>
+        <tr><td><code>Limit</code> / <code>Offset</code></td><td><code>limit: &lt;int&gt;</code> / <code>offset: &lt;int&gt;</code></td></tr>
+      </tbody>
+    </table>
+    <p>An expression sets <strong>exactly one</strong> of <code>field</code>, <code>value</code> or
+      <code>values</code>, discriminating a <code>FieldRef</code>, a <code>Constant</code> or an <code>Array</code>.</p>
+
+    <h2>Example</h2>
+    <pre><code>from:
+  name: users
+columns:
+  - field: name
+  - field: age
+    as: years
+where:
+  and:
+    - op: '&gt;='
+      left:
+        field: age
+      right:
+        value: 18
+    - or:
+        - op: In
+          left:
+            field: status
+          right:
+            values:
+              - active
+              - pending
+        - op: ==
+          left:
+            field: country
+          right:
+            value: US
+orderBy:
+  - field: name
+  - field: age
+    desc: true
+limit: 10
+offset: 20</code></pre>
+
+    <footer>
+      Generated and published from the <a href="https://github.com/dal-go/dalgo/tree/main/dtql">dalgo <code>dtql</code> package</a>.
+      The schema and examples are generated; this page is published in sync with them.
+    </footer>
+  </div>
+</body>
+</html>

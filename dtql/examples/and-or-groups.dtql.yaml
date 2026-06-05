@@ -1,0 +1,28 @@
+from:
+  name: users
+columns:
+  - field: id
+  - field: name
+where:
+  and:
+    - op: '>='
+      left:
+        field: age
+      right:
+        value: 18
+    - or:
+        - op: In
+          left:
+            field: status
+          right:
+            values:
+              - active
+              - pending
+        - op: ==
+          left:
+            field: country
+          right:
+            value: US
+orderBy:
+  - field: name
+limit: 100
