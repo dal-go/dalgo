@@ -1,9 +1,9 @@
 # Idea: Source-qualified, multi-key ORDER BY resolution in dalgo2memory
 
-**Status:** Approved
+**Status:** Specified
 **Date:** 2026-06-05
 **Owner:** alex
-**Promotes To:** —
+**Promotes To:** qualified-orderby-resolution
 **Supersedes:** —
 **Related Ideas:** —
 
