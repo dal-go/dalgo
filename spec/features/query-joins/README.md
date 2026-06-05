@@ -51,7 +51,7 @@ For this Feature an `ON` clause in scope is one or more equality `Comparison` no
 
 #### REQ: memory-qualified-resolution
 
-When executing a query with joins, `dalgo2memory` MUST resolve a qualified `FieldRef` to the correct recordset — empty `src` to the `From` base, a non-empty `src` to the joined source whose `Alias()`/`Name()` matches — when evaluating `ON`, `Where`, `Columns`, and `OrderBy`. An existing single-source query (all fields empty-`src`) MUST return the same results as before this Feature.
+When executing a query with joins, `dalgo2memory` MUST resolve a qualified `FieldRef` to the correct recordset — empty `src` to the `From` base, a non-empty `src` to the joined source whose `Alias()`/`Name()` matches — when evaluating `ON`, `Where`, `Columns`, and `OrderBy`. An existing single-source query (all fields empty-`src`) MUST return the same results as before this Feature. A non-empty `src` that matches no recordset in the query MUST produce a descriptive error, not a silent empty or absent value.
 
 #### REQ: memory-rejects-unsupported-join
 
@@ -68,8 +68,8 @@ When `dalgo2memory` encounters a join whose type it does not support (anything o
 ### AC: build-join-from-outside-dal (verifies REQ:public-joined-source-constructor, REQ:equi-join-on-shape)
 
 **Given** a `From` base `users u`, a second recordset `orders o`, and an equality `ON` condition `u.id == o.userId` built from qualified field references
-**When** code in the `dalgo2memory` package calls the exported constructor with the joined source, a join type, and the `ON` condition, then reads `From().Joins()[0].On()`
-**Then** the returned `JoinedSource` carries the join type and the exact `ON` condition, with no access to any unexported `dal` field required.
+**When** code in the `dalgo2memory` package calls the exported constructor with the joined source, a join type, and the `ON` condition, then reads the join back through the public API (its join type and its `On()` conditions)
+**Then** the returned join carries the join type and the exact `ON` condition, with no access to any unexported `dal` field required.
 
 ### AC: qualified-field-carries-source (verifies REQ:source-qualified-field-ref)
 
@@ -107,6 +107,12 @@ When `dalgo2memory` encounters a join whose type it does not support (anything o
 **When** `dalgo2memory` is asked to execute it
 **Then** it returns a descriptive error naming the unsupported shape and yields no result rows.
 
+### AC: unresolvable-source-errors (verifies REQ:memory-qualified-resolution)
+
+**Given** a `LEFT` join of `users u` and `orders o` and a field qualified with a `src` (`x`) that names neither recordset
+**When** `dalgo2memory` evaluates the query
+**Then** it returns a descriptive error naming the unresolved source and yields no result rows, rather than treating the field as empty.
+
 ## Architecture & Components
 
 - **`dal` (query model).** New: a join-type value (enum), an exported `JoinedSource` constructor accepting `(src RecordsetSource, joinType, on ...Condition)`, and the `NewFieldRef(src, name)` signature change. `FromSource.Join`/`Joins` and `JoinedSource.On` already exist and are reused. No new dependencies.
@@ -125,7 +131,7 @@ When `dalgo2memory` encounters a join whose type it does not support (anything o
 
 ## Testing Strategy
 
-Table tests in `dalgo2memory` over two small in-memory collections cover INNER (matches only), LEFT (unmatched-left retained with `nil` right), qualified resolution in `Where`, and the unsupported-join error. `dal`-level tests cover the join-type round-trip and the public constructor producing a populated `On()` from outside the package. The migration of every `NewFieldRef(` call site is verified by the full existing `dal` + `dalgo2memory` + `dtql` suites returning green. Rehearse stubs are scaffolded per the per-AC decision in `## Rehearse Integration`.
+Table tests in `dalgo2memory` over two small in-memory collections cover INNER (matches only), LEFT (unmatched-left retained with `nil` right), qualified resolution in `Where`, the unsupported-join error, and the unresolvable-`src` error. `dal`-level tests cover the join-type round-trip and the public constructor producing a populated `On()` from outside the package. The `NewFieldRef(src, name)` signature change has only two constructor-call surfaces in the module — `dal` itself (the `Field`/`AscendingField`/`DescendingField` wrappers and `dal` tests) and `dtql/deserialize.go`; `dalgo2memory` consumes `FieldRef` by type assertion rather than the constructor. The migration is verified by the full existing `dal` + `dtql` + `dalgo2memory` suites returning green.
 
 ## Out of Scope
 
@@ -155,6 +161,7 @@ All eight ACs are testable through pure Go surfaces — `dal` constructor/access
 - Exact spelling/exported names of the join-type constants (e.g. `dal.JoinInner`/`dal.JoinLeft`) and the constructor — settle in the Plan.
 - Whether a single-arg convenience wrapper for the common empty-`src` field is worth adding alongside `NewFieldRef(src, name)`.
 - Whether unsupported join types are rejected at construction in `dal` or only at execution in `dalgo2memory` (this Feature requires at least the execution-time rejection).
+- `JoinedSource.On()` currently has a pointer receiver while `From().Joins()` returns values; the Plan must make a join readable by value (a value receiver or returning pointers) so `AC:build-join-from-outside-dal` is achievable as written.
 
 ---
 *This document follows the https://specscore.md/feature-specification*
