@@ -95,23 +95,16 @@ func exprToYAML(expr dal.Expression) (exprYAML, error) {
 	case *dal.FieldRef:
 		return exprYAML{Field: e.Name()}, nil
 	case dal.Constant:
-		return exprYAML{Value: encodeNode(e.Value)}, nil
+		return exprYAML{Value: e.Value}, nil
 	case *dal.Constant:
-		return exprYAML{Value: encodeNode(e.Value)}, nil
+		return exprYAML{Value: e.Value}, nil
 	case dal.Array:
-		return exprYAML{Values: encodeNode(e.Value)}, nil
+		return exprYAML{Values: e.Value}, nil
 	case *dal.Array:
-		return exprYAML{Values: encodeNode(e.Value)}, nil
+		return exprYAML{Values: e.Value}, nil
 	default:
 		return exprYAML{}, fmt.Errorf("unsupported expression %T", expr)
 	}
-}
-
-func encodeNode(v any) *yaml.Node {
-	node := &yaml.Node{}
-	// Encode never fails for the scalar/slice value types DTQL admits.
-	_ = node.Encode(v)
-	return node
 }
 
 func condToYAML(cond dal.Condition) (*condYAML, error) {

@@ -1,7 +1,5 @@
 package dtql
 
-import "gopkg.in/yaml.v3"
-
 // document is the YAML representation of an in-scope dal.StructuredQuery.
 // Field order here defines the canonical key order of a DTQL-YAML document.
 type document struct {
@@ -23,9 +21,9 @@ type fromYAML struct {
 // Exactly one of Field / Value / Values is set, which discriminates a
 // FieldRef, a Constant or an Array respectively.
 type exprYAML struct {
-	Field  string     `yaml:"field,omitempty"`  // dal.FieldRef
-	Value  *yaml.Node `yaml:"value,omitempty"`  // dal.Constant (inline scalar)
-	Values *yaml.Node `yaml:"values,omitempty"` // dal.Array (inline sequence)
+	Field  string `yaml:"field,omitempty"`  // dal.FieldRef
+	Value  any    `yaml:"value,omitempty"`  // dal.Constant (inline scalar)
+	Values any    `yaml:"values,omitempty"` // dal.Array (inline sequence)
 }
 
 // columnYAML is the YAML representation of a dal.Column.
