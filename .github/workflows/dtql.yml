@@ -27,5 +27,5 @@ jobs:
         run: go run ./dtql/cmd/gen-schema
       - name: Fail if the committed schema is stale
         run: git diff --exit-code dtql/schema
-      - name: Run DTQL tests
+      - name: Run DTQL tests (schema freshness, examples deserialize + validate)
         run: go test ./dtql/...

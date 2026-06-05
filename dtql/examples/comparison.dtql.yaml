@@ -1,0 +1,8 @@
+from:
+  name: orders
+where:
+  op: '>='
+  left:
+    field: total
+  right:
+    value: 100
