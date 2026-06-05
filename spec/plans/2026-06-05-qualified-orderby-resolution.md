@@ -35,7 +35,7 @@ Validate the resolved `ORDER BY` keys before sorting (since the sort callback ca
 
 **Verifies:** qualified-orderby-resolution#ac:single-source-order-unchanged, qualified-orderby-resolution#ac:single-source-unresolvable-order-source
 **Depends-On:** 1
-**Status:** pending
+**Status:** done
 
 Route `ExecuteQueryToRecordsReader` through the shared comparator and remove `sortRows`, resolving an empty/base-matching `Source()` against the single base recordset so existing unqualified ordering (ascending and descending) is unchanged, and a non-empty source that matches neither the base alias nor name errors — the same rule as joins.
 

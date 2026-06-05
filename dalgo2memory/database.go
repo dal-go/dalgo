@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
 	"sync"
 
 	"github.com/dal-go/dalgo/dal"
@@ -261,10 +260,18 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if len(q.From().Joins()) > 0 {
 		return s.executeJoinQuery(q)
 	}
-	collectionName := q.From().Base().Name()
+	base := q.From().Base()
+	collectionName := base.Name()
 	collection := s.db.collections[collectionName]
 	if len(collection) == 0 {
 		return dal.NewRecordsReader([]dal.Record{}), nil
+	}
+	known := map[string]bool{"": true, base.Name(): true}
+	if a := base.Alias(); a != "" {
+		known[a] = true
+	}
+	if err := validateOrderSources(q.OrderBy(), known); err != nil {
+		return nil, err
 	}
 	rows := make([]memoryRow, 0, len(collection))
 	for id, b := range collection {
@@ -277,7 +284,15 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		}
 		rows = append(rows, memoryRow{id: id, data: data, raw: b})
 	}
-	sortRows(rows, q.OrderBy())
+	orderBySources(rows, q.OrderBy(),
+		func(r memoryRow) map[string]map[string]any {
+			src := map[string]map[string]any{"": r.data, base.Name(): r.data}
+			if a := base.Alias(); a != "" {
+				src[a] = r.data
+			}
+			return src
+		},
+		func(r memoryRow) string { return r.id })
 	if limit := q.Limit(); limit > 0 && limit < len(rows) {
 		rows = rows[:limit]
 	}
@@ -368,24 +383,6 @@ func matchesWhere(data map[string]any, condition dal.Condition) bool {
 		return false
 	}
 	return data[field.Name()] == constant.Value
-}
-
-func sortRows(rows []memoryRow, orderBy []dal.OrderExpression) {
-	if len(orderBy) == 0 {
-		sort.Slice(rows, func(i, j int) bool { return rows[i].id < rows[j].id })
-		return
-	}
-	sort.Slice(rows, func(i, j int) bool {
-		field, ok := orderBy[0].Expression().(dal.FieldRef)
-		if !ok {
-			return rows[i].id < rows[j].id
-		}
-		cmp := compare(rows[i].data[field.Name()], rows[j].data[field.Name()])
-		if orderBy[0].Descending() {
-			return cmp > 0
-		}
-		return cmp < 0
-	})
 }
 
 func compare(a, b any) int {

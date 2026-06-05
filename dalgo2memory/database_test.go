@@ -209,10 +209,6 @@ func TestQueryHelperBranches(t *testing.T) {
 		Right:    dal.Field("Other"),
 	}))
 
-	rows := []memoryRow{{id: "b", data: map[string]any{"Name": "b"}}, {id: "a", data: map[string]any{"Name": "a"}}}
-	sortRows(rows, []dal.OrderExpression{dal.Ascending(dal.Constant{Value: "not field"})})
-	require.Equal(t, "a", rows[0].id)
-
 	require.Equal(t, -1, compare("a", "b"))
 	require.Equal(t, 1, compare("b", "a"))
 	require.Equal(t, 0, compare("a", "a"))
