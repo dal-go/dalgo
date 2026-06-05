@@ -1,6 +1,6 @@
 # Idea: Computed Columns in recordset (neutral evaluator)
 
-**Status:** Implementing
+**Status:** Specified
 **Date:** 2026-06-02
 **Owner:** alex
 **Promotes To:** recordset-computed-columns
