@@ -1,6 +1,6 @@
 # Plan: First-class INNER/LEFT joins in dal's query model
 
-**Status:** Under Review
+**Status:** Approved
 **Source Feature:** query-joins
 **Date:** 2026-06-05
 **Owner:** alex
