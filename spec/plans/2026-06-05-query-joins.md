@@ -40,14 +40,14 @@ Add an exported `NewJoinedSource(src RecordsetSource, joinType JoinType, on ...C
 ### Task 4: `dalgo2memory` INNER nested-loop join with qualified resolution
 
 **Verifies:** query-joins#ac:inner-join-matches-only, query-joins#ac:qualified-resolution-in-where
-**Status:** pending
+**Status:** done
 
 Extend `dalgo2memory` to walk `From().Joins()` and execute an INNER equi-join over the two in-memory collections via nested loop, returning only matched pairs. Add the qualified-field resolver — empty `src` → `From` base, non-empty `src` → the joined source whose `Alias()`/`Name()` matches — and apply it when evaluating `ON`, `Where`, `Columns`, and `OrderBy`.
 
 ### Task 5: `dalgo2memory` LEFT join with null-filled right side
 
 **Verifies:** query-joins#ac:left-join-keeps-unmatched-left
-**Status:** pending
+**Status:** done
 
 Add LEFT semantics on top of Task 4's resolver and loop: emit every `From`-base row, with the joined source's fields present where the `ON` equality holds and absent/`nil` where no right row matches.
 

@@ -258,6 +258,9 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if !ok {
 		return nil, dal.ErrNotSupported
 	}
+	if len(q.From().Joins()) > 0 {
+		return s.executeJoinQuery(q)
+	}
 	collectionName := q.From().Base().Name()
 	collection := s.db.collections[collectionName]
 	if len(collection) == 0 {
