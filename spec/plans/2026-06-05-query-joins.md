@@ -33,7 +33,7 @@ Introduce an exported join-type value (e.g. `dal.JoinType` with `JoinInner` and 
 ### Task 3: Public `NewJoinedSource` constructor with value-readable `On()`
 
 **Verifies:** query-joins#ac:build-join-from-outside-dal
-**Status:** pending
+**Status:** done
 
 Add an exported `NewJoinedSource(src RecordsetSource, joinType JoinType, on ...Condition)` constructor, and make a join readable by value (a value receiver on `On()` or have `Joins()` return addressable joins) so a caller outside `dal` can build a typed equi-join with a populated `ON` clause and read back its type and conditions without touching unexported fields.
 

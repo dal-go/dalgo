@@ -71,11 +71,20 @@ type JoinedSource struct {
 	on       []Condition
 }
 
+// NewJoinedSource builds a JoinedSource of the given join type over src
+// with the supplied ON conditions. It lets callers outside the dal package
+// construct a fully-populated join (type + ON clause).
+func NewJoinedSource(src RecordsetSource, joinType JoinType, on ...Condition) JoinedSource {
+	return JoinedSource{RecordsetSource: src, joinType: joinType, on: on}
+}
+
 // JoinType returns the kind of join (INNER, LEFT, ...).
 func (j JoinedSource) JoinType() JoinType {
 	return j.joinType
 }
 
-func (j *JoinedSource) On() []Condition {
+// On returns the join's ON conditions. The value receiver makes a join
+// returned by From().Joins() readable without taking its address.
+func (j JoinedSource) On() []Condition {
 	return j.on
 }
