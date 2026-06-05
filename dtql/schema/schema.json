@@ -1,0 +1,259 @@
+{
+  "$defs": {
+    "column": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "field"
+          ]
+        },
+        {
+          "required": [
+            "value"
+          ]
+        },
+        {
+          "required": [
+            "values"
+          ]
+        }
+      ],
+      "properties": {
+        "as": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        "values": {
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "comparison": {
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "$ref": "#/$defs/expression"
+        },
+        "op": {
+          "enum": [
+            "\u003c",
+            "\u003c=",
+            "==",
+            "\u003e",
+            "\u003e=",
+            "In"
+          ]
+        },
+        "right": {
+          "$ref": "#/$defs/expression"
+        }
+      },
+      "required": [
+        "op",
+        "left",
+        "right"
+      ],
+      "type": "object"
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/comparison"
+        },
+        {
+          "$ref": "#/$defs/group"
+        }
+      ]
+    },
+    "expression": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "field"
+          ]
+        },
+        {
+          "required": [
+            "value"
+          ]
+        },
+        {
+          "required": [
+            "values"
+          ]
+        }
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        "values": {
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "from": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "group": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "and"
+          ]
+        },
+        {
+          "required": [
+            "or"
+          ]
+        }
+      ],
+      "properties": {
+        "and": {
+          "items": {
+            "$ref": "#/$defs/condition"
+          },
+          "type": "array"
+        },
+        "or": {
+          "items": {
+            "$ref": "#/$defs/condition"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "order": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "field"
+          ]
+        },
+        {
+          "required": [
+            "value"
+          ]
+        },
+        {
+          "required": [
+            "values"
+          ]
+        }
+      ],
+      "properties": {
+        "desc": {
+          "type": "boolean"
+        },
+        "field": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        "values": {
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://dal-go.github.io/dtql/schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "YAML serialization of dalgo's dal.StructuredQuery (core relational read-only subset).",
+  "properties": {
+    "columns": {
+      "items": {
+        "$ref": "#/$defs/column"
+      },
+      "type": "array"
+    },
+    "from": {
+      "$ref": "#/$defs/from"
+    },
+    "limit": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "offset": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "orderBy": {
+      "items": {
+        "$ref": "#/$defs/order"
+      },
+      "type": "array"
+    },
+    "where": {
+      "$ref": "#/$defs/condition"
+    }
+  },
+  "required": [
+    "from"
+  ],
+  "title": "DTQL",
+  "type": "object"
+}
