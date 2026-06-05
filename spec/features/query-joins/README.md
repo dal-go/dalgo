@@ -1,7 +1,7 @@
 # Feature: First-class INNER/LEFT joins in dal's query model
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-joins?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-joins?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-joins?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-joins?op=request-change) |
-**Status:** Draft
+**Status:** Under Review
 **Date:** 2026-06-05
 **Owner:** alex
 **Source Ideas:** first-class-query-joins
@@ -145,6 +145,10 @@ From the source Idea `first-class-query-joins`:
 - **Carried (Should):** a nested-loop join in `dalgo2memory` is sufficient to prove correctness including `LEFT` null-filling — validated by the INNER/LEFT ACs.
 - **Carried (Should):** qualification can reuse `RecordsetSource.Alias()`/`Name()` and empty `src` → base — now a requirement (`REQ:memory-qualified-resolution`).
 - **Deferred (Might):** equality-only `ON` covers the dominant need — encoded as `REQ:equi-join-on-shape`; richer `ON` stays out of scope.
+
+## Rehearse Integration
+
+All eight ACs are testable through pure Go surfaces — `dal` constructor/accessor calls and `dalgo2memory` query execution over in-memory maps — so they map directly to table tests in `dal/` and `dalgo2memory/` (see `## Testing Strategy`). Per-AC Rehearse stub files are intentionally **deferred to the Plan**, where each AC becomes a concrete `*_test.go` case; the rehearsal surface is the Go test suite rather than standalone scenario docs.
 
 ## Open Questions
 
