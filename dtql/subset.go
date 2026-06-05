@@ -39,7 +39,7 @@ func checkInScope(q dal.StructuredQuery) error {
 	return nil
 }
 
-// checkFrom verifies the From source is a single join-free root CollectionRef.
+// checkFrom verifies the From source is a single root CollectionRef with no joins.
 func checkFrom(from dal.FromSource) error {
 	if from == nil {
 		return fmt.Errorf("query has no From source")

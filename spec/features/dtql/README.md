@@ -92,7 +92,7 @@ The schema (both serializations), the example documents, and a human-readable, s
 
 ### AC: subset-nodes-represented (verifies REQ:covered-subset)
 
-**Given** a `StructuredQuery` with a single join-free `From` over a root `CollectionRef`, selected `Columns`, a `Where` combining `Comparison` (with inline `Constant`/`Array` values) and And/Or `GroupCondition`, `OrderBy`, `Limit`, and `Offset`
+**Given** a `StructuredQuery` with a single `From` (no joins) over a root `CollectionRef`, selected `Columns`, a `Where` combining `Comparison` (with inline `Constant`/`Array` values) and And/Or `GroupCondition`, `OrderBy`, `Limit`, and `Offset`
 **When** it is serialized to DTQL-YAML
 **Then** the YAML contains a defined representation for each of those nodes (source, columns, where tree with inline constants, order, limit, offset) with no node omitted.
 
@@ -200,6 +200,10 @@ From the cross-repo Idea `dtql-datatug-query-language`:
 - Should the cross-repo source link to the datatug Idea be formalized in `**Source Ideas:**` once tooling resolves cross-repo idea references, instead of being stated in prose?
 - Exact structural-equality mechanism for `round-trip-structural` (a `dal`-provided equality helper vs. a `dtql`-local comparator) — a Plan/implementation detail.
 - How far the relational subset later extends (`GroupBy`, joins, functions) before nested/document shapes — tracked for the next DTQL cycle.
+
+## Sidekick Seeds Generated
+
+- [dalgo-needs-first-class-join-support-in-its-query-model](../../ideas/seeds/dalgo-needs-first-class-join-support-in-its-query-model.md) — captured 2026-06-05 by user
 
 ---
 *This document follows the https://specscore.md/feature-specification*

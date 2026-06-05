@@ -16,7 +16,7 @@ This package imports `dal` but adds **no YAML dependency to `dal`**.
 
 ## Covered subset
 
-DTQL represents a single join-free `From` over a **root** `CollectionRef`
+DTQL represents a single `From` (with no `Joins()`) over a **root** `CollectionRef`
 (`Parent() == nil`), the selected `Columns`, the `Where` condition (`Comparison`
 and And/Or `GroupCondition` trees), `OrderBy`, and `Limit`/`Offset`. The
 in-scope expression nodes are field references, constants and constant arrays;

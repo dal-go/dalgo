@@ -27,7 +27,7 @@ func (q fakeQuery) Limit() int                     { return q.limit }
 func (q fakeQuery) Offset() int                    { return q.offset }
 func (q fakeQuery) StartFrom() dal.Cursor          { return q.startFrom }
 
-// rootFrom builds a join-free From over a root collection named users.
+// rootFrom builds a From with no joins over a root collection named users.
 func rootFrom() dal.FromSource {
 	return dal.From(dal.NewRootCollectionRef("users", ""))
 }
