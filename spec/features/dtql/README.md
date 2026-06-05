@@ -10,7 +10,7 @@
 
 ## Summary
 
-DTQL is a 1:1, lossless, human-readable **YAML serialization of dalgo's `dal.StructuredQuery`**. This Feature adds a top-level `dtql` package that (de)serializes between `dal.StructuredQuery` and a DTQL-YAML document for the core relational read-only subset, documents the YAML shape, and proves a lossless round-trip in both directions. It serves any dalgo consumer that needs to save, hand-edit, diff, and reload a structured query as text — first among them DataTug's serve-brokered query builder. Realizes the cross-repo Idea `specscore:idea/dtql-datatug-query-language@github.com/datatug/datatug`.
+DTQL is a 1:1, lossless, human-readable **YAML serialization of dalgo's `dal.StructuredQuery`**. This Feature adds a top-level `dtql` package that (de)serializes between `dal.StructuredQuery` and a DTQL-YAML document for the core relational read-only subset, documents the YAML shape, and proves a lossless round-trip in both directions. It also **publishes DTQL** as a public artifact: a JSON Schema (generated from the Go types) and a set of example documents, served as a documented site at **https://dal-go.github.io/dtql/** so DTQL files can be validated by any tool and read by humans. It serves any dalgo consumer that needs to save, hand-edit, diff, and reload a structured query as text — first among them DataTug's serve-brokered query builder. Realizes the cross-repo Idea `specscore:idea/dtql-datatug-query-language@github.com/datatug/datatug`.
 
 ## Problem
 
@@ -62,6 +62,26 @@ DTQL MUST live in a new top-level package `github.com/dal-go/dalgo/dtql` that im
 
 The package MUST document the DTQL-YAML shape — the mapping from each in-scope `dal` node (`From` / root `CollectionRef`, `Column`, `Comparison`, `GroupCondition`, `OrderExpression`, `FieldRef`, `Constant`, `Array`, `Operator`) to its YAML representation — versioned in-repo alongside the code.
 
+### Published schema and examples
+
+DTQL is published as a public, tool-validatable artifact so consumers in any language can validate a `.dtql.yaml` and humans can read the shape.
+
+#### REQ: machine-checkable-schema
+
+The package MUST provide a **JSON Schema (draft 2020-12)** describing the in-scope DTQL-YAML, **generated from the `dtql` Go types** (the types are the single source of truth). It MUST be emitted in both serializations — `schema.json` (the canonical `$id`, `https://dal-go.github.io/dtql/schema.json`) and `schema.yaml` (identical content) — and CI MUST fail if the committed schema is stale relative to the Go types (regenerate-and-diff).
+
+#### REQ: schema-accepts-serializer-output
+
+Every DTQL document produced by `serialize` for an in-scope `dal.StructuredQuery` MUST validate against the generated schema. A test MUST assert this over a representative set of in-scope queries, so the schema (generated from the types) and the serializer's actual output cannot drift.
+
+#### REQ: example-documents
+
+The package MUST provide a set of example DTQL documents that together exercise the in-scope subset (source, columns, comparison + And/Or group filters, ordering, limit/offset). Each example MUST be a valid DTQL document (it deserializes to a `dal.StructuredQuery`) **and** MUST validate against the schema; CI MUST enforce both.
+
+#### REQ: published-site
+
+The schema (both serializations), the example documents, and a human-readable, styled index page documenting the node→YAML mapping MUST be published at **https://dal-go.github.io/dtql/** (served from the `dal-go.github.io` repository) and MUST be kept in sync with the `dtql` package — the publish MUST be driven from the generated artifacts, not hand-maintained separately.
+
 ## Acceptance Criteria
 
 ### AC: serialize-and-back (verifies REQ:serialize-structuredquery)
@@ -112,9 +132,33 @@ The package MUST document the DTQL-YAML shape — the mapping from each in-scope
 **When** a reader looks for the DTQL-YAML shape
 **Then** in-repo documentation maps each in-scope `dal` node to its YAML representation.
 
+### AC: schema-generated-and-fresh (verifies REQ:machine-checkable-schema)
+
+**Given** the `dtql` Go types and the committed `schema.json` / `schema.yaml`
+**When** the schema is regenerated from the types in CI
+**Then** a JSON Schema (draft 2020-12) is produced in both serializations with a canonical `$id` of `https://dal-go.github.io/dtql/schema.json`, and CI fails if the regenerated schema differs from the committed one.
+
+### AC: serialized-validates-against-schema (verifies REQ:schema-accepts-serializer-output)
+
+**Given** a representative set of in-scope `dal.StructuredQuery` values
+**When** each is serialized to DTQL-YAML and the output is validated against the generated schema
+**Then** every serialized document passes schema validation (the serializer and schema agree).
+
+### AC: examples-valid (verifies REQ:example-documents)
+
+**Given** the set of example DTQL documents
+**When** CI runs
+**Then** each example deserializes to a `dal.StructuredQuery` and validates against the schema, and together they exercise source, columns, comparison + And/Or group filters, ordering, and limit/offset.
+
+### AC: site-published (verifies REQ:published-site)
+
+**Given** the generated schema, examples, and index page
+**When** the publish runs
+**Then** `https://dal-go.github.io/dtql/` serves `schema.json`, `schema.yaml`, the example documents, and a styled index page documenting the node→YAML mapping, sourced from the generated artifacts (not hand-maintained).
+
 ## Rehearse Integration
 
-Every AC has a concrete, pure-function Go surface (`serialize`, `deserialize`, round-trip composition, error returns, package import graph) and is directly unit-testable with table tests. Stub scaffolding under `_tests/` is deferred to the Plan phase so the stub set tracks the final task/test breakdown rather than being authored twice — consistent with the approach used by the serve-brokered query-builder Features that consume DTQL.
+Most ACs have a concrete, pure-function Go surface (`serialize`, `deserialize`, round-trip composition, error returns, package import graph) and are directly unit-testable with table tests. The schema, examples, and publish ACs (`schema-generated-and-fresh`, `examples-valid`, `site-published`) are CI-enforced checks (regenerate-and-diff, schema validation, publish output). Stub scaffolding under `_tests/` is deferred to the Plan phase so the stub set tracks the final task/test breakdown rather than being authored twice — consistent with the approach used by the serve-brokered query-builder Features that consume DTQL.
 
 ## Architecture and Components
 
@@ -122,10 +166,13 @@ Every AC has a concrete, pure-function Go surface (`serialize`, `deserialize`, r
 - **YAML encoding.** Uses a standard Go YAML library, isolated to the `dtql` package so `dal` stays dependency-free.
 - **Subset gate.** A single place that classifies a `StructuredQuery` as in-scope or rejects it (`reject-out-of-scope`), so the lossless guarantee is enforced in one spot.
 - **Shape doc.** An in-repo document (e.g. `dtql/README.md` or a doc comment) describing the node→YAML mapping (`documented-shape`).
+- **Schema generator.** A tool that emits the JSON Schema (`schema.json` + `schema.yaml`) from the `dtql` Go types; run in CI with a regenerate-and-diff staleness check (`machine-checkable-schema`).
+- **Examples.** A directory of example `.dtql.yaml` documents, validated in CI against the schema and against the deserializer (`example-documents`).
+- **Publish step.** CI that copies the generated schema, examples, and a styled `index.html` into the `dal-go.github.io` repo under `/dtql/` (`published-site`). Cross-repo: `dalgo` is the source of truth; `dal-go.github.io` is the serving surface.
 
 ## Data Flow
 
-`dal.StructuredQuery` → subset gate → DTQL-YAML (serialize). DTQL-YAML → validate → `dal.StructuredQuery` (deserialize). Round-trip tests compose the two in both directions.
+`dal.StructuredQuery` → subset gate → DTQL-YAML (serialize). DTQL-YAML → validate → `dal.StructuredQuery` (deserialize). Round-trip tests compose the two in both directions. Separately, the `dtql` Go types → schema generator → `schema.json` / `schema.yaml`; the schema + example documents + a styled `index.html` are published by CI to `dal-go.github.io/dtql/`, and examples are validated against the schema before publish.
 
 ## Not Doing / Out of Scope
 
@@ -133,8 +180,8 @@ Every AC has a concrete, pure-function Go surface (`serialize`, `deserialize`, r
 - The native-text form (`dal.TextQuery`) and its `QueryArg` parameters — DTQL serializes the *structured* side only; `dal.StructuredQuery` carries literal values inline as `Constant`/`Array` and has no parameter list.
 - A bespoke DTQL grammar/parser, and adopting an existing text language (PRQL/Malloy) — DTQL is YAML over the existing AST.
 - Per-driver rendering of the AST to a native SQL dialect or document query — owned by dalgo drivers and the serve-brokered daemon, not this package.
-- A separate machine-checkable schema artifact (e.g. JSON Schema) — this cycle ships the Go (de)serializer plus documented shape; the round-trip tests are the guarantee.
 - The saved-`.dtql.yaml` project-file UX — a DataTug consumer concern, not dalgo's.
+- A general docs/site framework for the `dal-go.github.io` site — DTQL publishes a `/dtql/` subtree into the existing static site; restyling or re-platforming that site is out of scope.
 
 ## Assumption Carryover
 
@@ -148,6 +195,8 @@ From the cross-repo Idea `dtql-datatug-query-language`:
 ## Open Questions
 
 - The acronym DTQL expands to "DataTug Query Language", but the format now lives in the general-purpose dalgo library. Keep the established DTQL name (used across the serve-brokered specs) or adopt a neutral gloss in dalgo? Kept as-is for cross-repo consistency this cycle.
+- The publish target is the `dal-go.github.io` repo (cross-repo). Does the `/dtql/` site warrant its own small Feature in `dal-go.github.io`, or is owning the publish from `dalgo` CI sufficient? Treated as a `dalgo`-owned publish this cycle.
+- Mechanism for the cross-repo publish (CI push with a deploy token vs. a `dal-go.github.io` workflow that pulls generated artifacts from a `dalgo` release) — a Plan/CI detail.
 - Should the cross-repo source link to the datatug Idea be formalized in `**Source Ideas:**` once tooling resolves cross-repo idea references, instead of being stated in prose?
 - Exact structural-equality mechanism for `round-trip-structural` (a `dal`-provided equality helper vs. a `dtql`-local comparator) — a Plan/implementation detail.
 - How far the relational subset later extends (`GroupBy`, joins, functions) before nested/document shapes — tracked for the next DTQL cycle.
