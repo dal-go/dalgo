@@ -1,0 +1,88 @@
+name: DTQL Publish
+
+# Publishes the DTQL artifacts to https://dal-go.github.io/dtql/.
+#
+# dalgo is the source of truth; dal-go.github.io is the serving surface. This
+# workflow assembles the /dtql/ subtree entirely from the GENERATED artifacts
+# (schema regenerated from the Go types, the validated example documents, and the
+# styled index page) and pushes it into the dal-go.github.io repository.
+#
+# PENDING — the live cross-repo push requires the repository owner to add a
+# DALGO_SITE_TOKEN secret (a PAT or deploy key with push access to
+# dal-go/dal-go.github.io). Until then the publish step is skipped automatically
+# (the guard below is false), so this workflow only assembles and uploads the
+# /dtql/ subtree as a build artifact for review.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'dtql/**'
+      - '.github/workflows/dtql-publish.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  publish:
+    name: Assemble and publish /dtql/
+    runs-on: ubuntu-latest
+    env:
+      DALGO_SITE_TOKEN: ${{ secrets.DALGO_SITE_TOKEN }}
+    steps:
+      - name: Checkout dalgo
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The schema is regenerated so the published artifact cannot be stale.
+      - name: Regenerate schema from the Go types
+        run: go run ./dtql/cmd/gen-schema
+
+      - name: Assemble the /dtql/ subtree from generated artifacts
+        run: |
+          set -euo pipefail
+          out="_site/dtql"
+          mkdir -p "$out/examples"
+          cp dtql/schema/schema.json "$out/schema.json"
+          cp dtql/schema/schema.yaml "$out/schema.yaml"
+          cp dtql/examples/*.dtql.yaml "$out/examples/"
+          cp dtql/site/index.html "$out/index.html"
+          echo "Assembled:" && find "$out" -type f | sort
+
+      - name: Upload /dtql/ subtree as a build artifact (always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dtql-site
+          path: _site/dtql
+
+      # Live cross-repo publish — runs only when the owner has provided a token.
+      - name: Publish to dal-go.github.io/dtql/
+        if: ${{ env.DALGO_SITE_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "https://x-access-token:${DALGO_SITE_TOKEN}@github.com/dal-go/dal-go.github.io.git" site-repo
+          rm -rf site-repo/dtql
+          mkdir -p site-repo/dtql
+          cp -R _site/dtql/. site-repo/dtql/
+          cd site-repo
+          git config user.name "dalgo-ci"
+          git config user.email "ci@dal-go.github.io"
+          git add dtql
+          if git diff --cached --quiet; then
+            echo "No DTQL changes to publish."
+            exit 0
+          fi
+          git commit -m "Publish DTQL artifacts from dalgo@${GITHUB_SHA}"
+          git push origin HEAD
+
+      - name: Note when publish is skipped
+        if: ${{ env.DALGO_SITE_TOKEN == '' }}
+        run: |
+          echo "::notice::DALGO_SITE_TOKEN is not set — the live publish to dal-go.github.io/dtql/ was skipped."
+          echo "::notice::Add a DALGO_SITE_TOKEN secret with push access to dal-go/dal-go.github.io to enable it."
