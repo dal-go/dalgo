@@ -27,7 +27,7 @@ Adds a `SelectColumns` terminal to `dal.QueryBuilder` so a caller can select a s
 
 #### REQ: project-selected-columns
 
-When `q.Columns()` is non-empty, `dalgo2memory` MUST return each result record's data as a `map[string]any` containing exactly the selected columns and no others, keyed by each column's `Alias` (falling back to the column's field name when the alias is empty), for both single-source and join queries.
+When `q.Columns()` is non-empty, `dalgo2memory` MUST project — regardless of `IntoRecord()` (the keys-only `IntoRecord()==nil` branch is bypassed) — returning each result record's data as a `map[string]any` with one entry per selected column, keyed by the column's `Alias` (falling back to the column's field name when the alias is empty) and carrying the resolved value (a `nil` value when the field is absent on the row, e.g. the joined source of an unmatched LEFT row), for both single-source and join queries. No unselected field appears in the map. (Two selected columns that resolve to the same key are an Open Question; the in-scope ACs use distinct keys.)
 
 #### REQ: qualified-column-resolution
 
@@ -37,9 +37,13 @@ Each selected column's `FieldRef` expression MUST be resolved to a recordset by 
 
 A query with an empty `Columns()` MUST return full records exactly as before this Feature — no projection, the existing `IntoRecord`/keys-only behavior is untouched.
 
-#### REQ: column-error-handling
+#### REQ: unresolvable-column-source-errors
 
-When projecting, a selected column whose `FieldRef` names a non-empty source that matches no recordset in the query, or whose expression is not a `FieldRef`, MUST produce a descriptive error and yield no result rows — consistent with the `WHERE`/`ORDER BY` unresolvable-source behavior. (Non-`FieldRef` column expressions are out of MVP scope and rejected rather than silently dropped.)
+When projecting, a selected column whose `FieldRef` names a non-empty source that matches no recordset in the query MUST produce a descriptive error and yield no result rows — consistent with the `WHERE`/`ORDER BY` unresolvable-source behavior.
+
+#### REQ: non-field-column-rejected
+
+When projecting, a selected column whose expression is not a `FieldRef` MUST produce a descriptive error and yield no result rows; non-`FieldRef` column expressions are out of MVP scope and rejected rather than silently dropped.
 
 ## Acceptance Criteria
 
@@ -67,13 +71,13 @@ When projecting, a selected column whose `FieldRef` names a non-empty source tha
 **When** it is executed by `dalgo2memory`
 **Then** it returns the full records exactly as before this Feature, with no projection applied.
 
-### AC: unknown-column-source-errors (verifies REQ:column-error-handling)
+### AC: unknown-column-source-errors (verifies REQ:unresolvable-column-source-errors)
 
 **Given** a query selecting a column whose `FieldRef` is qualified with a source that names no recordset in the query
 **When** it is executed
 **Then** it returns a descriptive error naming the unresolved source and yields no result rows.
 
-### AC: non-field-column-errors (verifies REQ:column-error-handling)
+### AC: non-field-column-errors (verifies REQ:non-field-column-rejected)
 
 **Given** a query selecting a column whose expression is not a `FieldRef` (e.g. a constant)
 **When** it is executed
@@ -90,9 +94,9 @@ When projecting, a selected column whose `FieldRef` names a non-empty source tha
 
 ## Error Handling & Failure Modes
 
-- Selected column with an unknown non-empty source → descriptive error, no rows (`REQ:column-error-handling`).
-- Selected column whose expression is not a `FieldRef` → descriptive error, no rows (`REQ:column-error-handling`).
-- A resolvable column whose value is absent on a row (e.g. the joined source on an unmatched LEFT row) projects to a `nil`/absent map entry, not an error.
+- Selected column with an unknown non-empty source → descriptive error, no rows (`REQ:unresolvable-column-source-errors`).
+- Selected column whose expression is not a `FieldRef` → descriptive error, no rows (`REQ:non-field-column-rejected`).
+- A resolvable column whose value is absent on a row (e.g. the joined source on an unmatched LEFT row) projects to the selected key with a `nil` value — the key is always present — not an error.
 
 ## Testing Strategy
 
@@ -104,7 +108,7 @@ All six ACs are testable through pure Go — `dal` builder calls and `dalgo2memo
 
 ## Out of Scope
 
-- Computed / function / constant column expressions — only `FieldRef` columns are projected; others are rejected (`REQ:column-error-handling`).
+- Computed / function / constant column expressions — only `FieldRef` columns are projected; others are rejected (`REQ:non-field-column-rejected`).
 - The columnar recordset reader (`ExecuteQueryToRecordsetReader` stays `ErrNotSupported`) — projection lands in the `RecordsReader` path as map records.
 - Projecting into a typed struct target — a column-projected query returns `map[string]any` keyed by alias/name.
 - `DISTINCT`, aggregates, `GROUP BY`.
@@ -118,7 +122,7 @@ From the source Idea `query-column-projection`:
 - **Carried (Must):** the join source-aware resolver can evaluate a column's `FieldRef` for projection — validated by `AC:join-projection-qualified`.
 - **Carried (Should):** a `map[string]any` keyed by alias/name is an acceptable projected-output shape — embodied by `REQ:project-selected-columns` and its ACs.
 - **Carried (Should):** empty `Columns()` preserves today's full-record behavior — validated by `AC:empty-columns-unchanged`.
-- **Resolved:** a non-`FieldRef` or unresolvable column errors (rather than silently dropping) — now `REQ:column-error-handling`.
+- **Resolved:** a non-`FieldRef` or unresolvable column errors (rather than silently dropping) — now `REQ:unresolvable-column-source-errors` and `REQ:non-field-column-rejected`.
 - **Deferred (Might):** whether consumers adopt column selection — not validated here; the capability is delivered regardless.
 
 ## Open Questions
