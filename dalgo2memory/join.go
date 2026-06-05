@@ -41,6 +41,10 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 	joinKey := sourceKey(join)
 	known := map[string]bool{"": true, baseKey: true, joinKey: true}
 
+	if err := validateOrderSources(q.OrderBy(), known); err != nil {
+		return nil, err
+	}
+
 	baseRows, err := s.loadRows(base.Name())
 	if err != nil {
 		return nil, err
@@ -108,6 +112,23 @@ func sourceKey(rs dal.RecordsetSource) string {
 		return a
 	}
 	return rs.Name()
+}
+
+// validateOrderSources rejects an ORDER BY FieldRef whose non-empty Source()
+// names no recordset in the query, before sorting (the sort callback cannot
+// return an error). A non-FieldRef key is not an error here — it is skipped
+// during the sort.
+func validateOrderSources(orderBy []dal.OrderExpression, known map[string]bool) error {
+	for _, oe := range orderBy {
+		f, ok := oe.Expression().(dal.FieldRef)
+		if !ok {
+			continue
+		}
+		if src := f.Source(); src != "" && !known[src] {
+			return fmt.Errorf("dalgo2memory: ORDER BY field %q references unknown source %q", f.Name(), src)
+		}
+	}
+	return nil
 }
 
 // orderJoinedRows stably sorts rows by the ORDER BY expressions in declared

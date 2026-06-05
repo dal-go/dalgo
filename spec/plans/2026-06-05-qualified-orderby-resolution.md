@@ -27,7 +27,7 @@ Build one ordering routine that resolves each `ORDER BY` `FieldRef` to its recor
 
 **Verifies:** qualified-orderby-resolution#ac:unresolvable-order-source-errors, qualified-orderby-resolution#ac:non-field-order-key-ignored
 **Depends-On:** 1
-**Status:** pending
+**Status:** done
 
 Validate the resolved `ORDER BY` keys before sorting (since the sort callback cannot return an error): an `ORDER BY` `FieldRef` whose non-empty source names no recordset returns a descriptive error and no rows, while a non-`FieldRef` expression is skipped as an ordering key with the remaining keys and base-id tiebreak still applied.
 

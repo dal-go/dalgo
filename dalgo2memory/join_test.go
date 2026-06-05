@@ -322,3 +322,20 @@ func TestExecuteJoin_OrderBy(t *testing.T) {
 		require.Equal(t, []float64{1, 1, 2}, idSeq(got))
 	})
 }
+
+// Task 2: ORDER BY edge handling.
+func TestExecuteJoin_OrderByEdges(t *testing.T) {
+	t.Run("unknown ORDER BY source errors", func(t *testing.T) {
+		db, ctx := seedForOrdering(t)
+		q := innerJoinQuery(dal.Ascending(dal.NewFieldRef("z", "foo")))
+		reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+		require.Nil(t, reader)
+		require.ErrorContains(t, err, "unknown source")
+	})
+
+	t.Run("non-field ORDER BY key is skipped, rows returned in base-id order", func(t *testing.T) {
+		db, ctx := seedForOrdering(t)
+		got := runJoinQuery(t, db, ctx, innerJoinQuery(dal.Ascending(dal.Constant{Value: 1})))
+		require.Equal(t, []float64{1, 1, 2}, idSeq(got))
+	})
+}
