@@ -1,9 +1,9 @@
 # Idea: First-class INNER/LEFT joins in dal's query model
 
-**Status:** Approved
+**Status:** Specifying
 **Date:** 2026-06-05
 **Owner:** alexander.trakhimenok
-**Promotes To:** —
+**Promotes To:** query-joins
 **Supersedes:** —
 **Related Ideas:** —
 
