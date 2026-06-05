@@ -33,6 +33,7 @@ func (f *from) NewQuery() *QueryBuilder {
 	for i, join := range f.joins {
 		f2.joins[i] = JoinedSource{
 			RecordsetSource: join.RecordsetSource,
+			joinType:        join.joinType,
 			on:              make([]Condition, len(join.on)),
 		}
 		copy(f2.joins[i].on, join.on)
@@ -51,9 +52,28 @@ func (f *from) Join(joint JoinedSource) FromSource {
 	return f
 }
 
+// JoinType enumerates the kinds of join. JoinInner and JoinLeft are
+// supported by executors; JoinRight, JoinFull and JoinCross are reserved
+// for future support and rejected at execution time until implemented.
+type JoinType string
+
+const (
+	JoinInner JoinType = "INNER"
+	JoinLeft  JoinType = "LEFT"
+	JoinRight JoinType = "RIGHT"
+	JoinFull  JoinType = "FULL"
+	JoinCross JoinType = "CROSS"
+)
+
 type JoinedSource struct {
 	RecordsetSource
-	on []Condition
+	joinType JoinType
+	on       []Condition
+}
+
+// JoinType returns the kind of join (INNER, LEFT, ...).
+func (j JoinedSource) JoinType() JoinType {
+	return j.joinType
 }
 
 func (j *JoinedSource) On() []Condition {

@@ -26,7 +26,7 @@ Add a source qualifier to `dal.FieldRef` and change the constructor to `NewField
 ### Task 2: Join-type enum on `JoinedSource`
 
 **Verifies:** query-joins#ac:join-type-readable
-**Status:** pending
+**Status:** done
 
 Introduce an exported join-type value (e.g. `dal.JoinType` with `JoinInner` and `JoinLeft`, leaving room for `RIGHT`/`FULL`/`CROSS`) carried on each `JoinedSource` and readable through its public API, so an INNER join is distinguishable from a LEFT join in the AST.
 
