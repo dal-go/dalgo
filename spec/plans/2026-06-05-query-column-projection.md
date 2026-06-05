@@ -1,6 +1,6 @@
 # Plan: Column selection in the query builder, projected by dalgo2memory
 
-**Status:** Under Review
+**Status:** Approved
 **Source Feature:** query-column-projection
 **Date:** 2026-06-05
 **Owner:** alex
