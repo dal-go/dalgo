@@ -55,3 +55,11 @@ func TestGroupCondition(t *testing.T) {
 		})
 	}
 }
+
+func TestNewGroupCondition(t *testing.T) {
+	a, b := String("a"), String("b")
+	gc := NewGroupCondition(And, a, b)
+	assert.Equal(t, Operator(And), gc.Operator())
+	assert.Equal(t, []Condition{a, b}, gc.Conditions())
+	assert.Equal(t, "('a' AND 'b')", gc.String())
+}

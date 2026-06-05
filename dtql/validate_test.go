@@ -13,13 +13,9 @@ import (
 // compileSchema compiles the generated DTQL JSON Schema for validation.
 func compileSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
-	schemaJSON, err := SchemaJSON()
-	if err != nil {
-		t.Fatalf("SchemaJSON: %v", err)
-	}
 	c := jsonschema.NewCompiler()
 	c.Draft = jsonschema.Draft2020
-	if err := c.AddResource(SchemaID, bytes.NewReader(schemaJSON)); err != nil {
+	if err := c.AddResource(SchemaID, bytes.NewReader(SchemaJSON())); err != nil {
 		t.Fatalf("AddResource: %v", err)
 	}
 	sch, err := c.Compile(SchemaID)
