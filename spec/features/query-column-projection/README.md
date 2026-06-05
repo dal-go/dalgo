@@ -1,11 +1,12 @@
 # Feature: Column selection in the query builder, projected by dalgo2memory
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-column-projection?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-column-projection?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-column-projection?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-column-projection?op=request-change) |
-**Status:** Under Review
+**Status:** Approved
 **Date:** 2026-06-05
 **Owner:** alex
 **Source Ideas:** query-column-projection
 **Supersedes:** —
+**Grade:** A
 
 ## Summary
 
