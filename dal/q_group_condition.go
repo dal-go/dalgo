@@ -10,6 +10,14 @@ type GroupCondition struct {
 	conditions []Condition
 }
 
+// NewGroupCondition creates a GroupCondition combining the given conditions with
+// a group operator (e.g. And or Or). It is the public constructor for the
+// otherwise unexported fields, enabling callers outside the dal package (such as
+// the dtql serializer) to reconstruct group conditions.
+func NewGroupCondition(operator Operator, conditions ...Condition) GroupCondition {
+	return GroupCondition{operator: operator, conditions: conditions}
+}
+
 func (v GroupCondition) Operator() Operator {
 	return v.operator
 }
