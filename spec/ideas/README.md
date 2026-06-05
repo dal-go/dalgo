@@ -12,7 +12,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [dal-records-reader-iter-seq](dal-records-reader-iter-seq.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
-| [first-class-query-joins](first-class-query-joins.md) | Specifying | 2026-06-05 | alexander.trakhimenok | query-joins |
+| [first-class-query-joins](first-class-query-joins.md) | Specified | 2026-06-05 | alexander.trakhimenok | query-joins |
 | [recordops](recordops.md) | Approved | 2026-05-15 | alex | — |
 | [recordset-computed-columns](recordset-computed-columns.md) | Specified | 2026-06-02 | alex | recordset-computed-columns |
 | [transaction-message](transaction-message.md) | Approved | 2026-06-02 | alex | — |
