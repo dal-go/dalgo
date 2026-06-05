@@ -11,7 +11,7 @@ import (
 
 // joinedRow is one row of a join result: the base record id, the per-source
 // data used to resolve qualified fields, and a flat merge of both sources
-// used to build the output record. For an unmatched LEFT row the joined
+// used as the output record data. For an unmatched LEFT row the joined
 // source's data is nil.
 type joinedRow struct {
 	baseID  string
@@ -21,7 +21,7 @@ type joinedRow struct {
 
 // executeJoinQuery executes a StructuredQuery whose From carries a single
 // INNER or LEFT equi-join, via a nested loop over the two in-memory
-// collections with source-qualified field resolution.
+// collections with source-qualified field resolution for ON and WHERE.
 func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, error) {
 	from := q.From()
 	joins := from.Joins()
@@ -38,14 +38,14 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 
 	base := from.Base()
 	baseKey := sourceKey(base)
-	joinKey := sourceKey(join.RecordsetSource)
+	joinKey := sourceKey(join)
 	known := map[string]bool{"": true, baseKey: true, joinKey: true}
 
 	baseRows, err := s.loadRows(base.Name())
 	if err != nil {
 		return nil, err
 	}
-	joinRows, err := s.loadRows(join.RecordsetSource.Name())
+	joinRows, err := s.loadRows(join.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 		matched := false
 		for _, jr := range joinRows {
 			sources := map[string]map[string]any{"": br.data, baseKey: br.data, joinKey: jr.data}
-			ok, err := evalJoinConditions(join.On(), sources, known)
+			ok, err := allConditionsMatch(join.On(), sources, known)
 			if err != nil {
 				return nil, err
 			}
@@ -74,7 +74,7 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 
 	filtered := make([]joinedRow, 0, len(combined))
 	for _, row := range combined {
-		ok, err := matchesWhereJoined(q.Where(), row.sources, known)
+		ok, err := matchesJoinCondition(q.Where(), row.sources, known)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 		}
 	}
 
-	orderJoinedRows(filtered, q.OrderBy())
+	sort.SliceStable(filtered, func(i, j int) bool { return filtered[i].baseID < filtered[j].baseID })
 
 	if limit := q.Limit(); limit > 0 && limit < len(filtered) {
 		filtered = filtered[:limit]
@@ -92,20 +92,11 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 	records := make([]dal.Record, 0, len(filtered))
 	for _, row := range filtered {
 		key := dal.NewKeyWithID(base.Name(), row.baseID)
-		template := q.IntoRecord()
-		if template == nil {
+		if q.IntoRecord() == nil {
 			records = append(records, dal.NewRecord(key).SetError(nil))
 			continue
 		}
-		b, err := json.Marshal(row.merged)
-		if err != nil {
-			return nil, err
-		}
-		data := template.Data()
-		if err := json.Unmarshal(b, data); err != nil {
-			return nil, err
-		}
-		records = append(records, dal.NewRecordWithData(key, data).SetError(nil))
+		records = append(records, dal.NewRecordWithData(key, row.merged).SetError(nil))
 	}
 	return dal.NewRecordsReader(records), nil
 }
@@ -162,9 +153,10 @@ func resolveJoinExpr(e dal.Expression, sources map[string]map[string]any, known 
 	}
 }
 
-func evalJoinConditions(conds []dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
+// allConditionsMatch reports whether every ON condition holds (AND).
+func allConditionsMatch(conds []dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
 	for _, c := range conds {
-		ok, err := matchesWhereJoined(c, sources, known)
+		ok, err := matchesJoinCondition(c, sources, known)
 		if err != nil {
 			return false, err
 		}
@@ -175,55 +167,26 @@ func evalJoinConditions(conds []dal.Condition, sources map[string]map[string]any
 	return true, nil
 }
 
-func matchesWhereJoined(cond dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
+// matchesJoinCondition evaluates a single equality Comparison over the
+// per-source data. A nil condition matches; any non-equality shape does not
+// (mirroring the in-memory adapter's single-source WHERE support).
+func matchesJoinCondition(cond dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
 	if cond == nil {
 		return true, nil
 	}
-	switch c := cond.(type) {
-	case dal.Comparison:
-		if c.Operator != dal.Equal {
-			return false, nil
-		}
-		l, lok, err := resolveJoinExpr(c.Left, sources, known)
-		if err != nil {
-			return false, err
-		}
-		r, rok, err := resolveJoinExpr(c.Right, sources, known)
-		if err != nil {
-			return false, err
-		}
-		return lok && rok && valuesEqual(l, r), nil
-	case dal.GroupCondition:
-		return matchesGroupJoined(c, sources, known)
-	default:
+	cmp, ok := cond.(dal.Comparison)
+	if !ok || cmp.Operator != dal.Equal {
 		return false, nil
 	}
-}
-
-func matchesGroupJoined(g dal.GroupCondition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
-	conds := g.Conditions()
-	if g.Operator() == dal.Or {
-		for _, c := range conds {
-			ok, err := matchesWhereJoined(c, sources, known)
-			if err != nil {
-				return false, err
-			}
-			if ok {
-				return true, nil
-			}
-		}
-		return false, nil
+	l, lok, err := resolveJoinExpr(cmp.Left, sources, known)
+	if err != nil {
+		return false, err
 	}
-	for _, c := range conds { // And (default)
-		ok, err := matchesWhereJoined(c, sources, known)
-		if err != nil {
-			return false, err
-		}
-		if !ok {
-			return false, nil
-		}
+	r, rok, err := resolveJoinExpr(cmp.Right, sources, known)
+	if err != nil {
+		return false, err
 	}
-	return true, nil
+	return lok && rok && valuesEqual(l, r), nil
 }
 
 func valuesEqual(a, b any) bool {
@@ -233,22 +196,4 @@ func valuesEqual(a, b any) bool {
 		}
 	}
 	return a == b
-}
-
-func orderJoinedRows(rows []joinedRow, orderBy []dal.OrderExpression) {
-	if len(orderBy) == 0 {
-		sort.SliceStable(rows, func(i, j int) bool { return rows[i].baseID < rows[j].baseID })
-		return
-	}
-	field, ok := orderBy[0].Expression().(dal.FieldRef)
-	if !ok {
-		return
-	}
-	sort.SliceStable(rows, func(i, j int) bool {
-		cmp := compare(rows[i].merged[field.Name()], rows[j].merged[field.Name()])
-		if orderBy[0].Descending() {
-			return cmp > 0
-		}
-		return cmp < 0
-	})
 }
