@@ -31,3 +31,15 @@ func (q fakeQuery) StartFrom() dal.Cursor          { return q.startFrom }
 func rootFrom() dal.FromSource {
 	return dal.From(dal.NewRootCollectionRef("users", ""))
 }
+
+// unsupportedExpr is a dal.Expression (fmt.Stringer) that DTQL does not cover —
+// used to drive the "unsupported expression" rejection paths.
+type unsupportedExpr struct{}
+
+func (unsupportedExpr) String() string { return "UNSUPPORTED_EXPR" }
+
+// unsupportedCond is a dal.Condition (fmt.Stringer) that is neither a Comparison
+// nor a GroupCondition — used to drive the "unsupported condition" path.
+type unsupportedCond struct{}
+
+func (unsupportedCond) String() string { return "UNSUPPORTED_COND" }

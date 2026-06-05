@@ -12,9 +12,3 @@ var inScopeComparisonOps = map[dal.Operator]bool{
 	dal.LessThen:       true, // <
 	dal.LessOrEqual:    true, // <=
 }
-
-// inScopeGroupOps is the set of dal group operators DTQL represents.
-var inScopeGroupOps = map[dal.Operator]bool{
-	dal.And: true, // AND
-	dal.Or:  true, // OR
-}

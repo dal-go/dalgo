@@ -24,7 +24,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Regenerate schema from Go types
-        run: go run ./dtql/cmd/gen-schema
+        run: go test ./dtql/ -run TestSchemaIsFresh -update
       - name: Fail if the committed schema is stale
         run: git diff --exit-code dtql/schema
       - name: Run DTQL tests (schema freshness, examples deserialize + validate)

@@ -3,7 +3,6 @@ package dtql
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"sort"
 
 	"gopkg.in/yaml.v3"
@@ -137,25 +136,20 @@ func comparisonOpEnum() []any {
 	return enum
 }
 
-// SchemaJSON renders the DTQL JSON Schema as canonical, indented JSON.
-func SchemaJSON() ([]byte, error) {
-	b, err := json.MarshalIndent(schemaDocument(), "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("marshal schema JSON: %w", err)
-	}
-	return append(b, '\n'), nil
+// SchemaJSON renders the DTQL JSON Schema as canonical, indented JSON. The
+// schema document holds only strings, bools, ints, slices and maps, so
+// marshaling cannot fail.
+func SchemaJSON() []byte {
+	b, _ := json.MarshalIndent(schemaDocument(), "", "  ")
+	return append(b, '\n')
 }
 
 // SchemaYAML renders the DTQL JSON Schema as canonical YAML (identical content).
-func SchemaYAML() ([]byte, error) {
+func SchemaYAML() []byte {
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
-	if err := enc.Encode(schemaDocument()); err != nil {
-		return nil, fmt.Errorf("marshal schema YAML: %w", err)
-	}
-	if err := enc.Close(); err != nil {
-		return nil, fmt.Errorf("finalize schema YAML: %w", err)
-	}
-	return buf.Bytes(), nil
+	_ = enc.Encode(schemaDocument())
+	_ = enc.Close()
+	return buf.Bytes()
 }

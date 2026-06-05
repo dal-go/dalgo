@@ -42,7 +42,7 @@ jobs:
 
       # The schema is regenerated so the published artifact cannot be stale.
       - name: Regenerate schema from the Go types
-        run: go run ./dtql/cmd/gen-schema
+        run: go test ./dtql/ -run TestSchemaIsFresh -update
 
       - name: Assemble the /dtql/ subtree from generated artifacts
         run: |

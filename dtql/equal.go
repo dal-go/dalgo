@@ -11,7 +11,9 @@ import (
 // (including inline Constant/Array values), OrderBy, Limit and Offset. It compares
 // via the dal accessor interface, so it is agnostic to the concrete query type
 // (e.g. a builder query vs. a deserialized one). It is the equality mechanism
-// behind the structural round-trip guarantee.
+// behind the structural round-trip guarantee. The in-scope dal nodes are value
+// types (Comparison, GroupCondition, FieldRef, Constant, Array), so the type
+// switches handle the value forms.
 func Equal(a, b dal.StructuredQuery) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
@@ -44,14 +46,8 @@ func fromEqual(a, b dal.FromSource) bool {
 }
 
 func rootCollection(from dal.FromSource) (dal.CollectionRef, bool) {
-	switch base := from.Base().(type) {
-	case dal.CollectionRef:
-		return base, true
-	case *dal.CollectionRef:
-		return *base, true
-	default:
-		return dal.CollectionRef{}, false
-	}
+	base, ok := from.Base().(dal.CollectionRef)
+	return base, ok
 }
 
 func columnsEqual(a, b []dal.Column) bool {
@@ -84,38 +80,24 @@ func condEqual(a, b dal.Condition) bool {
 		return b == nil
 	case dal.Comparison:
 		return comparisonEqual(ac, b)
-	case *dal.Comparison:
-		return comparisonEqual(*ac, b)
 	case dal.GroupCondition:
 		return groupEqual(ac, b)
-	case *dal.GroupCondition:
-		return groupEqual(*ac, b)
 	default:
 		return false
 	}
 }
 
 func comparisonEqual(a dal.Comparison, b dal.Condition) bool {
-	var bc dal.Comparison
-	switch v := b.(type) {
-	case dal.Comparison:
-		bc = v
-	case *dal.Comparison:
-		bc = *v
-	default:
+	bc, ok := b.(dal.Comparison)
+	if !ok {
 		return false
 	}
 	return a.Operator == bc.Operator && exprEqual(a.Left, bc.Left) && exprEqual(a.Right, bc.Right)
 }
 
 func groupEqual(a dal.GroupCondition, b dal.Condition) bool {
-	var bg dal.GroupCondition
-	switch v := b.(type) {
-	case dal.GroupCondition:
-		bg = v
-	case *dal.GroupCondition:
-		bg = *v
-	default:
+	bg, ok := b.(dal.GroupCondition)
+	if !ok {
 		return false
 	}
 	if a.Operator() != bg.Operator() {
@@ -136,50 +118,14 @@ func groupEqual(a dal.GroupCondition, b dal.Condition) bool {
 func exprEqual(a, b dal.Expression) bool {
 	switch ae := a.(type) {
 	case dal.FieldRef:
-		return fieldRefEqual(ae, b)
-	case *dal.FieldRef:
-		return fieldRefEqual(*ae, b)
+		bv, ok := b.(dal.FieldRef)
+		return ok && ae.Equal(bv)
 	case dal.Constant:
-		return constantEqual(ae, b)
-	case *dal.Constant:
-		return constantEqual(*ae, b)
+		bv, ok := b.(dal.Constant)
+		return ok && reflect.DeepEqual(ae.Value, bv.Value)
 	case dal.Array:
-		return arrayEqual(ae, b)
-	case *dal.Array:
-		return arrayEqual(*ae, b)
-	default:
-		return false
-	}
-}
-
-func fieldRefEqual(a dal.FieldRef, b dal.Expression) bool {
-	switch v := b.(type) {
-	case dal.FieldRef:
-		return a.Equal(v)
-	case *dal.FieldRef:
-		return a.Equal(*v)
-	default:
-		return false
-	}
-}
-
-func constantEqual(a dal.Constant, b dal.Expression) bool {
-	switch v := b.(type) {
-	case dal.Constant:
-		return reflect.DeepEqual(a.Value, v.Value)
-	case *dal.Constant:
-		return reflect.DeepEqual(a.Value, v.Value)
-	default:
-		return false
-	}
-}
-
-func arrayEqual(a dal.Array, b dal.Expression) bool {
-	switch v := b.(type) {
-	case dal.Array:
-		return a.Equal(v)
-	case *dal.Array:
-		return a.Equal(*v)
+		bv, ok := b.(dal.Array)
+		return ok && ae.Equal(bv)
 	default:
 		return false
 	}
