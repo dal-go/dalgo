@@ -145,14 +145,13 @@ func mergeData(base, join map[string]any) map[string]any {
 
 // resolveJoinExpr resolves a FieldRef against the per-source data, or returns
 // a Constant's value. An empty source denotes the From base. A non-empty
-// source that names no recordset in the query is treated as absent here; Task
-// 6 turns that into a descriptive error.
+// source that names no recordset in the query is a descriptive error.
 func resolveJoinExpr(e dal.Expression, sources map[string]map[string]any, known map[string]bool) (any, bool, error) {
 	switch v := e.(type) {
 	case dal.FieldRef:
 		src := v.Source()
 		if !known[src] {
-			return nil, false, nil
+			return nil, false, fmt.Errorf("dalgo2memory: field %q references unknown source %q", v.Name(), src)
 		}
 		val, present := sources[src][v.Name()]
 		return val, present, nil

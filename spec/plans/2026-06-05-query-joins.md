@@ -54,7 +54,7 @@ Add LEFT semantics on top of Task 4's resolver and loop: emit every `From`-base 
 ### Task 6: `dalgo2memory` error paths for unsupported and unresolvable shapes
 
 **Verifies:** query-joins#ac:unsupported-join-errors, query-joins#ac:unresolvable-source-errors
-**Status:** pending
+**Status:** done
 
 Return descriptive, row-suppressing errors when `dalgo2memory` meets a join type it does not support (anything other than INNER/LEFT, including a chained second join) or a non-empty field `src` that matches no recordset in the query, rather than silently producing wrong or empty results.
 

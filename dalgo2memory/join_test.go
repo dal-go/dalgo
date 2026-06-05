@@ -118,3 +118,44 @@ func TestExecuteJoin_QualifiedResolutionInWhere(t *testing.T) {
 		require.Equal(t, "shipped", *r.Status, "o.status must resolve to the order's value, not the user's 'active'")
 	}
 }
+
+// Task 6: unsupported join type or a chained second join errors, no rows.
+func TestExecuteJoin_UnsupportedJoinErrors(t *testing.T) {
+	db, ctx := seedUsersOrders(t)
+	users := dal.NewRootCollectionRef("users", "u")
+	orders := dal.NewRootCollectionRef("orders", "o")
+
+	t.Run("reserved RIGHT type", func(t *testing.T) {
+		right := dal.NewJoinedSource(orders, dal.JoinRight, onUserEqOrder())
+		q := dal.From(users).Join(right).NewQuery().SelectIntoRecord(intoJoinResult())
+		reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+		require.Nil(t, reader)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unsupported join type")
+	})
+
+	t.Run("chained second join", func(t *testing.T) {
+		j1 := dal.NewJoinedSource(orders, dal.JoinInner, onUserEqOrder())
+		j2 := dal.NewJoinedSource(orders, dal.JoinInner, onUserEqOrder())
+		q := dal.From(users).Join(j1).Join(j2).NewQuery().SelectIntoRecord(intoJoinResult())
+		reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+		require.Nil(t, reader)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "single join")
+	})
+}
+
+// Task 6: a field qualified with a source naming no recordset errors, no rows.
+func TestExecuteJoin_UnresolvableSourceErrors(t *testing.T) {
+	db, ctx := seedUsersOrders(t)
+	users := dal.NewRootCollectionRef("users", "u")
+	orders := dal.NewRootCollectionRef("orders", "o")
+	join := dal.NewJoinedSource(orders, dal.JoinLeft, onUserEqOrder())
+	where := dal.NewComparison(dal.NewFieldRef("x", "foo"), dal.Equal, dal.Constant{Value: 1})
+	q := dal.From(users).Join(join).NewQuery().Where(where).SelectIntoRecord(intoJoinResult())
+
+	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+	require.Nil(t, reader)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown source")
+}
