@@ -19,7 +19,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [dtql](dtql/README.md) | Approved | — |
 | [query-joins](query-joins/README.md) | Approved | — |
 | [qualified-orderby-resolution](qualified-orderby-resolution/README.md) | Approved | — |
-| [query-column-projection](query-column-projection/README.md) | Approved | — |
+| [query-column-projection](query-column-projection/README.md) | Stable | — |
 
 ## Open Questions
 
