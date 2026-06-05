@@ -1,6 +1,6 @@
 # Plan: Source-qualified, multi-key ORDER BY resolution in dalgo2memory
 
-**Status:** Approved
+**Status:** Implementing
 **Source Feature:** qualified-orderby-resolution
 **Date:** 2026-06-05
 **Owner:** alex
@@ -19,6 +19,7 @@ The Feature is one comparator used at two call sites, so the order is build-then
 ### Task 1: Shared source-aware multi-key comparator, adopted by the join executor
 
 **Verifies:** qualified-orderby-resolution#ac:join-orders-by-qualified-key, qualified-orderby-resolution#ac:orders-by-multiple-keys, qualified-orderby-resolution#ac:tiebreak-no-order-by, qualified-orderby-resolution#ac:tiebreak-all-keys-equal
+**Status:** done
 
 Build one ordering routine that resolves each `ORDER BY` `FieldRef` to its recordset (empty `Source()` -> base; non-empty -> the source whose `Alias()`/`Name()` matches, reusing the join WHERE resolver), stably sorts rows key-by-key in declared order honoring each `Descending()` via the existing `compare()`, and falls back to ascending base record id. Replace the join executor's base-id-only `sort.SliceStable` with it.
 
@@ -26,6 +27,7 @@ Build one ordering routine that resolves each `ORDER BY` `FieldRef` to its recor
 
 **Verifies:** qualified-orderby-resolution#ac:unresolvable-order-source-errors, qualified-orderby-resolution#ac:non-field-order-key-ignored
 **Depends-On:** 1
+**Status:** pending
 
 Validate the resolved `ORDER BY` keys before sorting (since the sort callback cannot return an error): an `ORDER BY` `FieldRef` whose non-empty source names no recordset returns a descriptive error and no rows, while a non-`FieldRef` expression is skipped as an ordering key with the remaining keys and base-id tiebreak still applied.
 
@@ -33,6 +35,7 @@ Validate the resolved `ORDER BY` keys before sorting (since the sort callback ca
 
 **Verifies:** qualified-orderby-resolution#ac:single-source-order-unchanged, qualified-orderby-resolution#ac:single-source-unresolvable-order-source
 **Depends-On:** 1
+**Status:** pending
 
 Route `ExecuteQueryToRecordsReader` through the shared comparator and remove `sortRows`, resolving an empty/base-matching `Source()` against the single base recordset so existing unqualified ordering (ascending and descending) is unchanged, and a non-empty source that matches neither the base alias nor name errors — the same rule as joins.
 

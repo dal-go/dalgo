@@ -83,7 +83,7 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 		}
 	}
 
-	sort.SliceStable(filtered, func(i, j int) bool { return filtered[i].baseID < filtered[j].baseID })
+	orderJoinedRows(filtered, q.OrderBy())
 
 	if limit := q.Limit(); limit > 0 && limit < len(filtered) {
 		filtered = filtered[:limit]
@@ -108,6 +108,30 @@ func sourceKey(rs dal.RecordsetSource) string {
 		return a
 	}
 	return rs.Name()
+}
+
+// orderJoinedRows stably sorts rows by the ORDER BY expressions in declared
+// order, resolving each FieldRef key against its source (empty Source() -> the
+// base, carried under the "" key of each row's sources map; non-empty -> the
+// recordset whose Alias()/Name() it matches). Each key honors its Descending()
+// flag; a non-FieldRef key is skipped; ties fall back to the base record id.
+func orderJoinedRows(rows []joinedRow, orderBy []dal.OrderExpression) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		for _, oe := range orderBy {
+			f, ok := oe.Expression().(dal.FieldRef)
+			if !ok {
+				continue
+			}
+			c := compare(rows[i].sources[f.Source()][f.Name()], rows[j].sources[f.Source()][f.Name()])
+			if oe.Descending() {
+				c = -c
+			}
+			if c != 0 {
+				return c < 0
+			}
+		}
+		return rows[i].baseID < rows[j].baseID
+	})
 }
 
 func (s session) loadRows(collectionName string) ([]memoryRow, error) {

@@ -245,3 +245,80 @@ func TestExecuteJoin_EdgeCases(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// seedForOrdering loads three matched rows with distinct amounts/status; users
+// carry a colliding "status" field ("zuser") to exercise qualified resolution.
+func seedForOrdering(t *testing.T) (*database, context.Context) {
+	t.Helper()
+	db := NewDB().(*database)
+	ctx := context.Background()
+	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "status": "zuser"})))
+	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "status": "zuser"})))
+	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "oa"), &map[string]any{"userId": 1, "amount": 30, "status": "c"})))
+	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "ob"), &map[string]any{"userId": 1, "amount": 10, "status": "a"})))
+	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "oc"), &map[string]any{"userId": 2, "amount": 20, "status": "b"})))
+	return db, ctx
+}
+
+func amountSeq(rows []map[string]any) []float64 {
+	out := make([]float64, len(rows))
+	for i, r := range rows {
+		out[i] = r["amount"].(float64)
+	}
+	return out
+}
+
+func idSeq(rows []map[string]any) []float64 {
+	out := make([]float64, len(rows))
+	for i, r := range rows {
+		out[i] = r["id"].(float64)
+	}
+	return out
+}
+
+func innerJoinQuery(order ...dal.OrderExpression) dal.Query {
+	join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+	return dal.From(usersAlias()).Join(join).NewQuery().OrderBy(order...).SelectIntoRecord(intoMapRecord())
+}
+
+// Task 1: source-qualified, multi-key ordering with base-id tiebreak.
+func TestExecuteJoin_OrderBy(t *testing.T) {
+	t.Run("by qualified numeric key ascending", func(t *testing.T) {
+		db, ctx := seedForOrdering(t)
+		got := runJoinQuery(t, db, ctx, innerJoinQuery(dal.Ascending(dal.NewFieldRef("o", "amount"))))
+		require.Equal(t, []float64{10, 20, 30}, amountSeq(got))
+	})
+
+	t.Run("by qualified colliding key uses the order's source", func(t *testing.T) {
+		db, ctx := seedForOrdering(t)
+		got := runJoinQuery(t, db, ctx, innerJoinQuery(dal.Ascending(dal.NewFieldRef("o", "status"))))
+		// o.status a,b,c -> amounts 10,20,30; status values are the order's, not "zuser".
+		require.Equal(t, []float64{10, 20, 30}, amountSeq(got))
+		for _, r := range got {
+			require.NotEqual(t, "zuser", r["status"])
+		}
+	})
+
+	t.Run("multiple keys: u.id asc then o.amount desc", func(t *testing.T) {
+		db, ctx := seedForOrdering(t)
+		got := runJoinQuery(t, db, ctx, innerJoinQuery(
+			dal.Ascending(dal.NewFieldRef("u", "id")),
+			dal.Descending(dal.NewFieldRef("o", "amount")),
+		))
+		require.Equal(t, []float64{1, 1, 2}, idSeq(got))
+		require.Equal(t, []float64{30, 10, 20}, amountSeq(got))
+	})
+
+	t.Run("no ORDER BY falls back to base-id order", func(t *testing.T) {
+		db, ctx := seedForOrdering(t)
+		got := runJoinQuery(t, db, ctx, innerJoinQuery())
+		require.Equal(t, []float64{1, 1, 2}, idSeq(got))
+	})
+
+	t.Run("all keys equal falls back to base-id order", func(t *testing.T) {
+		db, ctx := seedForOrdering(t)
+		// u.status is "zuser" for every row -> all equal -> base-id tiebreak.
+		got := runJoinQuery(t, db, ctx, innerJoinQuery(dal.Ascending(dal.NewFieldRef("u", "status"))))
+		require.Equal(t, []float64{1, 1, 2}, idSeq(got))
+	})
+}
