@@ -273,6 +273,9 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err := validateOrderSources(q.OrderBy(), known); err != nil {
 		return nil, err
 	}
+	if err := validateColumns(q.Columns(), known); err != nil {
+		return nil, err
+	}
 	rows := make([]memoryRow, 0, len(collection))
 	for id, b := range collection {
 		var data map[string]any
@@ -286,19 +289,20 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	}
 	orderBySources(rows, q.OrderBy(),
 		func(r memoryRow) map[string]map[string]any {
-			src := map[string]map[string]any{"": r.data, base.Name(): r.data}
-			if a := base.Alias(); a != "" {
-				src[a] = r.data
-			}
-			return src
+			return baseSources(base, r.data)
 		},
 		func(r memoryRow) string { return r.id })
 	if limit := q.Limit(); limit > 0 && limit < len(rows) {
 		rows = rows[:limit]
 	}
+	columns := q.Columns()
 	records := make([]dal.Record, len(rows))
 	for i, row := range rows {
 		key := dal.NewKeyWithID(collectionName, row.id)
+		if len(columns) > 0 {
+			records[i] = dal.NewRecordWithData(key, projectRow(columns, baseSources(base, row.data))).SetError(nil)
+			continue
+		}
 		template := q.IntoRecord()
 		if template == nil {
 			records[i] = dal.NewRecord(key).SetError(nil)

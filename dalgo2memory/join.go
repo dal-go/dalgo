@@ -44,6 +44,9 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 	if err := validateOrderSources(q.OrderBy(), known); err != nil {
 		return nil, err
 	}
+	if err := validateColumns(q.Columns(), known); err != nil {
+		return nil, err
+	}
 
 	baseRows, err := s.loadRows(base.Name())
 	if err != nil {
@@ -93,9 +96,14 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 		filtered = filtered[:limit]
 	}
 
+	columns := q.Columns()
 	records := make([]dal.Record, 0, len(filtered))
 	for _, row := range filtered {
 		key := dal.NewKeyWithID(base.Name(), row.baseID)
+		if len(columns) > 0 {
+			records = append(records, dal.NewRecordWithData(key, projectRow(columns, row.sources)).SetError(nil))
+			continue
+		}
 		if q.IntoRecord() == nil {
 			records = append(records, dal.NewRecord(key).SetError(nil))
 			continue

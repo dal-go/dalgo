@@ -23,6 +23,7 @@ type IQueryBuilder interface {
 	SelectIntoRecord(func() Record) StructuredQuery
 	SelectIntoRecordset(options ...recordset.Option) StructuredQuery
 	SelectKeysOnly(idKind reflect.Kind) StructuredQuery
+	SelectColumns(columns ...Column) StructuredQuery
 	StartFrom(cursor Cursor) IQueryBuilder
 }
 
@@ -109,6 +110,12 @@ func (s *QueryBuilder) SelectIntoRecordset(options ...recordset.Option) Structur
 func (s *QueryBuilder) SelectKeysOnly(idKind reflect.Kind) StructuredQuery {
 	q := s.newQuery()
 	q.idKind = idKind
+	return q
+}
+
+func (s *QueryBuilder) SelectColumns(columns ...Column) StructuredQuery {
+	q := s.newQuery()
+	q.columns = columns
 	return q
 }
 
