@@ -1,6 +1,6 @@
 # Plan: Column selection in the query builder, projected by dalgo2memory
 
-**Status:** Approved
+**Status:** Implementing
 **Source Feature:** query-column-projection
 **Date:** 2026-06-05
 **Owner:** alex
@@ -19,6 +19,7 @@ The Feature is a builder capability plus an executor that honors it, so the orde
 ### Task 1: SelectColumns terminal on dal.QueryBuilder
 
 **Verifies:** query-column-projection#ac:select-columns-recorded
+**Status:** done
 
 Add `SelectColumns(columns ...dal.Column) dal.StructuredQuery` to `QueryBuilder` and the `IQueryBuilder` interface, recording the ordered column list on the `StructuredQuery` via `newQuery()` (mirroring the existing `Select*` terminals), so `Columns()` returns them while queries built by any other terminal report an empty `Columns()`.
 
