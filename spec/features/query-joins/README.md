@@ -155,7 +155,7 @@ From the source Idea `first-class-query-joins`:
 
 ## Rehearse Integration
 
-All eight ACs are testable through pure Go surfaces — `dal` constructor/accessor calls and `dalgo2memory` query execution over in-memory maps — so they map directly to table tests in `dal/` and `dalgo2memory/` (see `## Testing Strategy`). Per-AC Rehearse stub files are intentionally **deferred to the Plan**, where each AC becomes a concrete `*_test.go` case; the rehearsal surface is the Go test suite rather than standalone scenario docs.
+All nine ACs are testable through pure Go surfaces — `dal` constructor/accessor calls and `dalgo2memory` query execution over in-memory maps — so they map directly to table tests in `dal/` and `dalgo2memory/` (see `## Testing Strategy`). Per-AC Rehearse stub files are intentionally **deferred to the Plan**, where each AC becomes a concrete `*_test.go` case; the rehearsal surface is the Go test suite rather than standalone scenario docs.
 
 ## Open Questions
 
