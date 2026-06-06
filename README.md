@@ -262,7 +262,7 @@ Start with these topic pages when you need more than the README:
 - [`inmemdb`](https://github.com/inmemdb) - in-memory database tooling.
 - [`strongo/bots-framework`](https://github.com/strongo/bots-framework) -
   framework for building chatbots.
-- [`datatug-cli`](https://github.com/datatug/datatug-cli) - context-aware data
+- [`DataTug`](https://github.com/datatug) - context-aware data
   viewer and collaborative query manager.
 
 ## 🤝 Contributing
