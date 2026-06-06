@@ -75,8 +75,10 @@ func (db *database) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Q
 	return session{db: db}.ExecuteQueryToRecordsReader(ctx, query)
 }
 
-func (db *database) ExecuteQueryToRecordsetReader(context.Context, dal.Query, ...recordset.Option) (dal.RecordsetReader, error) {
-	return nil, dal.ErrNotSupported
+func (db *database) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	return session{db: db}.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
 func (db *database) Set(ctx context.Context, record dal.Record) error {
@@ -325,10 +327,6 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		records[i] = dal.NewRecordWithData(key, data).SetError(nil)
 	}
 	return dal.NewRecordsReader(records), nil
-}
-
-func (s session) ExecuteQueryToRecordsetReader(context.Context, dal.Query, ...recordset.Option) (dal.RecordsetReader, error) {
-	return nil, dal.ErrNotSupported
 }
 
 var _ dal.ReadwriteTransaction = (*session)(nil)
