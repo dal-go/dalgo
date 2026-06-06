@@ -20,6 +20,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [query-joins](query-joins/README.md) | Approved | — |
 | [qualified-orderby-resolution](qualified-orderby-resolution/README.md) | Approved | — |
 | [query-column-projection](query-column-projection/README.md) | Stable | — |
+| [query-group-by-aggregation](query-group-by-aggregation/README.md) | Implementing | — |
 
 ## Open Questions
 

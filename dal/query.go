@@ -38,6 +38,9 @@ type StructuredQuery interface {
 	// GroupBy defines expressions to group by
 	GroupBy() []Expression
 
+	// Having defines a post-aggregation filter condition
+	Having() Condition
+
 	// OrderBy defines expressions to order by
 	OrderBy() []OrderExpression
 

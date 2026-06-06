@@ -19,6 +19,8 @@ type IQueryBuilder interface {
 	Where(conditions ...Condition) IQueryBuilder
 	WhereField(name string, operator Operator, v any) IQueryBuilder
 	WhereInArrayField(name string, v any) IQueryBuilder
+	GroupBy(expressions ...Expression) IQueryBuilder
+	Having(conditions ...Condition) IQueryBuilder
 	OrderBy(expressions ...OrderExpression) IQueryBuilder
 	SelectIntoRecord(func() Record) StructuredQuery
 	SelectIntoRecordset(options ...recordset.Option) StructuredQuery
@@ -50,7 +52,8 @@ type QueryBuilder struct {
 	//recordsetSource RecordsetSource
 	//offset          int
 	//limit           int
-	conditions []Condition
+	conditions       []Condition
+	havingConditions []Condition
 	//orderBy         []OrderExpression
 	//startCursor     Cursor
 }
@@ -82,6 +85,16 @@ func (s *QueryBuilder) OrderBy(expressions ...OrderExpression) IQueryBuilder {
 
 func (s *QueryBuilder) Where(conditions ...Condition) IQueryBuilder {
 	s.conditions = append(s.conditions, conditions...)
+	return s
+}
+
+func (s *QueryBuilder) GroupBy(expressions ...Expression) IQueryBuilder {
+	s.q.groupBy = append(s.q.groupBy, expressions...)
+	return s
+}
+
+func (s *QueryBuilder) Having(conditions ...Condition) IQueryBuilder {
+	s.havingConditions = append(s.havingConditions, conditions...)
 	return s
 }
 
@@ -126,6 +139,13 @@ func (s *QueryBuilder) newQuery() structuredQuery {
 		s.q.where = s.conditions[0]
 	default:
 		s.q.where = GroupCondition{conditions: s.conditions, operator: And}
+	}
+	switch len(s.havingConditions) {
+	case 0: // no having conditions
+	case 1:
+		s.q.having = s.havingConditions[0]
+	default:
+		s.q.having = GroupCondition{conditions: s.havingConditions, operator: And}
 	}
 	return s.q
 }

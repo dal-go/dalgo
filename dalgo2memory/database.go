@@ -273,8 +273,11 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err := validateOrderSources(q.OrderBy(), known); err != nil {
 		return nil, err
 	}
-	if err := validateColumns(q.Columns(), known); err != nil {
-		return nil, err
+	grouped := len(q.GroupBy()) > 0
+	if !grouped {
+		if err := validateColumns(q.Columns(), known); err != nil {
+			return nil, err
+		}
 	}
 	rows := make([]memoryRow, 0, len(collection))
 	for id, b := range collection {
@@ -286,6 +289,13 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 			continue
 		}
 		rows = append(rows, memoryRow{id: id, data: data, raw: b})
+	}
+	if grouped {
+		srcs := make([]rowSources, len(rows))
+		for i, row := range rows {
+			srcs[i] = baseSources(base, row.data)
+		}
+		return executeGroupedReader(q, srcs, collectionName, known)
 	}
 	orderBySources(rows, q.OrderBy(),
 		func(r memoryRow) map[string]map[string]any {
