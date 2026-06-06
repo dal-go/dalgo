@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dal-go/dalgo/constant"
 	"github.com/dal-go/dalgo/recordset"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,7 +30,7 @@ func TestSelect(t *testing.T) {
 			name: "select_1",
 			q: structuredQuery{
 				columns: []Column{
-					{Expression: constant.Int(1)},
+					{Expression: Constant{Value: 1}},
 				},
 			},
 			want: "SELECT 1",
@@ -40,7 +39,7 @@ func TestSelect(t *testing.T) {
 			name: "select_'abc'_AS_first_col",
 			q: structuredQuery{
 				columns: []Column{
-					{Expression: constant.Str("abc"), Alias: "first_col"},
+					{Expression: Constant{Value: "abc"}, Alias: "first_col"},
 				},
 			},
 			want: "SELECT 'abc' AS first_col",
