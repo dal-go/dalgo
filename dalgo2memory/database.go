@@ -19,7 +19,9 @@ func NewDB(options ...Option) dal.DB {
 		collections: make(map[string]map[string][]byte),
 	}
 	for _, option := range options {
-		option(db)
+		if option != nil {
+			option(db)
+		}
 	}
 	return db
 }
