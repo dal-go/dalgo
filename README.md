@@ -1,4 +1,4 @@
-# DALgo
+# 🔌 DALgo
 
 **DALgo** is a database abstraction layer for Go applications. It gives your
 business code one small, consistent API for records, queries, transactions,
@@ -16,7 +16,7 @@ go get github.com/dal-go/dalgo
 [![GoDoc](https://godoc.org/github.com/dal-go/dalgo?status.svg)](https://godoc.org/github.com/dal-go/dalgo)
 [![Sourcegraph](https://sourcegraph.com/github.com/dal-go/dalgo/-/badge.svg)](https://sourcegraph.com/github.com/dal-go/dalgo?badge)
 
-## Why Use DALgo
+## 🎯 Why Use DALgo
 
 DALgo is useful when an application needs stable data-access code without
 coupling the domain layer to Firestore, SQL, or a test-only database.
@@ -33,7 +33,7 @@ DALgo does not try to hide every database difference. Adapters can return
 the core API honest while still giving applications a shared path for the common
 operations.
 
-## Quick Example
+## ⚡ Quick Example
 
 This example uses `dalgo2memory`, the built-in in-memory adapter. The same
 application code can be written against `dal.DB` and supplied with another
@@ -78,7 +78,7 @@ func main() {
 }
 ```
 
-## Core API
+## 🔌 Core API
 
 The main package is [`dal`](./dal). It defines the interfaces application code
 usually depends on:
@@ -109,7 +109,7 @@ func LoadUser(ctx context.Context, db dal.ReadSession, id string) (*User, error)
 }
 ```
 
-## Hierarchical Collections
+## 🌳 Hierarchical Collections
 
 DALgo keys can represent nested document paths, which maps naturally to
 Firestore-style collections such as `countries/ireland/cities/dublin`.
@@ -140,7 +140,7 @@ q := dal.From(cities).NewQuery().
 	)
 ```
 
-## Queries
+## 🔎 Queries
 
 DALgo includes a structured query builder for common database-style reads:
 filters, ordering, joins, column projection, and aggregation. Adapter support is
@@ -169,7 +169,7 @@ Recent query capabilities include:
 - Recordset readers with typed columns where the adapter supports columnar
   output.
 
-## Transactions
+## 🔁 Transactions
 
 Transactions use callback-style workers. This keeps transaction lifetime scoped
 and lets adapters implement retries or backend-specific transaction behavior.
@@ -184,7 +184,7 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 Transaction options can carry isolation-level requests and a human-readable
 message. Some adapters can surface the message in logs or backend history.
 
-## Built-In Adapters
+## 🧰 Built-In Adapters
 
 This repository includes:
 
@@ -199,7 +199,7 @@ This repository includes:
 structured query features end to end, which makes it a practical default for
 unit tests around application data access.
 
-## Supported External Adapters
+## 🌐 Supported External Adapters
 
 DALgo supports production use through separate adapter modules:
 
@@ -214,7 +214,7 @@ DALgo supports production use through separate adapter modules:
 Deprecated BuntDB and BadgerDB adapters are not listed as supported production
 targets.
 
-## Packages
+## 📦 Packages
 
 - [`dal`](./dal) - core database abstraction, keys, records, sessions,
   transactions, queries, hooks, and schema mapping.
@@ -231,7 +231,7 @@ targets.
 - [`update`](./update) - field update helpers.
 - [`mocks`](./mocks) - generated mocks for tests.
 
-## Quality And Compatibility
+## ✅ Quality And Compatibility
 
 The project is maintained with automated checks and adapter-oriented test
 coverage:
@@ -243,7 +243,7 @@ coverage:
 - Feature specifications in [`spec/features`](./spec/features) document
   behavior that has been designed, implemented, and verified.
 
-## Documentation
+## 📚 Documentation
 
 Start with these topic pages when you need more than the README:
 
@@ -256,14 +256,14 @@ Start with these topic pages when you need more than the README:
 - [Adapters](./docs/adapters.md)
 - [Examples](./docs/examples.md)
 
-## Projects Using DALgo
+## 🚀 Projects Using DALgo
 
 - [`strongo/bots-framework`](https://github.com/strongo/bots-framework) -
   framework for building chatbots.
 - [`datatug-cli`](https://github.com/datatug/datatug-cli) - context-aware data
   viewer and collaborative query manager.
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome, especially adapter improvements, end-to-end coverage,
 and documentation that makes backend capabilities clearer. See
