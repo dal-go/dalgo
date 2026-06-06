@@ -258,6 +258,8 @@ Start with these topic pages when you need more than the README:
 
 ## 🚀 Projects Using DALgo
 
+- [`ingitdb`](https://github.com/ingitdb) - Git-native database tooling.
+- [`inmemdb`](https://github.com/inmemdb) - in-memory database tooling.
 - [`strongo/bots-framework`](https://github.com/strongo/bots-framework) -
   framework for building chatbots.
 - [`datatug-cli`](https://github.com/datatug/datatug-cli) - context-aware data
