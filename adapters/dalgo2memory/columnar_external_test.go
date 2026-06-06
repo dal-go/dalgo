@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	dalgo2memory2 "github.com/dal-go/dalgo/adapters/dalgo2memory"
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/dalgo2memory"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,9 +36,9 @@ func (s *externalStrategy) SetValue(slot int, value any) { s.bySlot[slot] = valu
 
 func (s *externalStrategy) ClearValue(slot int) { delete(s.bySlot, slot) }
 
-func (s *externalStrategy) EqualSlots(value any) (dalgo2memory.SlotSet, bool) {
+func (s *externalStrategy) EqualSlots(value any) (dalgo2memory2.SlotSet, bool) {
 	s.calls++
-	slots := make(dalgo2memory.SlotSet)
+	slots := make(dalgo2memory2.SlotSet)
 	for slot, v := range s.bySlot {
 		if v == value {
 			slots[slot] = struct{}{}
@@ -50,8 +50,8 @@ func (s *externalStrategy) EqualSlots(value any) (dalgo2memory.SlotSet, bool) {
 // WithExternalRoleIndex mirrors a hypothetical bitmap4dalgo2memory.WithBitmapColumn:
 // an exported constructor returning a ColumnOption that plugs an external
 // strategy into WithColumnarStorage.
-func WithExternalRoleIndex(s *externalStrategy) dalgo2memory.ColumnOption {
-	return dalgo2memory.WithColumnStrategy("Role", s)
+func WithExternalRoleIndex(s *externalStrategy) dalgo2memory2.ColumnOption {
+	return dalgo2memory2.WithColumnStrategy("Role", s)
 }
 
 // TestExternalStrategyPluggable verifies
@@ -63,12 +63,12 @@ func TestExternalStrategyPluggable(t *testing.T) {
 	ctx := context.Background()
 
 	stgy := newExternalStrategy()
-	colDB := dalgo2memory.NewDB(dalgo2memory.WithSchema(false,
-		dalgo2memory.WithCollection[externalUser]("users", nil,
-			dalgo2memory.WithColumnarStorage(WithExternalRoleIndex(stgy))),
+	colDB := dalgo2memory2.NewDB(dalgo2memory2.WithSchema(false,
+		dalgo2memory2.WithCollection[externalUser]("users", nil,
+			dalgo2memory2.WithColumnarStorage(WithExternalRoleIndex(stgy))),
 	))
-	serDB := dalgo2memory.NewDB(dalgo2memory.WithSchema(false,
-		dalgo2memory.WithCollection[externalUser]("users", nil),
+	serDB := dalgo2memory2.NewDB(dalgo2memory2.WithSchema(false,
+		dalgo2memory2.WithCollection[externalUser]("users", nil),
 	))
 
 	seed := func(db dal.DB) {

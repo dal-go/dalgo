@@ -261,4 +261,3 @@ func TestOptions_WithAbsentEqualsNil_NonNilCandidateStaysChanged(t *testing.T) {
 	assert.False(t, d.Candidates[0].Fields[0].Absent)
 	assert.Equal(t, "Al", d.Candidates[0].Fields[0].Value)
 }
-

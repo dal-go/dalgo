@@ -188,11 +188,11 @@ message. Some adapters can surface the message in logs or backend history.
 
 This repository includes:
 
-- [`dalgo2memory`](./dalgo2memory) - in-memory DALgo database for tests,
+- [`dalgo2memory`](adapters/dalgo2memory) - in-memory DALgo database for tests,
   examples, local development, and query behavior verification. It supports
   schema registration, typed records, serialized storage, columnar storage, and
   mixed-mode `map[string]any` columnar storage.
-- [`dalgo2fs`](./dalgo2fs) - filesystem-backed adapter useful for simple local
+- [`dalgo2fs`](adapters/dalgo2fs) - filesystem-backed adapter useful for simple local
   persistence and examples.
 
 `dalgo2memory` is intentionally useful beyond trivial tests. It can run many
@@ -218,8 +218,8 @@ targets.
 
 - [`dal`](./dal) - core database abstraction, keys, records, sessions,
   transactions, queries, hooks, and schema mapping.
-- [`dalgo2memory`](./dalgo2memory) - built-in in-memory adapter.
-- [`dalgo2fs`](./dalgo2fs) - filesystem adapter.
+- [`dalgo2memory`](adapters/dalgo2memory) - built-in in-memory adapter.
+- [`dalgo2fs`](adapters/dalgo2fs) - filesystem adapter.
 - [`orm`](./orm) - object and collection mapping helpers.
 - [`record`](./record) - helpers for strongly typed record handling.
 - [`recordset`](./recordset) - row and column-oriented recordset structures.

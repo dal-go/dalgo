@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dal-go/dalgo/adapters/dalgo2memory"
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/dalgo2memory"
 	"github.com/dal-go/dalgo/mocks/mock_dal"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
