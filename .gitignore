@@ -1,5 +1,8 @@
 # IDEs
 .idea/
+.claude/
+.junie/
+.memory_bank/
 
 # Binaries for programs and plugins
 *.exe
