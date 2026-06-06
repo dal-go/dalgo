@@ -1,12 +1,12 @@
 ---
 format: https://specscore.md/feature-specification
-status: Approved
+status: Stable
 ---
 
 # Feature: Mixed-mode columnar storage for map[string]any collections (dalgo2memory)
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/columnar-mixed-mode-maps?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/columnar-mixed-mode-maps?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/columnar-mixed-mode-maps?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/columnar-mixed-mode-maps?op=request-change) |
-**Status:** Approved
+**Status:** Stable
 **Date:** 2026-06-06
 **Owner:** alex
 **Source Ideas:** dalgo2memory-storage-engines
