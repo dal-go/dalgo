@@ -164,7 +164,7 @@ func TestMalformedStoredData(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
 	key := dal.NewKeyWithID("Bad", "json")
-	db.collections[key.Collection()] = map[string][]byte{keyID(key): []byte("{")}
+	db.collections[key.Collection()] = &serializedEngine{records: map[string][]byte{keyID(key): []byte("{")}}
 
 	require.Error(t, db.Get(ctx, dal.NewRecordWithData(key, &thing{})))
 	require.Error(t, db.GetMulti(ctx, []dal.Record{dal.NewRecordWithData(key, &thing{})}))

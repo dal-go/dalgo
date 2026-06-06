@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/feature-specification
+status: Implemented
+---
+
 # Feature: `recordops` package
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=request-change) |

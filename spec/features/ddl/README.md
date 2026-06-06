@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/feature-specification
+status: Implemented
+---
+
 # Feature: Schema Modification (DDL) Execution Surface (`ddl`)
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=request-change) |

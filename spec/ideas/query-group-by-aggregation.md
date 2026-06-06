@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Implemented
+---
+
 # Idea: GROUP BY with aggregation in the query builder, executed by dalgo2memory
 
 **Status:** Implemented

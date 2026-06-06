@@ -1,3 +1,7 @@
+---
+format: https://specscore.md/features-index-specification
+---
+
 # Features
 
 > [View in SpecStudio](https://specstudio.synchestra.io/project/features?id=dalgo@dal-go@github.com&path=spec%2Ffeatures) — graph, discussions, approvals
@@ -21,6 +25,10 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [qualified-orderby-resolution](qualified-orderby-resolution/README.md) | Approved | — |
 | [query-column-projection](query-column-projection/README.md) | Stable | — |
 | [query-group-by-aggregation](query-group-by-aggregation/README.md) | Stable | — |
+| [storage-engine-seam](storage-engine-seam/README.md) | Approved | — |
+| [serialized-storage](serialized-storage/README.md) | Approved | — |
+| [columnar-storage](columnar-storage/README.md) | Approved | — |
+| [columnar-mixed-mode-maps](columnar-mixed-mode-maps/README.md) | Approved | — |
 
 ## Open Questions
 

@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Specified
+---
+
 # Idea: First-class INNER/LEFT joins in dal's query model
 
 **Status:** Specified

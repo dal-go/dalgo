@@ -116,7 +116,7 @@ func TestSchemaRejectsUndefinedFieldsOnWrite(t *testing.T) {
 	bad := dal.NewRecordWithData(key, map[string]any{"Name": "Alice", "Unknown": 1})
 	require.Error(t, db.Set(ctx, bad))
 	require.Error(t, db.Insert(ctx, bad))
-	require.Empty(t, db.collections["users"])
+	require.Empty(t, db.collections["users"].(*serializedEngine).records)
 
 	// A payload that only uses defined fields is accepted.
 	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, map[string]any{"Name": "Alice", "Role": "admin"})))
@@ -140,7 +140,7 @@ func TestSchemaQueryMalformedStoredData(t *testing.T) {
 	)).(*database)
 	key := dal.NewKeyWithID("things", "bad")
 	// Decodes fine into map[string]any, but Count("x") fails to decode into thing.
-	db.collections["things"] = map[string][]byte{keyID(key): []byte(`{"Count":"x"}`)}
+	db.collections["things"] = &serializedEngine{records: map[string][]byte{keyID(key): []byte(`{"Count":"x"}`)}}
 
 	q := dal.From(dal.NewRootCollectionRef("things", "")).NewQuery().SelectKeysOnly(reflect.String)
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)

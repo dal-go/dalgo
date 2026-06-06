@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/feature-specification
+status: Implemented
+---
+
 # Feature: ddl Options (`IfNotExists`, `IfExists`)
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/options?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/options?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/options?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/options?op=request-change) |

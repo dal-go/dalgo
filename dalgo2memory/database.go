@@ -2,7 +2,6 @@ package dalgo2memory
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -16,7 +15,8 @@ import (
 // NewDB creates an in-memory DALgo database.
 func NewDB(options ...Option) dal.DB {
 	db := &database{
-		collections: make(map[string]map[string][]byte),
+		collections:       make(map[string]storageEngine),
+		schemaRefBreaking: true,
 	}
 	for _, option := range options {
 		if option != nil {
@@ -29,9 +29,15 @@ func NewDB(options ...Option) dal.DB {
 type database struct {
 	dal.ConcurrencyAvailable
 
-	mu          sync.RWMutex
-	collections map[string]map[string][]byte
+	mu sync.RWMutex
+	// collections maps a collection name to its storage engine. Stored records
+	// live solely inside these engine instances; the engine is created lazily
+	// on first access (see database.engine).
+	collections map[string]storageEngine
 	schema      *memorySchema
+	// schemaRefBreaking is the schema-wide columnar fidelity default (faithful
+	// unless WithoutSchemaRefBreaking was used). NewDB initializes it to true.
+	schemaRefBreaking bool
 }
 
 func (db *database) ID() string {
@@ -157,8 +163,7 @@ func (s session) Options() dal.TransactionOptions {
 }
 
 func (s session) Exists(_ context.Context, key *dal.Key) (bool, error) {
-	_, ok := s.getBytes(key)
-	return ok, nil
+	return s.db.engine(key.Collection()).exists(keyID(key)), nil
 }
 
 func (s session) Get(_ context.Context, record dal.Record) error {
@@ -166,14 +171,8 @@ func (s session) Get(_ context.Context, record dal.Record) error {
 		record.SetError(err)
 		return err
 	}
-	b, ok := s.getBytes(record.Key())
-	if !ok {
-		err := dal.NewErrNotFoundByKey(record.Key(), nil)
-		record.SetError(err)
-		return err
-	}
 	record.SetError(nil)
-	if err := json.Unmarshal(b, record.Data()); err != nil {
+	if err := s.db.engine(record.Key().Collection()).load(keyID(record.Key()), record); err != nil {
 		record.SetError(err)
 		return err
 	}
@@ -216,9 +215,7 @@ func (s session) InsertMulti(ctx context.Context, records []dal.Record, opts ...
 }
 
 func (s session) Delete(_ context.Context, key *dal.Key) error {
-	if collection := s.db.collections[key.Collection()]; collection != nil {
-		delete(collection, keyID(key))
-	}
+	s.db.engine(key.Collection()).delete(keyID(key))
 	return nil
 }
 
@@ -236,34 +233,16 @@ func (s session) Update(ctx context.Context, key *dal.Key, updates []update.Upda
 
 func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []update.Update, _ ...dal.Precondition) error {
 	collectionName := record.Key().Collection()
-	factory, err := s.db.recordFactory(collectionName)
-	if err != nil {
+	if err := s.db.guardCollection(collectionName); err != nil {
 		return err
 	}
-	b, ok := s.getBytes(record.Key())
-	if !ok {
-		return dal.NewErrNotFoundByKey(record.Key(), nil)
-	}
-	var data map[string]any
-	if err := json.Unmarshal(b, &data); err != nil {
-		return err
-	}
+	fieldUpdates := make(map[string]any, len(updates))
 	for _, upd := range updates {
 		if fieldName := upd.FieldName(); fieldName != "" {
-			data[fieldName] = upd.Value()
+			fieldUpdates[fieldName] = upd.Value()
 		}
 	}
-	next, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	if factory != nil {
-		if err := checkUnknownFields(collectionName, factory, next); err != nil {
-			return err
-		}
-	}
-	s.collection(record.Key())[keyID(record.Key())] = next
-	return nil
+	return s.db.engine(collectionName).update(keyID(record.Key()), fieldUpdates)
 }
 
 func (s session) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
@@ -289,8 +268,11 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err != nil {
 		return nil, err
 	}
-	collection := s.db.collections[collectionName]
-	if len(collection) == 0 {
+	allRows, err := s.loadCandidateRows(collectionName, q.Where())
+	if err != nil {
+		return nil, err
+	}
+	if len(allRows) == 0 {
 		return dal.NewRecordsReader([]dal.Record{}), nil
 	}
 	known := map[string]bool{"": true, base.Name(): true}
@@ -306,16 +288,12 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 			return nil, err
 		}
 	}
-	rows := make([]memoryRow, 0, len(collection))
-	for id, b := range collection {
-		var data map[string]any
-		if err := json.Unmarshal(b, &data); err != nil {
-			return nil, err
-		}
-		if !matchesWhere(data, q.Where()) {
+	rows := make([]memoryRow, 0, len(allRows))
+	for _, row := range allRows {
+		if !matchesWhere(row.data, q.Where()) {
 			continue
 		}
-		rows = append(rows, memoryRow{id: id, data: data, raw: b})
+		rows = append(rows, row)
 	}
 	if grouped {
 		srcs := make([]rowSources, len(rows))
@@ -343,7 +321,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		template := q.IntoRecord()
 		if template == nil && factory != nil {
 			data := factory()
-			if err := json.Unmarshal(row.raw, data); err != nil {
+			if err := row.materialize(data); err != nil {
 				return nil, err
 			}
 			records[i] = dal.NewRecordWithData(key, data).SetError(nil)
@@ -354,7 +332,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 			continue
 		}
 		data := template.Data()
-		if err := json.Unmarshal(row.raw, data); err != nil {
+		if err := row.materialize(data); err != nil {
 			return nil, err
 		}
 		records[i] = dal.NewRecordWithData(key, data).SetError(nil)
@@ -365,58 +343,24 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 var _ dal.ReadwriteTransaction = (*session)(nil)
 
 type memoryRow struct {
-	id   string
-	data map[string]any
-	raw  []byte
+	id          string
+	data        map[string]any
+	materialize func(target any) error
 }
 
 func (s session) save(record dal.Record, overwrite bool) error {
 	collectionName := record.Key().Collection()
-	factory, err := s.db.recordFactory(collectionName)
-	if err != nil {
+	if err := s.db.guardCollection(collectionName); err != nil {
 		record.SetError(err)
 		return err
-	}
-	id := keyID(record.Key())
-	collection := s.collection(record.Key())
-	if !overwrite {
-		if _, ok := collection[id]; ok {
-			return fmt.Errorf("record already exists: %s", record.Key())
-		}
 	}
 	record.SetError(nil)
-	b, err := json.Marshal(record.Data())
-	if err != nil {
+	if err := s.db.engine(collectionName).store(keyID(record.Key()), record, overwrite); err != nil {
 		record.SetError(err)
 		return err
 	}
-	if factory != nil {
-		if err := checkUnknownFields(collectionName, factory, b); err != nil {
-			record.SetError(err)
-			return err
-		}
-	}
-	collection[id] = b
 	record.SetError(nil)
 	return nil
-}
-
-func (s session) getBytes(key *dal.Key) ([]byte, bool) {
-	collection := s.db.collections[key.Collection()]
-	if collection == nil {
-		return nil, false
-	}
-	b, ok := collection[keyID(key)]
-	return b, ok
-}
-
-func (s session) collection(key *dal.Key) map[string][]byte {
-	collection := s.db.collections[key.Collection()]
-	if collection == nil {
-		collection = make(map[string][]byte)
-		s.db.collections[key.Collection()] = collection
-	}
-	return collection
 }
 
 func keyID(key *dal.Key) string {

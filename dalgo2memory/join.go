@@ -1,7 +1,6 @@
 package dalgo2memory
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"sort"
@@ -183,16 +182,50 @@ func orderJoinedRows(rows []joinedRow, orderBy []dal.OrderExpression) {
 }
 
 func (s session) loadRows(collectionName string) ([]memoryRow, error) {
-	collection := s.db.collections[collectionName]
-	rows := make([]memoryRow, 0, len(collection))
-	for id, b := range collection {
-		var data map[string]any
-		if err := json.Unmarshal(b, &data); err != nil {
+	engineRows, err := s.db.engine(collectionName).rows()
+	if err != nil {
+		return nil, err
+	}
+	return toMemoryRows(engineRows), nil
+}
+
+// candidateRowsEngine is the optional capability a storage engine implements to
+// accelerate the single supported equality WHERE predicate: it returns the rows
+// its column strategy selects (ok=true) or signals "no opinion" (ok=false) so
+// the caller scans all rows. The returned rows are still re-filtered with
+// matchesWhere, so the result is identical to a full scan.
+type candidateRowsEngine interface {
+	candidateRows(condition dal.Condition) ([]engineRow, bool, error)
+}
+
+// loadCandidateRows returns the rows a single-source query must consider for a
+// WHERE condition. When the collection's engine implements candidateRowsEngine
+// and has an opinion about the predicate, only the candidate rows are loaded;
+// otherwise every row is loaded for a full scan.
+func (s session) loadCandidateRows(collectionName string, condition dal.Condition) ([]memoryRow, error) {
+	eng := s.db.engine(collectionName)
+	if ce, ok := eng.(candidateRowsEngine); ok {
+		rows, hasOpinion, err := ce.candidateRows(condition)
+		if err != nil {
 			return nil, err
 		}
-		rows = append(rows, memoryRow{id: id, data: data, raw: b})
+		if hasOpinion {
+			return toMemoryRows(rows), nil
+		}
 	}
-	return rows, nil
+	allRows, err := eng.rows()
+	if err != nil {
+		return nil, err
+	}
+	return toMemoryRows(allRows), nil
+}
+
+func toMemoryRows(engineRows []engineRow) []memoryRow {
+	rows := make([]memoryRow, len(engineRows))
+	for i, r := range engineRows {
+		rows[i] = memoryRow(r)
+	}
+	return rows
 }
 
 func sortByID(rows []memoryRow) {

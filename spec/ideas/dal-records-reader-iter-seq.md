@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Draft
+---
+
 # Idea: Migrate dal.RecordsReader to iter.Seq
 
 **Status:** Draft

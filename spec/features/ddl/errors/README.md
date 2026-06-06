@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/feature-specification
+status: Implemented
+---
+
 # Feature: ddl PartialSuccessError
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/errors?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/errors?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/errors?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/errors?op=request-change) |

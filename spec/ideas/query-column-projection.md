@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Implemented
+---
+
 # Idea: Column selection in the query builder, projected by dalgo2memory
 
 **Status:** Implemented

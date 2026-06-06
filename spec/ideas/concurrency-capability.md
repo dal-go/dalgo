@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Approved
+---
+
 # Idea: DALgo Concurrency Capability Interface
 
 **Status:** Approved

@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/feature-specification
+status: Approved
+---
+
 # Feature: Computed Columns in recordset (neutral evaluator contract)
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordset-computed-columns?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordset-computed-columns?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordset-computed-columns?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordset-computed-columns?op=request-change) |

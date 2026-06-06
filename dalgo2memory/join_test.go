@@ -224,7 +224,7 @@ func TestExecuteJoin_EdgeCases(t *testing.T) {
 	t.Run("malformed base row errors", func(t *testing.T) {
 		db := NewDB().(*database)
 		ctx := context.Background()
-		db.collections["users"] = map[string][]byte{"1": []byte("{")}
+		db.collections["users"] = &serializedEngine{records: map[string][]byte{"1": []byte("{")}}
 		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1})))
 		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
 		q := dal.From(usersAlias()).Join(join).NewQuery().SelectIntoRecord(intoMapRecord())
@@ -237,7 +237,7 @@ func TestExecuteJoin_EdgeCases(t *testing.T) {
 		db := NewDB().(*database)
 		ctx := context.Background()
 		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "1"), &map[string]any{"id": 1})))
-		db.collections["orders"] = map[string][]byte{"a": []byte("{")}
+		db.collections["orders"] = &serializedEngine{records: map[string][]byte{"a": []byte("{")}}
 		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
 		q := dal.From(usersAlias()).Join(join).NewQuery().SelectIntoRecord(intoMapRecord())
 		reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
