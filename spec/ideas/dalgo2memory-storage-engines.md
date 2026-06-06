@@ -1,11 +1,11 @@
 ---
 format: https://specscore.md/idea-specification
-status: Specified
+status: Implemented
 ---
 
 # Idea: dalgo2memory Pluggable Storage Engines
 
-**Status:** Specified
+**Status:** Implemented
 **Date:** 2026-06-06
 **Owner:** alex
 **Promotes To:** columnar-mixed-mode-maps, columnar-storage, serialized-storage, storage-engine-seam

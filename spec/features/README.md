@@ -25,10 +25,10 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [qualified-orderby-resolution](qualified-orderby-resolution/README.md) | Approved | — |
 | [query-column-projection](query-column-projection/README.md) | Stable | — |
 | [query-group-by-aggregation](query-group-by-aggregation/README.md) | Stable | — |
-| [storage-engine-seam](storage-engine-seam/README.md) | Approved | — |
-| [serialized-storage](serialized-storage/README.md) | Approved | — |
-| [columnar-storage](columnar-storage/README.md) | Approved | — |
-| [columnar-mixed-mode-maps](columnar-mixed-mode-maps/README.md) | Approved | — |
+| [storage-engine-seam](storage-engine-seam/README.md) | Stable | — |
+| [serialized-storage](serialized-storage/README.md) | Stable | — |
+| [columnar-storage](columnar-storage/README.md) | Stable | — |
+| [columnar-mixed-mode-maps](columnar-mixed-mode-maps/README.md) | Stable | — |
 
 ## Open Questions
 
