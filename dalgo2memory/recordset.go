@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/dal-go/dalgo/dal"
@@ -54,24 +55,57 @@ func buildRecordsetReader(ctx context.Context, q dal.StructuredQuery, reader dal
 	colNames := recordsetColumnNames(q, rows)
 	cols := make([]recordset.Column[any], len(colNames))
 	for i, name := range colNames {
-		// NewTypedColumn[any] yields an unwrapped any-column that stores nil
-		// directly; NewColumn[any] would wrap it and reject the nil default
-		// that NewRow appends (nil.(any) is false), leaving the column empty.
-		cols[i] = recordset.NewTypedColumn[any](name, nil)
+		cols[i] = inferColumn(name, rows)
 	}
 	rs := recordset.NewColumnarRecordset(recordsetName(q, options...), cols...)
 	for _, m := range rows {
 		row := rs.NewRow()
 		for _, name := range colNames {
 			if v, ok := m[name]; ok {
-				// An any-typed standard column accepts any value, so SetValue
-				// cannot fail here (the column always exists and is not
-				// computed).
+				// The column exists and is not computed; a typed column only
+				// exists when every row holds that exact type (see inferColumn),
+				// and an any-column accepts anything — so SetValue cannot fail.
 				_ = row.SetValueByName(name, v, rs)
 			}
 		}
 	}
 	return &columnarReader{rs: rs}, nil
+}
+
+// inferColumn picks a column type for a named field from its values across all
+// rows. It returns a typed column (float64/string/bool/int) only when every row
+// holds a present, non-nil value of one consistent kind; anything nullable,
+// absent, mixed, or of another kind falls back to an untyped (any) column so
+// nulls stay representable. The adapter is schemaless, so the type is inferred
+// from values rather than a declared schema.
+func inferColumn(name string, rows []map[string]any) recordset.Column[any] {
+	var t reflect.Type
+	for _, m := range rows {
+		v, ok := m[name]
+		if !ok || v == nil {
+			return recordset.NewTypedColumn[any](name, nil)
+		}
+		vt := reflect.TypeOf(v)
+		if t == nil {
+			t = vt
+		} else if t != vt {
+			return recordset.NewTypedColumn[any](name, nil)
+		}
+	}
+	switch {
+	case t == nil: // no rows
+		return recordset.NewTypedColumn[any](name, nil)
+	case t.Kind() == reflect.Float64:
+		return recordset.NewColumn[float64](name, 0)
+	case t.Kind() == reflect.String:
+		return recordset.NewColumn[string](name, "")
+	case t.Kind() == reflect.Bool:
+		return recordset.NewColumn[bool](name, false)
+	case t.Kind() == reflect.Int:
+		return recordset.NewColumn[int](name, 0)
+	default:
+		return recordset.NewTypedColumn[any](name, nil)
+	}
 }
 
 // recordToMap renders a result record's data as a map keyed by column name.
