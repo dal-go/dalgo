@@ -44,8 +44,11 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 	if err := validateOrderSources(q.OrderBy(), known); err != nil {
 		return nil, err
 	}
-	if err := validateColumns(q.Columns(), known); err != nil {
-		return nil, err
+	grouped := len(q.GroupBy()) > 0
+	if !grouped {
+		if err := validateColumns(q.Columns(), known); err != nil {
+			return nil, err
+		}
 	}
 
 	baseRows, err := s.loadRows(base.Name())
@@ -88,6 +91,14 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 		if ok {
 			filtered = append(filtered, row)
 		}
+	}
+
+	if grouped {
+		srcs := make([]rowSources, len(filtered))
+		for i, row := range filtered {
+			srcs[i] = row.sources
+		}
+		return executeGroupedReader(q, srcs, base.Name(), known)
 	}
 
 	orderJoinedRows(filtered, q.OrderBy())

@@ -24,6 +24,9 @@ type structuredQuery struct {
 	// GroupBy defines expressions to group by
 	groupBy []Expression
 
+	// Having defines a post-aggregation filter condition
+	having Condition
+
 	// OrderBy defines expressions to order by
 	orderBy []OrderExpression
 
@@ -67,6 +70,10 @@ func (q structuredQuery) Where() Condition {
 
 func (q structuredQuery) GroupBy() []Expression {
 	return q.groupBy[:]
+}
+
+func (q structuredQuery) Having() Condition {
+	return q.having
 }
 
 func (q structuredQuery) OrderBy() []OrderExpression {
@@ -158,6 +165,9 @@ func (q structuredQuery) String() string {
 			}
 			_, _ = writer.WriteString(expr.String())
 		}
+	}
+	if q.having != nil {
+		_, _ = writer.WriteString("\nHAVING " + q.having.String())
 	}
 	if len(q.orderBy) > 0 {
 		_, _ = writer.WriteString("\nORDER BY ")
