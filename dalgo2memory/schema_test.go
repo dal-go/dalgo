@@ -127,6 +127,21 @@ func TestSchemaRejectsUndefinedFieldsOnWrite(t *testing.T) {
 	require.Equal(t, "member", got.Role)
 }
 
+func TestSchemaQueryMalformedStoredData(t *testing.T) {
+	ctx := context.Background()
+	db := NewDB(WithSchema(false,
+		WithCollection[thing]("things", nil),
+	)).(*database)
+	key := dal.NewKeyWithID("things", "bad")
+	// Decodes fine into map[string]any, but Count("x") fails to decode into thing.
+	db.collections["things"] = map[string][]byte{keyID(key): []byte(`{"Count":"x"}`)}
+
+	q := dal.From(dal.NewRootCollectionRef("things", "")).NewQuery().SelectKeysOnly(reflect.String)
+	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+	require.Nil(t, reader)
+	require.Error(t, err)
+}
+
 func TestSchemaAllowUndefinedFallsBack(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB(WithSchema(true,

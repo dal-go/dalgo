@@ -82,18 +82,10 @@ func (db *database) guardCollection(collection string) error {
 	return err
 }
 
-// guardFields validates that the marshaled record data contains no fields that
-// are undefined in the collection's schema type. It also enforces the collection
-// guard. It is a no-op when no schema is registered or the collection is an
-// allowed undefined collection.
-func (db *database) guardFields(collection string, marshaled []byte) error {
-	factory, err := db.recordFactory(collection)
-	if err != nil {
-		return err
-	}
-	if factory == nil {
-		return nil
-	}
+// checkUnknownFields validates that the marshaled record data contains no fields
+// that are undefined in the collection's schema type. Callers pass the factory
+// already resolved via recordFactory, and only call this when factory is not nil.
+func checkUnknownFields(collection string, factory func() any, marshaled []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(marshaled))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(factory()); err != nil {

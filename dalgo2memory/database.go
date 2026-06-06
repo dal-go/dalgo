@@ -233,7 +233,9 @@ func (s session) Update(ctx context.Context, key *dal.Key, updates []update.Upda
 }
 
 func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []update.Update, _ ...dal.Precondition) error {
-	if err := s.db.guardCollection(record.Key().Collection()); err != nil {
+	collectionName := record.Key().Collection()
+	factory, err := s.db.recordFactory(collectionName)
+	if err != nil {
 		return err
 	}
 	b, ok := s.getBytes(record.Key())
@@ -253,8 +255,10 @@ func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []up
 	if err != nil {
 		return err
 	}
-	if err := s.db.guardFields(record.Key().Collection(), next); err != nil {
-		return err
+	if factory != nil {
+		if err := checkUnknownFields(collectionName, factory, next); err != nil {
+			return err
+		}
 	}
 	s.collection(record.Key())[keyID(record.Key())] = next
 	return nil
@@ -366,7 +370,8 @@ type memoryRow struct {
 
 func (s session) save(record dal.Record, overwrite bool) error {
 	collectionName := record.Key().Collection()
-	if err := s.db.guardCollection(collectionName); err != nil {
+	factory, err := s.db.recordFactory(collectionName)
+	if err != nil {
 		record.SetError(err)
 		return err
 	}
@@ -383,9 +388,11 @@ func (s session) save(record dal.Record, overwrite bool) error {
 		record.SetError(err)
 		return err
 	}
-	if err := s.db.guardFields(collectionName, b); err != nil {
-		record.SetError(err)
-		return err
+	if factory != nil {
+		if err := checkUnknownFields(collectionName, factory, b); err != nil {
+			record.SetError(err)
+			return err
+		}
 	}
 	collection[id] = b
 	record.SetError(nil)
