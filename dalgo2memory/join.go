@@ -1,7 +1,6 @@
 package dalgo2memory
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"sort"
@@ -183,14 +182,13 @@ func orderJoinedRows(rows []joinedRow, orderBy []dal.OrderExpression) {
 }
 
 func (s session) loadRows(collectionName string) ([]memoryRow, error) {
-	collection := s.db.collections[collectionName]
-	rows := make([]memoryRow, 0, len(collection))
-	for id, b := range collection {
-		var data map[string]any
-		if err := json.Unmarshal(b, &data); err != nil {
-			return nil, err
-		}
-		rows = append(rows, memoryRow{id: id, data: data, raw: b})
+	engineRows, err := s.db.engine(collectionName).rows()
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]memoryRow, len(engineRows))
+	for i, r := range engineRows {
+		rows[i] = memoryRow(r)
 	}
 	return rows, nil
 }

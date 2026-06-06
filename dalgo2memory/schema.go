@@ -14,20 +14,53 @@ type Option func(*database)
 type collectionDef struct {
 	name      string
 	newRecord func() any
+	// newEngine builds the storage engine backing the collection. It is set by
+	// a CollectionOption (default: Serialized) and consumed by WithSchema.
+	newEngine engineFactory
+}
+
+// engineFactory builds a storage engine for a collection given its name and
+// record-type factory (nil when schemaless).
+type engineFactory func(collection string, factory func() any) storageEngine
+
+// CollectionOption configures a collection definition produced by WithCollection
+// — currently the per-collection storage-engine selection. Pass it as a trailing
+// argument to WithCollection.
+type CollectionOption func(*collectionDef)
+
+// WithSerializedStorage selects the Serialized storage engine for a collection.
+// It is the default engine, so this option states the default explicitly; an
+// option-less collection behaves identically.
+func WithSerializedStorage() CollectionOption {
+	return func(def *collectionDef) {
+		def.newEngine = serializedEngineFactory
+	}
+}
+
+// serializedEngineFactory is the engineFactory for the default Serialized engine.
+func serializedEngineFactory(collection string, factory func() any) storageEngine {
+	return newSerializedEngine(collection, factory)
 }
 
 // WithCollection registers a collection backed by the concrete record type T.
 //
 // If newRecord is nil, a zero value (new(T)) is used to materialize each record
 // read by a query. Provide a factory to populate default field values instead.
-func WithCollection[T any](name string, newRecord func() *T) collectionDef {
+//
+// Trailing CollectionOption arguments select a per-collection storage engine;
+// with none, the collection uses the default Serialized engine.
+func WithCollection[T any](name string, newRecord func() *T, opts ...CollectionOption) collectionDef {
 	factory := func() any {
 		if newRecord != nil {
 			return newRecord()
 		}
 		return new(T)
 	}
-	return collectionDef{name: name, newRecord: factory}
+	def := collectionDef{name: name, newRecord: factory}
+	for _, opt := range opts {
+		opt(&def)
+	}
+	return def
 }
 
 // WithSchema registers per-collection record types so that queries return records
@@ -40,19 +73,26 @@ func WithCollection[T any](name string, newRecord func() *T) collectionDef {
 func WithSchema(allowUndefinedCollections bool, collections ...collectionDef) Option {
 	return func(db *database) {
 		factories := make(map[string]func() any, len(collections))
+		engines := make(map[string]engineFactory, len(collections))
 		for _, c := range collections {
 			factories[c.name] = c.newRecord
+			if c.newEngine != nil {
+				engines[c.name] = c.newEngine
+			}
 		}
 		db.schema = &memorySchema{
 			collections:    factories,
+			engines:        engines,
 			allowUndefined: allowUndefinedCollections,
 		}
 	}
 }
 
-// memorySchema holds the registered record factories for the in-memory database.
+// memorySchema holds the registered record factories and per-collection engine
+// choices for the in-memory database.
 type memorySchema struct {
 	collections    map[string]func() any
+	engines        map[string]engineFactory
 	allowUndefined bool
 }
 
@@ -80,6 +120,29 @@ func (db *database) recordFactory(collection string) (func() any, error) {
 func (db *database) guardCollection(collection string) error {
 	_, err := db.recordFactory(collection)
 	return err
+}
+
+// engine resolves the storage engine for a collection, constructing it lazily
+// on first access and registering it. The engine choice comes from the
+// collection's registered CollectionOption when present; any collection without
+// a recorded choice (unregistered, or registered without an engine option)
+// resolves to the default Serialized engine. The record-type factory (for
+// unknown-field validation) is resolved alongside; callers that need the guard
+// error should call recordFactory/guardCollection first.
+func (db *database) engine(collection string) storageEngine {
+	if eng, ok := db.collections[collection]; ok {
+		return eng
+	}
+	factory, _ := db.recordFactory(collection)
+	newEngine := serializedEngineFactory
+	if db.schema != nil {
+		if chosen, ok := db.schema.engines[collection]; ok {
+			newEngine = chosen
+		}
+	}
+	eng := newEngine(collection, factory)
+	db.collections[collection] = eng
+	return eng
 }
 
 // checkUnknownFields validates that the marshaled record data contains no fields

@@ -1,6 +1,6 @@
 # Plan: Pluggable per-collection storage engine seam (dalgo2memory)
 
-**Status:** Approved
+**Status:** Completed
 **Source Feature:** storage-engine-seam
 **Date:** 2026-06-06
 **Owner:** alex
@@ -19,6 +19,7 @@ The seam is an interface plus a refactor, so the order is define-the-contract, a
 ### Task 1: Define the storageEngine interface
 
 **Verifies:** storage-engine-seam#ac:engine-interface-defined
+**Status:** done
 
 Declare an internal `storageEngine` interface owning per-collection store-by-id (insert/overwrite), exists-by-id, load-by-id-into-record, delete-by-id, update-by-id (decoded field updates, not bytes), and row enumeration. Enumeration yields each row as a `map[string]any` field view plus a typed-materialization path, with no parameter or return type that is a serialized byte representation.
 
@@ -26,6 +27,7 @@ Declare an internal `storageEngine` interface owning per-collection store-by-id 
 
 **Verifies:** storage-engine-seam#ac:withcollection-options-backward-compatible
 **Depends-On:** 1
+**Status:** done
 
 Introduce an exported `CollectionOption` type and `WithSerializedStorage()` option, and extend `WithCollection[T]` to `WithCollection[T](name, newRecord, opts ...CollectionOption)` so existing 2-arg calls compile unchanged with `newRecord` keeping its `func() *T` type. Record the selected engine on the collection definition so `WithSchema` carries it into the database.
 
@@ -33,6 +35,7 @@ Introduce an exported `CollectionOption` type and `WithSerializedStorage()` opti
 
 **Verifies:** storage-engine-seam#ac:operations-succeed-through-engine, storage-engine-seam#ac:no-byte-map-on-database, storage-engine-seam#ac:default-is-serialized, storage-engine-seam#ac:unregistered-collection-is-serialized
 **Depends-On:** 2
+**Status:** done
 
 Replace `database.collections map[string]map[string][]byte` with a per-collection engine registry, extracting today's JSON marshal/unmarshal/`checkUnknownFields`/insert-guard/not-found logic into a default `serializedEngine` that implements the interface. Make every `database`/`session` operation (`Exists`, `Get`/`GetMulti`, `Set`/`SetMulti`, `Insert`/`InsertMulti`, `Delete`/`DeleteMulti`, `Update`/`UpdateRecord`/`UpdateMulti`, both query paths) delegate to the target collection's engine, resolving the Serialized default for any unregistered or option-less collection so observable behavior is unchanged.
 
@@ -40,6 +43,7 @@ Replace `database.collections map[string]map[string][]byte` with a per-collectio
 
 **Verifies:** storage-engine-seam#ac:mixed-engines-in-one-db, storage-engine-seam#ac:existing-suite-green
 **Depends-On:** 3
+**Status:** done
 
 Support distinct engines per collection within one `database`, each routing through its own engine instance with no cross-collection interference, and confirm the default and `WithSerializedStorage()` paths are observably identical to pre-Feature behavior. The full existing `dalgo2memory` test suite passes unchanged and statement coverage remains 100%.
 
