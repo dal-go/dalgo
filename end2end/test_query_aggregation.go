@@ -3,7 +3,6 @@ package end2end
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
@@ -27,11 +26,8 @@ func readMapRecords(ctx context.Context, db dal.DB, q dal.Query, txMsg string) (
 		}
 		out = make([]map[string]any, len(records))
 		for i, rec := range records {
-			m, err := recordDataAsMap(rec)
-			if err != nil {
-				return err
-			}
-			out[i] = m
+			// Projected and aggregated records carry map data by contract.
+			out[i] = rec.Data().(map[string]any)
 		}
 		return nil
 	}, dal.TxWithMessage(txMsg))
@@ -49,19 +45,6 @@ func readRecordset(ctx context.Context, db dal.DB, q dal.Query, txMsg string) (r
 		return e
 	}, dal.TxWithMessage(txMsg))
 	return rs, err
-}
-
-// recordDataAsMap returns a projected/aggregated record's data as a map,
-// accepting either a map value or a pointer to one.
-func recordDataAsMap(rec dal.Record) (map[string]any, error) {
-	switch d := rec.Data().(type) {
-	case map[string]any:
-		return d, nil
-	case *map[string]any:
-		return *d, nil
-	default:
-		return nil, fmt.Errorf("expected map[string]any record data, got %T", rec.Data())
-	}
 }
 
 // indexByString groups rows by the string value of a given key (e.g. the
