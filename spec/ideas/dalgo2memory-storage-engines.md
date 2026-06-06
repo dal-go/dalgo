@@ -8,7 +8,7 @@ status: Specified
 **Status:** Specified
 **Date:** 2026-06-06
 **Owner:** alex
-**Promotes To:** columnar-storage, serialized-storage, storage-engine-seam
+**Promotes To:** columnar-mixed-mode-maps, columnar-storage, serialized-storage, storage-engine-seam
 **Supersedes:** —
 **Related Ideas:** —
 

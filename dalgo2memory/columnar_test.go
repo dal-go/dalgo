@@ -52,15 +52,25 @@ func TestColumnar_RequiresTypedCollection(t *testing.T) {
 	require.True(t, ok)
 	require.Nil(t, eng.initErr)
 
+	// Selecting columnar storage for a non-struct, non-map collection (here a
+	// scalar element type) fails with the typed-collection error on use.
+	scalarDB := NewDB(WithSchema(false,
+		WithCollection[int]("nums", nil, WithColumnarStorage()),
+	)).(*database)
+	scalarErr := scalarDB.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("nums", "n1"), 1))
+	require.Error(t, scalarErr)
+	require.ErrorContains(t, scalarErr, "nums")
+	require.ErrorContains(t, scalarErr, "typed collection")
+
 	// Selecting columnar storage for a schemaless (map[string]any) collection
-	// fails with a descriptive error on use.
+	// with no declared column fails with a descriptive error on use.
 	schemalessDB := NewDB(WithSchema(false,
 		WithCollection[map[string]any]("blobs", nil, WithColumnarStorage()),
 	)).(*database)
 	err := schemalessDB.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("blobs", "b1"), map[string]any{"x": 1}))
 	require.Error(t, err)
 	require.ErrorContains(t, err, "blobs")
-	require.ErrorContains(t, err, "typed collection")
+	require.ErrorContains(t, err, "declared column")
 
 	// Every operation reports the init error.
 	badEng := schemalessDB.engine("blobs").(*columnarEngine)

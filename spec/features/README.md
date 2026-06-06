@@ -28,6 +28,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [storage-engine-seam](storage-engine-seam/README.md) | Approved | — |
 | [serialized-storage](serialized-storage/README.md) | Approved | — |
 | [columnar-storage](columnar-storage/README.md) | Approved | — |
+| [columnar-mixed-mode-maps](columnar-mixed-mode-maps/README.md) | Approved | — |
 
 ## Open Questions
 

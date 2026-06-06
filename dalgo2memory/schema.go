@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 )
 
 // Option configures an in-memory database created by NewDB.
@@ -56,6 +57,23 @@ func WithColumnStrategy(name string, strategy ColumnStrategy) ColumnOption {
 			cfg.strategies = make(map[string]ColumnStrategy)
 		}
 		cfg.strategies[name] = strategy
+	}
+}
+
+// WithDeclaredColumn declares a columnar column by name for a map-backed
+// (map[string]any) collection, stored in a strongly-typed []T slice. At least
+// one declared column is required to select columnar storage for a map-backed
+// collection; undeclared fields are kept in a parallel leftover map. On a
+// struct collection a declared column is accepted but redundant (the struct
+// path reflects over the record type instead). When the same name is declared
+// more than once, the last declaration wins.
+func WithDeclaredColumn[T any](name string) ColumnOption {
+	return func(cfg *columnarConfig) {
+		var zero T
+		cfg.declared = append(cfg.declared, declaredColumn{
+			name:     name,
+			elemType: reflect.TypeOf(&zero).Elem(),
+		})
 	}
 }
 

@@ -52,6 +52,13 @@ type columnarEngine struct {
 	refBreak  bool                      // faithful (deep-copy ref-bearing columns) when true
 	stgyByCol map[string]ColumnStrategy // explicit per-column strategies
 
+	// mapBacked reports a mixed-mode map[string]any collection: columns come
+	// from declared options and undeclared fields are kept in leftover.
+	mapBacked bool
+	// leftover holds each row's undeclared fields, indexed by the same per-row
+	// slot as the column slices (nil for the struct path).
+	leftover []map[string]any
+
 	// initErr is set when the factory could not build a typed columnar engine
 	// (schemaless/non-struct selection); every operation reports it.
 	initErr error
@@ -60,11 +67,23 @@ type columnarEngine struct {
 var _ storageEngine = (*columnarEngine)(nil)
 
 // columnarConfig is the resolved configuration produced by WithColumnarStorage:
-// the per-column strategies and the optional per-collection ref-breaking
-// override (nil means "inherit the schema-wide default").
+// the per-column strategies, the optional per-collection ref-breaking override
+// (nil means "inherit the schema-wide default"), and the columns explicitly
+// declared for a map-backed (map[string]any) collection.
 type columnarConfig struct {
 	strategies   map[string]ColumnStrategy
 	refBreakOver *bool
+	declared     []declaredColumn
+}
+
+// declaredColumn names a column explicitly declared (via WithDeclaredColumn) for
+// a map-backed columnar collection, together with the Go element type its typed
+// slice holds. Declared columns are the column set for a map[string]any
+// collection; on a struct collection they are accepted but redundant (the struct
+// path reflects over the record type instead).
+type declaredColumn struct {
+	name     string
+	elemType reflect.Type
 }
 
 // newColumnarEngineFactory builds an engineFactory that constructs a columnar
@@ -79,6 +98,9 @@ func newColumnarEngineFactory(cfg columnarConfig) engineFactory {
 		}
 		recordType, err := structTypeOf(factory)
 		if err != nil {
+			if isMapBackedFactory(factory) {
+				return newMapBackedEngine(collection, factory, refBreak, cfg)
+			}
 			return &columnarEngine{
 				collection: collection,
 				factory:    factory,
@@ -97,6 +119,47 @@ func newColumnarEngineFactory(cfg columnarConfig) engineFactory {
 		eng.buildColumns()
 		return eng
 	}
+}
+
+// isMapBackedFactory reports whether the collection's record type is
+// map[string]any (a schemaless mixed-mode collection), as opposed to a struct
+// or any other type.
+func isMapBackedFactory(factory func() any) bool {
+	if factory == nil {
+		return false
+	}
+	t := reflect.TypeOf(factory())
+	for t != nil && t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	return t != nil && t == mapStringAnyType
+}
+
+var mapStringAnyType = reflect.TypeOf(map[string]any{})
+
+// newMapBackedEngine builds a mixed-mode columnar engine for a map[string]any
+// collection from its explicitly declared columns. With no declared column the
+// engine cannot infer its columns, so every operation reports a descriptive
+// error (REQ:mixed-mode-selection).
+func newMapBackedEngine(collection string, factory func() any, refBreak bool, cfg columnarConfig) *columnarEngine {
+	if len(cfg.declared) == 0 {
+		return &columnarEngine{
+			collection: collection,
+			factory:    factory,
+			initErr:    fmt.Errorf("columnar storage for map-backed collection %q requires at least one declared column (WithDeclaredColumn)", collection),
+		}
+	}
+	eng := &columnarEngine{
+		collection: collection,
+		factory:    factory,
+		byName:     make(map[string]*column),
+		idToSlot:   make(map[string]int),
+		refBreak:   refBreak,
+		stgyByCol:  cfg.strategies,
+		mapBacked:  true,
+	}
+	eng.buildDeclaredColumns(cfg.declared)
+	return eng
 }
 
 // structTypeOf returns the struct type T given a factory returning *T (or T).
@@ -147,6 +210,41 @@ func (e *columnarEngine) buildColumns() {
 		}
 		e.columns = append(e.columns, col)
 		e.byName[name] = col
+	}
+}
+
+// buildDeclaredColumns derives one typed column per declared column for a
+// map-backed collection, in declaration order. A column's element type is the
+// declared Go type (or []any when an interface type is declared), and its
+// strategy is the explicit one when supplied, else the default typed-slice
+// strategy. When the same name is declared more than once, the last declaration
+// wins (its element type replaces the earlier one).
+func (e *columnarEngine) buildDeclaredColumns(declared []declaredColumn) {
+	for _, dc := range declared {
+		elemType := dc.elemType
+		if elemType.Kind() == reflect.Interface {
+			elemType = anyType
+		}
+		col := &column{
+			name:       dc.name,
+			values:     reflect.MakeSlice(reflect.SliceOf(elemType), 0, 0),
+			elemType:   elemType,
+			refBearing: isRefBearing(dc.elemType),
+			engine:     e,
+		}
+		if stgy, ok := e.stgyByCol[dc.name]; ok && stgy != nil {
+			col.strategy = stgy
+		} else {
+			def := newTypedSliceStrategy(col)
+			col.strategy = def
+			col.defaultStgy = def
+		}
+		if existing, ok := e.byName[dc.name]; ok {
+			*existing = *col // last-declaration-wins: replace in place, keep order
+			continue
+		}
+		e.columns = append(e.columns, col)
+		e.byName[dc.name] = col
 	}
 }
 
@@ -213,12 +311,12 @@ func (e *columnarEngine) store(id string, record dal.Record, overwrite bool) err
 			return fmt.Errorf("record already exists: %s", record.Key())
 		}
 	}
-	values, err := e.decodeFields(record.Data())
+	values, leftover, err := e.prepareWrite(record.Data())
 	if err != nil {
 		return err
 	}
 	slot := e.allocSlot(id)
-	e.writeSlot(slot, values)
+	e.writeSlot(slot, values, leftover)
 	return nil
 }
 
@@ -259,16 +357,18 @@ func (e *columnarEngine) update(id string, updates map[string]any) error {
 		return err
 	}
 	for fieldName, value := range updates {
-		if _, ok := e.byName[fieldName]; !ok {
+		// On the struct path an unknown field is rejected; on the map-backed
+		// path an undeclared field is a valid leftover field.
+		if _, ok := e.byName[fieldName]; !ok && !e.mapBacked {
 			return fmt.Errorf("record for collection %q does not conform to the schema: unknown field %q", e.collection, fieldName)
 		}
 		current[fieldName] = value
 	}
-	values, err := e.decodeFields(current)
+	values, leftover, err := e.prepareWrite(current)
 	if err != nil {
 		return err
 	}
-	e.writeSlot(slot, values)
+	e.writeSlot(slot, values, leftover)
 	return nil
 }
 
@@ -377,32 +477,94 @@ func (e *columnarEngine) allocSlot(id string) int {
 	for _, col := range e.columns {
 		col.values = reflect.Append(col.values, reflect.Zero(col.elemType))
 	}
+	if e.mapBacked {
+		e.leftover = append(e.leftover, nil)
+	}
 	e.live = append(e.live, true)
 	e.slotToID = append(e.slotToID, id)
 	e.idToSlot[id] = slot
 	return slot
 }
 
-// writeSlot stores already-decoded per-column values at slot and updates each
-// column's strategy write side.
-func (e *columnarEngine) writeSlot(slot int, values []reflect.Value) {
+// writeSlot stores already-decoded per-column values at slot, updates each
+// column's strategy write side, and (on the map-backed path) stores the row's
+// leftover map of undeclared fields at the same slot.
+func (e *columnarEngine) writeSlot(slot int, values []reflect.Value, leftover map[string]any) {
 	for i, col := range e.columns {
 		col.values.Index(slot).Set(values[i])
 		col.strategy.SetValue(slot, values[i].Interface())
 	}
+	if e.mapBacked {
+		e.leftover[slot] = leftover
+	}
 }
 
 // freeSlot tombstones a slot: it marks it dead, zeroes its column cells, clears
-// each strategy, and pushes it to the free list for reuse.
+// each strategy, drops its leftover map (map-backed), and pushes it to the free
+// list for reuse.
 func (e *columnarEngine) freeSlot(slot int) {
 	for _, col := range e.columns {
 		col.values.Index(slot).Set(reflect.Zero(col.elemType))
 		col.strategy.ClearValue(slot)
 	}
+	if e.mapBacked {
+		e.leftover[slot] = nil
+	}
 	e.live[slot] = false
 	e.slotToID[slot] = ""
 	e.freeList = append(e.freeList, slot)
 	e.deadCount++
+}
+
+// prepareWrite decodes a record's data into per-column values and, on the
+// map-backed path, the leftover map of undeclared fields. On the struct path the
+// leftover return is nil. Decoding happens before any slot is reserved, so a
+// decode error (non-serializable value, unknown field on the struct path, or a
+// declared value that cannot be stored as its column type) leaves nothing stored
+// for the record.
+func (e *columnarEngine) prepareWrite(data any) ([]reflect.Value, map[string]any, error) {
+	if e.mapBacked {
+		return e.decodeMapFields(data)
+	}
+	values, err := e.decodeFields(data)
+	return values, nil, err
+}
+
+// decodeMapFields decodes a map-backed record: each declared column's value is
+// decoded into its typed cell (a clearly-incompatible value is a descriptive
+// error) and removed from the leftover, while every undeclared field is
+// deep-copied (JSON round-trip, faithful default) into the leftover map at the
+// row's slot. A record with only declared fields yields a nil leftover.
+func (e *columnarEngine) decodeMapFields(data any) ([]reflect.Value, map[string]any, error) {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return nil, nil, err
+	}
+	var asMap map[string]any
+	if err := json.Unmarshal(b, &asMap); err != nil {
+		return nil, nil, err
+	}
+	values := make([]reflect.Value, len(e.columns))
+	for i, col := range e.columns {
+		dst := reflect.New(col.elemType)
+		if raw, present := asMap[col.name]; present {
+			if err := assignInto(dst, raw, col); err != nil {
+				return nil, nil, fmt.Errorf("declared column %q of collection %q: %w", col.name, e.collection, err)
+			}
+		}
+		values[i] = dst.Elem()
+	}
+	var leftover map[string]any
+	for key, raw := range asMap {
+		if _, declared := e.byName[key]; declared {
+			continue // declared keys live in typed columns, not in leftover
+		}
+		if leftover == nil {
+			leftover = make(map[string]any)
+		}
+		leftover[key] = raw // raw is the JSON-decoded value: already ref-isolated
+	}
+	return values, leftover, nil
 }
 
 // decodeFields converts a record's data (a struct, pointer, or map[string]any)
@@ -491,7 +653,10 @@ func assignInto(dst reflect.Value, raw any, col *column) error {
 // (numbers as float64, nested as map[string]any), so the shared query pipeline
 // produces identical results.
 func (e *columnarEngine) rowData(slot int) (map[string]any, error) {
-	cells := make(map[string]any, len(e.columns))
+	cells := make(map[string]any, len(e.columns)+len(e.leftoverAt(slot)))
+	for key, value := range e.leftoverAt(slot) {
+		cells[key] = value
+	}
 	for _, col := range e.columns {
 		cells[col.name] = col.values.Index(slot).Interface()
 	}
@@ -510,7 +675,10 @@ func (e *columnarEngine) rowData(slot int) (map[string]any, error) {
 // per-column cells into a JSON object and unmarshaling it into target, so the
 // result shares no references with stored data or other reads.
 func (e *columnarEngine) materializeSlot(slot int, target any) error {
-	obj := make(map[string]any, len(e.columns))
+	obj := make(map[string]any, len(e.columns)+len(e.leftoverAt(slot)))
+	for key, value := range e.leftoverAt(slot) {
+		obj[key] = value
+	}
 	for _, col := range e.columns {
 		obj[col.name] = col.values.Index(slot).Interface()
 	}
@@ -519,6 +687,16 @@ func (e *columnarEngine) materializeSlot(slot int, target any) error {
 		return err
 	}
 	return json.Unmarshal(b, target)
+}
+
+// leftoverAt returns the slot's leftover map of undeclared fields on the
+// map-backed path, or nil on the struct path (and for an empty leftover). Ranging
+// over a nil map is a no-op, so callers merge it unconditionally.
+func (e *columnarEngine) leftoverAt(slot int) map[string]any {
+	if !e.mapBacked {
+		return nil
+	}
+	return e.leftover[slot]
 }
 
 // maybeCompact compacts when the dead-slot fraction crosses the threshold,
@@ -554,6 +732,13 @@ func (e *columnarEngine) compact() {
 		}
 		col.values = next
 	}
+	var newLeftover []map[string]any
+	if e.mapBacked {
+		newLeftover = make([]map[string]any, newLen)
+		for newSlot, oldSlot := range liveSlots {
+			newLeftover[newSlot] = e.leftover[oldSlot]
+		}
+	}
 	newSlotToID := make([]string, newLen)
 	newLive := make([]bool, newLen)
 	for newSlot, oldSlot := range liveSlots {
@@ -562,6 +747,7 @@ func (e *columnarEngine) compact() {
 		newLive[newSlot] = true
 		e.idToSlot[id] = newSlot
 	}
+	e.leftover = newLeftover
 	e.slotToID = newSlotToID
 	e.live = newLive
 	e.freeList = e.freeList[:0]

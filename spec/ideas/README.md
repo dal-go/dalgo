@@ -16,7 +16,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [dal-records-reader-iter-seq](dal-records-reader-iter-seq.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
-| [dalgo2memory-storage-engines](dalgo2memory-storage-engines.md) | Specified | 2026-06-06 | alex | columnar-storage, serialized-storage, storage-engine-seam |
+| [dalgo2memory-storage-engines](dalgo2memory-storage-engines.md) | Specified | 2026-06-06 | alex | columnar-mixed-mode-maps, columnar-storage, serialized-storage, storage-engine-seam |
 | [first-class-query-joins](first-class-query-joins.md) | Specified | 2026-06-05 | alexander.trakhimenok | query-joins |
 | [qualified-orderby-resolution](qualified-orderby-resolution.md) | Specified | 2026-06-05 | alex | qualified-orderby-resolution |
 | [query-column-projection](query-column-projection.md) | Implemented | 2026-06-05 | alex | query-column-projection |
