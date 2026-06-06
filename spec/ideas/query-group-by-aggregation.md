@@ -1,6 +1,6 @@
 # Idea: GROUP BY with aggregation in the query builder, executed by dalgo2memory
 
-**Status:** Implementing
+**Status:** Implemented
 **Date:** 2026-06-05
 **Owner:** alex
 **Promotes To:** query-group-by-aggregation
