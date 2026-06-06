@@ -89,7 +89,7 @@ func checkUnknownFields(collection string, factory func() any, marshaled []byte)
 	decoder := json.NewDecoder(bytes.NewReader(marshaled))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(factory()); err != nil {
-		return fmt.Errorf("record for collection %q has fields not defined in the schema: %w", collection, err)
+		return fmt.Errorf("record for collection %q does not conform to the schema: %w", collection, err)
 	}
 	return nil
 }
