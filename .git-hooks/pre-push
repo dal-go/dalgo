@@ -3,6 +3,31 @@
 #   > git config core.hooksPath .git-hooks || echo 'Not in a git repo'
 echo "Running .git-hooks/pre-push..."
 
+# Block conventional-commit breaking-change markers while pre-1.0 (stay on v0.x).
+# The release tooling treats "type!:" or a "BREAKING CHANGE:" footer as a major
+# bump, which jumps v0.x -> v1.0.0. Reject such commits before they reach origin.
+while read -r _local_ref local_oid _remote_ref remote_oid; do
+  case "$local_oid" in *[!0]*) : ;; *) continue ;; esac   # skip branch deletions
+  case "$remote_oid" in
+    *[!0]*) range="$remote_oid..$local_oid" ;;            # update to existing remote ref
+    *)      range="$local_oid --not --remotes" ;;         # new ref: only not-yet-pushed commits
+  esac
+  offenders=$(git rev-list $range | while read -r sha; do
+    subject=$(git show -s --format='%s' "$sha")
+    body=$(git show -s --format='%b' "$sha")
+    if printf '%s\n' "$subject" | grep -Eq '^[a-z]+(\([^)]+\))?!:' \
+       || printf '%s\n' "$body" | grep -Eq '^BREAKING[ -]CHANGE:'; then
+      printf '  %s %s\n' "$(git show -s --format='%h' "$sha")" "$subject"
+    fi
+  done)
+  if [ -n "$offenders" ]; then
+    echo "pre-push: blocked breaking-change commit(s) (pre-1.0, must stay on v0.x):"
+    echo "$offenders"
+    echo "Drop the '!' and any 'BREAKING CHANGE:' footer, or bypass with: git push --no-verify"
+    exit 1
+  fi
+done
+
 # Enforce 100% test coverage, matching CI (min_test_coverage_percent: 100).
 cover_file=$(mktemp)
 trap 'rm -f "$cover_file"' EXIT
