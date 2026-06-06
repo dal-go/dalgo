@@ -70,6 +70,8 @@ func TestRecordset_GroupByAggregation(t *testing.T) {
 	rs := drainRecordset(t, db, ctx, q)
 	require.Equal(t, 2, rs.RowsCount())
 	require.Equal(t, []string{"category", "total"}, columnNames(rs))
+	require.Equal(t, reflect.TypeOf(""), rs.GetColumnByName("category").ValueType(), "category is a typed string column")
+	require.Equal(t, reflect.TypeOf(float64(0)), rs.GetColumnByName("total").ValueType(), "SUM is a typed float64 column")
 	byCat := map[string]any{}
 	for i := 0; i < rs.RowsCount(); i++ {
 		byCat[cellByName(t, rs, i, "category").(string)] = cellByName(t, rs, i, "total")
@@ -181,6 +183,38 @@ func TestRecordToMap(t *testing.T) {
 		_, err := recordToMap(withData(make(chan int)))
 		require.Error(t, err)
 	})
+}
+
+// inferColumn types a column from its values, falling back to any when the
+// values are nullable, absent, mixed, or of an unsupported kind.
+func TestInferColumn(t *testing.T) {
+	rows := func(vals ...any) []map[string]any {
+		out := make([]map[string]any, len(vals))
+		for i, v := range vals {
+			out[i] = map[string]any{"c": v}
+		}
+		return out
+	}
+	cases := []struct {
+		name string
+		rows []map[string]any
+		want reflect.Type
+	}{
+		{"float64", rows(1.0, 2.0), reflect.TypeOf(float64(0))},
+		{"string", rows("a", "b"), reflect.TypeOf("")},
+		{"bool", rows(true, false), reflect.TypeOf(false)},
+		{"int", rows(1, 2), reflect.TypeOf(int(0))},
+		{"nested unsupported kind", rows([]any{1}), nil},
+		{"mixed types", rows(1.0, "x"), nil},
+		{"nil value present", rows(1.0, nil), nil},
+		{"empty rows", []map[string]any{}, nil},
+		{"absent key", []map[string]any{{"other": 1.0}}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, inferColumn("c", tc.rows).ValueType())
+		})
+	}
 }
 
 // buildRecordsetReader surfaces a reader error from the records pipeline.
