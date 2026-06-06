@@ -14,10 +14,14 @@ import (
 )
 
 // NewDB creates an in-memory DALgo database.
-func NewDB() dal.DB {
-	return &database{
+func NewDB(options ...Option) dal.DB {
+	db := &database{
 		collections: make(map[string]map[string][]byte),
 	}
+	for _, option := range options {
+		option(db)
+	}
+	return db
 }
 
 type database struct {
@@ -25,6 +29,7 @@ type database struct {
 
 	mu          sync.RWMutex
 	collections map[string]map[string][]byte
+	schema      *memorySchema
 }
 
 func (db *database) ID() string {
@@ -155,6 +160,10 @@ func (s session) Exists(_ context.Context, key *dal.Key) (bool, error) {
 }
 
 func (s session) Get(_ context.Context, record dal.Record) error {
+	if err := s.db.guardCollection(record.Key().Collection()); err != nil {
+		record.SetError(err)
+		return err
+	}
 	b, ok := s.getBytes(record.Key())
 	if !ok {
 		err := dal.NewErrNotFoundByKey(record.Key(), nil)
@@ -224,6 +233,9 @@ func (s session) Update(ctx context.Context, key *dal.Key, updates []update.Upda
 }
 
 func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []update.Update, _ ...dal.Precondition) error {
+	if err := s.db.guardCollection(record.Key().Collection()); err != nil {
+		return err
+	}
 	b, ok := s.getBytes(record.Key())
 	if !ok {
 		return dal.NewErrNotFoundByKey(record.Key(), nil)
@@ -239,6 +251,9 @@ func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []up
 	}
 	next, err := json.Marshal(data)
 	if err != nil {
+		return err
+	}
+	if err := s.db.guardFields(record.Key().Collection(), next); err != nil {
 		return err
 	}
 	s.collection(record.Key())[keyID(record.Key())] = next
@@ -264,6 +279,10 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	}
 	base := q.From().Base()
 	collectionName := base.Name()
+	factory, err := s.db.recordFactory(collectionName)
+	if err != nil {
+		return nil, err
+	}
 	collection := s.db.collections[collectionName]
 	if len(collection) == 0 {
 		return dal.NewRecordsReader([]dal.Record{}), nil
@@ -316,6 +335,14 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 			continue
 		}
 		template := q.IntoRecord()
+		if template == nil && factory != nil {
+			data := factory()
+			if err := json.Unmarshal(row.raw, data); err != nil {
+				return nil, err
+			}
+			records[i] = dal.NewRecordWithData(key, data).SetError(nil)
+			continue
+		}
 		if template == nil {
 			records[i] = dal.NewRecord(key).SetError(nil)
 			continue
@@ -338,6 +365,11 @@ type memoryRow struct {
 }
 
 func (s session) save(record dal.Record, overwrite bool) error {
+	collectionName := record.Key().Collection()
+	if err := s.db.guardCollection(collectionName); err != nil {
+		record.SetError(err)
+		return err
+	}
 	id := keyID(record.Key())
 	collection := s.collection(record.Key())
 	if !overwrite {
@@ -348,6 +380,10 @@ func (s session) save(record dal.Record, overwrite bool) error {
 	record.SetError(nil)
 	b, err := json.Marshal(record.Data())
 	if err != nil {
+		record.SetError(err)
+		return err
+	}
+	if err := s.db.guardFields(collectionName, b); err != nil {
 		record.SetError(err)
 		return err
 	}
