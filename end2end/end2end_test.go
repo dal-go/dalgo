@@ -190,6 +190,14 @@ func TestEndToEnd(t *testing.T) {
 			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.CityIDsSortedByPopulation))
 		case "SELECT ID FROM Cities WHERE Country = 'IN'":
 			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs([]string{"Delhi_Delhi", "Maharashtra_Mumbai"}))
+		case "SELECT Name AS city, Country FROM Cities",
+			"SELECT Country, COUNT(*), SUM(Population) GROUP BY Country",
+			"SELECT Country, COUNT(*) GROUP BY Country HAVING COUNT(*) > 1":
+			// This mock DB does not implement column projection / GROUP BY, so
+			// both read paths report the capability as unsupported and the
+			// shared end2end subtests skip.
+			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+			tx.EXPECT().GetRecordsetReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 		case "verify_cleanupDelete":
 			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []dal.Record) error {
 				for _, record := range records {

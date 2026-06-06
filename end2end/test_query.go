@@ -182,6 +182,12 @@ func queryOperationsTest(ctx context.Context, t *testing.T, db dal.DB, eventuall
 
 		})
 	})
+	t.Run("SELECT Name AS city, Country FROM Cities", func(t *testing.T) {
+		queryColumnProjectionTest(ctx, t, db)
+	})
+	t.Run("SELECT Country, aggregates FROM Cities GROUP BY Country", func(t *testing.T) {
+		queryGroupByTest(ctx, t, db)
+	})
 }
 
 func deleteAllCities(ctx context.Context, db dal.DB) (err error) {
