@@ -28,6 +28,12 @@ func readAll(t *testing.T, reader dal.RecordsReader) []dal.Record {
 	}
 }
 
+func TestNewDBIgnoresNilOption(t *testing.T) {
+	db := NewDB(nil, WithSchema(false, WithCollection[user]("users", nil)), nil).(*database)
+	require.NotNil(t, db.schema)
+	require.Contains(t, db.schema.collections, "users")
+}
+
 func TestSchemaTypedQueryResults(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB(WithSchema(false,
