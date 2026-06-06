@@ -15,7 +15,8 @@ import (
 // NewDB creates an in-memory DALgo database.
 func NewDB(options ...Option) dal.DB {
 	db := &database{
-		collections: make(map[string]storageEngine),
+		collections:       make(map[string]storageEngine),
+		schemaRefBreaking: true,
 	}
 	for _, option := range options {
 		if option != nil {
@@ -34,6 +35,9 @@ type database struct {
 	// on first access (see database.engine).
 	collections map[string]storageEngine
 	schema      *memorySchema
+	// schemaRefBreaking is the schema-wide columnar fidelity default (faithful
+	// unless WithoutSchemaRefBreaking was used). NewDB initializes it to true.
+	schemaRefBreaking bool
 }
 
 func (db *database) ID() string {
@@ -264,7 +268,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err != nil {
 		return nil, err
 	}
-	allRows, err := s.loadRows(collectionName)
+	allRows, err := s.loadCandidateRows(collectionName, q.Where())
 	if err != nil {
 		return nil, err
 	}

@@ -37,7 +37,7 @@ func (e *countingEngine) rows() ([]engineRow, error) { return e.inner.rows() }
 // withCountingStorage is a test-only CollectionOption selecting countingEngine.
 func withCountingStorage() CollectionOption {
 	return func(def *collectionDef) {
-		def.newEngine = func(collection string, factory func() any) storageEngine {
+		def.newEngine = func(collection string, factory func() any, _ bool) storageEngine {
 			return &countingEngine{inner: newSerializedEngine(collection, factory)}
 		}
 	}

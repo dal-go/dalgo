@@ -19,9 +19,12 @@ type collectionDef struct {
 	newEngine engineFactory
 }
 
-// engineFactory builds a storage engine for a collection given its name and
-// record-type factory (nil when schemaless).
-type engineFactory func(collection string, factory func() any) storageEngine
+// engineFactory builds a storage engine for a collection given its name, its
+// record-type factory (nil when schemaless), and the schema-wide ref-breaking
+// default (faithful unless WithoutSchemaRefBreaking was used). An engine that
+// has no per-collection fidelity setting honors schemaRefBreaking; the
+// Serialized engine ignores it (it is always faithful).
+type engineFactory func(collection string, factory func() any, schemaRefBreaking bool) storageEngine
 
 // CollectionOption configures a collection definition produced by WithCollection
 // — currently the per-collection storage-engine selection. Pass it as a trailing
@@ -37,8 +40,53 @@ func WithSerializedStorage() CollectionOption {
 	}
 }
 
+// ColumnOption configures a single aspect of a columnar collection: it either
+// supplies a ColumnStrategy for a named column (WithColumnStrategy) or sets the
+// per-collection ref-breaking override (WithColumnarRefBreaking). It is passed
+// to WithColumnarStorage. Exported so an out-of-core package can return one
+// carrying its own ColumnStrategy without dalgo2memory importing it.
+type ColumnOption func(*columnarConfig)
+
+// WithColumnStrategy supplies a ColumnStrategy for the named column of a
+// columnar collection. Columns without an explicit strategy use the default
+// typed-slice strategy.
+func WithColumnStrategy(name string, strategy ColumnStrategy) ColumnOption {
+	return func(cfg *columnarConfig) {
+		if cfg.strategies == nil {
+			cfg.strategies = make(map[string]ColumnStrategy)
+		}
+		cfg.strategies[name] = strategy
+	}
+}
+
+// WithColumnarRefBreaking sets the per-collection ref-breaking override for a
+// columnar collection, taking precedence over the schema-wide default
+// (WithoutSchemaRefBreaking). Pass true to force faithful storage, false to
+// store reference-bearing columns without the serialization round-trip.
+func WithColumnarRefBreaking(refBreaking bool) ColumnOption {
+	return func(cfg *columnarConfig) {
+		cfg.refBreakOver = &refBreaking
+	}
+}
+
+// WithColumnarStorage selects the columnar storage engine for a
+// schema-registered WithCollection[T] collection, with optional per-column
+// strategies and a per-collection ref-breaking override. Selecting columnar
+// storage for a schemaless or non-struct collection fails with a descriptive
+// error when the collection is used.
+func WithColumnarStorage(opts ...ColumnOption) CollectionOption {
+	return func(def *collectionDef) {
+		var cfg columnarConfig
+		for _, opt := range opts {
+			opt(&cfg)
+		}
+		def.newEngine = newColumnarEngineFactory(cfg)
+	}
+}
+
 // serializedEngineFactory is the engineFactory for the default Serialized engine.
-func serializedEngineFactory(collection string, factory func() any) storageEngine {
+// The Serialized engine is always faithful, so it ignores schemaRefBreaking.
+func serializedEngineFactory(collection string, factory func() any, _ bool) storageEngine {
 	return newSerializedEngine(collection, factory)
 }
 
@@ -96,6 +144,17 @@ type memorySchema struct {
 	allowUndefined bool
 }
 
+// WithoutSchemaRefBreaking disables columnar ref-breaking schema-wide: columnar
+// collections store reference-bearing column values without the serialization
+// round-trip unless a collection re-enables it (see WithColumnarRefBreaking).
+// It has no effect on the always-faithful Serialized engine. The default is
+// faithful (ref-breaking on).
+func WithoutSchemaRefBreaking() Option {
+	return func(db *database) {
+		db.schemaRefBreaking = false
+	}
+}
+
 // recordFactory returns the factory for a collection.
 //
 // It returns (nil, nil) when no schema is registered, or when the collection is
@@ -140,7 +199,7 @@ func (db *database) engine(collection string) storageEngine {
 			newEngine = chosen
 		}
 	}
-	eng := newEngine(collection, factory)
+	eng := newEngine(collection, factory, db.schemaRefBreaking)
 	db.collections[collection] = eng
 	return eng
 }

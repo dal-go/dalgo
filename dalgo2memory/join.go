@@ -186,11 +186,46 @@ func (s session) loadRows(collectionName string) ([]memoryRow, error) {
 	if err != nil {
 		return nil, err
 	}
+	return toMemoryRows(engineRows), nil
+}
+
+// candidateRowsEngine is the optional capability a storage engine implements to
+// accelerate the single supported equality WHERE predicate: it returns the rows
+// its column strategy selects (ok=true) or signals "no opinion" (ok=false) so
+// the caller scans all rows. The returned rows are still re-filtered with
+// matchesWhere, so the result is identical to a full scan.
+type candidateRowsEngine interface {
+	candidateRows(condition dal.Condition) ([]engineRow, bool, error)
+}
+
+// loadCandidateRows returns the rows a single-source query must consider for a
+// WHERE condition. When the collection's engine implements candidateRowsEngine
+// and has an opinion about the predicate, only the candidate rows are loaded;
+// otherwise every row is loaded for a full scan.
+func (s session) loadCandidateRows(collectionName string, condition dal.Condition) ([]memoryRow, error) {
+	eng := s.db.engine(collectionName)
+	if ce, ok := eng.(candidateRowsEngine); ok {
+		rows, hasOpinion, err := ce.candidateRows(condition)
+		if err != nil {
+			return nil, err
+		}
+		if hasOpinion {
+			return toMemoryRows(rows), nil
+		}
+	}
+	allRows, err := eng.rows()
+	if err != nil {
+		return nil, err
+	}
+	return toMemoryRows(allRows), nil
+}
+
+func toMemoryRows(engineRows []engineRow) []memoryRow {
 	rows := make([]memoryRow, len(engineRows))
 	for i, r := range engineRows {
 		rows[i] = memoryRow(r)
 	}
-	return rows, nil
+	return rows
 }
 
 func sortByID(rows []memoryRow) {
