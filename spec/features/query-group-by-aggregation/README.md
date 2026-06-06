@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/feature-specification
+status: Stable
+---
+
 # Feature: GROUP BY with aggregation in the query builder, executed by dalgo2memory
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-group-by-aggregation?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-group-by-aggregation?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-group-by-aggregation?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-group-by-aggregation?op=request-change) |

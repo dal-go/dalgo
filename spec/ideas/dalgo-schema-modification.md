@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Approved
+---
+
 # Idea: DALgo Schema Modification (DDL) Surface
 
 **Status:** Approved

@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/feature-specification
+status: Implemented
+---
+
 # Feature: Schema Description Vocabulary & Read Capability (`dbschema`)
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dbschema?op=request-change) |

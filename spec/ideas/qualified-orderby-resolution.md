@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Specified
+---
+
 # Idea: Source-qualified, multi-key ORDER BY resolution in dalgo2memory
 
 **Status:** Specified

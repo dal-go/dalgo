@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Draft
+---
+
 # Idea: DALgo dialect-aware SQL emission
 
 **Status:** Draft

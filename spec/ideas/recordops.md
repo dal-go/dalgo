@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Approved
+---
+
 # Idea: recordops — Recordset Operations Package
 
 **Status:** Approved

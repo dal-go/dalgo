@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/idea-specification
+status: Specified
+---
+
 # Idea: Computed Columns in recordset (neutral evaluator)
 
 **Status:** Specified

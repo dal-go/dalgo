@@ -1,3 +1,7 @@
+---
+format: https://specscore.md/plans-index-specification
+---
+
 # Plans
 
 Implementation plans linked to SpecScore Features. Each plan breaks a Feature into ordered,
