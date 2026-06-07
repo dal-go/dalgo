@@ -1,12 +1,7 @@
 ---
 type: sidekick-seed
-slug: starlark4dalgo-pluggable-formula-engine-adapter-libraries
-captured_at: 2026-06-02T00:00:00Z
 captured_by: specstudio:specify
-captured_during: spec/features/recordset-computed-columns
-trigger: explicit
 status: queued
-synchestra_task: null
 ---
 # starlark4dalgo: pluggable formula-engine adapter libraries for the dalgo recordset.Evaluator interface
 

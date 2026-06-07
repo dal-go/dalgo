@@ -1,12 +1,7 @@
 ---
 type: sidekick-seed
-slug: dalgo-needs-first-class-join-support-in-its-query-model
-captured_at: 2026-06-05T17:24:56Z
 captured_by: user
-captured_during: spec/features/dtql
-trigger: explicit
 status: queued
-synchestra_task: null
 ---
 # dalgo needs first-class join support in its query model
 
