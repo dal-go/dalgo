@@ -6,6 +6,7 @@ import (
 
 	"github.com/dal-go/dalgo/adapters/dalgo2memory"
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/recordset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -135,6 +136,59 @@ func TestCollection_IDPlainOrKeyOption(t *testing.T) {
 	got, err := users.Get(ctx, db, dal.WithFields([]dal.FieldVal{{Name: "tenant", Value: "t1"}, {Name: "id", Value: "u9"}}))
 	require.NoError(t, err)
 	assert.Equal(t, "Carol", got.Name)
+}
+
+func TestCollection_AllDistinct(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		if err := users.Set(ctx, tx, "u1", User{Name: "Alice"}); err != nil {
+			return err
+		}
+		return users.Set(ctx, tx, "u2", User{Name: "Bob"})
+	})
+
+	all, err := users.All(ctx, db)
+	require.NoError(t, err)
+	require.Len(t, all, 2)
+
+	names := []string{all[0].Name, all[1].Name}
+	assert.ElementsMatch(t, []string{"Alice", "Bob"}, names)
+
+	// Results must not alias: mutating one element does not change the other.
+	all[0].Name = "Mutated"
+	assert.NotEqual(t, all[0].Name, all[1].Name)
+}
+
+// unsupportedReadSession is a ReadSession whose query executor reports the query
+// is unsupported, used to verify All surfaces dal.ErrNotSupported.
+type unsupportedReadSession struct{}
+
+func (unsupportedReadSession) Get(context.Context, dal.Record) error { return dal.ErrNotSupported }
+func (unsupportedReadSession) Exists(context.Context, *dal.Key) (bool, error) {
+	return false, dal.ErrNotSupported
+}
+func (unsupportedReadSession) GetMulti(context.Context, []dal.Record) error {
+	return dal.ErrNotSupported
+}
+func (unsupportedReadSession) ExecuteQueryToRecordsReader(context.Context, dal.Query) (dal.RecordsReader, error) {
+	return nil, dal.ErrNotSupported
+}
+func (unsupportedReadSession) ExecuteQueryToRecordsetReader(context.Context, dal.Query, ...recordset.Option) (dal.RecordsetReader, error) {
+	return nil, dal.ErrNotSupported
+}
+
+var _ dal.ReadSession = unsupportedReadSession{}
+
+func TestCollection_AllUnsupportedSurfacesError(t *testing.T) {
+	ctx := context.Background()
+	users := dal.CollectionOf[User]()
+
+	all, err := users.All(ctx, unsupportedReadSession{})
+	require.ErrorIs(t, err, dal.ErrNotSupported)
+	assert.Nil(t, all)
 }
 
 func TestCollection_WriteNeedsWriteSession(t *testing.T) {

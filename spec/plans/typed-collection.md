@@ -48,7 +48,7 @@ Implement `Get(ctx, ReadSession, id) (T, error)` by wrapping `new(T)` in a recor
 
 **Verifies:** typed-collection#ac:typed-all-distinct, typed-collection#ac:all-unsupported-surfaces-error
 **Depends-On:** 2
-**Status:** pending
+**Status:** done
 
 Implement `All(ctx, ReadSession) ([]T, error)` building a `StructuredQuery` over the handle's `CollectionRef` with a per-row `new(T)` factory so results never alias; surface `dal.ErrNotSupported` from backends that cannot run the query.
 
