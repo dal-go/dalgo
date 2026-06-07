@@ -97,6 +97,16 @@ Verified by the cross-adapter end2end suite plus dal unit tests proving: Get/All
 - **Existing Features affected:** the point CRUD terminals are additive (no existing call site changes; `CollectionRef` reused unchanged; adapters get those ergonomics for free). The generated `Insert` requires the adapter `InsertOption` change above — a coordinated, storage-specific change to each adapter, not free.
 - **Dependencies:** the existing `dal` session interfaces (`ReadSession`/`WriteSession`), the `Key`/`CollectionRef` path types, the `update` package, and (for generated `Insert` only) adapter support for `InsertOption`. No new external dependency; `dal` does not gain a `record` import.
 
+## Delivery (sub-plans)
+
+This Idea is delivered as three Features, each with its own Approved, AC-mapped Plan. Execute in dependency order — `typed-collection` is the foundation; the other two extend the same `dal.Collection[T]` type and depend on it (but not on each other). This section is the umbrella/epic view (a lint-clean parent-plan-of-plans is not supported by the current `specscore` plan schema).
+
+| Order | Feature | Plan | Scope | Tasks / ACs |
+|:--:|---|---|---|:--:|
+| 1 | `typed-collection` | `spec/plans/typed-collection.md` | Session-less `dal.Collection[T]` point CRUD: constructors, `id any`, `Get`/`All`/`InsertWithID`/`Set`/`Update`/`Delete`, `.In`. Pure additive, `dal`-only. | 8 / 15 |
+| 2 | `collection-generated-insert` | `spec/plans/collection-generated-insert.md` | Generated-id `Insert(...InsertOption)` + `dalgo2memory` honoring `InsertOption` (approach C) + loud-failure guard + end2end. Depends on (1). | 4 / 7 |
+| 3 | `typed-collection-extras` | `spec/plans/typed-collection-extras.md` | `ManyInserter[T]`/`Item[T]` batch insert + `Count`/`Exists`/`First`. Depends on (1); independent of (2). | 4 / 8 |
+
 ## Open Questions
 
 _Resolved during ideation:_ session binding (per-call, session-less handle); read/write safety (no handle split — `ReadSession`/`WriteSession` terminal params); package ownership (`dal`, cycle-free); reuse of `CollectionRef` (by composition, not generification); id slot typing (`any` = plain value | eager `WithID`/`WithFields` KeyOption, no new id type); `Insert` split into `InsertWithID` (known id) + bare `Insert` (generated via `...InsertOption`), so generators route through `InsertOption` only and are rejected elsewhere at compile time; all insert terminals return `(*Key, error)` (rehydrate); `Get` not-found returns `(zero T, error)`; generated `Insert` uses approach C — adapters honor `InsertOption` (storage-specific), starting with `dalgo2memory`, proven by an end2end test. Remaining:
