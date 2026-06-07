@@ -2,11 +2,19 @@ package dal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/dal-go/dalgo/update"
 )
+
+// ErrInsertOptionNotHonored is returned by Collection[T].Insert when the
+// underlying WriteSession reports success but leaves the record's key without an
+// id — i.e. the adapter ignored the InsertOption generator. It makes a generated
+// Insert fail LOUDLY on a non-honoring adapter instead of reporting a false
+// success under a <nil> id.
+var ErrInsertOptionNotHonored = errors.New("dal: insert option not honored: record key has no id after a successful insert")
 
 // CollectionNamer is implemented by a record type that knows its own collection
 // name. The CollectionName method MUST be declared on a value receiver so that
@@ -147,6 +155,9 @@ func (c collection[T]) Insert(ctx context.Context, s WriteSession, value T, opts
 	}
 	if err := s.Insert(ctx, record, opts...); err != nil {
 		return nil, err
+	}
+	if id := record.Key().ID; id == nil || id == "" {
+		return nil, fmt.Errorf("%w (collection %q)", ErrInsertOptionNotHonored, c.ref.Name())
 	}
 	return record.Key(), nil
 }

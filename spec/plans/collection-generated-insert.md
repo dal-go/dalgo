@@ -40,7 +40,7 @@ Add `Insert(ctx, WriteSession, value T, opts ...dal.InsertOption) (*dal.Key, err
 
 **Verifies:** collection-generated-insert#ac:loud-failure-on-nonhonoring-adapter
 **Depends-On:** 2
-**Status:** pending
+**Status:** done
 
 After the underlying insert returns nil error, have `Insert` assert the record's key id is non-nil/non-empty and otherwise return a descriptive error (e.g. an exported sentinel), so generated `Insert` fails loudly on an adapter that ignores `InsertOption` instead of reporting a `<nil>`-id success. Test with a stub `WriteSession` that drops the option.
 

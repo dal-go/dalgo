@@ -239,6 +239,66 @@ func TestCollection_InsertWithExplicitOption(t *testing.T) {
 	assert.Len(t, id, 20, "explicit WithRandomStringKey(20,...) must yield a 20-char id")
 }
 
+// stubWriteSession is a WriteSession whose Insert behavior is supplied per test;
+// every other method is an unused no-op. It lets us drive Collection[T].Insert's
+// loud-failure guard and the underlying-insert error path without a real backend.
+type stubWriteSession struct {
+	insert func(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error
+}
+
+func (s stubWriteSession) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
+	return s.insert(ctx, record, opts...)
+}
+func (stubWriteSession) InsertMulti(context.Context, []dal.Record, ...dal.InsertOption) error {
+	return nil
+}
+func (stubWriteSession) Set(context.Context, dal.Record) error        { return nil }
+func (stubWriteSession) SetMulti(context.Context, []dal.Record) error { return nil }
+func (stubWriteSession) Delete(context.Context, *dal.Key) error       { return nil }
+func (stubWriteSession) DeleteMulti(context.Context, []*dal.Key) error {
+	return nil
+}
+func (stubWriteSession) Update(context.Context, *dal.Key, []update.Update, ...dal.Precondition) error {
+	return nil
+}
+func (stubWriteSession) UpdateRecord(context.Context, dal.Record, []update.Update, ...dal.Precondition) error {
+	return nil
+}
+func (stubWriteSession) UpdateMulti(context.Context, []*dal.Key, []update.Update, ...dal.Precondition) error {
+	return nil
+}
+
+var _ dal.WriteSession = stubWriteSession{}
+
+func TestCollection_InsertLoudFailureOnNonHonoringAdapter(t *testing.T) {
+	ctx := context.Background()
+	users := dal.CollectionOf[User]()
+
+	// A WriteSession that ignores InsertOption leaves the key incomplete.
+	dropping := stubWriteSession{insert: func(context.Context, dal.Record, ...dal.InsertOption) error {
+		return nil // success, but never assigns an id
+	}}
+
+	key, err := users.Insert(ctx, dropping, User{Name: "Alice"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, dal.ErrInsertOptionNotHonored)
+	assert.Nil(t, key, "no key may be returned when the option was not honored")
+}
+
+func TestCollection_InsertUnderlyingErrorPassthrough(t *testing.T) {
+	ctx := context.Background()
+	users := dal.CollectionOf[User]()
+
+	boom := errors.New("insert failed")
+	failing := stubWriteSession{insert: func(context.Context, dal.Record, ...dal.InsertOption) error {
+		return boom
+	}}
+
+	key, err := users.Insert(ctx, failing, User{Name: "Alice"})
+	require.ErrorIs(t, err, boom)
+	assert.Nil(t, key)
+}
+
 func TestCollection_InsertWithIDReturnsKey(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
