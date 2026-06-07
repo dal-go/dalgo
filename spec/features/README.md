@@ -29,6 +29,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [serialized-storage](serialized-storage/README.md) | Stable | — |
 | [columnar-storage](columnar-storage/README.md) | Stable | — |
 | [columnar-mixed-mode-maps](columnar-mixed-mode-maps/README.md) | Stable | — |
+| [typed-collection](typed-collection/README.md) | Approved | — |
 
 ## Open Questions
 

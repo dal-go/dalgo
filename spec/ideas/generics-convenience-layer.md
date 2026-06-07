@@ -1,14 +1,14 @@
 ---
 format: https://specscore.md/idea-specification
-status: Approved
+status: Specifying
 ---
 
 # Idea: Generics-first, context-first typed convenience layer
 
-**Status:** Approved
+**Status:** Specified
 **Date:** 2026-06-07
 **Owner:** alexander.trakhimenok
-**Promotes To:** —
+**Promotes To:** typed-collection
 **Supersedes:** —
 **Related Ideas:** —
 
