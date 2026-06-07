@@ -24,7 +24,7 @@ Adapter first, terminal second: wire `dalgo2memory` to honor `InsertOption` so g
 
 **Verifies:** collection-generated-insert#ac:memory-generates-via-insert-option, collection-generated-insert#ac:generation-precedes-storage
 **Depends-On:** —
-**Status:** pending
+**Status:** done
 
 Extend `dalgo2memory`'s write path so that when `NewInsertOptions(opts...).IDGenerator()` is non-nil it runs `dal.InsertWithIdGenerator` (supplying an `exists` predicate over the engine and an `insert` callback), generating the id and retrying on collision BEFORE computing the storage key. On generator exhaustion return the generator's error with nothing persisted. This also makes raw `session.Insert(ctx, record, gen)` work, fixing the latent no-op.
 
