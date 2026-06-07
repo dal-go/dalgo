@@ -34,6 +34,12 @@ type Collection[T any] interface {
 	// backends that cannot run the query.
 	All(ctx context.Context, s ReadSession) ([]T, error)
 
+	// Insert inserts value under a GENERATED id and returns the assigned key.
+	// When opts is empty a default generator (WithRandomStringKey) is injected.
+	// Only this terminal accepts InsertOption — generators cannot reach the
+	// id-taking terminals.
+	Insert(ctx context.Context, s WriteSession, value T, opts ...InsertOption) (*Key, error)
+
 	// InsertWithID inserts value at a known id and returns the record's key.
 	InsertWithID(ctx context.Context, s WriteSession, id any, value T) (*Key, error)
 
@@ -128,6 +134,21 @@ func (c collection[T]) All(ctx context.Context, s ReadSession) ([]T, error) {
 		values[i] = *r.Data().(*T)
 	}
 	return values, nil
+}
+
+func (c collection[T]) Insert(ctx context.Context, s WriteSession, value T, opts ...InsertOption) (*Key, error) {
+	key := NewIncompleteKey(c.ref.Name(), reflect.String, c.ref.Parent())
+	if err := c.guardParent(key); err != nil {
+		return nil, err
+	}
+	record := NewRecordWithData(key, &value)
+	if len(opts) == 0 {
+		opts = []InsertOption{WithRandomStringKey(DefaultRandomStringIDLength, 5)}
+	}
+	if err := s.Insert(ctx, record, opts...); err != nil {
+		return nil, err
+	}
+	return record.Key(), nil
 }
 
 func (c collection[T]) InsertWithID(ctx context.Context, s WriteSession, id any, value T) (*Key, error) {

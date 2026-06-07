@@ -32,7 +32,7 @@ Extend `dalgo2memory`'s write path so that when `NewInsertOptions(opts...).IDGen
 
 **Verifies:** collection-generated-insert#ac:generated-insert-returns-key, collection-generated-insert#ac:generated-insert-explicit-option, collection-generated-insert#ac:generator-not-accepted-elsewhere
 **Depends-On:** 1
-**Status:** pending
+**Status:** done
 
 Add `Insert(ctx, WriteSession, value T, opts ...dal.InsertOption) (*dal.Key, error)` to `dal.Collection[T]`: build a record with an incomplete key from the handle's `CollectionRef`, inject the default `WithRandomStringKey(dal.DefaultRandomStringIDLength, 5)` when `opts` is empty, forward to `WriteSession.Insert`, and return the assigned key. Confirm (signature + negative-compile example) that only the bare `Insert` accepts `InsertOption`, so generators cannot reach `InsertWithID`/`Get`/`Set`/`Update`/`Delete`.
 

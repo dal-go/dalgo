@@ -201,6 +201,44 @@ func TestCollection_AllUnsupportedSurfacesError(t *testing.T) {
 	assert.Nil(t, all)
 }
 
+func TestCollection_InsertGeneratesKey(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	var key *dal.Key
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		var err error
+		key, err = users.Insert(ctx, tx, User{Name: "Alice"})
+		return err
+	})
+
+	require.NotNil(t, key)
+	id, ok := key.ID.(string)
+	require.True(t, ok)
+	require.NotEmpty(t, id, "id must be a non-empty generated string")
+
+	got, err := users.Get(ctx, db, id)
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", got.Name)
+}
+
+func TestCollection_InsertWithExplicitOption(t *testing.T) {
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	var key *dal.Key
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		var err error
+		key, err = users.Insert(ctx, tx, User{Name: "Alice"}, dal.WithRandomStringKey(20, 5))
+		return err
+	})
+
+	id, ok := key.ID.(string)
+	require.True(t, ok)
+	assert.Len(t, id, 20, "explicit WithRandomStringKey(20,...) must yield a 20-char id")
+}
+
 func TestCollection_InsertWithIDReturnsKey(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
@@ -352,6 +390,9 @@ func TestCollection_WriteTerminalsIncompleteParentError(t *testing.T) {
 	contacts := dal.CollectionOf[Contact]().In(incompleteParent)
 
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		if _, err := contacts.Insert(ctx, tx, Contact{}); err == nil {
+			return errors.New("Insert must error under incomplete parent")
+		}
 		if _, err := contacts.InsertWithID(ctx, tx, "c1", Contact{}); err == nil {
 			return errors.New("InsertWithID must error under incomplete parent")
 		}

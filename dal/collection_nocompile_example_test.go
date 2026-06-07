@@ -26,3 +26,23 @@ func writeTerminalRejectsPlainDB(ctx context.Context, db dal.DB) {
 	// COMPILE ERROR (expected): dal.DB does not satisfy dal.WriteSession.
 	_ = users.Set(ctx, db, "u1", User{Name: "Alice"})
 }
+
+// generatorRejectedByIDTakingTerminals is the NEGATIVE-COMPILE proof for AC
+// generator-not-accepted-elsewhere: only the bare Insert accepts
+// ...dal.InsertOption; the id-taking terminals (InsertWithID/Get/Set/Update/
+// Delete) MUST NOT, so passing a generator to them is a compile error.
+func generatorRejectedByIDTakingTerminals(ctx context.Context, tx dal.ReadwriteTransaction) {
+	users := dal.CollectionOf[User]()
+	gen := dal.WithRandomStringKey(16, 5)
+
+	// Each line below is an expected COMPILE ERROR: these terminals take no
+	// InsertOption.
+	_, _ = users.InsertWithID(ctx, tx, "u1", User{}, gen)
+	_, _ = users.Get(ctx, tx, "u1", gen)
+	_ = users.Set(ctx, tx, "u1", User{}, gen)
+	_ = users.Update(ctx, tx, "u1", nil, gen)
+	_ = users.Delete(ctx, tx, "u1", gen)
+
+	// The bare Insert, by contrast, DOES accept it (this line is valid).
+	_, _ = users.Insert(ctx, tx, User{}, gen)
+}
