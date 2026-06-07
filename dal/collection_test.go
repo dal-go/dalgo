@@ -84,6 +84,31 @@ func TestCollectionAt_ConstructByExplicitName(t *testing.T) {
 	assert.Equal(t, "things/t1", key.String())
 }
 
+func TestCollection_GetRoundtrip(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+	})
+
+	got, err := users.Get(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", got.Name)
+}
+
+func TestCollection_GetNotFound(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	got, err := users.Get(ctx, db, "missing")
+	require.Error(t, err)
+	assert.True(t, dal.IsNotFound(err), "error must be a not-found error from the Get call")
+	assert.Equal(t, User{}, got, "must return the zero value on not-found")
+}
+
 func TestCollection_IDPlainOrKeyOption(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)

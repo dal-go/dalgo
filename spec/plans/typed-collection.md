@@ -40,7 +40,7 @@ Internal helper turning the `id any` argument into a `*dal.Key` from the handle'
 
 **Verifies:** typed-collection#ac:typed-get-roundtrip, typed-collection#ac:get-not-found
 **Depends-On:** 2
-**Status:** pending
+**Status:** done
 
 Implement `Get(ctx, ReadSession, id) (T, error)` by wrapping `new(T)` in a record and calling the session getter, returning the decoded value. Map the session call's not-found error to `(zero T, err)` without consulting `record.Error()`/`record.Exists()`.
 
