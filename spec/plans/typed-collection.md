@@ -72,7 +72,7 @@ Implement `Update(ctx, WriteSession, id, updates []update.Update, preconditions 
 
 **Verifies:** typed-collection#ac:nested-get, typed-collection#ac:nested-incomplete-parent-errors
 **Depends-On:** 3
-**Status:** pending
+**Status:** done
 
 Implement `In(parent *dal.Key) dal.Collection[T]` composing the `CollectionRef` parent chain (one level). A terminal on a handle scoped under an incomplete parent key returns a descriptive error rather than panicking.
 

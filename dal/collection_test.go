@@ -2,6 +2,7 @@ package dal_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/dal-go/dalgo/adapters/dalgo2memory"
@@ -25,6 +26,13 @@ func (User) CollectionName() string { return "users" }
 type thing struct {
 	Name string `json:"name"`
 }
+
+// Contact is a nested record type, stored under a parent user.
+type Contact struct {
+	Email string `json:"email"`
+}
+
+func (Contact) CollectionName() string { return "contacts" }
 
 func newMemoryDB(t *testing.T) dal.DB {
 	t.Helper()
@@ -267,6 +275,41 @@ func TestCollection_DeleteRemoves(t *testing.T) {
 
 	_, err := users.Get(ctx, db, "u1")
 	assert.True(t, dal.IsNotFound(err), "record must be gone after Delete")
+}
+
+func TestCollection_NestedGet(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+
+	parentKey := dal.NewKeyWithID("users", "u1")
+	contacts := dal.CollectionOf[Contact]().In(parentKey)
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		key, err := contacts.InsertWithID(ctx, tx, "c1", Contact{Email: "a@example.com"})
+		if err != nil {
+			return err
+		}
+		assert.Equal(t, "users/u1/contacts/c1", key.String())
+		return nil
+	})
+
+	got, err := contacts.Get(ctx, db, "c1")
+	require.NoError(t, err)
+	assert.Equal(t, "a@example.com", got.Email)
+}
+
+func TestCollection_NestedIncompleteParentErrors(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+
+	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
+	contacts := dal.CollectionOf[Contact]().In(incompleteParent)
+
+	assert.NotPanics(t, func() {
+		_, err := contacts.Get(ctx, db, "c1")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "incomplete parent")
+	})
 }
 
 func TestCollection_WriteNeedsWriteSession(t *testing.T) {
