@@ -1,6 +1,6 @@
 ---
 format: https://specscore.md/idea-specification
-status: Specifying
+status: Specified
 ---
 
 # Idea: Generics-first, context-first typed convenience layer
