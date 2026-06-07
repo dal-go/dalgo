@@ -47,7 +47,7 @@ import (
 	"fmt"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/dalgo2memory"
+	"github.com/dal-go/dalgo/adapters/dalgo2memory"
 )
 
 type User struct {
