@@ -1,11 +1,11 @@
 ---
 format: https://specscore.md/idea-specification
-status: Draft
+status: Approved
 ---
 
 # Idea: Generics-first, context-first typed convenience layer
 
-**Status:** Draft
+**Status:** Approved
 **Date:** 2026-06-07
 **Owner:** alexander.trakhimenok
 **Promotes To:** —
