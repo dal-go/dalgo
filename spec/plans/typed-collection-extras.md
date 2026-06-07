@@ -48,7 +48,7 @@ Implement `Exists(ctx, ReadSession, id any) (bool, error)` as a key-only probe: 
 
 **Verifies:** typed-collection-extras#ac:first-returns-or-empty, typed-collection-extras#ac:first-unsupported
 **Depends-On:** —
-**Status:** pending
+**Status:** done
 
 Implement `First(ctx, ReadSession) (T, bool, error)` building a limit-1 `StructuredQuery` over the `CollectionRef` with a `new(T)` factory; return `(value, true, nil)` for a non-empty collection, `(zero T, false, nil)` for an empty one, and surface `dal.ErrNotSupported` from incapable backends.
 

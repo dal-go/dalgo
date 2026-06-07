@@ -531,6 +531,37 @@ func TestCollection_ExistsErrorPassthrough(t *testing.T) {
 	assert.False(t, exists)
 }
 
+func TestCollection_FirstReturnsOrEmpty(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	// Empty collection: (zero, false, nil).
+	value, found, err := users.First(ctx, db)
+	require.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, User{}, value)
+
+	// Non-empty collection: (value, true, nil).
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+	})
+	value, found, err = users.First(ctx, db)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "Alice", value.Name)
+}
+
+func TestCollection_FirstUnsupported(t *testing.T) {
+	ctx := context.Background()
+	users := dal.CollectionOf[User]()
+
+	value, found, err := users.First(ctx, unsupportedReadSession{})
+	require.ErrorIs(t, err, dal.ErrNotSupported)
+	assert.False(t, found)
+	assert.Equal(t, User{}, value)
+}
+
 func TestCollection_ItemTypeShape(t *testing.T) {
 	// Item[T] is exactly {ID any; Value T}. (The no-record-import half of the AC
 	// is enforced by TestDalDoesNotImportRecord.)
