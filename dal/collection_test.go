@@ -470,6 +470,34 @@ func TestCollection_WriteTerminalsIncompleteParentError(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCollection_CountReturnsTotal(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		for _, id := range []string{"u1", "u2", "u3"} {
+			if err := users.Set(ctx, tx, id, User{Name: id}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	n, err := users.Count(ctx, db)
+	require.NoError(t, err)
+	assert.Equal(t, 3, n)
+}
+
+func TestCollection_CountUnsupported(t *testing.T) {
+	ctx := context.Background()
+	users := dal.CollectionOf[User]()
+
+	n, err := users.Count(ctx, unsupportedReadSession{})
+	require.ErrorIs(t, err, dal.ErrNotSupported)
+	assert.Equal(t, 0, n)
+}
+
 func TestCollection_ItemTypeShape(t *testing.T) {
 	// Item[T] is exactly {ID any; Value T}. (The no-record-import half of the AC
 	// is enforced by TestDalDoesNotImportRecord.)

@@ -32,7 +32,7 @@ Define `dal.Item[T any]{ ID any; Value T }` (no `record` import) and the `dal.Ma
 
 **Verifies:** typed-collection-extras#ac:count-returns-total, typed-collection-extras#ac:count-unsupported
 **Depends-On:** —
-**Status:** pending
+**Status:** done
 
 Implement `Count(ctx, ReadSession) (int, error)` building a count aggregation `StructuredQuery` over the handle's `CollectionRef` and running it via the `ReadSession` query executor; surface `dal.ErrNotSupported` from incapable backends rather than a silent `0`.
 

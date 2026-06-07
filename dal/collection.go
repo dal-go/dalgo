@@ -42,6 +42,20 @@ type Collection[T any] interface {
 	// backends that cannot run the query.
 	All(ctx context.Context, s ReadSession) ([]T, error)
 
+	// Count returns the number of records in the collection. It surfaces
+	// ErrNotSupported from backends that cannot run the underlying query rather
+	// than a silent 0.
+	Count(ctx context.Context, s ReadSession) (int, error)
+
+	// Exists reports whether a record exists at id. A not-found result maps to
+	// (false, nil); any other failure is returned as (false, err).
+	Exists(ctx context.Context, s ReadSession, id any) (bool, error)
+
+	// First returns the first record in the collection (an underlying limit-1
+	// query). An empty collection yields (zero T, false, nil); an incapable
+	// backend surfaces ErrNotSupported.
+	First(ctx context.Context, s ReadSession) (value T, found bool, err error)
+
 	// Insert inserts value under a GENERATED id and returns the assigned key.
 	// When opts is empty a default generator (WithRandomStringKey) is injected.
 	// Only this terminal accepts InsertOption — generators cannot reach the
@@ -178,6 +192,45 @@ func (c collection[T]) Insert(ctx context.Context, s WriteSession, value T, opts
 		return nil, fmt.Errorf("%w (collection %q)", ErrInsertOptionNotHonored, c.ref.Name())
 	}
 	return record.Key(), nil
+}
+
+func (c collection[T]) Count(ctx context.Context, s ReadSession) (int, error) {
+	query := NewQueryBuilder(From(c.ref)).SelectKeysOnly(reflect.String)
+	records, err := ExecuteQueryAndReadAllToRecords(ctx, query, s)
+	if err != nil {
+		return 0, err
+	}
+	return len(records), nil
+}
+
+func (c collection[T]) Exists(ctx context.Context, s ReadSession, id any) (bool, error) {
+	key, err := c.keyForID(id)
+	if err != nil {
+		return false, err
+	}
+	record := NewRecordWithData(key, new(T))
+	if err = s.Get(ctx, record); err != nil {
+		if IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (c collection[T]) First(ctx context.Context, s ReadSession) (T, bool, error) {
+	var zero T
+	query := NewQueryBuilder(From(c.ref)).Limit(1).SelectIntoRecord(func() Record {
+		return NewRecordWithIncompleteKey(c.ref.Name(), reflect.String, new(T))
+	})
+	records, err := ExecuteQueryAndReadAllToRecords(ctx, query, s)
+	if err != nil {
+		return zero, false, err
+	}
+	if len(records) == 0 {
+		return zero, false, nil
+	}
+	return *records[0].Data().(*T), true, nil
 }
 
 func (c collection[T]) InsertWithID(ctx context.Context, s WriteSession, id any, value T) (*Key, error) {
