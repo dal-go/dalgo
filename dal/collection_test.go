@@ -2,6 +2,7 @@ package dal_test
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -310,6 +311,62 @@ func TestCollection_NestedIncompleteParentErrors(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incomplete parent")
 	})
+}
+
+func TestCollection_KeyOptionError(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	// A KeyOption that fails is surfaced by every terminal's id resolution.
+	// (dal.KeyOption is an alias for func(*dal.Key) error, so this value's
+	// dynamic type matches the type switch in keyForID.)
+	badOpt := func(*dal.Key) error { return errors.New("boom") }
+	_, err := users.Get(ctx, db, badOpt)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "boom")
+}
+
+func TestCollection_InsertWithIDDuplicateErrors(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		_, err := users.InsertWithID(ctx, tx, "u1", User{Name: "Alice"})
+		return err
+	})
+
+	// Inserting again at the same id must surface the session Insert error.
+	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		_, err := users.InsertWithID(ctx, tx, "u1", User{Name: "Bob"})
+		return err
+	})
+	require.Error(t, err)
+}
+
+func TestCollection_WriteTerminalsIncompleteParentError(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
+	contacts := dal.CollectionOf[Contact]().In(incompleteParent)
+
+	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		if _, err := contacts.InsertWithID(ctx, tx, "c1", Contact{}); err == nil {
+			return errors.New("InsertWithID must error under incomplete parent")
+		}
+		if err := contacts.Set(ctx, tx, "c1", Contact{}); err == nil {
+			return errors.New("Set must error under incomplete parent")
+		}
+		if err := contacts.Update(ctx, tx, "c1", []update.Update{update.ByFieldName("email", "x")}); err == nil {
+			return errors.New("Update must error under incomplete parent")
+		}
+		if err := contacts.Delete(ctx, tx, "c1"); err == nil {
+			return errors.New("Delete must error under incomplete parent")
+		}
+		return nil
+	})
+	require.NoError(t, err)
 }
 
 func TestCollection_WriteNeedsWriteSession(t *testing.T) {

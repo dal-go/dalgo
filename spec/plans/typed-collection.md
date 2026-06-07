@@ -80,7 +80,7 @@ Implement `In(parent *dal.Key) dal.Collection[T]` composing the `CollectionRef` 
 
 **Verifies:** typed-collection#ac:additive-suite-stays-green
 **Depends-On:** 7
-**Status:** pending
+**Status:** done
 
 Confirm the layer is additive: run the full pre-existing `dal` + `dalgo2memory` + `end2end` suites and keep them green with no existing call-site changes, and add a test/assertion that `dal` still does not import the `record` package.
 
