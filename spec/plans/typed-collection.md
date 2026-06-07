@@ -24,7 +24,7 @@ Build bottom-up in package `dal`: first the interface, constructors, and session
 
 **Verifies:** typed-collection#ac:construct-by-convention, typed-collection#ac:construct-by-explicit-name, typed-collection#ac:write-needs-write-session
 **Depends-On:** —
-**Status:** pending
+**Status:** done
 
 Define `dal.Collection[T]` (read methods take `ReadSession`, write methods take `WriteSession`), the `CollectionNamer` interface, the unexported impl composing a `dal.CollectionRef`, and the `CollectionOf[T CollectionNamer]()` / `CollectionAt[T any](name)` constructors. Add a negative-compile example proving a write terminal rejects a plain `DB`.
 
