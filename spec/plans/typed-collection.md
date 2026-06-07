@@ -64,7 +64,7 @@ Implement `InsertWithID(ctx, WriteSession, id, value) (*dal.Key, error)` and `Se
 
 **Verifies:** typed-collection#ac:update-applies-fields, typed-collection#ac:delete-removes
 **Depends-On:** 2
-**Status:** pending
+**Status:** done
 
 Implement `Update(ctx, WriteSession, id, updates []update.Update, preconditions ...dal.Precondition) error` and `Delete(ctx, WriteSession, id) error`, delegating to the session `Updater`/`Deleter` with the resolved key.
 

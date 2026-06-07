@@ -7,6 +7,7 @@ import (
 	"github.com/dal-go/dalgo/adapters/dalgo2memory"
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/dalgo/update"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -231,6 +232,41 @@ func TestCollection_SetUpserts(t *testing.T) {
 	got, err = users.Get(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, User{Name: "Bob"}, got)
+}
+
+func TestCollection_UpdateAppliesFields(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+	})
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Update(ctx, tx, "u1", []update.Update{update.ByFieldName("name", "Bob")})
+	})
+
+	got, err := users.Get(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, "Bob", got.Name)
+}
+
+func TestCollection_DeleteRemoves(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+	})
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Delete(ctx, tx, "u1")
+	})
+
+	_, err := users.Get(ctx, db, "u1")
+	assert.True(t, dal.IsNotFound(err), "record must be gone after Delete")
 }
 
 func TestCollection_WriteNeedsWriteSession(t *testing.T) {
