@@ -15,6 +15,46 @@ type genUser struct {
 	Name string `json:"name"`
 }
 
+// TestCollection_Insert_EndToEnd verifies AC e2e-generated-insert-roundtrip: the
+// typed Collection[T].Insert (default generator and an explicit
+// WithRandomStringKey) returns a complete assigned key against dalgo2memory and
+// the record round-trips via Get. This dalgo2memory-specific test is separate
+// from the shared gomock-driven TestDalgoDB suite (which stays green).
+func TestCollection_Insert_EndToEnd(t *testing.T) {
+	ctx := context.Background()
+	db := dalgo2memory.NewDB()
+	users := dal.CollectionAt[genUser]("e2eusers")
+
+	// Default generator (no options).
+	var k1 *dal.Key
+	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		var err error
+		k1, err = users.Insert(ctx, tx, genUser{Name: "Alice"})
+		return err
+	}))
+	require.NotNil(t, k1)
+	id1, ok := k1.ID.(string)
+	require.True(t, ok)
+	require.NotEmpty(t, id1)
+	got1, err := users.Get(ctx, db, id1)
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", got1.Name)
+
+	// Explicit generator with a custom length.
+	var k2 *dal.Key
+	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		var err error
+		k2, err = users.Insert(ctx, tx, genUser{Name: "Bob"}, dal.WithRandomStringKey(24, 5))
+		return err
+	}))
+	id2, ok := k2.ID.(string)
+	require.True(t, ok)
+	assert.Len(t, id2, 24)
+	got2, err := users.Get(ctx, db, id2)
+	require.NoError(t, err)
+	assert.Equal(t, "Bob", got2.Name)
+}
+
 // TestSession_Insert_GeneratesViaInsertOption verifies AC
 // memory-generates-via-insert-option: a raw session.Insert (reached via the
 // transaction handle, outside the typed layer) with a generator InsertOption

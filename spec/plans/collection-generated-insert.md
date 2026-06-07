@@ -48,7 +48,7 @@ After the underlying insert returns nil error, have `Insert` assert the record's
 
 **Verifies:** collection-generated-insert#ac:e2e-generated-insert-roundtrip
 **Depends-On:** 3
-**Status:** pending
+**Status:** done
 
 Add a `dalgo2memory`-specific test (NOT the shared gomock-driven `TestDalgoDB`) exercising generated `Insert` with both the zero-option default and an explicit `WithRandomStringKey`, asserting a complete assigned key is returned and the record round-trips via `Get`; confirm the existing shared `TestDalgoDB` suite stays green.
 
