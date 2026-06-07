@@ -56,7 +56,7 @@ Implement `All(ctx, ReadSession) ([]T, error)` building a `StructuredQuery` over
 
 **Verifies:** typed-collection#ac:insert-with-id-returns-key, typed-collection#ac:set-upserts
 **Depends-On:** 2
-**Status:** pending
+**Status:** done
 
 Implement `InsertWithID(ctx, WriteSession, id, value) (*dal.Key, error)` and `Set(ctx, WriteSession, id, value) error`, delegating to the session `Inserter`/`Setter` with a record built from the resolved key; `InsertWithID` returns that key.
 

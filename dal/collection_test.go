@@ -191,6 +191,48 @@ func TestCollection_AllUnsupportedSurfacesError(t *testing.T) {
 	assert.Nil(t, all)
 }
 
+func TestCollection_InsertWithIDReturnsKey(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	var key *dal.Key
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		var err error
+		key, err = users.InsertWithID(ctx, tx, "u1", User{Name: "Alice"})
+		return err
+	})
+
+	require.NotNil(t, key)
+	assert.Equal(t, "u1", key.ID)
+
+	got, err := users.Get(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", got.Name)
+}
+
+func TestCollection_SetUpserts(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	// Set with no pre-existing record (insert).
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+	})
+	got, err := users.Get(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, User{Name: "Alice"}, got)
+
+	// Set again over the existing record (overwrite).
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Bob"})
+	})
+	got, err = users.Get(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, User{Name: "Bob"}, got)
+}
+
 func TestCollection_WriteNeedsWriteSession(t *testing.T) {
 	// Positive half of AC write-needs-write-session: a write terminal compiles
 	// and commits when given a transaction handle (which satisfies
