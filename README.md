@@ -78,6 +78,111 @@ func main() {
 }
 ```
 
+## 🪄 Typed Collections (Simplified API)
+
+For everyday point CRUD you usually do not need to build keys, wrap records, and
+type-assert data by hand. DALgo provides a generic, session-less
+`dal.Collection[T]` handle that returns typed values directly. It is additive
+over the core API, uses no reflection of its own, and works with every adapter.
+
+```go
+type User struct {
+	Name  string
+	Email string
+}
+
+// CollectionName (value receiver) names the collection.
+func (User) CollectionName() string { return "users" }
+
+// A Collection[T] holds no session, so declare it once and reuse it
+// (e.g. as a package-level var).
+var Users = dal.CollectionOf[User]()
+
+func demo(ctx context.Context, db dal.DB) error {
+	// Writes go through a read-write transaction. Because dal.DB is not a
+	// WriteSession, calling a write terminal with a plain db is a compile error.
+	if err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return Users.Set(ctx, tx, "u1", User{Name: "Ada Lovelace", Email: "ada@example.com"})
+	}); err != nil {
+		return err
+	}
+
+	// Reads take a dal.ReadSession (a plain dal.DB satisfies it) and return T.
+	user, err := Users.Get(ctx, db, "u1")
+	if err != nil {
+		return err // not-found is reported via dal.IsNotFound(err)
+	}
+	fmt.Println(user.Email)
+	return nil
+}
+```
+
+The handle exposes the common operations as typed terminals:
+
+- **Reads:** `Get` (one record → `T`), `All` (whole collection → `[]T`),
+  `First`, `Count`, `Exists`.
+- **Writes:** `Insert` (generated id → `*dal.Key`), `InsertWithID` (known id),
+  `Set` (upsert), `Update`, `Delete`, and batch `InsertMany` via the opt-in
+  `dal.ManyInserter[T]` interface.
+- **Nesting:** `In(parentKey)` scopes the handle to a subcollection such as
+  `users/u1/contacts`.
+- **Compile-time safety:** read terminals take `dal.ReadSession` and write
+  terminals take `dal.WriteSession`, so writes are only reachable inside
+  `RunReadwriteTransaction`.
+
+### Standard `database/sql` vs DALgo
+
+The same "read one user by id" written against the standard library and against
+a DALgo typed collection. The DALgo version is backend-agnostic: the identical
+code runs on Firestore, SQL, the filesystem, or the in-memory adapter.
+
+<table>
+<tr><th>Standard <code>database/sql</code></th><th>DALgo typed collection</th></tr>
+<tr>
+<td>
+
+```go
+type User struct {
+	ID, Name, Email string
+}
+
+func GetUser(ctx context.Context, db *sql.DB, id string) (*User, error) {
+	row := db.QueryRowContext(ctx,
+		"SELECT id, name, email FROM users WHERE id = ?", id)
+
+	u := &User{}
+	err := row.Scan(&u.ID, &u.Name, &u.Email)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+```
+
+</td>
+<td>
+
+```go
+type User struct {
+	Name, Email string
+}
+
+func (User) CollectionName() string { return "users" }
+
+var Users = dal.CollectionOf[User]()
+
+func GetUser(ctx context.Context, db dal.DB, id string) (User, error) {
+	return Users.Get(ctx, db, id)
+}
+```
+
+</td>
+</tr>
+</table>
+
 ## 🔌 Core API
 
 The main package is [`dal`](./dal). It defines the interfaces application code

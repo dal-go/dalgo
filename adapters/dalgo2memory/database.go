@@ -201,7 +201,27 @@ func (s session) SetMulti(ctx context.Context, records []dal.Record) error {
 	return nil
 }
 
-func (s session) Insert(_ context.Context, record dal.Record, _ ...dal.InsertOption) error {
+// insertWithGeneratorMaxAttempts bounds the id-generation collision-retry loop
+// when honoring an InsertOption generator. The deferred InsertOption family does
+// not expose its own max-attempts through the InsertOptions interface, so the
+// storage layer picks the bound; random-string collisions are astronomically
+// rare, so a generous bound is effectively only hit by deterministic generators.
+const insertWithGeneratorMaxAttempts = 100
+
+func (s session) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
+	if gen := dal.NewInsertOptions(opts...).IDGenerator(); gen != nil {
+		return dal.InsertWithIdGenerator(ctx, record, gen, insertWithGeneratorMaxAttempts,
+			func(key *dal.Key) error {
+				if s.db.engine(key.Collection()).exists(keyID(key)) {
+					return nil // id is taken: signal "exists" so generation retries
+				}
+				return dal.ErrRecordNotFound // id is free: signal "not found" so it is inserted
+			},
+			func(r dal.Record) error {
+				return s.save(r, false)
+			},
+		)
+	}
 	return s.save(record, false)
 }
 

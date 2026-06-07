@@ -18,6 +18,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
 | [dalgo2memory-storage-engines](dalgo2memory-storage-engines.md) | Implemented | 2026-06-06 | alex | columnar-mixed-mode-maps, columnar-storage, serialized-storage, storage-engine-seam |
 | [first-class-query-joins](first-class-query-joins.md) | Specified | 2026-06-05 | alexander.trakhimenok | query-joins |
+| [generics-convenience-layer](generics-convenience-layer.md) | Specified | 2026-06-07 | alexander.trakhimenok | collection-generated-insert, typed-collection, typed-collection-extras |
 | [qualified-orderby-resolution](qualified-orderby-resolution.md) | Specified | 2026-06-05 | alex | qualified-orderby-resolution |
 | [query-column-projection](query-column-projection.md) | Implemented | 2026-06-05 | alex | query-column-projection |
 | [query-group-by-aggregation](query-group-by-aggregation.md) | Implemented | 2026-06-05 | alex | query-group-by-aggregation |
