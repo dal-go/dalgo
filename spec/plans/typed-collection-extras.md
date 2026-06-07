@@ -40,7 +40,7 @@ Implement `Count(ctx, ReadSession) (int, error)` building a count aggregation `S
 
 **Verifies:** typed-collection-extras#ac:exists-true-false, typed-collection-extras#ac:exists-error-passthrough
 **Depends-On:** —
-**Status:** pending
+**Status:** done
 
 Implement `Exists(ctx, ReadSession, id any) (bool, error)` as a key-only probe: build the key from `id` + the handle's `CollectionRef`, call the session getter, and map a not-found error to `(false, nil)`, any other error to `(false, err)`, and success to `(true, nil)`.
 

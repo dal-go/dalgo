@@ -498,6 +498,39 @@ func TestCollection_CountUnsupported(t *testing.T) {
 	assert.Equal(t, 0, n)
 }
 
+func TestCollection_ExistsTrueFalse(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+	})
+
+	exists, err := users.Exists(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	exists, err = users.Exists(ctx, db, "missing")
+	require.NoError(t, err)
+	assert.False(t, exists, "not-found must map to (false, nil)")
+
+	// keyForID error path: incomplete parent.
+	nested := dal.CollectionOf[Contact]().In(dal.NewIncompleteKey("users", reflect.String, nil))
+	_, err = nested.Exists(ctx, db, "c1")
+	require.Error(t, err)
+}
+
+func TestCollection_ExistsErrorPassthrough(t *testing.T) {
+	ctx := context.Background()
+	users := dal.CollectionOf[User]()
+
+	// A non-not-found lookup failure must be returned, not swallowed.
+	exists, err := users.Exists(ctx, unsupportedReadSession{}, "u1")
+	require.ErrorIs(t, err, dal.ErrNotSupported)
+	assert.False(t, exists)
+}
+
 func TestCollection_ItemTypeShape(t *testing.T) {
 	// Item[T] is exactly {ID any; Value T}. (The no-record-import half of the AC
 	// is enforced by TestDalDoesNotImportRecord.)
