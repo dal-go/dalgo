@@ -84,6 +84,34 @@ func TestCollectionAt_ConstructByExplicitName(t *testing.T) {
 	assert.Equal(t, "things/t1", key.String())
 }
 
+func TestCollection_IDPlainOrKeyOption(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	// Store once using a plain id value.
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+	})
+
+	// The same record is addressable by the plain value AND by dal.WithID.
+	byPlain, err := users.Get(ctx, db, "u1")
+	require.NoError(t, err)
+	byOption, err := users.Get(ctx, db, dal.WithID("u1"))
+	require.NoError(t, err)
+	assert.Equal(t, byPlain, byOption)
+	assert.Equal(t, "Alice", byPlain.Name)
+
+	// A composite-key record is addressable by dal.WithFields.
+	composite := dal.WithFields([]dal.FieldVal{{Name: "tenant", Value: "t1"}, {Name: "id", Value: "u9"}})
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, composite, User{Name: "Carol"})
+	})
+	got, err := users.Get(ctx, db, dal.WithFields([]dal.FieldVal{{Name: "tenant", Value: "t1"}, {Name: "id", Value: "u9"}}))
+	require.NoError(t, err)
+	assert.Equal(t, "Carol", got.Name)
+}
+
 func TestCollection_WriteNeedsWriteSession(t *testing.T) {
 	// Positive half of AC write-needs-write-session: a write terminal compiles
 	// and commits when given a transaction handle (which satisfies

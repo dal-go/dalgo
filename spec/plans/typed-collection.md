@@ -32,7 +32,7 @@ Define `dal.Collection[T]` (read methods take `ReadSession`, write methods take 
 
 **Verifies:** typed-collection#ac:id-plain-or-keyoption
 **Depends-On:** 1
-**Status:** pending
+**Status:** done
 
 Internal helper turning the `id any` argument into a `*dal.Key` from the handle's `CollectionRef`: a plain value sets `Key.ID`; a `dal.KeyOption` (`WithID`/`WithFields`) is applied via `NewKeyWithOptions`. Shared by every terminal.
 
