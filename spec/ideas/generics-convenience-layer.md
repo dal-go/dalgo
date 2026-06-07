@@ -8,7 +8,7 @@ status: Specified
 **Status:** Specified
 **Date:** 2026-06-07
 **Owner:** alexander.trakhimenok
-**Promotes To:** collection-generated-insert, typed-collection
+**Promotes To:** collection-generated-insert, typed-collection, typed-collection-extras
 **Supersedes:** —
 **Related Ideas:** —
 

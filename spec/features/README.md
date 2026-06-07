@@ -31,6 +31,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [columnar-mixed-mode-maps](columnar-mixed-mode-maps/README.md) | Stable | — |
 | [typed-collection](typed-collection/README.md) | Approved | — |
 | [collection-generated-insert](collection-generated-insert/README.md) | Approved | — |
+| [typed-collection-extras](typed-collection-extras/README.md) | Approved | — |
 
 ## Open Questions
 
