@@ -470,6 +470,70 @@ func TestCollection_WriteTerminalsIncompleteParentError(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCollection_ItemTypeShape(t *testing.T) {
+	// Item[T] is exactly {ID any; Value T}. (The no-record-import half of the AC
+	// is enforced by TestDalDoesNotImportRecord.)
+	item := dal.Item[User]{ID: "u1", Value: User{Name: "Alice"}}
+	assert.Equal(t, any("u1"), item.ID)
+	assert.Equal(t, User{Name: "Alice"}, item.Value)
+}
+
+func TestCollection_InsertManyRoundtrips(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[User]()
+
+	mi, ok := users.(dal.ManyInserter[User])
+	require.True(t, ok, "Collection[T] value must satisfy dal.ManyInserter[T]")
+
+	var keys []*dal.Key
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		var err error
+		keys, err = mi.InsertMany(ctx, tx,
+			dal.Item[User]{ID: "u1", Value: User{Name: "Alice"}},
+			dal.Item[User]{ID: "u2", Value: User{Name: "Bob"}},
+		)
+		return err
+	})
+
+	require.Len(t, keys, 2)
+	assert.Equal(t, "u1", keys[0].ID)
+	assert.Equal(t, "u2", keys[1].ID)
+
+	got1, err := users.Get(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", got1.Name)
+	got2, err := users.Get(ctx, db, "u2")
+	require.NoError(t, err)
+	assert.Equal(t, "Bob", got2.Name)
+}
+
+func TestCollection_InsertManyErrorPaths(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+
+	// keyForID error: incomplete parent.
+	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
+	nested := dal.CollectionOf[Contact]().In(incompleteParent).(dal.ManyInserter[Contact])
+	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		_, e := nested.InsertMany(ctx, tx, dal.Item[Contact]{ID: "c1", Value: Contact{}})
+		return e
+	})
+	require.Error(t, err)
+
+	// InsertMulti error: duplicate id within the same collection.
+	users := dal.CollectionOf[User]().(dal.ManyInserter[User])
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		_, e := users.InsertMany(ctx, tx, dal.Item[User]{ID: "dup", Value: User{Name: "A"}})
+		return e
+	})
+	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		_, e := users.InsertMany(ctx, tx, dal.Item[User]{ID: "dup", Value: User{Name: "B"}})
+		return e
+	})
+	require.Error(t, err)
+}
+
 func TestCollection_WriteNeedsWriteSession(t *testing.T) {
 	// Positive half of AC write-needs-write-session: a write terminal compiles
 	// and commits when given a transaction handle (which satisfies

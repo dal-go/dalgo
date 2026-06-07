@@ -24,7 +24,7 @@ Each terminal is independent (it adds one method/interface on the existing `Coll
 
 **Verifies:** typed-collection-extras#ac:item-type-no-record-import, typed-collection-extras#ac:insert-many-roundtrips
 **Depends-On:** —
-**Status:** pending
+**Status:** done
 
 Define `dal.Item[T any]{ ID any; Value T }` (no `record` import) and the `dal.ManyInserter[T]` interface; implement `InsertMany(ctx, WriteSession, items ...Item[T]) ([]*dal.Key, error)` on the concrete `Collection[T]` by building `[]dal.Record` from each item's complete key (`Item.ID` + the handle's `CollectionRef`) and delegating to the session's `MultiInserter` (falling back to per-item `Inserter.Insert`), returning keys in input order.
 

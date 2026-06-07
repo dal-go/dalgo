@@ -64,6 +64,24 @@ type Collection[T any] interface {
 	In(parent *Key) Collection[T]
 }
 
+// Item is a dal-native id+value pair for batch insert. ID follows the same
+// id any = plain value | WithID/WithFields convention as the point terminals.
+// Item deliberately does NOT reference the record package, so the batch API adds
+// no dal -> record import.
+type Item[T any] struct {
+	ID    any
+	Value T
+}
+
+// ManyInserter is the opt-in batch-insert interface, mirroring dalgo's
+// Inserter/MultiInserter split. The concrete Collection[T] value satisfies it
+// (obtain it via a type assertion: c.(dal.ManyInserter[T])).
+type ManyInserter[T any] interface {
+	// InsertMany inserts each item at its known id and returns the keys in
+	// input order.
+	InsertMany(ctx context.Context, s WriteSession, items ...Item[T]) (keys []*Key, err error)
+}
+
 // collection is the unexported implementation of Collection[T]. It is a small
 // value composing a CollectionRef and the phantom type T.
 type collection[T any] struct {
@@ -200,4 +218,25 @@ func (c collection[T]) Delete(ctx context.Context, s WriteSession, id any) error
 
 func (c collection[T]) In(parent *Key) Collection[T] {
 	return collection[T]{ref: NewCollectionRef(c.ref.Name(), "", parent)}
+}
+
+// InsertMany inserts each item at its known id, delegating to the session's
+// MultiInserter (every WriteSession provides one), and returns the keys in input
+// order.
+func (c collection[T]) InsertMany(ctx context.Context, s WriteSession, items ...Item[T]) ([]*Key, error) {
+	records := make([]Record, len(items))
+	keys := make([]*Key, len(items))
+	for i, item := range items {
+		key, err := c.keyForID(item.ID)
+		if err != nil {
+			return nil, err
+		}
+		value := item.Value
+		records[i] = NewRecordWithData(key, &value)
+		keys[i] = key
+	}
+	if err := s.InsertMulti(ctx, records); err != nil {
+		return nil, err
+	}
+	return keys, nil
 }
