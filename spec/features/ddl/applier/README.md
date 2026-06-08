@@ -8,6 +8,7 @@ status: Implemented
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/applier?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/applier?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/applier?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl/applier?op=request-change) |
 
 **Status:** Implemented
+**Source Ideas:** —
 **Source Idea:** —
 **Parent Feature:** [`ddl`](../README.md)
 
