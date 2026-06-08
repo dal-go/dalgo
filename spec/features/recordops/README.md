@@ -8,6 +8,7 @@ status: Implemented
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/recordops?op=request-change) |
 
 **Status:** Implemented
+**Source Ideas:** —
 **Source Idea:** [`recordops`](../../ideas/recordops.md)
 
 ## Summary

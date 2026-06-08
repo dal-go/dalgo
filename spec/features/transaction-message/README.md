@@ -8,6 +8,7 @@ status: Approved
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/transaction-message?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/transaction-message?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/transaction-message?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/transaction-message?op=request-change) |
 
 **Status:** Approved
+**Source Ideas:** —
 **Date:** 2026-06-02
 **Owner:** alex
 **Source Idea:** [`transaction-message`](../../ideas/transaction-message.md)

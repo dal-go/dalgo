@@ -8,6 +8,7 @@ status: Implemented
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/ddl?op=request-change) |
 
 **Status:** Implemented
+**Source Ideas:** —
 **Source Idea:** [`dalgo-schema-modification`](../../ideas/dalgo-schema-modification.md)
 
 ## Summary
