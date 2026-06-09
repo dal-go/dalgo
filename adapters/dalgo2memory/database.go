@@ -387,23 +387,121 @@ func keyID(key *dal.Key) string {
 	return fmt.Sprint(key.ID)
 }
 
+// matchesWhere evaluates the WHERE condition shapes that dalgo2firestore
+// translates to native Firestore filters, so memory-backed tests behave like
+// the Firestore adapter:
+//
+//   - FieldRef op Constant for ==, >, >=, <, <=
+//   - Constant In FieldRef    → Firestore's "array-contains"
+//   - FieldRef op dal.Array   → Firestore's "array-contains-any"
+//   - GroupCondition with AND → all sub-conditions must match
+//
+// Any other shape (including OR groups, which dalgo2firestore rejects) does
+// not match.
 func matchesWhere(data map[string]any, condition dal.Condition) bool {
 	if condition == nil {
 		return true
 	}
-	comparison, ok := condition.(dal.Comparison)
-	if !ok || comparison.Operator != dal.Equal {
+	switch cond := condition.(type) {
+	case dal.GroupCondition:
+		if cond.Operator() != dal.And {
+			return false
+		}
+		for _, c := range cond.Conditions() {
+			if !matchesWhere(data, c) {
+				return false
+			}
+		}
+		return true
+	case dal.Comparison:
+		return matchesComparison(data, cond)
+	default:
 		return false
 	}
-	field, ok := comparison.Left.(dal.FieldRef)
-	if !ok {
+}
+
+func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
+	switch left := comparison.Left.(type) {
+	case dal.FieldRef:
+		switch right := comparison.Right.(type) {
+		case dal.Constant:
+			switch comparison.Operator {
+			case dal.Equal:
+				return data[left.Name()] == right.Value
+			case dal.GreaterThen, dal.GreaterOrEqual, dal.LessThen, dal.LessOrEqual:
+				value, ok := data[left.Name()]
+				if !ok {
+					return false
+				}
+				return compareOp(comparison.Operator, value, right.Value)
+			default:
+				return false
+			}
+		case dal.Array:
+			// dalgo2firestore maps FieldRef vs dal.Array to "array-contains-any"
+			// regardless of the operator; mirror that.
+			return fieldContainsAny(data[left.Name()], right.Value)
+		default:
+			return false
+		}
+	case dal.Constant:
+		// dalgo2firestore maps Constant In FieldRef to "array-contains".
+		right, ok := comparison.Right.(dal.FieldRef)
+		if !ok || comparison.Operator != dal.In {
+			return false
+		}
+		return fieldContains(data[right.Name()], left.Value)
+	default:
 		return false
 	}
-	constant, ok := comparison.Right.(dal.Constant)
-	if !ok {
+}
+
+// fieldContains reports whether the record field's value is a slice or array
+// containing v. Serialized rows decode JSON arrays as []any, so elements are
+// matched per elementEquals.
+func fieldContains(fieldValue, v any) bool {
+	rv := reflect.ValueOf(fieldValue)
+	if !rv.IsValid() || (rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array) {
 		return false
 	}
-	return data[field.Name()] == constant.Value
+	for i := 0; i < rv.Len(); i++ {
+		if elementEquals(rv.Index(i).Interface(), v) {
+			return true
+		}
+	}
+	return false
+}
+
+// fieldContainsAny reports whether the record field's value is a slice or
+// array containing at least one element of values ("array-contains-any").
+func fieldContainsAny(fieldValue, values any) bool {
+	rv := reflect.ValueOf(values)
+	if !rv.IsValid() || (rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array) {
+		return false
+	}
+	for i := 0; i < rv.Len(); i++ {
+		if fieldContains(fieldValue, rv.Index(i).Interface()) {
+			return true
+		}
+	}
+	return false
+}
+
+// elementEquals matches an array element against a constant. Numbers are
+// compared by value because serialized rows decode all JSON numbers as
+// float64; everything else uses Go equality (uncomparable values never match).
+func elementEquals(a, b any) bool {
+	if af, ok := number(a); ok {
+		bf, ok := number(b)
+		return ok && af == bf
+	}
+	if t := reflect.TypeOf(a); t != nil && !t.Comparable() {
+		return false
+	}
+	if t := reflect.TypeOf(b); t != nil && !t.Comparable() {
+		return false
+	}
+	return a == b
 }
 
 func compare(a, b any) int {
