@@ -209,7 +209,14 @@ func (s session) SetMulti(ctx context.Context, records []dal.Record) error {
 const insertWithGeneratorMaxAttempts = 100
 
 func (s session) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
-	if gen := dal.NewInsertOptions(opts...).IDGenerator(); gen != nil {
+	options := dal.NewInsertOptions(opts...)
+	gen := options.IDGenerator()
+	if gen == nil && options.PreferAdapterGeneratedID() {
+		// The in-memory backend has no native ID generation mechanism, so per the
+		// dal.WithAdapterGeneratedID contract fall back to the default random-string generator.
+		gen = dal.NewInsertOptions(dal.WithRandomStringKey(dal.DefaultRandomStringIDLength, 5)).IDGenerator()
+	}
+	if gen != nil {
 		return dal.InsertWithIdGenerator(ctx, record, gen, insertWithGeneratorMaxAttempts,
 			func(key *dal.Key) error {
 				if s.db.engine(key.Collection()).exists(keyID(key)) {

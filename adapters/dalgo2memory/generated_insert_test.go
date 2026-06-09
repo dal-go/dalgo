@@ -80,6 +80,54 @@ func TestSession_Insert_GeneratesViaInsertOption(t *testing.T) {
 	assert.Equal(t, "Alice", out.Name)
 }
 
+// TestSession_Insert_WithAdapterGeneratedID verifies that
+// dal.WithAdapterGeneratedID is honored by dalgo2memory: the in-memory backend
+// has no native ID generation, so per the option's contract it falls back to
+// the default random-string generator and the record is retrievable by the
+// generated id.
+func TestSession_Insert_WithAdapterGeneratedID(t *testing.T) {
+	ctx := context.Background()
+	db := dalgo2memory.NewDB()
+
+	var record dal.Record
+	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		record = dal.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Alice"})
+		return tx.Insert(ctx, record, dal.WithAdapterGeneratedID())
+	}))
+
+	id, ok := record.Key().ID.(string)
+	require.True(t, ok, "generated id must be a string")
+	require.NotEmpty(t, id)
+	assert.Len(t, id, dal.DefaultRandomStringIDLength)
+
+	// Retrievable by the generated id.
+	out := &genUser{}
+	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", id), out)))
+	assert.Equal(t, "Alice", out.Name)
+}
+
+// TestSession_Insert_WithAdapterGeneratedID_ExplicitGeneratorWins verifies that
+// when dal.WithAdapterGeneratedID is combined with an explicit generator
+// option, the explicit generator wins (a 24-char id, not the 16-char default).
+func TestSession_Insert_WithAdapterGeneratedID_ExplicitGeneratorWins(t *testing.T) {
+	ctx := context.Background()
+	db := dalgo2memory.NewDB()
+
+	var record dal.Record
+	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		record = dal.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Bob"})
+		return tx.Insert(ctx, record, dal.WithAdapterGeneratedID(), dal.WithRandomStringKey(24, 5))
+	}))
+
+	id, ok := record.Key().ID.(string)
+	require.True(t, ok, "generated id must be a string")
+	assert.Len(t, id, 24, "explicit generator must win over WithAdapterGeneratedID")
+
+	out := &genUser{}
+	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", id), out)))
+	assert.Equal(t, "Bob", out.Name)
+}
+
 // TestSession_Insert_GenerationPrecedesStorage_NoNilID verifies (part of AC
 // generation-precedes-storage) that a generated insert never stores under a
 // "<nil>" id.
