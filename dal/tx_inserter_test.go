@@ -167,6 +167,23 @@ func TestInsertOptions_IDGenerator(t *testing.T) {
 	assert.Equal(t, err, io.IDGenerator()(context.Background(), nil))
 }
 
+func TestWithAdapterGeneratedID(t *testing.T) {
+	t.Run("default_is_false", func(t *testing.T) {
+		io := NewInsertOptions()
+		assert.False(t, io.PreferAdapterGeneratedID())
+	})
+	t.Run("option_sets_flag", func(t *testing.T) {
+		io := NewInsertOptions(WithAdapterGeneratedID())
+		assert.True(t, io.PreferAdapterGeneratedID())
+		assert.Nil(t, io.IDGenerator())
+	})
+	t.Run("explicit_generator_is_preserved_alongside_flag", func(t *testing.T) {
+		io := NewInsertOptions(WithAdapterGeneratedID(), WithRandomStringKey(10, 5))
+		assert.True(t, io.PreferAdapterGeneratedID())
+		assert.NotNil(t, io.IDGenerator(), "explicit generator must win: adapters check IDGenerator() first")
+	})
+}
+
 func TestNewInsertOptions(t *testing.T) {
 	called := false
 	o := func(options *insertOptions) {

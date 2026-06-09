@@ -24,14 +24,23 @@ type IDGenerator = func(ctx context.Context, record Record) error
 // InsertOptions defines interface for insert options
 type InsertOptions interface {
 	IDGenerator() IDGenerator
+
+	// PreferAdapterGeneratedID reports whether WithAdapterGeneratedID was passed.
+	// See WithAdapterGeneratedID for the contract adapters must follow.
+	PreferAdapterGeneratedID() bool
 }
 
 type insertOptions struct {
-	idGenerator IDGenerator
+	idGenerator              IDGenerator
+	preferAdapterGeneratedID bool
 }
 
 func (v insertOptions) IDGenerator() IDGenerator {
 	return v.idGenerator
+}
+
+func (v insertOptions) PreferAdapterGeneratedID() bool {
+	return v.preferAdapterGeneratedID
 }
 
 var _ InsertOptions = (*insertOptions)(nil)
@@ -47,6 +56,26 @@ func NewInsertOptions(opts ...InsertOption) InsertOptions {
 
 // InsertOption defines a contract for an insert option
 type InsertOption func(options *insertOptions)
+
+// WithAdapterGeneratedID requests that the storage adapter generates the record
+// ID natively (e.g. Firestore's client-side auto-generated 20-char document IDs).
+//
+// Contract for adapters:
+//   - An adapter SHOULD use its backend's native ID generation mechanism if it has one.
+//   - An adapter that has no native mechanism MUST fall back to the default
+//     random-string generator (WithRandomStringKey(DefaultRandomStringIDLength, 5)),
+//     so this option never fails on a compliant adapter.
+//   - If an explicit ID generator option (e.g. WithRandomStringKey) is supplied
+//     alongside this option, the explicit generator wins: adapters must check
+//     InsertOptions.IDGenerator() first and only consult
+//     InsertOptions.PreferAdapterGeneratedID() when it is nil.
+//
+// Adapters introspect this option via InsertOptions.PreferAdapterGeneratedID().
+func WithAdapterGeneratedID() InsertOption {
+	return func(options *insertOptions) {
+		options.preferAdapterGeneratedID = true
+	}
+}
 
 type randomStringOptions struct {
 	length int
