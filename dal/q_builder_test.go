@@ -67,6 +67,53 @@ func TestQueryBuilder(t *testing.T) {
 		}
 	})
 
+	t.Run("with_where_array_contains", func(t *testing.T) {
+		qb2 := qb.Clone().WhereArrayContains("tags", "important")
+		q := qb2.SelectIntoRecord(newRecord)
+		assertQuery(t, q)
+
+		// Same shape as WhereInArrayField: value In field, what dalgo2firestore
+		// translates to "array-contains".
+		if comparison, ok := q.Where().(Comparison); ok {
+			assert.Equal(t, In, comparison.Operator)
+			assert.Equal(t, Constant{Value: "important"}, comparison.Left)
+			assert.Equal(t, FieldRef{name: "tags"}, comparison.Right)
+		} else {
+			t.Errorf("Expected Comparison condition, got %T", q.Where())
+		}
+	})
+
+	t.Run("with_where_array_contains_any", func(t *testing.T) {
+		qb2 := qb.Clone().WhereArrayContainsAny("tags", []string{"a", "b"})
+		q := qb2.SelectIntoRecord(newRecord)
+		assertQuery(t, q)
+
+		// Shape: field In array, what dalgo2firestore translates to
+		// "array-contains-any".
+		if comparison, ok := q.Where().(Comparison); ok {
+			assert.Equal(t, In, comparison.Operator)
+			assert.Equal(t, FieldRef{name: "tags"}, comparison.Left)
+			assert.Equal(t, Array{Value: []string{"a", "b"}}, comparison.Right)
+		} else {
+			t.Errorf("Expected Comparison condition, got %T", q.Where())
+		}
+	})
+
+	t.Run("with_where_array_contains_any_passing_array", func(t *testing.T) {
+		arr := Array{Value: []int{1, 2}}
+		qb2 := qb.Clone().WhereArrayContainsAny("nums", arr)
+		q := qb2.SelectIntoRecord(newRecord)
+		assertQuery(t, q)
+
+		if comparison, ok := q.Where().(Comparison); ok {
+			assert.Equal(t, In, comparison.Operator)
+			assert.Equal(t, FieldRef{name: "nums"}, comparison.Left)
+			assert.Equal(t, arr, comparison.Right)
+		} else {
+			t.Errorf("Expected Comparison condition, got %T", q.Where())
+		}
+	})
+
 	t.Run("SelectIntoRecordset", func(t *testing.T) {
 		q := qb.Clone().SelectIntoRecordset()
 		assert.NotNil(t, q)

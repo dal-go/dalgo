@@ -19,6 +19,8 @@ type IQueryBuilder interface {
 	Where(conditions ...Condition) IQueryBuilder
 	WhereField(name string, operator Operator, v any) IQueryBuilder
 	WhereInArrayField(name string, v any) IQueryBuilder
+	WhereArrayContains(name string, v any) IQueryBuilder
+	WhereArrayContainsAny(name string, values any) IQueryBuilder
 	GroupBy(expressions ...Expression) IQueryBuilder
 	Having(conditions ...Condition) IQueryBuilder
 	OrderBy(expressions ...OrderExpression) IQueryBuilder
@@ -105,6 +107,25 @@ func (s *QueryBuilder) WhereField(name string, operator Operator, v any) IQueryB
 
 func (s *QueryBuilder) WhereInArrayField(name string, v any) IQueryBuilder {
 	s.conditions = append(s.conditions, Comparison{Left: Constant{Value: v}, Operator: In, Right: FieldRef{name: name}})
+	return s
+}
+
+// WhereArrayContains adds a condition that an array field contains the given value.
+// Adapters translate it to the platform's array membership operator,
+// e.g. Firestore's "array-contains". It is an alias for WhereInArrayField.
+func (s *QueryBuilder) WhereArrayContains(name string, v any) IQueryBuilder {
+	return s.WhereInArrayField(name, v)
+}
+
+// WhereArrayContainsAny adds a condition that an array field contains at least one
+// element of the given values, e.g. Firestore's "array-contains-any".
+// The values must be a dal.Array or a slice type supported by NewArray.
+func (s *QueryBuilder) WhereArrayContainsAny(name string, values any) IQueryBuilder {
+	arr, ok := values.(Array)
+	if !ok {
+		arr = NewArray(values)
+	}
+	s.conditions = append(s.conditions, Comparison{Left: FieldRef{name: name}, Operator: In, Right: arr})
 	return s
 }
 
