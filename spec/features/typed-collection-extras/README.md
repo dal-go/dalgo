@@ -3,7 +3,7 @@ format: https://specscore.md/feature-specification
 status: Approved
 ---
 
-# Feature: Collection[T] batch insert and Count/Exists/First terminals
+# Feature: Collection[K, T] batch insert and Count/Exists/First terminals
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/typed-collection-extras?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/typed-collection-extras?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/typed-collection-extras?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/typed-collection-extras?op=request-change) |
 **Status:** Approved
@@ -15,11 +15,11 @@ status: Approved
 
 ## Summary
 
-Adds the opt-in ManyInserter[T] batch-insert interface (with dal-native Item[T]) and the Count/Exists/First read conveniences to dal.Collection[T], all additive over existing dal interfaces and cycle-free.
+Adds the opt-in ManyInserter[K, T] batch-insert interface (with dal-native Item[K, T]) and the Count/Exists/First read conveniences to dal.Collection[K, T], all additive over existing dal interfaces and cycle-free.
 
 ## Problem
 
-`typed-collection` ships the point-CRUD core but defers the remaining ergonomic terminals the source Idea identified: batch insert and the `Count`/`Exists`/`First` read conveniences (borrow-doc #2). These are mechanical follow-ons on the same `Collection[T]` handle, but each has a distinct contract worth pinning, and batch insert needs a `dal`-native id+value pair so the layer stays cycle-free (no `record` import). This Feature adds them additively, mirroring dalgo's existing single/multi split.
+`typed-collection` ships the point-CRUD core but defers the remaining ergonomic terminals the source Idea identified: batch insert and the `Count`/`Exists`/`First` read conveniences (borrow-doc #2). These are mechanical follow-ons on the same `Collection[K, T]` handle, but each has a distinct contract worth pinning, and batch insert needs a `dal`-native id+value pair so the layer stays cycle-free (no `record` import). This Feature adds them additively, mirroring dalgo's existing single/multi split.
 
 ## Behavior
 
@@ -27,32 +27,32 @@ Adds the opt-in ManyInserter[T] batch-insert interface (with dal-native Item[T])
 
 #### REQ: item-type
 
-`dal` MUST define `Item[T any]` as a struct `{ ID any; Value T }` — a dal-native id+value pair (the `ID` follows the same `id any` = plain value | `WithID`/`WithFields` `KeyOption` convention as the point terminals). It MUST NOT reference the `record` package, so the batch API adds no `dal` → `record` import.
+`dal` MUST define `Item[K comparable, T any]` as a struct `{ ID K; Value T }` — a dal-native id+value pair whose `ID` is the same typed scalar id `K` used by the point terminals. It MUST NOT reference the `record` package, so the batch API adds no `dal` → `record` import.
 
 #### REQ: many-inserter
 
-`dal` MUST define `ManyInserter[T any]` as a separate interface `{ InsertMany(ctx, s WriteSession, items ...Item[T]) (keys []*dal.Key, err error) }`, mirroring dalgo's `Inserter`/`MultiInserter` split. The concrete `Collection[T]` value MUST satisfy it. `InsertMany` MUST insert each item at its known id (delegating to the session's `MultiInserter` where available, else a sequential fallback) and return the keys in input order. Generated ids are out of scope here (that is the `collection-generated-insert` Feature).
+`dal` MUST define `ManyInserter[K comparable, T any]` as a separate interface `{ InsertMany(ctx, s WriteSession, items ...Item[K, T]) (keys []*dal.Key, err error) }`, mirroring dalgo's `Inserter`/`MultiInserter` split. The concrete `Collection[K, T]` value MUST satisfy it. `InsertMany` MUST insert each item at its known id (delegating to the session's `MultiInserter` where available, else a sequential fallback) and return the keys in input order. Generated ids are out of scope here (that is the `collection-generated-insert` Feature).
 
 ### Read conveniences
 
 #### REQ: count
 
-`Collection[T]` MUST provide `Count(ctx, s ReadSession) (int, error)` returning the number of records in the collection. Where the backend cannot execute the underlying count query it MUST surface `dal.ErrNotSupported` rather than a silent `0`.
+`Collection[K, T]` MUST provide `Count(ctx, s ReadSession) (int, error)` returning the number of records in the collection. Where the backend cannot execute the underlying count query it MUST surface `dal.ErrNotSupported` rather than a silent `0`.
 
 #### REQ: exists
 
-`Collection[T]` MUST provide `Exists(ctx, s ReadSession, id any) (bool, error)` reporting whether a record exists at `id`. A not-found result MUST map to `(false, nil)` — not an error — while any other failure is returned as `(false, err)`.
+`Collection[K, T]` MUST provide `Exists(ctx, s ReadSession, id K) (bool, error)` reporting whether a record exists at `id`. A not-found result MUST map to `(false, nil)` — not an error — while any other failure is returned as `(false, err)`.
 
 #### REQ: first
 
-`Collection[T]` MUST provide `First(ctx, s ReadSession) (value T, found bool, err error)` returning the first record in the collection (an underlying limit-1 query). An empty collection MUST yield `(zero T, false, nil)`; an incapable backend MUST surface `dal.ErrNotSupported`.
+`Collection[K, T]` MUST provide `First(ctx, s ReadSession) (value T, found bool, err error)` returning the first record in the collection (an underlying limit-1 query). An empty collection MUST yield `(zero T, false, nil)`; an incapable backend MUST surface `dal.ErrNotSupported`.
 
 ## Architecture & Components
 
-- **`dal.Item[T]` + `dal.ManyInserter[T]`** — new dal-native types; `Collection[T]`'s concrete impl implements `ManyInserter[T]` by building `[]dal.Record` (each with a complete key from `Item.ID` + the handle's `CollectionRef`) and calling the session's `MultiInserter.InsertMulti`, falling back to per-item `Inserter.Insert` when multi is unavailable.
+- **`dal.Item[K, T]` + `dal.ManyInserter[K, T]`** — new dal-native types; `Collection[K, T]`'s concrete impl implements `ManyInserter[K, T]` by building `[]dal.Record` (each with a complete key from `Item.ID` + the handle's `CollectionRef`) and calling the session's `MultiInserter.InsertMulti`, falling back to per-item `Inserter.Insert` when multi is unavailable.
 - **`Count`/`First`** — build a `StructuredQuery` over the handle's `CollectionRef` (count aggregation; limit-1 select with a per-row `new(T)` factory) and run it via the `ReadSession`'s `QueryExecutor`, inheriting `ErrNotSupported` portability — like `All` in `typed-collection`.
-- **`Exists`** — a key-only existence probe: build the key from `id` + the handle's `CollectionRef` and call the session getter, mapping a not-found error to `(false, nil)`, any other error to `(false, err)`, and success to `(true, nil)`.
-- **Dependencies** — `typed-collection` (the `Collection[T]` type and its `CollectionRef`/`id any` conventions), plus existing `dal` `MultiInserter`/`QueryExecutor`.
+- **`Exists`** — a key-only existence probe: build the key from the typed `id K` + the handle's `CollectionRef` and call the session getter, mapping a not-found error to `(false, nil)`, any other error to `(false, err)`, and success to `(true, nil)`.
+- **Dependencies** — `typed-collection` (the `Collection[K, T]` type and its `CollectionRef`/typed-`id K` conventions), plus existing `dal` `MultiInserter`/`QueryExecutor`.
 
 ## Not Doing / Out of Scope
 
@@ -69,14 +69,14 @@ Adds the opt-in ManyInserter[T] batch-insert interface (with dal-native Item[T])
 
 ### AC: item-type-no-record-import (verifies REQ:item-type)
 
-**Given** the new `dal.Item[T]` type
+**Given** the new `dal.Item[K, T]` type
 **When** the `dal` package is built and its import graph inspected
-**Then** `Item[T]` is `{ID any; Value T}` and `dal` still does not import the `record` package.
+**Then** `Item[K, T]` is `{ID K; Value T}` and `dal` still does not import the `record` package.
 
 ### AC: insert-many-roundtrips (verifies REQ:many-inserter)
 
-**Given** a `Collection[User]` and a writable `tx`
-**When** `InsertMany(ctx, tx, dal.Item[User]{ID:"u1",Value:a}, dal.Item[User]{ID:"u2",Value:b})` is called
+**Given** a `Collection[string, User]` and a writable `tx`
+**When** `InsertMany(ctx, tx, dal.Item[string, User]{ID:"u1",Value:a}, dal.Item[string, User]{ID:"u2",Value:b})` is called
 **Then** records exist at `"u1"` and `"u2"`, and the returned keys are `["u1","u2"]` in input order.
 
 ### AC: count-returns-total (verifies REQ:count)
