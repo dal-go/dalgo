@@ -123,9 +123,11 @@ func demo(ctx context.Context, db dal.DB) error {
 The handle exposes the common operations as typed terminals:
 
 - **Reads:** `GetData` (one record → `T`), `GetRecord` (→ `dal.Record`),
-  `All` (whole collection → `[]T`), `First`, `Count`, `Exists`. For a typed
-  id+record pair use `record.GetWithID(ctx, coll, s, id)` (a free function in
-  package `record`, since `dal` stays free of any `record` import).
+  `GetRecordWithID` (→ `dal.RecordWithID[K]`), `GetRecordWithDataAndID`
+  (→ `dal.RecordWithDataAndID[K, *T]`), `All` (whole collection → `[]T`),
+  `First`, `Count`, `Exists`. For interface-typed model data created by a
+  factory, use the free function `dal.GetRecordWithIDIntoData(ctx, s, key, id,
+  data)`, which decodes into the value you pass.
 - **Writes:** `Insert` (generated id → `*dal.Key`), `InsertWithID` (known id),
   `InsertRecord`, `SetByID` (upsert), `SetRecord`, `UpdateByID`, `UpdateByKey`,
   `DeleteByID`, `DeleteByKey`, and batch `InsertMany` via the opt-in

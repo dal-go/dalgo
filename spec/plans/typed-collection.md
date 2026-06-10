@@ -84,13 +84,13 @@ Implement `In(parent *dal.Key) dal.Collection[T]` composing the `CollectionRef` 
 
 Confirm the layer is additive: run the full pre-existing `dal` + `dalgo2memory` + `end2end` suites and keep them green with no existing call-site changes, and add a test/assertion that `dal` still does not import the `record` package.
 
-### Task 9: GetRecord primitive and record.GetWithID
+### Task 9: GetRecord primitive and typed id accessors
 
 **Verifies:** typed-collection#ac:get-record-and-with-id
 **Depends-On:** 3
 **Status:** done
 
-Add `GetRecord(ctx, ReadSession, id K) (dal.Record, error)` as the read primitive `GetData` delegates to, and the free function `record.GetWithID[K, T](ctx, c, s, id) (record.WithID[K], error)` in package `record` (keeping `dal` free of any `record` import). Both surface the session not-found error.
+Add `GetRecord(ctx, ReadSession, id K) (dal.Record, error)` as the read primitive the other read accessors delegate to. Add the typed id accessors `GetRecordWithID(...) (dal.RecordWithID[K], error)` and `GetRecordWithDataAndID(...) (dal.RecordWithDataAndID[K, *T], error)` as `Collection` methods, plus the free function `dal.GetRecordWithIDIntoData[K, D](ctx, s, key, id, data) (dal.RecordWithDataAndID[K, D], error)` for interface/factory data (decoding into a caller-supplied value). Keep `record.GetWithID` as a deprecated thin forwarder to `Collection.GetRecordWithID`. All surface the session not-found error.
 
 ## Open Questions
 
