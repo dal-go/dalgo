@@ -131,7 +131,9 @@ The handle exposes the common operations as typed terminals:
 - **Writes:** `Insert` (generated id → `*dal.Key`), `InsertWithID` (known id),
   `InsertRecord`, `SetByID` (upsert), `SetRecord`, `UpdateByID`, `UpdateByKey`,
   `DeleteByID`, `DeleteByKey`, and batch `InsertMany` via the opt-in
-  `dal.ManyInserter[K, T]` interface.
+  `dal.ManyInserter[K, T]` interface. For interface-typed model data, insert via
+  the free function `dal.InsertRecordWithDataAndID(ctx, s, key, id, data)` (the
+  write twin of `GetRecordWithIDIntoData`).
 - **Composite / multi-field keys:** pass `dal.WithKeyOptions(...)` to the
   constructor, or build a `*dal.Key` with `dal.NewKeyWithFields` and use the
   `*ByKey` terminals.

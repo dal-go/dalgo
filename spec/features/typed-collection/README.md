@@ -15,7 +15,7 @@ status: Approved
 
 ## Summary
 
-A session-less generic dal.Collection[K, T] handle in package dal with point-CRUD terminals keyed by a typed id K. Reads expose GetData/GetRecord plus the typed id accessors GetRecordWithID/GetRecordWithDataAndID and the dal.GetRecordWithIDIntoData factory function (with a deprecated record.GetWithID forwarder); writes expose InsertWithID/InsertRecord/SetByID/SetRecord/UpdateByID/UpdateByKey/DeleteByID/DeleteByKey, with deprecated Get/Set/Update/Delete aliases. Key options (composite keys, parent) are configured on the constructor via WithKeyOptions. Built additively over the existing dal session interfaces. Generated Insert and batch are separate Features.
+A session-less generic dal.Collection[K, T] handle in package dal with point-CRUD terminals keyed by a typed id K. Reads expose GetData/GetRecord plus the typed id accessors GetRecordWithID/GetRecordWithDataAndID and the dal.GetRecordWithIDIntoData factory function (with a deprecated record.GetWithID forwarder); writes expose InsertWithID/InsertRecord/SetByID/SetRecord/UpdateByID/UpdateByKey/DeleteByID/DeleteByKey plus the dal.InsertRecordWithDataAndID factory function, with deprecated Get/Set/Update/Delete aliases. Key options (composite keys, parent) are configured on the constructor via WithKeyOptions. Built additively over the existing dal session interfaces. Generated Insert and batch are separate Features.
 
 ## Problem
 
@@ -62,6 +62,8 @@ For backward compatibility package `record` MUST keep `GetWithID[K comparable, T
 #### REQ: insert-with-id
 
 `Collection[K, T]` MUST provide `InsertWithID(ctx, s WriteSession, id K, value T) (*dal.Key, error)` that inserts a new record at a KNOWN id and returns the record's key. It MUST delegate to the record primitive `InsertRecord(ctx, s WriteSession, r dal.Record, opts ...dal.InsertOption) error`. (Generated ids are out of scope for this Feature.)
+
+For models whose data type is an interface created by a factory (the write twin of `GetRecordWithIDIntoData`), `dal` MUST provide a free function `InsertRecordWithDataAndID[K comparable, D any](ctx, s WriteSession, key *dal.Key, id K, data D) (dal.RecordWithDataAndID[K, D], error)` that inserts the caller-supplied `data` value as-is (so `D` may be an interface) and returns the typed wrapper. It is a free function because Go forbids type parameters on methods.
 
 #### REQ: typed-set
 
@@ -147,7 +149,7 @@ The layer MUST live in package `dal`, implemented over the existing session inte
 
 **Given** a `Collection[string, User]` and a writable transaction `tx`
 **When** `InsertWithID(ctx, tx, "u1", User{Name:"Alice"})` is called
-**Then** a record exists at id `"u1"` and the returned `*dal.Key` has ID `"u1"` and a nil error; a direct `InsertRecord` with a caller-built record stores it the same way.
+**Then** a record exists at id `"u1"` and the returned `*dal.Key` has ID `"u1"` and a nil error; a direct `InsertRecord` with a caller-built record stores it the same way; and `dal.InsertRecordWithDataAndID(ctx, tx, key, id, data)` inserts a caller-supplied (possibly interface) data value and returns the typed `RecordWithDataAndID`.
 
 ### AC: set-upserts (verifies REQ:typed-set)
 
@@ -195,6 +197,7 @@ The layer MUST live in package `dal`, implemented over the existing session inte
 
 - **`dal.Collection[K, T]` (interface)** — the typed contract: `GetData`/`Get`(deprecated)/`GetRecord`/`GetRecordWithID`/`GetRecordWithDataAndID`/`All`/`InsertWithID`/`InsertRecord`/`SetByID`/`Set`(deprecated)/`SetRecord`/`UpdateByID`/`Update`(deprecated)/`UpdateByKey`/`DeleteByID`/`Delete`(deprecated)/`DeleteByKey`/`In`. Lives in `dal` (the contracts package), alongside `ReadSession`/`Getter`/etc.
 - **`dal.GetRecordWithIDIntoData[K, D]` (free function)** — decodes into a caller-supplied `data` value, so `D` may be an interface (factory pattern); a free function because Go forbids method type parameters.
+- **`dal.InsertRecordWithDataAndID[K, D]` (free function)** — the write twin: inserts the caller-supplied `data` value as-is (interface-friendly) and returns the typed `RecordWithDataAndID[K, D]`.
 - **unexported impl (in `dal`)** — a small value composing a `dal.CollectionRef` (name + optional parent), the configured `[]KeyOption`, and the phantom `K, T`. `idToKey(id K)` builds a `Key` from the handle's `CollectionRef`, sets `Key.ID = id`, applies the collection's key options via `setKeyOptions`, then guards the parent chain. Each terminal wraps `new(T)`/`&value` with `NewRecordWithData`, calls the matching session method, and returns the typed value / key / error. `*ByID` terminals delegate to the corresponding `*ByKey`/`*Record` primitive.
 - **`CollectionOption` + `WithKeyOptions`** — a constructor option carrying collection-level `dal.KeyOption`s.
 - **`CollectionNamer` (interface)** — `CollectionName() string`; a constraint on `CollectionOf`.
