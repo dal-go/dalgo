@@ -198,7 +198,7 @@ func resolveGroupValue(e dal.Expression, g *aggGroup, known map[string]bool) (an
 		v, _, err := resolveJoinExpr(ex, g.rows[0], known)
 		return v, err
 	case dal.Constant:
-		return ex.Value, nil
+		return normalizeConstant(ex.Value), nil
 	default:
 		return nil, fmt.Errorf("dalgo2memory: unsupported grouped expression %T", e)
 	}

@@ -2,6 +2,7 @@ package dalgo2memory
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -432,15 +433,16 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 	case dal.FieldRef:
 		switch right := comparison.Right.(type) {
 		case dal.Constant:
+			norm := normalizeConstant(right.Value)
 			switch comparison.Operator {
 			case dal.Equal:
-				return data[left.Name()] == right.Value
+				return data[left.Name()] == norm
 			case dal.GreaterThen, dal.GreaterOrEqual, dal.LessThen, dal.LessOrEqual:
 				value, ok := data[left.Name()]
 				if !ok {
 					return false
 				}
-				return compareOp(comparison.Operator, value, right.Value)
+				return compareOp(comparison.Operator, value, norm)
 			default:
 				return false
 			}
@@ -457,7 +459,7 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 		if !ok || comparison.Operator != dal.In {
 			return false
 		}
-		return fieldContains(data[right.Name()], left.Value)
+		return fieldContains(data[right.Name()], normalizeConstant(left.Value))
 	default:
 		return false
 	}
@@ -509,6 +511,22 @@ func elementEquals(a, b any) bool {
 		return false
 	}
 	return a == b
+}
+
+// normalizeConstant normalizes a query constant the same way stored row values
+// are normalized (JSON marshal then unmarshal into any). This ensures that
+// time.Time constants (marshaled to RFC3339 strings) compare correctly against
+// the strings stored in serialized rows.
+func normalizeConstant(v any) any {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return v
+	}
+	var out any
+	if err := json.Unmarshal(b, &out); err != nil {
+		return v
+	}
+	return out
 }
 
 func compare(a, b any) int {
