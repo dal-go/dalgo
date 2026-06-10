@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/stretchr/testify/require"
@@ -215,6 +216,87 @@ func TestQueryWhereOperatorsEndToEnd(t *testing.T) {
 			require.Equal(t, tt.want, ids)
 		})
 	}
+}
+
+type timedThing struct {
+	DtNext time.Time
+}
+
+// insertTimedThings seeds two rows: one with a zero time, one with a non-zero time.
+func insertTimedThings(t *testing.T, db *database) {
+	t.Helper()
+	ctx := context.Background()
+	zero := time.Time{}
+	nonZero := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	for id, data := range map[string]*timedThing{
+		"zero":    {DtNext: zero},
+		"nonzero": {DtNext: nonZero},
+	} {
+		key := dal.NewKeyWithID("timed", id)
+		require.NoError(t, db.Insert(ctx, dal.NewRecordWithData(key, data)))
+	}
+}
+
+func queryTimedThings(t *testing.T, db *database, where func(qb *dal.QueryBuilder) dal.IQueryBuilder) []string {
+	t.Helper()
+	q := where(dal.From(dal.NewRootCollectionRef("timed", "")).NewQuery()).
+		SelectKeysOnly(reflect.String)
+	reader, err := db.ExecuteQueryToRecordsReader(context.Background(), q)
+	require.NoError(t, err)
+	ids := make([]string, 0)
+	for _, record := range readAll(t, reader) {
+		ids = append(ids, record.Key().ID.(string))
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// TestQueryWhereTimeEqualEndToEnd verifies that a time.Time constant in an
+// Equal filter matches the stored RFC3339-normalized value.
+func TestQueryWhereTimeEqualEndToEnd(t *testing.T) {
+	db := NewDB().(*database)
+	insertTimedThings(t, db)
+
+	zero := time.Time{}
+	nonZero := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	ids := queryTimedThings(t, db, func(qb *dal.QueryBuilder) dal.IQueryBuilder {
+		return qb.WhereField("DtNext", dal.Equal, zero)
+	})
+	require.Equal(t, []string{"zero"}, ids)
+
+	ids = queryTimedThings(t, db, func(qb *dal.QueryBuilder) dal.IQueryBuilder {
+		return qb.WhereField("DtNext", dal.Equal, nonZero)
+	})
+	require.Equal(t, []string{"nonzero"}, ids)
+}
+
+// TestQueryWhereTimeGreaterThenEndToEnd verifies that GreaterThen on a zero
+// time constant does NOT match rows whose DtNext is also zero, and that
+// chronological ordering is correct.
+func TestQueryWhereTimeGreaterThenEndToEnd(t *testing.T) {
+	db := NewDB().(*database)
+	insertTimedThings(t, db)
+
+	zero := time.Time{}
+	// zero > zero must be false: no rows returned
+	ids := queryTimedThings(t, db, func(qb *dal.QueryBuilder) dal.IQueryBuilder {
+		return qb.WhereField("DtNext", dal.GreaterThen, zero)
+	})
+	require.Equal(t, []string{"nonzero"}, ids)
+}
+
+// TestQueryWhereTimeOrderingEndToEnd verifies chronological sort order.
+func TestQueryWhereTimeOrderingEndToEnd(t *testing.T) {
+	db := NewDB().(*database)
+	insertTimedThings(t, db)
+
+	zero := time.Time{}
+	// GreaterOrEqual zero matches both rows; nonzero > zero so nonzero comes last in ascending.
+	ids := queryTimedThings(t, db, func(qb *dal.QueryBuilder) dal.IQueryBuilder {
+		return qb.WhereField("DtNext", dal.GreaterOrEqual, zero)
+	})
+	require.Equal(t, []string{"nonzero", "zero"}, ids)
 }
 
 // TestQueryWhereMultipleConditionsEndToEnd verifies that multiple Where
