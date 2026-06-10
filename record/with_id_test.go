@@ -1,39 +1,25 @@
-package record
+package record_test
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/record"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestWithID_String(t *testing.T) {
-	tests := []struct {
-		name  string
-		input fmt.Stringer
-		want  string
-	}{
-		{
-			name:  "Empty FullID",
-			input: WithID[string]{ID: "1", FullID: "", Key: nil, Record: nil},
-			want:  "{ID=1, FullID=nil, Key=<nil>, Record=<nil>}",
-		},
-		{
-			name:  "FullID is not empty, ID is string",
-			input: WithID[string]{ID: "1", FullID: "custom-1", Key: nil, Record: nil},
-			want:  `{ID="1", FullID="custom-1", Key=<nil>, Record=<nil>}`,
-		},
-		{
-			name:  "FullID is not empty, ID is integer",
-			input: WithID[int]{ID: 1, FullID: "custom-1", Key: nil, Record: nil},
-			want:  `{ID=1, FullID="custom-1", Key=<nil>, Record=<nil>}`,
-		},
-	}
+// TestNewWithID covers the backward-compatible record.NewWithID forwarder.
+// The full RecordWithID behavior is tested in package dal.
+func TestNewWithID(t *testing.T) {
+	type data struct{ Title string }
+	key := dal.NewKeyWithID("things", "t1")
+	d := &data{Title: "x"}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.input.String()
-			if got != tt.want {
-				t.Errorf("WithID.String() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	got := record.NewWithID("t1", key, d) // returns record.WithID = dal.RecordWithID alias
+
+	assert.Equal(t, "t1", got.ID)
+	assert.Equal(t, key, got.Key)
+	assert.NotNil(t, got.Record)
+	got.Record.SetError(nil)
+	assert.Equal(t, d, got.Record.Data())
 }
