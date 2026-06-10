@@ -1,34 +1,16 @@
 package record
 
 import (
-	"fmt"
-
 	"github.com/dal-go/dalgo/dal"
 )
 
-// WithID is a record with a strongly typed ID
-type WithID[K comparable] struct {
-	ID     K          `json:"id"`               // Unique id of the record in collection
-	FullID string     `json:"fullID,omitempty"` // Custom id of the record fully unique across all DB collections
-	Key    *dal.Key   `json:"-"`
-	Record dal.Record `json:"-"`
-}
+// WithID is a backward-compatible alias for dal.RecordWithID.
+//
+// The type now lives in package dal so the typed Collection layer can return it
+// without a dal -> record import cycle. New code should prefer dal.RecordWithID.
+type WithID[K comparable] = dal.RecordWithID[K]
 
-// String returns string representation of a record with an ID
-func (v WithID[K]) String() string {
-	if v.FullID == "" {
-		return fmt.Sprintf("{ID=%v, FullID=nil, Key=%v, Record=%v}", v.ID, v.Key, v.Record)
-	}
-	if id, ok := any(v.ID).(string); ok {
-		return fmt.Sprintf(`{ID="%s", FullID="%s", Key=%v, Record=%v}`, id, v.FullID, v.Key, v.Record)
-	}
-	return fmt.Sprintf(`{ID=%+v, FullID="%s", Key=%v, Record=%v}`, v.ID, v.FullID, v.Key, v.Record)
-}
-
+// NewWithID forwards to dal.NewRecordWithID, kept for backward compatibility.
 func NewWithID[T comparable](id T, key *dal.Key, data any) WithID[T] {
-	return WithID[T]{
-		ID:     id,
-		Key:    key,
-		Record: dal.NewRecordWithData(key, data),
-	}
+	return dal.NewRecordWithID(id, key, data)
 }
