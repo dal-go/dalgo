@@ -84,8 +84,9 @@ func main() {
 
 For everyday point CRUD you usually do not need to build keys, wrap records, and
 type-assert data by hand. DALgo provides a generic, session-less
-`dal.Collection[T]` handle that returns typed values directly. It is additive
-over the core API, uses no reflection of its own, and works with every adapter.
+`dal.Collection[K, T]` handle (id type `K`, record type `T`) that returns typed
+values directly. It is additive over the core API, uses no reflection of its
+own, and works with every adapter.
 
 ```go
 type User struct {
@@ -96,21 +97,21 @@ type User struct {
 // CollectionName (value receiver) names the collection.
 func (User) CollectionName() string { return "users" }
 
-// A Collection[T] holds no session, so declare it once and reuse it
-// (e.g. as a package-level var).
-var Users = dal.CollectionOf[User]()
+// A Collection[K, T] holds no session, so declare it once and reuse it
+// (e.g. as a package-level var). Here ids are strings (K = string).
+var Users = dal.CollectionOf[string, User]()
 
 func demo(ctx context.Context, db dal.DB) error {
 	// Writes go through a read-write transaction. Because dal.DB is not a
 	// WriteSession, calling a write terminal with a plain db is a compile error.
 	if err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return Users.Set(ctx, tx, "u1", User{Name: "Ada Lovelace", Email: "ada@example.com"})
+		return Users.SetByID(ctx, tx, "u1", User{Name: "Ada Lovelace", Email: "ada@example.com"})
 	}); err != nil {
 		return err
 	}
 
 	// Reads take a dal.ReadSession (a plain dal.DB satisfies it) and return T.
-	user, err := Users.Get(ctx, db, "u1")
+	user, err := Users.GetData(ctx, db, "u1")
 	if err != nil {
 		return err // not-found is reported via dal.IsNotFound(err)
 	}
@@ -121,11 +122,19 @@ func demo(ctx context.Context, db dal.DB) error {
 
 The handle exposes the common operations as typed terminals:
 
-- **Reads:** `Get` (one record → `T`), `All` (whole collection → `[]T`),
-  `First`, `Count`, `Exists`.
+- **Reads:** `GetData` (one record → `T`), `GetRecord` (→ `dal.Record`),
+  `All` (whole collection → `[]T`), `First`, `Count`, `Exists`. For a typed
+  id+record pair use `record.GetWithID(ctx, coll, s, id)` (a free function in
+  package `record`, since `dal` stays free of any `record` import).
 - **Writes:** `Insert` (generated id → `*dal.Key`), `InsertWithID` (known id),
-  `Set` (upsert), `Update`, `Delete`, and batch `InsertMany` via the opt-in
-  `dal.ManyInserter[T]` interface.
+  `InsertRecord`, `SetByID` (upsert), `SetRecord`, `UpdateByID`, `UpdateByKey`,
+  `DeleteByID`, `DeleteByKey`, and batch `InsertMany` via the opt-in
+  `dal.ManyInserter[K, T]` interface.
+- **Composite / multi-field keys:** pass `dal.WithKeyOptions(...)` to the
+  constructor, or build a `*dal.Key` with `dal.NewKeyWithFields` and use the
+  `*ByKey` terminals.
+- **Deprecated aliases:** `Get`/`Set`/`Update`/`Delete` remain as thin
+  delegators to `GetData`/`SetByID`/`UpdateByID`/`DeleteByID`.
 - **Nesting:** `In(parentKey)` scopes the handle to a subcollection such as
   `users/u1/contacts`.
 - **Compile-time safety:** read terminals take `dal.ReadSession` and write
@@ -174,10 +183,10 @@ type User struct {
 
 func (User) CollectionName() string { return "users" }
 
-var Users = dal.CollectionOf[User]()
+var Users = dal.CollectionOf[string, User]()
 
 func GetUser(ctx context.Context, db dal.DB, id string) (User, error) {
-	return Users.Get(ctx, db, id)
+	return Users.GetData(ctx, db, id)
 }
 ```
 

@@ -30,11 +30,11 @@ Define `dal.Collection[T]` (read methods take `ReadSession`, write methods take 
 
 ### Task 2: id-argument resolution
 
-**Verifies:** typed-collection#ac:id-plain-or-keyoption
+**Verifies:** typed-collection#ac:key-options-on-constructor
 **Depends-On:** 1
 **Status:** done
 
-Internal helper turning the `id any` argument into a `*dal.Key` from the handle's `CollectionRef`: a plain value sets `Key.ID`; a `dal.KeyOption` (`WithID`/`WithFields`) is applied via `NewKeyWithOptions`. Shared by every terminal.
+Internal `idToKey(id K)` helper turning the typed `id K` argument into a `*dal.Key` from the handle's `CollectionRef`: it sets `Key.ID = id`, then applies the collection's configured key options (`dal.WithKeyOptions(...)`, e.g. `WithFields`/parent) via `setKeyOptions`, and guards the parent chain. Shared by every `*ByID` terminal.
 
 ### Task 3: Get terminal with not-found mapping
 
@@ -83,6 +83,14 @@ Implement `In(parent *dal.Key) dal.Collection[T]` composing the `CollectionRef` 
 **Status:** done
 
 Confirm the layer is additive: run the full pre-existing `dal` + `dalgo2memory` + `end2end` suites and keep them green with no existing call-site changes, and add a test/assertion that `dal` still does not import the `record` package.
+
+### Task 9: GetRecord primitive and record.GetWithID
+
+**Verifies:** typed-collection#ac:get-record-and-with-id
+**Depends-On:** 3
+**Status:** done
+
+Add `GetRecord(ctx, ReadSession, id K) (dal.Record, error)` as the read primitive `GetData` delegates to, and the free function `record.GetWithID[K, T](ctx, c, s, id) (record.WithID[K], error)` in package `record` (keeping `dal` free of any `record` import). Both surface the session not-found error.
 
 ## Open Questions
 

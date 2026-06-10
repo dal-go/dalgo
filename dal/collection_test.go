@@ -15,7 +15,7 @@ import (
 )
 
 // User is a record type that knows its own collection name via a value-receiver
-// CollectionName method (so dal.CollectionOf[User]() works without *User).
+// CollectionName method (so dal.CollectionOf[string, User]() works without *User).
 type User struct {
 	Name string `json:"name"`
 }
@@ -52,7 +52,7 @@ func TestCollectionOf_ConstructByConvention(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
 
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	// The handle is a reusable value: insert two records via the same handle.
 	var key1, key2 *dal.Key
@@ -71,10 +71,10 @@ func TestCollectionOf_ConstructByConvention(t *testing.T) {
 	assert.Equal(t, "users/u2", key2.String())
 
 	// The same reusable handle round-trips both records.
-	got1, err := users.Get(ctx, db, "u1")
+	got1, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", got1.Name)
-	got2, err := users.Get(ctx, db, "u2")
+	got2, err := users.GetData(ctx, db, "u2")
 	require.NoError(t, err)
 	assert.Equal(t, "Bob", got2.Name)
 }
@@ -82,7 +82,7 @@ func TestCollectionOf_ConstructByConvention(t *testing.T) {
 func TestCollectionAt_ConstructByExplicitName(t *testing.T) {
 	db := newMemoryDB(t)
 
-	things := dal.CollectionAt[thing]("things")
+	things := dal.CollectionAt[string, thing]("things")
 
 	var key *dal.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -98,13 +98,13 @@ func TestCollectionAt_ConstructByExplicitName(t *testing.T) {
 func TestCollection_GetRoundtrip(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
 
-	got, err := users.Get(ctx, db, "u1")
+	got, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", got.Name)
 }
@@ -112,52 +112,88 @@ func TestCollection_GetRoundtrip(t *testing.T) {
 func TestCollection_GetNotFound(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
-	got, err := users.Get(ctx, db, "missing")
+	got, err := users.GetData(ctx, db, "missing")
 	require.Error(t, err)
 	assert.True(t, dal.IsNotFound(err), "error must be a not-found error from the Get call")
 	assert.Equal(t, User{}, got, "must return the zero value on not-found")
 }
 
-func TestCollection_IDPlainOrKeyOption(t *testing.T) {
+func TestCollection_GetRecord(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
-	// Store once using a plain id value.
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
 
-	// The same record is addressable by the plain value AND by dal.WithID.
-	byPlain, err := users.Get(ctx, db, "u1")
+	rec, err := users.GetRecord(ctx, db, "u1")
 	require.NoError(t, err)
-	byOption, err := users.Get(ctx, db, dal.WithID("u1"))
-	require.NoError(t, err)
-	assert.Equal(t, byPlain, byOption)
-	assert.Equal(t, "Alice", byPlain.Name)
+	require.NotNil(t, rec)
+	assert.Equal(t, "users/u1", rec.Key().String())
+	assert.Equal(t, "Alice", rec.Data().(*User).Name)
 
-	// A composite-key record is addressable by dal.WithFields.
-	composite := dal.WithFields([]dal.FieldVal{{Name: "tenant", Value: "t1"}, {Name: "id", Value: "u9"}})
+	// Not-found returns the record together with the not-found error.
+	rec2, err := users.GetRecord(ctx, db, "missing")
+	require.Error(t, err)
+	assert.True(t, dal.IsNotFound(err))
+	require.NotNil(t, rec2)
+
+	// idToKey error path (incomplete parent) propagates as a nil record + error.
+	nested := dal.CollectionOf[string, Contact]().In(dal.NewIncompleteKey("users", reflect.String, nil))
+	rec3, err := nested.GetRecord(ctx, db, "c1")
+	require.Error(t, err)
+	assert.Nil(t, rec3)
+}
+
+func TestCollection_WithKeyOptions(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+
+	// Collection-level key options are applied to every key the handle builds.
+	parent := dal.NewKeyWithID("tenants", "t1")
+	users := dal.CollectionOf[string, User](dal.WithKeyOptions(dal.WithParentKey(parent)))
+
+	var key *dal.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, composite, User{Name: "Carol"})
+		var err error
+		key, err = users.InsertWithID(ctx, tx, "u1", User{Name: "Alice"})
+		return err
 	})
-	got, err := users.Get(ctx, db, dal.WithFields([]dal.FieldVal{{Name: "tenant", Value: "t1"}, {Name: "id", Value: "u9"}}))
+	assert.Equal(t, "tenants/t1/users/u1", key.String())
+
+	// The same option is applied on reads, so the record round-trips.
+	got, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
-	assert.Equal(t, "Carol", got.Name)
+	assert.Equal(t, "Alice", got.Name)
+}
+
+func TestCollection_KeyOptionError(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+
+	// A failing collection-level key option is surfaced by every terminal's id
+	// resolution.
+	badOpt := func(*dal.Key) error { return errors.New("boom") }
+	users := dal.CollectionOf[string, User](dal.WithKeyOptions(badOpt))
+
+	_, err := users.GetData(ctx, db, "u1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "boom")
 }
 
 func TestCollection_AllDistinct(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		if err := users.Set(ctx, tx, "u1", User{Name: "Alice"}); err != nil {
+		if err := users.SetByID(ctx, tx, "u1", User{Name: "Alice"}); err != nil {
 			return err
 		}
-		return users.Set(ctx, tx, "u2", User{Name: "Bob"})
+		return users.SetByID(ctx, tx, "u2", User{Name: "Bob"})
 	})
 
 	all, err := users.All(ctx, db)
@@ -194,7 +230,7 @@ var _ dal.ReadSession = unsupportedReadSession{}
 
 func TestCollection_AllUnsupportedSurfacesError(t *testing.T) {
 	ctx := context.Background()
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	all, err := users.All(ctx, unsupportedReadSession{})
 	require.ErrorIs(t, err, dal.ErrNotSupported)
@@ -204,7 +240,7 @@ func TestCollection_AllUnsupportedSurfacesError(t *testing.T) {
 func TestCollection_InsertGeneratesKey(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	var key *dal.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -218,14 +254,14 @@ func TestCollection_InsertGeneratesKey(t *testing.T) {
 	require.True(t, ok)
 	require.NotEmpty(t, id, "id must be a non-empty generated string")
 
-	got, err := users.Get(ctx, db, id)
+	got, err := users.GetData(ctx, db, id)
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", got.Name)
 }
 
 func TestCollection_InsertWithExplicitOption(t *testing.T) {
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	var key *dal.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -240,7 +276,7 @@ func TestCollection_InsertWithExplicitOption(t *testing.T) {
 }
 
 // stubWriteSession is a WriteSession whose Insert behavior is supplied per test;
-// every other method is an unused no-op. It lets us drive Collection[T].Insert's
+// every other method is an unused no-op. It lets us drive Collection.Insert's
 // loud-failure guard and the underlying-insert error path without a real backend.
 type stubWriteSession struct {
 	insert func(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error
@@ -272,7 +308,7 @@ var _ dal.WriteSession = stubWriteSession{}
 
 func TestCollection_InsertLoudFailureOnNonHonoringAdapter(t *testing.T) {
 	ctx := context.Background()
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	// A WriteSession that ignores InsertOption leaves the key incomplete.
 	dropping := stubWriteSession{insert: func(context.Context, dal.Record, ...dal.InsertOption) error {
@@ -287,7 +323,7 @@ func TestCollection_InsertLoudFailureOnNonHonoringAdapter(t *testing.T) {
 
 func TestCollection_InsertUnderlyingErrorPassthrough(t *testing.T) {
 	ctx := context.Background()
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	boom := errors.New("insert failed")
 	failing := stubWriteSession{insert: func(context.Context, dal.Record, ...dal.InsertOption) error {
@@ -302,7 +338,7 @@ func TestCollection_InsertUnderlyingErrorPassthrough(t *testing.T) {
 func TestCollection_InsertWithIDReturnsKey(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	var key *dal.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -314,66 +350,188 @@ func TestCollection_InsertWithIDReturnsKey(t *testing.T) {
 	require.NotNil(t, key)
 	assert.Equal(t, "u1", key.ID)
 
-	got, err := users.Get(ctx, db, "u1")
+	got, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", got.Name)
+}
+
+func TestCollection_InsertRecord(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[string, User]()
+
+	// Direct record insert (the primitive the other inserts delegate to).
+	rec := dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &User{Name: "Alice"})
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.InsertRecord(ctx, tx, rec)
+	})
+	got, err := users.GetData(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", got.Name)
+
+	// guardParent error path: a record whose key has an incomplete parent.
+	badKey := dal.NewKeyWithParentAndID(dal.NewIncompleteKey("users", reflect.String, nil), "contacts", "c1")
+	badRec := dal.NewRecordWithData(badKey, &Contact{Email: "x@example.com"})
+	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.InsertRecord(ctx, tx, badRec)
+	})
+	require.Error(t, err)
 }
 
 func TestCollection_SetUpserts(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
-	// Set with no pre-existing record (insert).
+	// SetByID with no pre-existing record (insert).
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
-	got, err := users.Get(ctx, db, "u1")
+	got, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, User{Name: "Alice"}, got)
 
-	// Set again over the existing record (overwrite).
+	// SetByID again over the existing record (overwrite).
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Bob"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Bob"})
 	})
-	got, err = users.Get(ctx, db, "u1")
+	got, err = users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, User{Name: "Bob"}, got)
+}
+
+func TestCollection_SetRecord(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[string, User]()
+
+	rec := dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &User{Name: "Alice"})
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.SetRecord(ctx, tx, rec)
+	})
+	got, err := users.GetData(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", got.Name)
+
+	// guardParent error path.
+	badKey := dal.NewKeyWithParentAndID(dal.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
+	badRec := dal.NewRecordWithData(badKey, &User{})
+	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.SetRecord(ctx, tx, badRec)
+	})
+	require.Error(t, err)
 }
 
 func TestCollection_UpdateAppliesFields(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Update(ctx, tx, "u1", []update.Update{update.ByFieldName("name", "Bob")})
+		return users.UpdateByID(ctx, tx, "u1", []update.Update{update.ByFieldName("name", "Bob")})
 	})
 
-	got, err := users.Get(ctx, db, "u1")
+	got, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, "Bob", got.Name)
+}
+
+func TestCollection_UpdateByKey(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[string, User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
+	})
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.UpdateByKey(ctx, tx, dal.NewKeyWithID("users", "u1"), []update.Update{update.ByFieldName("name", "Bob")})
+	})
+	got, err := users.GetData(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, "Bob", got.Name)
+
+	// guardParent error path.
+	badKey := dal.NewKeyWithParentAndID(dal.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
+	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.UpdateByKey(ctx, tx, badKey, []update.Update{update.ByFieldName("name", "X")})
+	})
+	require.Error(t, err)
 }
 
 func TestCollection_DeleteRemoves(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Delete(ctx, tx, "u1")
+		return users.DeleteByID(ctx, tx, "u1")
 	})
 
-	_, err := users.Get(ctx, db, "u1")
+	_, err := users.GetData(ctx, db, "u1")
 	assert.True(t, dal.IsNotFound(err), "record must be gone after Delete")
+}
+
+func TestCollection_DeleteByKey(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[string, User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
+	})
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.DeleteByKey(ctx, tx, dal.NewKeyWithID("users", "u1"))
+	})
+	_, err := users.GetData(ctx, db, "u1")
+	assert.True(t, dal.IsNotFound(err))
+
+	// guardParent error path.
+	badKey := dal.NewKeyWithParentAndID(dal.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
+	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.DeleteByKey(ctx, tx, badKey)
+	})
+	require.Error(t, err)
+}
+
+// TestCollection_DeprecatedAliasesDelegate exercises the deprecated Get/Set/
+// Update/Delete aliases so they remain covered while delegating to the canonical
+// GetData/SetByID/UpdateByID/DeleteByID terminals.
+func TestCollection_DeprecatedAliasesDelegate(t *testing.T) {
+	ctx := context.Background()
+	db := newMemoryDB(t)
+	users := dal.CollectionOf[string, User]()
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Set(ctx, tx, "u1", User{Name: "Alice"}) //nolint:staticcheck // exercises deprecated alias
+	})
+
+	got, err := users.Get(ctx, db, "u1") //nolint:staticcheck // exercises deprecated alias
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", got.Name)
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Update(ctx, tx, "u1", []update.Update{update.ByFieldName("name", "Bob")}) //nolint:staticcheck // exercises deprecated alias
+	})
+	got, err = users.GetData(ctx, db, "u1")
+	require.NoError(t, err)
+	assert.Equal(t, "Bob", got.Name)
+
+	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return users.Delete(ctx, tx, "u1") //nolint:staticcheck // exercises deprecated alias
+	})
+	_, err = users.GetData(ctx, db, "u1")
+	assert.True(t, dal.IsNotFound(err))
 }
 
 func TestCollection_NestedGet(t *testing.T) {
@@ -381,7 +539,7 @@ func TestCollection_NestedGet(t *testing.T) {
 	db := newMemoryDB(t)
 
 	parentKey := dal.NewKeyWithID("users", "u1")
-	contacts := dal.CollectionOf[Contact]().In(parentKey)
+	contacts := dal.CollectionOf[string, Contact]().In(parentKey)
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		key, err := contacts.InsertWithID(ctx, tx, "c1", Contact{Email: "a@example.com"})
@@ -392,7 +550,7 @@ func TestCollection_NestedGet(t *testing.T) {
 		return nil
 	})
 
-	got, err := contacts.Get(ctx, db, "c1")
+	got, err := contacts.GetData(ctx, db, "c1")
 	require.NoError(t, err)
 	assert.Equal(t, "a@example.com", got.Email)
 }
@@ -402,33 +560,19 @@ func TestCollection_NestedIncompleteParentErrors(t *testing.T) {
 	db := newMemoryDB(t)
 
 	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
-	contacts := dal.CollectionOf[Contact]().In(incompleteParent)
+	contacts := dal.CollectionOf[string, Contact]().In(incompleteParent)
 
 	assert.NotPanics(t, func() {
-		_, err := contacts.Get(ctx, db, "c1")
+		_, err := contacts.GetData(ctx, db, "c1")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incomplete parent")
 	})
 }
 
-func TestCollection_KeyOptionError(t *testing.T) {
-	ctx := context.Background()
-	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
-
-	// A KeyOption that fails is surfaced by every terminal's id resolution.
-	// (dal.KeyOption is an alias for func(*dal.Key) error, so this value's
-	// dynamic type matches the type switch in keyForID.)
-	badOpt := func(*dal.Key) error { return errors.New("boom") }
-	_, err := users.Get(ctx, db, badOpt)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "boom")
-}
-
 func TestCollection_InsertWithIDDuplicateErrors(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		_, err := users.InsertWithID(ctx, tx, "u1", User{Name: "Alice"})
@@ -447,7 +591,7 @@ func TestCollection_WriteTerminalsIncompleteParentError(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
 	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
-	contacts := dal.CollectionOf[Contact]().In(incompleteParent)
+	contacts := dal.CollectionOf[string, Contact]().In(incompleteParent)
 
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		if _, err := contacts.Insert(ctx, tx, Contact{}); err == nil {
@@ -456,14 +600,14 @@ func TestCollection_WriteTerminalsIncompleteParentError(t *testing.T) {
 		if _, err := contacts.InsertWithID(ctx, tx, "c1", Contact{}); err == nil {
 			return errors.New("InsertWithID must error under incomplete parent")
 		}
-		if err := contacts.Set(ctx, tx, "c1", Contact{}); err == nil {
-			return errors.New("Set must error under incomplete parent")
+		if err := contacts.SetByID(ctx, tx, "c1", Contact{}); err == nil {
+			return errors.New("SetByID must error under incomplete parent")
 		}
-		if err := contacts.Update(ctx, tx, "c1", []update.Update{update.ByFieldName("email", "x")}); err == nil {
-			return errors.New("Update must error under incomplete parent")
+		if err := contacts.UpdateByID(ctx, tx, "c1", []update.Update{update.ByFieldName("email", "x")}); err == nil {
+			return errors.New("UpdateByID must error under incomplete parent")
 		}
-		if err := contacts.Delete(ctx, tx, "c1"); err == nil {
-			return errors.New("Delete must error under incomplete parent")
+		if err := contacts.DeleteByID(ctx, tx, "c1"); err == nil {
+			return errors.New("DeleteByID must error under incomplete parent")
 		}
 		return nil
 	})
@@ -473,11 +617,11 @@ func TestCollection_WriteTerminalsIncompleteParentError(t *testing.T) {
 func TestCollection_CountReturnsTotal(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		for _, id := range []string{"u1", "u2", "u3"} {
-			if err := users.Set(ctx, tx, id, User{Name: id}); err != nil {
+			if err := users.SetByID(ctx, tx, id, User{Name: id}); err != nil {
 				return err
 			}
 		}
@@ -491,7 +635,7 @@ func TestCollection_CountReturnsTotal(t *testing.T) {
 
 func TestCollection_CountUnsupported(t *testing.T) {
 	ctx := context.Background()
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	n, err := users.Count(ctx, unsupportedReadSession{})
 	require.ErrorIs(t, err, dal.ErrNotSupported)
@@ -501,10 +645,10 @@ func TestCollection_CountUnsupported(t *testing.T) {
 func TestCollection_ExistsTrueFalse(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
 
 	exists, err := users.Exists(ctx, db, "u1")
@@ -515,15 +659,15 @@ func TestCollection_ExistsTrueFalse(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, exists, "not-found must map to (false, nil)")
 
-	// keyForID error path: incomplete parent.
-	nested := dal.CollectionOf[Contact]().In(dal.NewIncompleteKey("users", reflect.String, nil))
+	// idToKey error path: incomplete parent.
+	nested := dal.CollectionOf[string, Contact]().In(dal.NewIncompleteKey("users", reflect.String, nil))
 	_, err = nested.Exists(ctx, db, "c1")
 	require.Error(t, err)
 }
 
 func TestCollection_ExistsErrorPassthrough(t *testing.T) {
 	ctx := context.Background()
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	// A non-not-found lookup failure must be returned, not swallowed.
 	exists, err := users.Exists(ctx, unsupportedReadSession{}, "u1")
@@ -534,7 +678,7 @@ func TestCollection_ExistsErrorPassthrough(t *testing.T) {
 func TestCollection_FirstReturnsOrEmpty(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	// Empty collection: (zero, false, nil).
 	value, found, err := users.First(ctx, db)
@@ -544,7 +688,7 @@ func TestCollection_FirstReturnsOrEmpty(t *testing.T) {
 
 	// Non-empty collection: (value, true, nil).
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
 	value, found, err = users.First(ctx, db)
 	require.NoError(t, err)
@@ -554,7 +698,7 @@ func TestCollection_FirstReturnsOrEmpty(t *testing.T) {
 
 func TestCollection_FirstUnsupported(t *testing.T) {
 	ctx := context.Background()
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	value, found, err := users.First(ctx, unsupportedReadSession{})
 	require.ErrorIs(t, err, dal.ErrNotSupported)
@@ -563,27 +707,27 @@ func TestCollection_FirstUnsupported(t *testing.T) {
 }
 
 func TestCollection_ItemTypeShape(t *testing.T) {
-	// Item[T] is exactly {ID any; Value T}. (The no-record-import half of the AC
+	// Item[K, T] is exactly {ID K; Value T}. (The no-record-import half of the AC
 	// is enforced by TestDalDoesNotImportRecord.)
-	item := dal.Item[User]{ID: "u1", Value: User{Name: "Alice"}}
-	assert.Equal(t, any("u1"), item.ID)
+	item := dal.Item[string, User]{ID: "u1", Value: User{Name: "Alice"}}
+	assert.Equal(t, "u1", item.ID)
 	assert.Equal(t, User{Name: "Alice"}, item.Value)
 }
 
 func TestCollection_InsertManyRoundtrips(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
-	mi, ok := users.(dal.ManyInserter[User])
-	require.True(t, ok, "Collection[T] value must satisfy dal.ManyInserter[T]")
+	mi, ok := users.(dal.ManyInserter[string, User])
+	require.True(t, ok, "Collection[K, T] value must satisfy dal.ManyInserter[K, T]")
 
 	var keys []*dal.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		keys, err = mi.InsertMany(ctx, tx,
-			dal.Item[User]{ID: "u1", Value: User{Name: "Alice"}},
-			dal.Item[User]{ID: "u2", Value: User{Name: "Bob"}},
+			dal.Item[string, User]{ID: "u1", Value: User{Name: "Alice"}},
+			dal.Item[string, User]{ID: "u2", Value: User{Name: "Bob"}},
 		)
 		return err
 	})
@@ -592,10 +736,10 @@ func TestCollection_InsertManyRoundtrips(t *testing.T) {
 	assert.Equal(t, "u1", keys[0].ID)
 	assert.Equal(t, "u2", keys[1].ID)
 
-	got1, err := users.Get(ctx, db, "u1")
+	got1, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", got1.Name)
-	got2, err := users.Get(ctx, db, "u2")
+	got2, err := users.GetData(ctx, db, "u2")
 	require.NoError(t, err)
 	assert.Equal(t, "Bob", got2.Name)
 }
@@ -604,23 +748,23 @@ func TestCollection_InsertManyErrorPaths(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
 
-	// keyForID error: incomplete parent.
+	// idToKey error: incomplete parent.
 	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
-	nested := dal.CollectionOf[Contact]().In(incompleteParent).(dal.ManyInserter[Contact])
+	nested := dal.CollectionOf[string, Contact]().In(incompleteParent).(dal.ManyInserter[string, Contact])
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		_, e := nested.InsertMany(ctx, tx, dal.Item[Contact]{ID: "c1", Value: Contact{}})
+		_, e := nested.InsertMany(ctx, tx, dal.Item[string, Contact]{ID: "c1", Value: Contact{}})
 		return e
 	})
 	require.Error(t, err)
 
 	// InsertMulti error: duplicate id within the same collection.
-	users := dal.CollectionOf[User]().(dal.ManyInserter[User])
+	users := dal.CollectionOf[string, User]().(dal.ManyInserter[string, User])
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		_, e := users.InsertMany(ctx, tx, dal.Item[User]{ID: "dup", Value: User{Name: "A"}})
+		_, e := users.InsertMany(ctx, tx, dal.Item[string, User]{ID: "dup", Value: User{Name: "A"}})
 		return e
 	})
 	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		_, e := users.InsertMany(ctx, tx, dal.Item[User]{ID: "dup", Value: User{Name: "B"}})
+		_, e := users.InsertMany(ctx, tx, dal.Item[string, User]{ID: "dup", Value: User{Name: "B"}})
 		return e
 	})
 	require.Error(t, err)
@@ -629,18 +773,18 @@ func TestCollection_InsertManyErrorPaths(t *testing.T) {
 func TestCollection_WriteNeedsWriteSession(t *testing.T) {
 	// Positive half of AC write-needs-write-session: a write terminal compiles
 	// and commits when given a transaction handle (which satisfies
-	// WriteSession). The negative half — that Set(ctx, db, ...) with a plain DB
-	// does NOT compile — is proven by the build-tagged file
+	// WriteSession). The negative half — that SetByID(ctx, db, ...) with a plain
+	// DB does NOT compile — is proven by the build-tagged file
 	// collection_nocompile_example_test.go.
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	users := dal.CollectionOf[User]()
+	users := dal.CollectionOf[string, User]()
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.Set(ctx, tx, "u1", User{Name: "Alice"})
+		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
 
-	got, err := users.Get(ctx, db, "u1")
+	got, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", got.Name)
 }
