@@ -23,7 +23,7 @@ type genUser struct {
 func TestCollection_Insert_EndToEnd(t *testing.T) {
 	ctx := context.Background()
 	db := dalgo2memory.NewDB()
-	users := dal.CollectionAt[genUser]("e2eusers")
+	users := dal.CollectionAt[string, genUser]("e2eusers")
 
 	// Default generator (no options).
 	var k1 *dal.Key
@@ -36,7 +36,7 @@ func TestCollection_Insert_EndToEnd(t *testing.T) {
 	id1, ok := k1.ID.(string)
 	require.True(t, ok)
 	require.NotEmpty(t, id1)
-	got1, err := users.Get(ctx, db, id1)
+	got1, err := users.GetData(ctx, db, id1)
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", got1.Name)
 
@@ -50,7 +50,7 @@ func TestCollection_Insert_EndToEnd(t *testing.T) {
 	id2, ok := k2.ID.(string)
 	require.True(t, ok)
 	assert.Len(t, id2, 24)
-	got2, err := users.Get(ctx, db, id2)
+	got2, err := users.GetData(ctx, db, id2)
 	require.NoError(t, err)
 	assert.Equal(t, "Bob", got2.Name)
 }
