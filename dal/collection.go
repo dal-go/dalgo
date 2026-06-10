@@ -53,6 +53,16 @@ type Collection[K comparable, T any] interface {
 	// the not-found error from the session Get call.
 	GetRecord(ctx context.Context, s ReadSession, id K) (Record, error)
 
+	// GetRecordWithID reads id and returns a typed RecordWithID[K] (id + key +
+	// record, no typed data). On not-found it returns the zero value and the
+	// session's not-found error.
+	GetRecordWithID(ctx context.Context, s ReadSession, id K) (RecordWithID[K], error)
+
+	// GetRecordWithDataAndID reads id and returns a RecordWithDataAndID[K, *T]
+	// whose Data is the decoded *T (the same pointer held by the Record). On
+	// not-found it returns the zero value and the session's not-found error.
+	GetRecordWithDataAndID(ctx context.Context, s ReadSession, id K) (RecordWithDataAndID[K, *T], error)
+
 	// All returns every record in the collection, each decoded into a freshly
 	// allocated value so results never alias. It surfaces ErrNotSupported from
 	// backends that cannot run the query.
@@ -230,6 +240,25 @@ func (c collection[K, T]) GetData(ctx context.Context, s ReadSession, id K) (T, 
 		return zero, err
 	}
 	return *record.Data().(*T), nil
+}
+
+func (c collection[K, T]) GetRecordWithID(ctx context.Context, s ReadSession, id K) (RecordWithID[K], error) {
+	record, err := c.GetRecord(ctx, s, id)
+	if err != nil {
+		return RecordWithID[K]{}, err
+	}
+	return RecordWithID[K]{ID: id, Key: record.Key(), Record: record}, nil
+}
+
+func (c collection[K, T]) GetRecordWithDataAndID(ctx context.Context, s ReadSession, id K) (RecordWithDataAndID[K, *T], error) {
+	record, err := c.GetRecord(ctx, s, id)
+	if err != nil {
+		return RecordWithDataAndID[K, *T]{}, err
+	}
+	return RecordWithDataAndID[K, *T]{
+		RecordWithID: RecordWithID[K]{ID: id, Key: record.Key(), Record: record},
+		Data:         record.Data().(*T),
+	}, nil
 }
 
 func (c collection[K, T]) Get(ctx context.Context, s ReadSession, id K) (T, error) {

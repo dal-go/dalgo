@@ -15,7 +15,7 @@ status: Approved
 
 ## Summary
 
-A session-less generic dal.Collection[K, T] handle in package dal with point-CRUD terminals keyed by a typed id K. Reads expose GetData/GetRecord (and a record.GetWithID free function); writes expose InsertWithID/InsertRecord/SetByID/SetRecord/UpdateByID/UpdateByKey/DeleteByID/DeleteByKey, with deprecated Get/Set/Update/Delete aliases. Key options (composite keys, parent) are configured on the constructor via WithKeyOptions. Built additively over the existing dal session interfaces. Generated Insert and batch are separate Features.
+A session-less generic dal.Collection[K, T] handle in package dal with point-CRUD terminals keyed by a typed id K. Reads expose GetData/GetRecord plus the typed id accessors GetRecordWithID/GetRecordWithDataAndID and the dal.GetRecordWithIDIntoData factory function (with a deprecated record.GetWithID forwarder); writes expose InsertWithID/InsertRecord/SetByID/SetRecord/UpdateByID/UpdateByKey/DeleteByID/DeleteByKey, with deprecated Get/Set/Update/Delete aliases. Key options (composite keys, parent) are configured on the constructor via WithKeyOptions. Built additively over the existing dal session interfaces. Generated Insert and batch are separate Features.
 
 ## Problem
 
@@ -43,7 +43,15 @@ Every point terminal that takes an id MUST take a strongly typed `id K` argument
 
 #### REQ: typed-get-record
 
-`Collection[K, T]` MUST provide `GetRecord(ctx, s ReadSession, id K) (dal.Record, error)` that returns the underlying `dal.Record` (its `Data()` is a `*T`). It is the read primitive `GetData` delegates to. Package `record` MUST additionally provide a free function `GetWithID[K comparable, T any](ctx, c dal.Collection[K, T], s dal.ReadSession, id K) (record.WithID[K], error)` returning a typed id+record pair — it lives in `record` (not as a method) so `dal` introduces no `record` import.
+`Collection[K, T]` MUST provide `GetRecord(ctx, s ReadSession, id K) (dal.Record, error)` that returns the underlying `dal.Record` (its `Data()` is a `*T`). It is the read primitive the other read accessors delegate to.
+
+`Collection[K, T]` MUST additionally provide typed id-bearing accessors built over `GetRecord`:
+- `GetRecordWithID(ctx, s ReadSession, id K) (dal.RecordWithID[K], error)` — id + key + record (no typed data).
+- `GetRecordWithDataAndID(ctx, s ReadSession, id K) (dal.RecordWithDataAndID[K, *T], error)` — adds the decoded `*T` (the same pointer the Record holds).
+
+For models whose data type is an interface created by a factory (so `new(T)` cannot allocate it), `dal` MUST provide a free function `GetRecordWithIDIntoData[K comparable, D any](ctx, s ReadSession, key *dal.Key, id K, data D) (dal.RecordWithDataAndID[K, D], error)` that decodes INTO the caller-supplied `data` value. It is a free function (not a method) because Go forbids type parameters on methods, so the decoupled data type `D` cannot be a `Collection[K, T]` method.
+
+For backward compatibility package `record` MUST keep `GetWithID[K comparable, T any](...) (record.WithID[K], error)` as a deprecated thin forwarder to `Collection.GetRecordWithID` (`record.WithID` is an alias for `dal.RecordWithID`).
 
 #### REQ: typed-all
 
@@ -120,8 +128,8 @@ The layer MUST live in package `dal`, implemented over the existing session inte
 ### AC: get-record-and-with-id (verifies REQ:typed-get-record)
 
 **Given** a `User{Name:"Alice"}` stored at id `"u1"`
-**When** `GetRecord(ctx, db, "u1")` and `record.GetWithID(ctx, coll, db, "u1")` are called
-**Then** `GetRecord` returns a `dal.Record` whose `Data()` is a `*User` with `Name=="Alice"`, and `GetWithID` returns a `record.WithID[string]` carrying id `"u1"`, the key, and that record; on not-found both return the not-found error.
+**When** `GetRecord`, `GetRecordWithID`, `GetRecordWithDataAndID`, and `dal.GetRecordWithIDIntoData` (and the deprecated `record.GetWithID` forwarder) are called for `"u1"`
+**Then** `GetRecord` returns a `dal.Record` whose `Data()` is a `*User` with `Name=="Alice"`; `GetRecordWithID` returns a `dal.RecordWithID[string]` carrying id/key/record; `GetRecordWithDataAndID` additionally exposes `Data` as the `*User` the Record holds; `GetRecordWithIDIntoData` decodes into a caller-supplied value (including an interface value); and on not-found each returns the session's not-found error.
 
 ### AC: typed-all-distinct (verifies REQ:typed-all)
 
@@ -185,12 +193,13 @@ The layer MUST live in package `dal`, implemented over the existing session inte
 
 ## Architecture & Components
 
-- **`dal.Collection[K, T]` (interface)** — the typed contract: `GetData`/`Get`(deprecated)/`GetRecord`/`All`/`InsertWithID`/`InsertRecord`/`SetByID`/`Set`(deprecated)/`SetRecord`/`UpdateByID`/`Update`(deprecated)/`UpdateByKey`/`DeleteByID`/`Delete`(deprecated)/`DeleteByKey`/`In`. Lives in `dal` (the contracts package), alongside `ReadSession`/`Getter`/etc.
+- **`dal.Collection[K, T]` (interface)** — the typed contract: `GetData`/`Get`(deprecated)/`GetRecord`/`GetRecordWithID`/`GetRecordWithDataAndID`/`All`/`InsertWithID`/`InsertRecord`/`SetByID`/`Set`(deprecated)/`SetRecord`/`UpdateByID`/`Update`(deprecated)/`UpdateByKey`/`DeleteByID`/`Delete`(deprecated)/`DeleteByKey`/`In`. Lives in `dal` (the contracts package), alongside `ReadSession`/`Getter`/etc.
+- **`dal.GetRecordWithIDIntoData[K, D]` (free function)** — decodes into a caller-supplied `data` value, so `D` may be an interface (factory pattern); a free function because Go forbids method type parameters.
 - **unexported impl (in `dal`)** — a small value composing a `dal.CollectionRef` (name + optional parent), the configured `[]KeyOption`, and the phantom `K, T`. `idToKey(id K)` builds a `Key` from the handle's `CollectionRef`, sets `Key.ID = id`, applies the collection's key options via `setKeyOptions`, then guards the parent chain. Each terminal wraps `new(T)`/`&value` with `NewRecordWithData`, calls the matching session method, and returns the typed value / key / error. `*ByID` terminals delegate to the corresponding `*ByKey`/`*Record` primitive.
 - **`CollectionOption` + `WithKeyOptions`** — a constructor option carrying collection-level `dal.KeyOption`s.
 - **`CollectionNamer` (interface)** — `CollectionName() string`; a constraint on `CollectionOf`.
 - **Constructors** — `CollectionOf[K comparable, T CollectionNamer](opts ...CollectionOption)` and `CollectionAt[K comparable, T any](name string, opts ...CollectionOption)`, both returning `dal.Collection[K, T]`.
-- **`record.GetWithID[K, T]` (free function)** — returns `record.WithID[K]` over a `dal.Collection[K, T]`; lives in `record` to keep `dal` free of any `record` import.
+- **`record.GetWithID[K, T]` (deprecated free function)** — a thin forwarder to `Collection.GetRecordWithID`, kept for backward compatibility (`record.WithID` aliases `dal.RecordWithID`).
 - **Dependencies** — existing `dal` session interfaces (`ReadSession`/`WriteSession`), `Key`/`CollectionRef`, and the `update` package. No new external dependency; no `record` import in `dal`.
 
 Data flow (GetData): `id K` → `Key` (handle `CollectionRef` + id + key options) → `GetRecord` → `NewRecordWithData(key, new(T))` → `ReadSession.Get` → return `*new(T)`, mapping the call's not-found error to `(zero T, err)`.
