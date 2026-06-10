@@ -58,7 +58,7 @@ Implement `All(ctx, ReadSession) ([]T, error)` building a `StructuredQuery` over
 **Depends-On:** 2
 **Status:** done
 
-Implement `InsertWithID(ctx, WriteSession, id, value) (*dal.Key, error)` and `Set(ctx, WriteSession, id, value) error`, delegating to the session `Inserter`/`Setter` with a record built from the resolved key; `InsertWithID` returns that key.
+Implement `InsertWithID(ctx, WriteSession, id, value) (*dal.Key, error)` and `Set(ctx, WriteSession, id, value) error`, delegating to the session `Inserter`/`Setter` with a record built from the resolved key; `InsertWithID` returns that key. Also add the free function `dal.InsertRecordWithDataAndID[K, D](ctx, s, key, id, data) (dal.RecordWithDataAndID[K, D], error)` — the write twin of `GetRecordWithIDIntoData` — which inserts a caller-supplied (possibly interface) data value and returns the typed wrapper.
 
 ### Task 6: Update and Delete terminals
 
