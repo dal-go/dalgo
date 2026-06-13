@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"gopkg.in/yaml.v3"
 )
 
@@ -14,8 +14,12 @@ import (
 func compileSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
 	c := jsonschema.NewCompiler()
-	c.Draft = jsonschema.Draft2020
-	if err := c.AddResource(SchemaID, bytes.NewReader(SchemaJSON())); err != nil {
+	c.DefaultDraft(jsonschema.Draft2020)
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(SchemaJSON()))
+	if err != nil {
+		t.Fatalf("UnmarshalJSON schema: %v", err)
+	}
+	if err := c.AddResource(SchemaID, doc); err != nil {
 		t.Fatalf("AddResource: %v", err)
 	}
 	sch, err := c.Compile(SchemaID)
