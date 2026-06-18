@@ -1,6 +1,6 @@
 # Plan: Pluggable per-collection storage engine seam (dalgo2memory)
 
-**Status:** Completed
+**Status:** Implemented
 **Source Feature:** storage-engine-seam
 **Date:** 2026-06-06
 **Owner:** alex

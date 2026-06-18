@@ -4,7 +4,7 @@ status: Draft
 ---
 # Plan: Typed Collection
 
-**Status:** Approved
+**Status:** Implemented
 **Source Feature:** typed-collection
 **Date:** 2026-06-07
 **Owner:** alexandertrakhimenok

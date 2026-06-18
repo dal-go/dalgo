@@ -1,6 +1,6 @@
 # Plan: Columnar storage engine (dalgo2memory)
 
-**Status:** Completed
+**Status:** Implemented
 **Source Feature:** columnar-storage
 **Date:** 2026-06-06
 **Owner:** alex

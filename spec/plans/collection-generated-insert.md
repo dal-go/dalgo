@@ -4,7 +4,7 @@ status: Draft
 ---
 # Plan: Collection Generated Insert
 
-**Status:** Approved
+**Status:** Implemented
 **Source Feature:** collection-generated-insert
 **Date:** 2026-06-07
 **Owner:** alexandertrakhimenok

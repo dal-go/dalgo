@@ -1,6 +1,6 @@
 # Plan: GROUP BY with aggregation in the query builder, executed by dalgo2memory
 
-**Status:** Completed
+**Status:** Implemented
 **Source Feature:** query-group-by-aggregation
 **Date:** 2026-06-05
 **Owner:** alex
