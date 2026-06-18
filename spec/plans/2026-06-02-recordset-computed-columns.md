@@ -1,6 +1,6 @@
 # Plan: Computed Columns in recordset (neutral evaluator contract)
 
-**Status:** Completed
+**Status:** Implemented
 **Source Feature:** recordset-computed-columns
 **Date:** 2026-06-02
 **Owner:** alex

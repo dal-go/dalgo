@@ -1,6 +1,6 @@
 # Plan: Serialized storage engine (dalgo2memory default)
 
-**Status:** Completed
+**Status:** Implemented
 **Source Feature:** serialized-storage
 **Date:** 2026-06-06
 **Owner:** alex

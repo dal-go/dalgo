@@ -4,7 +4,7 @@ status: Draft
 ---
 # Plan: Typed Collection Extras
 
-**Status:** Approved
+**Status:** Implemented
 **Source Feature:** typed-collection-extras
 **Date:** 2026-06-07
 **Owner:** alexandertrakhimenok

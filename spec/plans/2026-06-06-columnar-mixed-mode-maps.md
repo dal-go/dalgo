@@ -1,6 +1,6 @@
 # Plan: Mixed-mode columnar storage for map[string]any collections (dalgo2memory)
 
-**Status:** Completed
+**Status:** Implemented
 **Source Feature:** columnar-mixed-mode-maps
 **Date:** 2026-06-06
 **Owner:** alex
