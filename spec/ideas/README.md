@@ -17,6 +17,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
 | [dalgo2memory-storage-engines](dalgo2memory-storage-engines.md) | Implemented | 2026-06-06 | alex | columnar-mixed-mode-maps, columnar-storage, serialized-storage, storage-engine-seam |
+| [dalgo2namecheap](dalgo2namecheap.md) | Specified | 2026-06-26 | alexander.trakhimenok@gmail.com | dalgo2namecheap-namecheap-api-adapter |
 | [first-class-query-joins](first-class-query-joins.md) | Specified | 2026-06-05 | alexander.trakhimenok | query-joins |
 | [generics-convenience-layer](generics-convenience-layer.md) | Specified | 2026-06-07 | alexander.trakhimenok | collection-generated-insert, typed-collection, typed-collection-extras |
 | [qualified-orderby-resolution](qualified-orderby-resolution.md) | Specified | 2026-06-05 | alex | qualified-orderby-resolution |
