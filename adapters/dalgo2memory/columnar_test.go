@@ -76,7 +76,7 @@ func TestColumnar_RequiresTypedCollection(t *testing.T) {
 	badEng := schemalessDB.engine("blobs").(*columnarEngine)
 	require.False(t, badEng.exists("b1"))
 	require.Error(t, badEng.load("b1", dal.NewRecordWithData(dal.NewKeyWithID("blobs", "b1"), &map[string]any{})))
-	require.Error(t, badEng.update("b1", map[string]any{"x": 1}))
+	require.Error(t, badEng.update("b1", []update.Update{update.ByFieldName("x", 1)}))
 	_, rowsErr := badEng.rows()
 	require.Error(t, rowsErr)
 	_, _, candErr := badEng.candidateRows(nil)
