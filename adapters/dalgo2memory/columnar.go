@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/update"
 )
 
 // compactionThreshold is the dead-slot fraction that triggers compaction. When
@@ -344,7 +345,7 @@ func (e *columnarEngine) delete(id string) {
 	e.maybeCompact()
 }
 
-func (e *columnarEngine) update(id string, updates map[string]any) error {
+func (e *columnarEngine) update(id string, updates []update.Update) error {
 	if e.initErr != nil {
 		return e.initErr
 	}
@@ -356,13 +357,19 @@ func (e *columnarEngine) update(id string, updates map[string]any) error {
 	if err != nil {
 		return err
 	}
-	for fieldName, value := range updates {
-		// On the struct path an unknown field is rejected; on the map-backed
-		// path an undeclared field is a valid leftover field.
-		if _, ok := e.byName[fieldName]; !ok && !e.mapBacked {
-			return fmt.Errorf("record for collection %q does not conform to the schema: unknown field %q", e.collection, fieldName)
+	// Validate top-level field names against the schema before applying.
+	// FieldPath updates are nested and always mutate the intermediate map, so
+	// they are not validated against the flat column set here (the JSON
+	// round-trip in prepareWrite will reject any truly unknown top-level key).
+	for _, upd := range updates {
+		if fn := upd.FieldName(); fn != "" {
+			if _, ok := e.byName[fn]; !ok && !e.mapBacked {
+				return fmt.Errorf("record for collection %q does not conform to the schema: unknown field %q", e.collection, fn)
+			}
 		}
-		current[fieldName] = value
+	}
+	if err := applyUpdatesToMap(current, updates); err != nil {
+		return err
 	}
 	values, leftover, err := e.prepareWrite(current)
 	if err != nil {

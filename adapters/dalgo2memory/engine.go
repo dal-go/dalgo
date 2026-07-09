@@ -1,7 +1,10 @@
 package dalgo2memory
 
 import (
+	"fmt"
+
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/update"
 )
 
 // storageEngine is the internal, per-collection storage seam. It owns how one
@@ -28,10 +31,12 @@ type storageEngine interface {
 	// delete removes the record stored under id, if any.
 	delete(id string)
 
-	// update applies decoded field updates (name -> value) to the record
-	// stored under id, re-validating against the engine's own representation.
+	// update applies a list of field updates to the record stored under id,
+	// re-validating against the engine's own representation. Each Update carries
+	// either a FieldName (top-level key) or a FieldPath (nested key sequence).
+	// A value of update.DeleteField removes the key rather than setting it.
 	// It returns a not-found error when no record with that id is stored.
-	update(id string, updates map[string]any) error
+	update(id string, updates []update.Update) error
 
 	// rows enumerates the collection's stored rows for query execution. Each
 	// row exposes a decoded map[string]any field view (for WHERE/GROUP
@@ -46,4 +51,55 @@ type engineRow struct {
 	id          string
 	data        map[string]any
 	materialize func(target any) error
+}
+
+// applyUpdatesToMap applies a slice of Update values to a flat-or-nested
+// map[string]any. Each Update has either a FieldName (a single top-level key)
+// or a FieldPath (a sequence of nested keys). A value of update.DeleteField
+// removes the leaf key; any other value sets it. Intermediate nodes are created
+// as map[string]any when they are missing; if an intermediate node exists but is
+// not a map[string]any, applyUpdatesToMap returns a descriptive error rather
+// than panicking.
+func applyUpdatesToMap(data map[string]any, updates []update.Update) error {
+	for _, upd := range updates {
+		var path []string
+		if fp := upd.FieldPath(); len(fp) > 0 {
+			path = fp
+		} else if fn := upd.FieldName(); fn != "" {
+			path = []string{fn}
+		} else {
+			continue // neither set — skip (should not happen after Validate)
+		}
+		if err := applyPathUpdate(data, path, upd.Value()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// applyPathUpdate walks path in data, creating intermediate map[string]any
+// nodes as needed, then sets or deletes the leaf. Returns an error when an
+// intermediate value exists but is not a map[string]any.
+func applyPathUpdate(data map[string]any, path []string, value any) error {
+	// Navigate to the parent map of the leaf.
+	current := data
+	for _, key := range path[:len(path)-1] {
+		switch v := current[key].(type) {
+		case map[string]any:
+			current = v
+		case nil:
+			next := make(map[string]any)
+			current[key] = next
+			current = next
+		default:
+			return fmt.Errorf("field path segment %q is not a map (got %T)", key, current[key])
+		}
+	}
+	leaf := path[len(path)-1]
+	if value == update.DeleteField {
+		delete(current, leaf)
+	} else {
+		current[leaf] = value
+	}
+	return nil
 }

@@ -264,13 +264,7 @@ func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []up
 	if err := s.db.guardCollection(collectionName); err != nil {
 		return err
 	}
-	fieldUpdates := make(map[string]any, len(updates))
-	for _, upd := range updates {
-		if fieldName := upd.FieldName(); fieldName != "" {
-			fieldUpdates[fieldName] = upd.Value()
-		}
-	}
-	return s.db.engine(collectionName).update(keyID(record.Key()), fieldUpdates)
+	return s.db.engine(collectionName).update(keyID(record.Key()), updates)
 }
 
 func (s session) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {

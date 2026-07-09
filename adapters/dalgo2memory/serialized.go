@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/update"
 )
 
 // serializedEngine is the default storage engine: it stores each record as
@@ -70,7 +71,7 @@ func (e *serializedEngine) delete(id string) {
 	delete(e.records, id)
 }
 
-func (e *serializedEngine) update(id string, updates map[string]any) error {
+func (e *serializedEngine) update(id string, updates []update.Update) error {
 	b, ok := e.records[id]
 	if !ok {
 		return dal.NewErrNotFoundByKey(dal.NewKeyWithID(e.collection, id), nil)
@@ -79,8 +80,8 @@ func (e *serializedEngine) update(id string, updates map[string]any) error {
 	if err := json.Unmarshal(b, &data); err != nil {
 		return err
 	}
-	for fieldName, value := range updates {
-		data[fieldName] = value
+	if err := applyUpdatesToMap(data, updates); err != nil {
+		return err
 	}
 	next, err := json.Marshal(data)
 	if err != nil {

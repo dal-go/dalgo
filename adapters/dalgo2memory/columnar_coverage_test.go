@@ -282,7 +282,7 @@ func TestColumnar_UpdateOnBrokenEngine(t *testing.T) {
 		WithCollection[map[string]any]("blobs", nil, WithColumnarStorage()),
 	)).(*database)
 	eng := db.engine("blobs").(*columnarEngine)
-	require.Error(t, eng.update("x", map[string]any{"a": 1}))
+	require.Error(t, eng.update("x", []update.Update{update.ByFieldName("a", 1)}))
 }
 
 // TestColumnar_DecodeFieldsNonObjectErrors covers decodeFields' unmarshal-to-map

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/update"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +29,7 @@ func (e *countingEngine) load(id string, record dal.Record) error { return e.inn
 
 func (e *countingEngine) delete(id string) { e.inner.delete(id) }
 
-func (e *countingEngine) update(id string, updates map[string]any) error {
+func (e *countingEngine) update(id string, updates []update.Update) error {
 	return e.inner.update(id, updates)
 }
 

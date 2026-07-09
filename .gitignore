@@ -25,3 +25,4 @@
 
 # SpecStudio local event journal
 .specscore/events.jsonl
+.worktrees
