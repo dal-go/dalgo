@@ -1,0 +1,16 @@
+#!/bin/sh
+# Pre-push hook mirroring CI's coverage gate (strongo/go-ci-action):
+# the full test suite must keep total statement coverage at 100%.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+set -e
+
+echo "pre-push: running tests with coverage (CI requires 100%)..."
+profile="$(mktemp)"
+trap 'rm -f "$profile"' EXIT
+
+go test ./... -coverprofile="$profile" -count=1
+
+total=$(go tool cover -func="$profile" | grep total | awk '{print $3}' | sed 's/%//')
+echo "pre-push: total coverage: ${total}%"
+awk -v t="$total" -v m=100 'BEGIN { if (t < m) { print "pre-push: coverage " t "% is below required " m "% — push aborted (CI would fail)"; exit 1 } }'

@@ -91,3 +91,15 @@ Date:   Thu Feb 2 11:41:15 2018 -0800
 
 Notice the `Author` and `Signed-off-by` lines match.
 If they don't your PR will be rejected by the automated DCO check.
+
+## Git hooks
+
+CI requires 100% total statement coverage. To catch this before pushing,
+enable the repo-provided hooks once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+The `pre-push` hook runs `go test ./... -coverprofile=...` and aborts the
+push if total coverage drops below 100% (same gate as CI).
