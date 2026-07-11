@@ -21,6 +21,7 @@ type serializedEngine struct {
 	collection string
 	factory    func() any
 	records    map[string][]byte
+	keys       map[string]*dal.Key // full key (with parent chain) per stored id
 }
 
 var _ storageEngine = (*serializedEngine)(nil)
@@ -32,6 +33,7 @@ func newSerializedEngine(collection string, factory func() any) *serializedEngin
 		collection: collection,
 		factory:    factory,
 		records:    make(map[string][]byte),
+		keys:       make(map[string]*dal.Key),
 	}
 }
 
@@ -56,6 +58,7 @@ func (e *serializedEngine) store(id string, record dal.Record, overwrite bool) e
 		}
 	}
 	e.records[id] = b
+	e.keys[id] = record.Key()
 	return nil
 }
 
@@ -69,6 +72,7 @@ func (e *serializedEngine) load(id string, record dal.Record) error {
 
 func (e *serializedEngine) delete(id string) {
 	delete(e.records, id)
+	delete(e.keys, id)
 }
 
 func (e *serializedEngine) update(id string, updates []update.Update) error {
@@ -110,6 +114,7 @@ func (e *serializedEngine) rows() ([]engineRow, error) {
 			materialize: func(target any) error {
 				return json.Unmarshal(raw, target)
 			},
+			key: e.keys[id],
 		})
 	}
 	return rows, nil

@@ -45,12 +45,15 @@ type storageEngine interface {
 	rows() ([]engineRow, error)
 }
 
-// engineRow is one enumerated row: its id, a decoded field view, and a
-// materialize callback that loads the row into a caller-provided typed target.
+// engineRow is one enumerated row: its id, a decoded field view, a materialize
+// callback that loads the row into a caller-provided typed target, and the
+// stored record's full key (with its parent chain) so a collection-group query
+// returns records carrying their parents — matching Firestore.
 type engineRow struct {
 	id          string
 	data        map[string]any
 	materialize func(target any) error
+	key         *dal.Key
 }
 
 // applyUpdatesToMap applies a slice of Update values to a flat-or-nested

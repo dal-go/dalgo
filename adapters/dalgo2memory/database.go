@@ -310,9 +310,19 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 			return nil, err
 		}
 	}
+	var parent *dal.Key
+	if cr, ok := base.(dal.CollectionRef); ok {
+		parent = cr.Parent()
+	}
 	rows := make([]memoryRow, 0, len(allRows))
 	for _, row := range allRows {
 		if !matchesWhere(row.data, q.Where()) {
+			continue
+		}
+		// Parent-scoped query: keep only rows whose stored key is a direct child
+		// of the requested parent. A nil parent (root collection ref) is the
+		// collection-group case and keeps every row across all parents.
+		if parent != nil && !isChildOf(row.key, parent) {
 			continue
 		}
 		rows = append(rows, row)
@@ -335,7 +345,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	columns := q.Columns()
 	records := make([]dal.Record, len(rows))
 	for i, row := range rows {
-		key := dal.NewKeyWithID(collectionName, row.id)
+		key := resultKey(row, collectionName)
 		if len(columns) > 0 {
 			records[i] = dal.NewRecordWithData(key, projectRow(columns, baseSources(base, row.data))).SetError(nil)
 			continue
@@ -368,6 +378,7 @@ type memoryRow struct {
 	id          string
 	data        map[string]any
 	materialize func(target any) error
+	key         *dal.Key
 }
 
 func (s session) save(record dal.Record, overwrite bool) error {
@@ -387,6 +398,29 @@ func (s session) save(record dal.Record, overwrite bool) error {
 
 func keyID(key *dal.Key) string {
 	return fmt.Sprint(key.ID)
+}
+
+// resultKey returns the stored full key (with its parent chain) for a query
+// result row, falling back to a leaf-only key when a row carries none.
+func resultKey(row memoryRow, collectionName string) *dal.Key {
+	if row.key != nil {
+		return row.key
+	}
+	return dal.NewKeyWithID(collectionName, row.id)
+}
+
+// isChildOf reports whether key's immediate parent is the given parent (by full
+// path) — used to scope a parent-anchored collection query. Both keys come from
+// stored records / collection refs and so are valid.
+func isChildOf(key, parent *dal.Key) bool {
+	if key == nil || parent == nil {
+		return false
+	}
+	p := key.Parent()
+	if p == nil {
+		return false
+	}
+	return p.String() == parent.String()
 }
 
 // matchesWhere evaluates the WHERE condition shapes that dalgo2firestore
@@ -516,10 +550,10 @@ func normalizeConstant(v any) any {
 	if err != nil {
 		return v
 	}
+	// b is valid JSON produced by Marshal above, so unmarshalling into any never
+	// fails.
 	var out any
-	if err := json.Unmarshal(b, &out); err != nil {
-		return v
-	}
+	_ = json.Unmarshal(b, &out)
 	return out
 }
 
