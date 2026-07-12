@@ -47,6 +47,7 @@ type columnarEngine struct {
 	byName    map[string]*column
 	idToSlot  map[string]int
 	slotToID  []string                  // slotToID[slot] == "" when the slot is dead
+	slotToKey []*dal.Key                // slotToKey[slot] is the stored record's full key
 	live      []bool                    // live[slot] reports whether the slot holds a record
 	freeList  []int                     // dead slots available for reuse
 	deadCount int                       // number of dead (tombstoned) slots
@@ -317,7 +318,25 @@ func (e *columnarEngine) store(id string, record dal.Record, overwrite bool) err
 		return err
 	}
 	slot := e.allocSlot(id)
+	e.setSlotKey(slot, record.Key())
 	e.writeSlot(slot, values, leftover)
+	return nil
+}
+
+// setSlotKey records the stored record's full key at slot, growing the parallel
+// slice to cover newly-allocated slots.
+func (e *columnarEngine) setSlotKey(slot int, key *dal.Key) {
+	for len(e.slotToKey) <= slot {
+		e.slotToKey = append(e.slotToKey, nil)
+	}
+	e.slotToKey[slot] = key
+}
+
+// slotKey returns the stored full key at slot, or nil if none was recorded.
+func (e *columnarEngine) slotKey(slot int) *dal.Key {
+	if slot >= 0 && slot < len(e.slotToKey) {
+		return e.slotToKey[slot]
+	}
 	return nil
 }
 
@@ -407,6 +426,7 @@ func (e *columnarEngine) buildRows(ids []string) ([]engineRow, error) {
 			id:          id,
 			data:        data,
 			materialize: func(target any) error { return e.materializeSlot(s, target) },
+			key:         e.slotKey(slot),
 		})
 	}
 	return rows, nil
@@ -519,6 +539,9 @@ func (e *columnarEngine) freeSlot(slot int) {
 	}
 	e.live[slot] = false
 	e.slotToID[slot] = ""
+	if slot < len(e.slotToKey) {
+		e.slotToKey[slot] = nil
+	}
 	e.freeList = append(e.freeList, slot)
 	e.deadCount++
 }
