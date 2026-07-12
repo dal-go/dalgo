@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/dal-go/dalgo/dal"
@@ -396,8 +397,30 @@ func (s session) save(record dal.Record, overwrite bool) error {
 	return nil
 }
 
+// keyID is a record's storage identity within its per-leaf-collection engine.
+// Records are grouped by leaf collection name, so a nested record's leaf id is
+// not unique on its own: spaces/A/items/i1 and spaces/B/items/i1 share the leaf
+// id "i1" yet are distinct records (as in Firestore). Root-level records keep
+// the bare leaf id (backward compatible, and what the white-box engine tests
+// address records by); nested records are keyed by their full parent-chain path
+// so the same leaf id under different parents no longer collides.
 func keyID(key *dal.Key) string {
-	return fmt.Sprint(key.ID)
+	if key.Parent() == nil {
+		return fmt.Sprint(key.ID)
+	}
+	return keyPath(key)
+}
+
+// keyPath builds a record's full "collection/id/collection/id/…" path from the
+// root down. Unlike dal.Key.String it performs no validation and so never
+// panics on an incomplete key — keyID can run on the insert-generator path
+// before a generated id is finalized.
+func keyPath(key *dal.Key) string {
+	var parts []string
+	for k := key; k != nil; k = k.Parent() {
+		parts = append([]string{k.Collection() + "/" + fmt.Sprint(k.ID)}, parts...)
+	}
+	return strings.Join(parts, "/")
 }
 
 // resultKey returns the stored full key (with its parent chain) for a query
