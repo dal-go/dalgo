@@ -770,15 +770,21 @@ func (e *columnarEngine) compact() {
 		}
 	}
 	newSlotToID := make([]string, newLen)
+	newSlotToKey := make([]*dal.Key, newLen)
 	newLive := make([]bool, newLen)
 	for newSlot, oldSlot := range liveSlots {
 		id := e.slotToID[oldSlot]
 		newSlotToID[newSlot] = id
+		// Every live slot had its full key recorded at store time, so this
+		// carries the parent chain across compaction (else collection-group
+		// query results would lose their parent after a compaction).
+		newSlotToKey[newSlot] = e.slotToKey[oldSlot]
 		newLive[newSlot] = true
 		e.idToSlot[id] = newSlot
 	}
 	e.leftover = newLeftover
 	e.slotToID = newSlotToID
+	e.slotToKey = newSlotToKey
 	e.live = newLive
 	e.freeList = e.freeList[:0]
 	e.deadCount = 0

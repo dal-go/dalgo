@@ -76,6 +76,97 @@ func TestParentScopedQueryFiltersByParent(t *testing.T) {
 	require.Equal(t, "spaceA", records[0].Key().Parent().ID)
 }
 
+func cgGet(t *testing.T, db dal.DB, space, id string) (*cgItem, error) {
+	t.Helper()
+	got := &cgItem{}
+	rec := dal.NewRecordWithData(cgKey(space, id), got)
+	err := db.RunReadonlyTransaction(context.Background(), func(ctx context.Context, tx dal.ReadTransaction) error {
+		return tx.Get(ctx, rec)
+	})
+	return got, err
+}
+
+func cgDelete(t *testing.T, db dal.DB, space, id string) {
+	t.Helper()
+	require.NoError(t, db.RunReadwriteTransaction(context.Background(), func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return tx.Delete(ctx, cgKey(space, id))
+	}))
+}
+
+// Two records sharing a leaf id under different parents are distinct records —
+// storing one must not overwrite the other, exactly as in Firestore where
+// spaces/A/items/i1 and spaces/B/items/i1 are unrelated documents.
+func TestSameLeafIdDifferentParentsDoNotCollide(t *testing.T) {
+	ctx := context.Background()
+	db := NewDB()
+	cgSeed(t, db, "spaceA", "i1", "fromA")
+	cgSeed(t, db, "spaceB", "i1", "fromB") // same leaf id "i1", different parent
+
+	// Each parent keeps its own record (no silent overwrite).
+	gotA, err := cgGet(t, db, "spaceA", "i1")
+	require.NoError(t, err)
+	require.Equal(t, "fromA", gotA.Name)
+	gotB, err := cgGet(t, db, "spaceB", "i1")
+	require.NoError(t, err)
+	require.Equal(t, "fromB", gotB.Name)
+
+	// A collection-group query returns both, each under its own parent.
+	records, err := dal.ExecuteQueryAndReadAllToRecords(ctx, cgQuery("items", nil), db)
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+	byName := map[string]string{}
+	for _, rec := range records {
+		byName[rec.Data().(*cgItem).Name], _ = rec.Key().Parent().ID.(string)
+	}
+	require.Equal(t, "spaceA", byName["fromA"])
+	require.Equal(t, "spaceB", byName["fromB"])
+
+	// Deleting one parent's record leaves the other untouched.
+	cgDelete(t, db, "spaceB", "i1")
+	_, err = cgGet(t, db, "spaceA", "i1")
+	require.NoError(t, err)
+	_, err = cgGet(t, db, "spaceB", "i1")
+	require.True(t, dal.IsNotFound(err))
+}
+
+// The columnar engine must also keep same-leaf-id-across-parents distinct, and
+// preserve each surviving record's full parent key across a compaction (which
+// re-indexes slots).
+func TestColumnarSameLeafIdSurvivesCompaction(t *testing.T) {
+	ctx := context.Background()
+	db := NewDB(WithSchema(false,
+		WithCollection[cgItem]("items", nil, WithColumnarStorage()),
+	))
+	seed := func(space, id, name string) {
+		require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			return tx.Set(ctx, dal.NewRecordWithData(cgKey(space, id), &cgItem{Name: name}))
+		}))
+	}
+	seed("spaceA", "i1", "a1")
+	seed("spaceA", "i2", "a2")
+	seed("spaceB", "i1", "b1") // same leaf id "i1" as spaceA — must not collide
+	seed("spaceB", "i2", "b2")
+
+	// Delete a majority to force compaction; the sole survivor is spaceA/i1.
+	cgDelete(t, db, "spaceA", "i2")
+	cgDelete(t, db, "spaceB", "i2")
+	cgDelete(t, db, "spaceB", "i1")
+
+	records, err := dal.ExecuteQueryAndReadAllToRecords(ctx, cgQuery("items", nil), db)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	require.Equal(t, "i1", records[0].Key().ID)
+	require.Equal(t, "spaceA", records[0].Key().Parent().ID, "parent key must survive compaction")
+	require.Equal(t, "a1", records[0].Data().(*cgItem).Name)
+}
+
+func TestKeyIDRootAndNested(t *testing.T) {
+	// Root-level key keeps the bare leaf id (backward compatible).
+	require.Equal(t, "i1", keyID(dal.NewKeyWithID("items", "i1")))
+	// Nested key uses the full parent-chain path so it is globally unique.
+	require.Equal(t, "spaces/spaceA/items/i1", keyID(cgKey("spaceA", "i1")))
+}
+
 func TestIsChildOf(t *testing.T) {
 	space := dal.NewKeyWithID("spaces", "s")
 	child := dal.NewKeyWithParentAndID(space, "items", "i1")
