@@ -101,8 +101,14 @@ type ReadwriteTransaction interface {
 
 // NewContextWithTransaction stores transaction and original context intoRecord a transactional context
 func NewContextWithTransaction(nonTransactionalContext context.Context, tx Transaction) context.Context {
-	nonTransactionalContext = context.WithValue(nonTransactionalContext, &nonTransactionalContextKey, nonTransactionalContext)
-	return context.WithValue(nonTransactionalContext, &transactionContextKey, tx)
+	originalContext := nonTransactionalContext
+	if existing := nonTransactionalContext.Value(&transactionContextKey); existing != nil {
+		if original := nonTransactionalContext.Value(&nonTransactionalContextKey); original != nil {
+			originalContext = original.(context.Context)
+		}
+	}
+	transactionalContext := context.WithValue(nonTransactionalContext, &nonTransactionalContextKey, originalContext)
+	return context.WithValue(transactionalContext, &transactionContextKey, tx)
 }
 
 // GetTransaction returns original transaction object

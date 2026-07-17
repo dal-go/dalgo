@@ -12,6 +12,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 
 | Idea | Status | Date | Owner | Promotes To |
 |------|--------|------|-------|-------------|
+| [access-policies](access-policies.md) | Implemented | 2026-07-17 | alex | access-policies |
 | [concurrency-capability](concurrency-capability.md) | Approved | 2026-05-12 | alex | — |
 | [dal-records-reader-iter-seq](dal-records-reader-iter-seq.md) | Draft | 2026-05-15 | alex | — |
 | [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Draft | 2026-05-15 | alex | — |

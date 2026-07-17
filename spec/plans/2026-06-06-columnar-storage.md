@@ -19,7 +19,7 @@ The columnar engine is the largest piece, so it is built bottom-up: representati
 ### Task 1: WithColumnarStorage selection (typed-only)
 
 **Verifies:** columnar-storage#ac:columnar-requires-typed-collection
-**Status:** done
+**Status:** complete
 
 Add the `WithColumnarStorage(...ColumnOption)` `CollectionOption` that selects the columnar engine for a schema-registered `WithCollection[T]` collection, and make selection on a schemaless/undefined collection fail with a descriptive error.
 
@@ -27,7 +27,7 @@ Add the `WithColumnarStorage(...ColumnOption)` `CollectionOption` that selects t
 
 **Verifies:** columnar-storage#ac:columns-are-typed-slices, columnar-storage#ac:slot-stable-across-columns
 **Depends-On:** 1
-**Status:** done
+**Status:** complete
 
 Derive one column per JSON-serializable field of `T` via reflection, storing each in a slice typed to the field's Go type (`[]any` fallback for interface/heterogeneous fields), all indexed by a single shared per-row slot; map each record id to a slot that stays stable for the record's lifetime.
 
@@ -35,7 +35,7 @@ Derive one column per JSON-serializable field of `T` via reflection, storing eac
 
 **Verifies:** columnar-storage#ac:write-breaks-refs-by-default, columnar-storage#ac:fidelity-opt-out-toggles-ref-breaking
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 On write, store scalar/value columns by direct assignment and deep-copy reference-bearing columns via a serialization round-trip so stored data shares no references with caller values by default; add a schema-wide option and a per-collection option to disable ref-breaking (per-collection overriding schema-wide), defaulting to faithful.
 
@@ -43,7 +43,7 @@ On write, store scalar/value columns by direct assignment and deep-copy referenc
 
 **Verifies:** columnar-storage#ac:parity-with-serialized-ops
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Ensure `Set` overwrites, `Insert` on an existing id errors without overwriting, `Get`/`Update` on an absent id return not-found, and an `Update` naming a field undefined on `T` is rejected — matching the Serialized engine's outcomes exactly (representational differences only).
 
@@ -51,7 +51,7 @@ Ensure `Set` overwrites, `Insert` on an existing id errors without overwriting, 
 
 **Verifies:** columnar-storage#ac:delete-tombstones-and-hides, columnar-storage#ac:compaction-preserves-live-records
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 `Delete` marks a slot dead and frees it for reuse while keeping other slots stable, and a tombstoned slot never appears in `Get`/`Exists`/queries; when the dead-slot fraction crosses a threshold, compaction reclaims dead slots under the global write lock, preserving every live record and its values without exposing partial state to readers.
 
@@ -59,7 +59,7 @@ Ensure `Set` overwrites, `Insert` on an existing id errors without overwriting, 
 
 **Verifies:** columnar-storage#ac:get-and-query-reassemble, columnar-storage#ac:columnar-query-matches-serialized
 **Depends-On:** 3, 5
-**Status:** done
+**Status:** complete
 
 Reassemble each live row from its per-column slot values into a `map[string]any` field view and a typed materialization for `Get`/`IntoRecord`/factory targets, with no shared references between rows; verify that the supported single equality `WHERE` predicate plus projection and `ORDER BY`/`LIMIT` (and join) return results identical in content and order to an equivalent Serialized collection.
 
@@ -67,7 +67,7 @@ Reassemble each live row from its per-column slot values into a `map[string]any`
 
 **Verifies:** columnar-storage#ac:strategy-interface-exported, columnar-storage#ac:default-strategy-scans-column
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Define and export a `ColumnStrategy` interface (write side to set/clear a value at a slot; equality read side returning matching live slots or "no opinion") and a per-column option to supply one; implement the default typed-slice strategy that answers equality by scanning comparable columns (Go `==`, as in `matchesWhere`) and may return "no opinion" for non-comparable `[]any` columns — proving an external package can plug in without a core dependency.
 
@@ -75,7 +75,7 @@ Define and export a `ColumnStrategy` interface (write side to set/clear a value 
 
 **Verifies:** columnar-storage#ac:where-uses-strategy, columnar-storage#ac:where-falls-back-on-no-opinion
 **Depends-On:** 6, 7
-**Status:** done
+**Status:** complete
 
 For the single `field == value` predicate the adapter supports, consult the target column's `ColumnStrategy` and use its returned slot set to select candidate rows (the read side returns a set so future multi-predicate `AND` can intersect), falling back to scanning on "no opinion"; the result is identical to the Serialized engine's for the same query.
 
@@ -83,7 +83,7 @@ For the single `field == value` predicate the adapter supports, consult the targ
 
 **Verifies:** columnar-storage#ac:columnar-passes-race
 **Depends-On:** 5, 8
-**Status:** done
+**Status:** complete
 
 Run the columnar engine under the existing single global write lock with `go test -race`, interleaving reads with writes, deletes, and a compaction, confirming no data race is reported and results remain correct.
 

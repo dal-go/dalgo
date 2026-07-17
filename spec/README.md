@@ -4,6 +4,17 @@ This directory contains the specification for [DALgo](https://github.com/dal-go/
 
 The specification format follows [SpecScore](https://specscore.md).
 
+## Scope Boundary
+
+This specification tree covers DALgo source code, public Go APIs, runtime
+behavior, compatibility, and code-level verification only.
+
+It MUST NOT be used to specify the separate [dalgo.io](https://dalgo.io/)
+website, including its content, information architecture, visual design,
+marketing, deployment, or other website implementation. Website work may link
+to DALgo code specifications for technical facts, but remains a separate
+product deliverable outside this `spec/` tree.
+
 ## Open Questions
 
 None at this time.

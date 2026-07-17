@@ -24,7 +24,7 @@ Adapter first, terminal second: wire `dalgo2memory` to honor `InsertOption` so g
 
 **Verifies:** collection-generated-insert#ac:memory-generates-via-insert-option, collection-generated-insert#ac:generation-precedes-storage
 **Depends-On:** —
-**Status:** done
+**Status:** complete
 
 Extend `dalgo2memory`'s write path so that when `NewInsertOptions(opts...).IDGenerator()` is non-nil it runs `dal.InsertWithIdGenerator` (supplying an `exists` predicate over the engine and an `insert` callback), generating the id and retrying on collision BEFORE computing the storage key. On generator exhaustion return the generator's error with nothing persisted. This also makes raw `session.Insert(ctx, record, gen)` work, fixing the latent no-op.
 
@@ -32,7 +32,7 @@ Extend `dalgo2memory`'s write path so that when `NewInsertOptions(opts...).IDGen
 
 **Verifies:** collection-generated-insert#ac:generated-insert-returns-key, collection-generated-insert#ac:generated-insert-explicit-option, collection-generated-insert#ac:generator-not-accepted-elsewhere
 **Depends-On:** 1
-**Status:** done
+**Status:** complete
 
 Add `Insert(ctx, WriteSession, value T, opts ...dal.InsertOption) (*dal.Key, error)` to `dal.Collection[T]`: build a record with an incomplete key from the handle's `CollectionRef`, inject the default `WithRandomStringKey(dal.DefaultRandomStringIDLength, 5)` when `opts` is empty, forward to `WriteSession.Insert`, and return the assigned key. Confirm (signature + negative-compile example) that only the bare `Insert` accepts `InsertOption`, so generators cannot reach `InsertWithID`/`Get`/`Set`/`Update`/`Delete`.
 
@@ -40,7 +40,7 @@ Add `Insert(ctx, WriteSession, value T, opts ...dal.InsertOption) (*dal.Key, err
 
 **Verifies:** collection-generated-insert#ac:loud-failure-on-nonhonoring-adapter
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 After the underlying insert returns nil error, have `Insert` assert the record's key id is non-nil/non-empty and otherwise return a descriptive error (e.g. an exported sentinel), so generated `Insert` fails loudly on an adapter that ignores `InsertOption` instead of reporting a `<nil>`-id success. Test with a stub `WriteSession` that drops the option.
 
@@ -48,7 +48,7 @@ After the underlying insert returns nil error, have `Insert` assert the record's
 
 **Verifies:** collection-generated-insert#ac:e2e-generated-insert-roundtrip
 **Depends-On:** 3
-**Status:** done
+**Status:** complete
 
 Add a `dalgo2memory`-specific test (NOT the shared gomock-driven `TestDalgoDB`) exercising generated `Insert` with both the zero-option default and an explicit `WithRandomStringKey`, asserting a complete assigned key is returned and the record round-trips via `Get`; confirm the existing shared `TestDalgoDB` suite stays green.
 
