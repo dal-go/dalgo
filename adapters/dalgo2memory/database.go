@@ -41,6 +41,9 @@ type database struct {
 	// mu without attempting an RWMutex lock upgrade.
 	enginesMu sync.Mutex
 	schema    *memorySchema
+	// noReadsAfterWritesInTransaction emulates Firestore's transaction ordering
+	// rule for databases created with WithNoReadsAfterWritesInTransaction.
+	noReadsAfterWritesInTransaction bool
 	// schemaRefBreaking is the schema-wide columnar fidelity default (faithful
 	// unless WithoutSchemaRefBreaking was used). NewDB initializes it to true.
 	schemaRefBreaking bool
@@ -67,7 +70,9 @@ func (db *database) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker
 func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	return f(ctx, session{db: db})
+	return f(ctx, session{db: db, txState: &transactionState{
+		noReadsAfterWrites: db.noReadsAfterWritesInTransaction,
+	}})
 }
 
 func (db *database) Exists(ctx context.Context, key *dal.Key) (bool, error) {
@@ -157,7 +162,30 @@ func (db *database) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []
 var _ dal.DB = (*database)(nil)
 
 type session struct {
-	db *database
+	db      *database
+	txState *transactionState
+}
+
+type transactionState struct {
+	noReadsAfterWrites bool
+	hasWritten         bool
+}
+
+// ErrReadAfterWriteInTransaction matches the ordering error returned by
+// Firestore transactions when a read follows a queued write.
+var ErrReadAfterWriteInTransaction = errors.New("firestore: read after write in transaction")
+
+func (s session) allowRead() error {
+	if s.txState != nil && s.txState.noReadsAfterWrites && s.txState.hasWritten {
+		return ErrReadAfterWriteInTransaction
+	}
+	return nil
+}
+
+func (s session) markWrite() {
+	if s.txState != nil {
+		s.txState.hasWritten = true
+	}
 }
 
 func (s session) ID() string {
@@ -169,10 +197,17 @@ func (s session) Options() dal.TransactionOptions {
 }
 
 func (s session) Exists(_ context.Context, key *dal.Key) (bool, error) {
+	if err := s.allowRead(); err != nil {
+		return false, err
+	}
 	return s.db.engine(key.Collection()).exists(keyID(key)), nil
 }
 
 func (s session) Get(_ context.Context, record dal.Record) error {
+	if err := s.allowRead(); err != nil {
+		record.SetError(err)
+		return err
+	}
 	if err := s.db.guardCollection(record.Key().Collection()); err != nil {
 		record.SetError(err)
 		return err
@@ -186,6 +221,9 @@ func (s session) Get(_ context.Context, record dal.Record) error {
 }
 
 func (s session) GetMulti(ctx context.Context, records []dal.Record) error {
+	if err := s.allowRead(); err != nil {
+		return err
+	}
 	for _, record := range records {
 		if err := s.Get(ctx, record); err != nil && !dal.IsNotFound(err) {
 			return err
@@ -195,7 +233,11 @@ func (s session) GetMulti(ctx context.Context, records []dal.Record) error {
 }
 
 func (s session) Set(_ context.Context, record dal.Record) error {
-	return s.save(record, true)
+	if err := s.save(record, true); err != nil {
+		return err
+	}
+	s.markWrite()
+	return nil
 }
 
 func (s session) SetMulti(ctx context.Context, records []dal.Record) error {
@@ -223,7 +265,7 @@ func (s session) Insert(ctx context.Context, record dal.Record, opts ...dal.Inse
 		gen = dal.NewInsertOptions(dal.WithRandomStringKey(dal.DefaultRandomStringIDLength, 5)).IDGenerator()
 	}
 	if gen != nil {
-		return dal.InsertWithIdGenerator(ctx, record, gen, insertWithGeneratorMaxAttempts,
+		err := dal.InsertWithIdGenerator(ctx, record, gen, insertWithGeneratorMaxAttempts,
 			func(key *dal.Key) error {
 				if s.db.engine(key.Collection()).exists(keyID(key)) {
 					return nil // id is taken: signal "exists" so generation retries
@@ -234,8 +276,16 @@ func (s session) Insert(ctx context.Context, record dal.Record, opts ...dal.Inse
 				return s.save(r, false)
 			},
 		)
+		if err == nil {
+			s.markWrite()
+		}
+		return err
 	}
-	return s.save(record, false)
+	if err := s.save(record, false); err != nil {
+		return err
+	}
+	s.markWrite()
+	return nil
 }
 
 func (s session) InsertMulti(ctx context.Context, records []dal.Record, opts ...dal.InsertOption) error {
@@ -249,6 +299,7 @@ func (s session) InsertMulti(ctx context.Context, records []dal.Record, opts ...
 
 func (s session) Delete(_ context.Context, key *dal.Key) error {
 	s.db.engine(key.Collection()).delete(keyID(key))
+	s.markWrite()
 	return nil
 }
 
@@ -269,7 +320,11 @@ func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []up
 	if err := s.db.guardCollection(collectionName); err != nil {
 		return err
 	}
-	return s.db.engine(collectionName).update(keyID(record.Key()), updates)
+	if err := s.db.engine(collectionName).update(keyID(record.Key()), updates); err != nil {
+		return err
+	}
+	s.markWrite()
+	return nil
 }
 
 func (s session) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
@@ -282,6 +337,9 @@ func (s session) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []upd
 }
 
 func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query) (dal.RecordsReader, error) {
+	if err := s.allowRead(); err != nil {
+		return nil, err
+	}
 	q, ok := query.(dal.StructuredQuery)
 	if !ok {
 		return nil, dal.ErrNotSupported
