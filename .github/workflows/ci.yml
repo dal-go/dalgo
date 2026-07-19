@@ -22,4 +22,6 @@ jobs:
       COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
     with:
       code_coverage: true
+      cgo_enabled: true
       min_test_coverage_percent: 100
+      additional_go_test_path: -race ./...

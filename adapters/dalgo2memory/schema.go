@@ -207,6 +207,9 @@ func (db *database) guardCollection(collection string) error {
 // unknown-field validation) is resolved alongside; callers that need the guard
 // error should call recordFactory/guardCollection first.
 func (db *database) engine(collection string) storageEngine {
+	db.enginesMu.Lock()
+	defer db.enginesMu.Unlock()
+
 	if eng, ok := db.collections[collection]; ok {
 		return eng
 	}
