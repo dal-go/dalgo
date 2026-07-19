@@ -31,6 +31,11 @@ We build with our own tooling:
 - **[DataTug](https://datatug.io)** — query & explore data
 <!-- /dev-approach -->
 
+> **Specification scope:** The [`spec/`](./spec) tree specifies DALgo code and
+> runtime behavior only. The separate [dalgo.io](https://dalgo.io/) website,
+> its content, visual design, and marketing pages are intentionally outside the
+> SpecScore scope of this repository.
+
 ## 🎯 Why Use DALgo
 
 DALgo is useful when an application needs stable data-access code without
@@ -39,6 +44,8 @@ coupling the domain layer to Firestore, SQL, or a test-only database.
 - Keep application logic independent from a concrete database client.
 - Use the same record, query, and transaction shape across supported adapters.
 - Test business logic with the built-in in-memory adapter.
+- Put extensions, tenants, jobs, and support tools behind portable,
+  adapter-independent [access policies](./docs/access-policies.md).
 - Add logging, validation, metrics, and other behavior through hooks.
 - Model both document/key-value stores and relational tables through one key and
   schema abstraction.
@@ -47,6 +54,40 @@ DALgo does not try to hide every database difference. Adapters can return
 `dal.ErrNotSupported` for capabilities their backend cannot provide. This keeps
 the core API honest while still giving applications a shared path for the common
 operations.
+
+## 🛡️ Access Policies: Least Privilege at the DAL Boundary
+
+DALgo can wrap any adapter with a capability boundary that is enforced before
+the adapter sees a read, query, batch, mutation, or transaction operation.
+Policies distinguish `Get`, `Exists`, `Query`, `Insert`, `Set`, `Update`,
+`Delete`, and the reserved `Truncate` operation. Write access never silently
+grants read access.
+
+```go
+extension := access.MustPolicy("extension-trackus",
+	access.Root(access.Deny(access.ReadWrite, "outside-extension")),
+	access.Scope("ext", "trackus",
+		access.Allow(access.ReadWrite, "own-global-data")),
+	access.Scope("spaces", access.AnyID,
+		access.Scope("ext", "trackus",
+			access.Allow(access.ReadWrite, "own-space-data"))),
+)
+
+db := access.MustSecureDB(rawDB, access.RequireContextPolicy())
+ctx := access.WithPolicy(context.Background(), extension)
+```
+
+Rules are hierarchical: a more-specific child may carve a denial out of an
+allowed parent or reopen a subtree denied by its parent. Separate database and
+context policies intersect, so adding a policy can only narrow authority.
+Every denied call returns an inspectable `access.DeniedError` with the
+operation, resource, policy name/source, matched rule ID, and explanation.
+
+Policies can be authored as versioned YAML, represented equivalently as JSON,
+and loaded from any `io.Reader`—files are only one possible storage choice.
+The same hierarchy also supports independent audit selection without granting
+data access. See the [Access Policies guide](./docs/access-policies.md) for the
+complete model, loading APIs, error handling, and security boundary.
 
 ## ⚡ Quick Example
 

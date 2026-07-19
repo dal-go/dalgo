@@ -19,7 +19,7 @@ The columnar engine already has the typed-column slices, slot/free-list model, t
 ### Task 1: Map-backed selection, declared-column option, and type enforcement
 
 **Verifies:** columnar-mixed-mode-maps#ac:mixed-mode-requires-declared-column, columnar-mixed-mode-maps#ac:declared-value-wrong-type-errors
-**Status:** done
+**Status:** complete
 
 Lift the struct-only restriction so `WithColumnarStorage` builds a columnar engine for a `map[string]any` collection from explicitly declared columns; selecting it with no declared column fails with a descriptive error. Add the declared-column `ColumnOption` (name + element type) and make a written declared value that cannot be stored as the declared type a descriptive write error that stores nothing for that record.
 
@@ -27,7 +27,7 @@ Lift the struct-only restriction so `WithColumnarStorage` builds a columnar engi
 
 **Verifies:** columnar-mixed-mode-maps#ac:declared-field-removed-from-leftover, columnar-mixed-mode-maps#ac:leftover-holds-undeclared-fields, columnar-mixed-mode-maps#ac:slot-stays-synced-through-delete-and-compaction
 **Depends-On:** 1
-**Status:** done
+**Status:** complete
 
 Store each declared column in its typed slice (removing the declared key from the record) and retain every undeclared field in a parallel `leftover []map[string]any` indexed by the same per-row slot. Wire the leftover store into slot allocation, tombstone delete, slot reuse, and compaction so a row's declared cells and its leftover map are always moved or freed together.
 
@@ -35,7 +35,7 @@ Store each declared column in its typed slice (removing the declared key from th
 
 **Verifies:** columnar-mixed-mode-maps#ac:read-reconstructs-full-record, columnar-mixed-mode-maps#ac:where-on-declared-column-accelerated, columnar-mixed-mode-maps#ac:where-on-leftover-field-scans
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Reassemble `Get`/query rows by overlaying each declared column's slot value onto a copy of the slot's leftover map, yielding the full `map[string]any` with each key exactly once. Route an equality `WHERE` on a declared column through that column's `ColumnStrategy` and an equality `WHERE` on a leftover field through the scan fall-back; both results identical to the Serialized engine.
 
@@ -43,7 +43,7 @@ Reassemble `Get`/query rows by overlaying each declared column's slot value onto
 
 **Verifies:** columnar-mixed-mode-maps#ac:mixed-mode-parity-and-fidelity
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Confirm declared columns inherit the hybrid write + fidelity opt-out, the leftover map's values are deep-copied under the faithful default (post-write caller mutation does not affect stored data), and `Set`/`Insert`/`Delete`/`Update` outcomes match the Serialized engine for the same `map[string]any` data.
 

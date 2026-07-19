@@ -33,6 +33,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [collection-generated-insert](collection-generated-insert/README.md) | Approved | — |
 | [typed-collection-extras](typed-collection-extras/README.md) | Approved | — |
 | [dalgo2namecheap-namecheap-api-adapter](dalgo2namecheap-namecheap-api-adapter/README.md) | Approved | — |
+| [access-policies](access-policies/README.md) | Stable | — |
 
 ## Open Questions
 

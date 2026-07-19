@@ -24,7 +24,7 @@ Build bottom-up in package `dal`: first the interface, constructors, and session
 
 **Verifies:** typed-collection#ac:construct-by-convention, typed-collection#ac:construct-by-explicit-name, typed-collection#ac:write-needs-write-session
 **Depends-On:** —
-**Status:** done
+**Status:** complete
 
 Define `dal.Collection[T]` (read methods take `ReadSession`, write methods take `WriteSession`), the `CollectionNamer` interface, the unexported impl composing a `dal.CollectionRef`, and the `CollectionOf[T CollectionNamer]()` / `CollectionAt[T any](name)` constructors. Add a negative-compile example proving a write terminal rejects a plain `DB`.
 
@@ -32,7 +32,7 @@ Define `dal.Collection[T]` (read methods take `ReadSession`, write methods take 
 
 **Verifies:** typed-collection#ac:key-options-on-constructor
 **Depends-On:** 1
-**Status:** done
+**Status:** complete
 
 Internal `idToKey(id K)` helper turning the typed `id K` argument into a `*dal.Key` from the handle's `CollectionRef`: it sets `Key.ID = id`, then applies the collection's configured key options (`dal.WithKeyOptions(...)`, e.g. `WithFields`/parent) via `setKeyOptions`, and guards the parent chain. Shared by every `*ByID` terminal.
 
@@ -40,7 +40,7 @@ Internal `idToKey(id K)` helper turning the typed `id K` argument into a `*dal.K
 
 **Verifies:** typed-collection#ac:typed-get-roundtrip, typed-collection#ac:get-not-found
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Implement `Get(ctx, ReadSession, id) (T, error)` by wrapping `new(T)` in a record and calling the session getter, returning the decoded value. Map the session call's not-found error to `(zero T, err)` without consulting `record.Error()`/`record.Exists()`.
 
@@ -48,7 +48,7 @@ Implement `Get(ctx, ReadSession, id) (T, error)` by wrapping `new(T)` in a recor
 
 **Verifies:** typed-collection#ac:typed-all-distinct, typed-collection#ac:all-unsupported-surfaces-error
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Implement `All(ctx, ReadSession) ([]T, error)` building a `StructuredQuery` over the handle's `CollectionRef` with a per-row `new(T)` factory so results never alias; surface `dal.ErrNotSupported` from backends that cannot run the query.
 
@@ -56,7 +56,7 @@ Implement `All(ctx, ReadSession) ([]T, error)` building a `StructuredQuery` over
 
 **Verifies:** typed-collection#ac:insert-with-id-returns-key, typed-collection#ac:set-upserts
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Implement `InsertWithID(ctx, WriteSession, id, value) (*dal.Key, error)` and `Set(ctx, WriteSession, id, value) error`, delegating to the session `Inserter`/`Setter` with a record built from the resolved key; `InsertWithID` returns that key. Also add the free function `dal.InsertRecordWithDataAndID[K, D](ctx, s, key, id, data) (dal.RecordWithDataAndID[K, D], error)` — the write twin of `GetRecordWithIDIntoData` — which inserts a caller-supplied (possibly interface) data value and returns the typed wrapper.
 
@@ -64,7 +64,7 @@ Implement `InsertWithID(ctx, WriteSession, id, value) (*dal.Key, error)` and `Se
 
 **Verifies:** typed-collection#ac:update-applies-fields, typed-collection#ac:delete-removes
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Implement `Update(ctx, WriteSession, id, updates []update.Update, preconditions ...dal.Precondition) error` and `Delete(ctx, WriteSession, id) error`, delegating to the session `Updater`/`Deleter` with the resolved key.
 
@@ -72,7 +72,7 @@ Implement `Update(ctx, WriteSession, id, updates []update.Update, preconditions 
 
 **Verifies:** typed-collection#ac:nested-get, typed-collection#ac:nested-incomplete-parent-errors
 **Depends-On:** 3
-**Status:** done
+**Status:** complete
 
 Implement `In(parent *dal.Key) dal.Collection[T]` composing the `CollectionRef` parent chain (one level). A terminal on a handle scoped under an incomplete parent key returns a descriptive error rather than panicking.
 
@@ -80,7 +80,7 @@ Implement `In(parent *dal.Key) dal.Collection[T]` composing the `CollectionRef` 
 
 **Verifies:** typed-collection#ac:additive-suite-stays-green
 **Depends-On:** 7
-**Status:** done
+**Status:** complete
 
 Confirm the layer is additive: run the full pre-existing `dal` + `dalgo2memory` + `end2end` suites and keep them green with no existing call-site changes, and add a test/assertion that `dal` still does not import the `record` package.
 
@@ -88,7 +88,7 @@ Confirm the layer is additive: run the full pre-existing `dal` + `dalgo2memory` 
 
 **Verifies:** typed-collection#ac:get-record-and-with-id
 **Depends-On:** 3
-**Status:** done
+**Status:** complete
 
 Add `GetRecord(ctx, ReadSession, id K) (dal.Record, error)` as the read primitive the other read accessors delegate to. Add the typed id accessors `GetRecordWithID(...) (dal.RecordWithID[K], error)` and `GetRecordWithDataAndID(...) (dal.RecordWithDataAndID[K, *T], error)` as `Collection` methods, plus the free function `dal.GetRecordWithIDIntoData[K, D](ctx, s, key, id, data) (dal.RecordWithDataAndID[K, D], error)` for interface/factory data (decoding into a caller-supplied value). Keep `record.GetWithID` as a deprecated thin forwarder to `Collection.GetRecordWithID`. All surface the session not-found error.
 

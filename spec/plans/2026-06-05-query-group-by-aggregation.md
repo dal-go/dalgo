@@ -19,21 +19,21 @@ The Feature is a builder capability plus an executor that consumes it, so the or
 ### Task 1: GroupBy builder method on dal.QueryBuilder
 
 **Verifies:** query-group-by-aggregation#ac:group-by-recorded
-**Status:** done
+**Status:** complete
 
 Add a chainable `GroupBy(expressions ...dal.Expression) dal.IQueryBuilder` to `QueryBuilder` and the `IQueryBuilder` interface, appending to `structuredQuery.groupBy` exactly as `OrderBy` appends to `orderBy`, so `GroupBy()` returns the expressions while a query on which `GroupBy` was never called reports an empty `GroupBy()`.
 
 ### Task 2: Having clause — getter, field, builder, and String() rendering
 
 **Verifies:** query-group-by-aggregation#ac:having-recorded-and-rendered
-**Status:** done
+**Status:** complete
 
 Add `Having() dal.Condition` to `StructuredQuery`, a `having Condition` field on `structuredQuery`, and a `Having(conditions ...dal.Condition) dal.IQueryBuilder` builder method that AND-combines multiple conditions like `Where`; render the `HAVING` clause in `structuredQuery.String()` immediately after the `GROUP BY` block.
 
 ### Task 3: COUNT(*) star expression and Count() builder
 
 **Verifies:** query-group-by-aggregation#ac:count-star-expressible
-**Status:** done
+**Status:** complete
 
 Add a star/row `Expression` to the `dal` query model and a `Count()` builder defined as an alias for `Count(*)`, rendering as `COUNT(*)` in `String()`, while the existing `CountAs(field, alias)` keeps its field-count semantics.
 
@@ -41,7 +41,7 @@ Add a star/row `Expression` to the `dal` query model and a `Count()` builder def
 
 **Verifies:** query-group-by-aggregation#ac:single-source-grouping-with-aggregates, query-group-by-aggregation#ac:all-null-group-aggregates-null, query-group-by-aggregation#ac:empty-groupby-unchanged
 **Depends-On:** 1, 3
-**Status:** done
+**Status:** complete
 
 When `q.GroupBy()` is non-empty, partition the WHERE-matched rows into groups keyed by the ordered group-key tuple (resolved via the shared per-source resolver) and emit one row per group, evaluating `SUM`/`COUNT`/`MIN`/`MAX`/`AVG`/`COUNT(*)` with standard SQL null handling (skip nulls; `AVG` divides by non-null count; all-null `SUM`/`AVG`/`MIN`/`MAX` yield `null`; `COUNT(*)` counts all rows) reusing the existing `number()` coercion; an empty `GroupBy()` bypasses the path entirely, leaving today's behavior unchanged.
 
@@ -49,7 +49,7 @@ When `q.GroupBy()` is non-empty, partition the WHERE-matched rows into groups ke
 
 **Verifies:** query-group-by-aggregation#ac:non-grouped-select-column-errors
 **Depends-On:** 4
-**Status:** done
+**Status:** complete
 
 Before emitting any group row, reject a grouped query whose SELECT contains a column that is neither an aggregate function expression nor one of the group-by expressions, returning a descriptive error and no rows — consistent with the eager hard-reject `validateColumns` already applies.
 
@@ -57,7 +57,7 @@ Before emitting any group row, reject a grouped query whose SELECT contains a co
 
 **Verifies:** query-group-by-aggregation#ac:having-filters-by-alias, query-group-by-aggregation#ac:having-filters-by-aggregate-expression, query-group-by-aggregation#ac:having-on-unselected-aggregate
 **Depends-On:** 2, 4
-**Status:** done
+**Status:** complete
 
 When `q.Having()` is non-nil, evaluate it as a post-aggregation filter over each group's aggregated row and drop failing groups; resolve a `HAVING` operand by either the SELECT alias bound to an aggregate or the aggregate expression itself (both yielding the same per-group value), computing an aggregate referenced only in `HAVING` over the group without adding it to the output row.
 
@@ -65,7 +65,7 @@ When `q.Having()` is non-nil, evaluate it as a post-aggregation filter over each
 
 **Verifies:** query-group-by-aggregation#ac:grouped-order-and-limit
 **Depends-On:** 4
-**Status:** done
+**Status:** complete
 
 For a grouped query, apply `ORDER BY`, `LIMIT`, and `OFFSET` to the post-`HAVING` group rows rather than to the pre-grouping input rows, so ordering and limiting operate on the aggregated result set.
 
@@ -73,7 +73,7 @@ For a grouped query, apply `ORDER BY`, `LIMIT`, and `OFFSET` to the post-`HAVING
 
 **Verifies:** query-group-by-aggregation#ac:join-grouping-qualified
 **Depends-On:** 4
-**Status:** done
+**Status:** complete
 
 Route `executeJoinQuery` through the same grouping/aggregation pass so group keys and aggregate inputs can reference qualified sources (e.g. `u.country`), reusing the join's existing source-aware resolver, emitting one aggregated row per distinct group across the joined rows.
 

@@ -4,7 +4,7 @@ This directory contains comprehensive documentation for AI agents incorporating 
 
 ## Documentation Overview
 
-Total: **12 documents** covering all aspects of DALgo  
+Total: **13 documents** covering all aspects of DALgo
 Total lines: **~7,000 lines** of detailed documentation and examples
 
 ### Core Documentation
@@ -16,6 +16,7 @@ Total lines: **~7,000 lines** of detailed documentation and examples
 | [records.md](records.md) | 14 KB | Record lifecycle, key management, strongly typed records |
 | [queries.md](queries.md) | 16 KB | Query building, filtering, ordering, pagination |
 | [transactions.md](transactions.md) | 19 KB | Transaction patterns, isolation levels, best practices |
+| [access-policies.md](access-policies.md) | — | Capability boundaries, YAML/JSON policies, denial explanations, and audit selection |
 
 ### Implementation Guides
 
@@ -98,6 +99,9 @@ Read in order:
 - [errors.md](errors.md) - Error handling
 - [hooks.md](hooks.md) - Validation
 
+**Restricting extensions, tenants, or tools:**
+- [access-policies.md](access-policies.md) - Enforce least privilege across adapters
+
 ### 4. Reference Material
 
 Keep these handy:
@@ -130,6 +134,7 @@ This documentation aims to enable AI agents to:
 | ORM/Type safety | ✅ Complete |
 | Hierarchical data | ✅ Complete |
 | Multi-tenancy | ✅ Complete |
+| Access policies | ✅ Complete |
 | Examples | ✅ Complete |
 
 ## Maintenance

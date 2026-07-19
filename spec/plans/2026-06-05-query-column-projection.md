@@ -19,7 +19,7 @@ The Feature is a builder capability plus an executor that honors it, so the orde
 ### Task 1: SelectColumns terminal on dal.QueryBuilder
 
 **Verifies:** query-column-projection#ac:select-columns-recorded
-**Status:** done
+**Status:** complete
 
 Add `SelectColumns(columns ...dal.Column) dal.StructuredQuery` to `QueryBuilder` and the `IQueryBuilder` interface, recording the ordered column list on the `StructuredQuery` via `newQuery()` (mirroring the existing `Select*` terminals), so `Columns()` returns them while queries built by any other terminal report an empty `Columns()`.
 
@@ -27,7 +27,7 @@ Add `SelectColumns(columns ...dal.Column) dal.StructuredQuery` to `QueryBuilder`
 
 **Verifies:** query-column-projection#ac:single-source-projection, query-column-projection#ac:join-projection-qualified, query-column-projection#ac:empty-columns-unchanged
 **Depends-On:** 1
-**Status:** done
+**Status:** complete
 
 When `q.Columns()` is non-empty, project each result row of both `ExecuteQueryToRecordsReader` (single-source) and `executeJoinQuery` (join) to a `map[string]any` with one entry per selected column, keyed by its `Alias` (falling back to the field name) and resolved via the shared per-source resolver (empty `Source()` -> base; alias/name -> source, collision-correct), bypassing the keys-only `IntoRecord()==nil` branch. An empty `Columns()` leaves the existing full-record output unchanged.
 
@@ -35,7 +35,7 @@ When `q.Columns()` is non-empty, project each result row of both `ExecuteQueryTo
 
 **Verifies:** query-column-projection#ac:unknown-column-source-errors, query-column-projection#ac:non-field-column-errors
 **Depends-On:** 2
-**Status:** done
+**Status:** complete
 
 Validate the selected columns before producing rows: a column whose `FieldRef` names a non-empty source matching no recordset, or whose expression is not a `FieldRef`, returns a descriptive error and no rows — consistent with the `WHERE`/`ORDER BY` unresolvable-source behavior.
 
