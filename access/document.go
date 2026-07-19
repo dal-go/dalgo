@@ -67,10 +67,14 @@ func (YAMLCodec) Decode(reader io.Reader, document *Document) error {
 	return ensureSingleDocument(func(value any) error { return decoder.Decode(value) })
 }
 
-func (YAMLCodec) Encode(writer io.Writer, document Document) error {
+func (YAMLCodec) Encode(writer io.Writer, document Document) (err error) {
 	encoder := yaml.NewEncoder(writer)
 	encoder.SetIndent(2)
-	defer encoder.Close()
+	defer func() {
+		if closeErr := encoder.Close(); err == nil && closeErr != nil {
+			err = fmt.Errorf("access: close YAML encoder: %w", closeErr)
+		}
+	}()
 	if err := encoder.Encode(document); err != nil {
 		return fmt.Errorf("access: encode YAML policy: %w", err)
 	}
@@ -372,9 +376,7 @@ func parseDocumentPath(value string) (PathPattern, error) {
 	if path == "/" || path == "/**" {
 		return PathPattern{}, nil
 	}
-	if strings.HasSuffix(path, "/**") {
-		path = strings.TrimSuffix(path, "/**")
-	}
+	path = strings.TrimSuffix(path, "/**")
 	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
 	patternParts := make([]any, len(parts))
 	for i, part := range parts {

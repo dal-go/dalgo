@@ -79,7 +79,7 @@ func (p *requestCapturePolicy) Authorize(ctx context.Context, request Request) e
 func TestContextGuardComplete(t *testing.T) {
 	ctx := context.Background()
 	p := MustPolicy("all", Root(Allow(ReadWrite, "all")))
-	if got := policiesFromContext(nil); got != nil {
+	if got := policiesFromContext(context.TODO()); got != nil {
 		t.Fatal(got)
 	}
 	if len(policiesFromContext(ctx)) != 0 {
@@ -93,7 +93,8 @@ func TestContextGuardComplete(t *testing.T) {
 	if len(policiesFromContext(ctx2)) != 2 {
 		t.Fatal()
 	}
-	for _, fn := range []func(){func() { WithPolicy(nil, p) }, func() { WithPolicy(context.Background(), nil) }} {
+	var nilCtx context.Context
+	for _, fn := range []func(){func() { WithPolicy(nilCtx, p) }, func() { WithPolicy(context.Background(), nil) }} {
 		func() {
 			defer func() {
 				if recover() == nil {
