@@ -71,9 +71,7 @@ func (YAMLCodec) Encode(writer io.Writer, document Document) (err error) {
 	encoder := yaml.NewEncoder(writer)
 	encoder.SetIndent(2)
 	defer func() {
-		if closeErr := encoder.Close(); err == nil && closeErr != nil {
-			err = fmt.Errorf("access: close YAML encoder: %w", closeErr)
-		}
+		err = errors.Join(err, encoder.Close())
 	}()
 	if err := encoder.Encode(document); err != nil {
 		return fmt.Errorf("access: encode YAML policy: %w", err)
