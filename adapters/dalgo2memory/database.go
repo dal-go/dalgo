@@ -36,7 +36,11 @@ type database struct {
 	// live solely inside these engine instances; the engine is created lazily
 	// on first access (see database.engine).
 	collections map[string]storageEngine
-	schema      *memorySchema
+	// enginesMu serializes lazy engine initialization. Read-only transactions
+	// hold mu.RLock and therefore cannot safely initialize collections through
+	// mu without attempting an RWMutex lock upgrade.
+	enginesMu sync.Mutex
+	schema    *memorySchema
 	// schemaRefBreaking is the schema-wide columnar fidelity default (faithful
 	// unless WithoutSchemaRefBreaking was used). NewDB initializes it to true.
 	schemaRefBreaking bool

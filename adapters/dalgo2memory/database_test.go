@@ -3,7 +3,9 @@ package dalgo2memory
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
@@ -194,6 +196,50 @@ func TestQueryEmptyCollection(t *testing.T) {
 	record, err := reader.Next()
 	require.Nil(t, record)
 	require.ErrorIs(t, err, dal.ErrNoMoreRecords)
+}
+
+// TestConcurrentReadonlyQueriesInitializeEnginesSafely verifies that queries
+// against previously unseen collections can initialize their storage engines
+// concurrently. It is intended to run under the race detector.
+func TestConcurrentReadonlyQueriesInitializeEnginesSafely(t *testing.T) {
+	const workers = 32
+
+	db := NewDB().(*database)
+	ready := make(chan struct{}, workers)
+	start := make(chan struct{})
+	errs := make(chan error, workers)
+	var wg sync.WaitGroup
+
+	for i := range workers {
+		collection := fmt.Sprintf("collection-%d", i)
+		query := dal.From(dal.NewRootCollectionRef(collection, "")).NewQuery().SelectKeysOnly(reflect.String)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- db.RunReadonlyTransaction(context.Background(), func(ctx context.Context, tx dal.ReadTransaction) error {
+				ready <- struct{}{}
+				<-start
+				reader, err := tx.ExecuteQueryToRecordsReader(ctx, query)
+				if err != nil {
+					return err
+				}
+				return reader.Close()
+			})
+		}()
+	}
+
+	for range workers {
+		<-ready
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	require.Len(t, db.collections, workers)
 }
 
 func TestQueryHelperBranches(t *testing.T) {

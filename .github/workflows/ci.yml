@@ -23,3 +23,4 @@ jobs:
     with:
       code_coverage: true
       min_test_coverage_percent: 100
+      additional_go_test_path: -race ./...
