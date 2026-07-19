@@ -198,6 +198,98 @@ func TestQueryEmptyCollection(t *testing.T) {
 	require.ErrorIs(t, err, dal.ErrNoMoreRecords)
 }
 
+func TestNoReadsAfterWritesInTransaction(t *testing.T) {
+	ctx := context.Background()
+	key := dal.NewKeyWithID("Things", "existing")
+
+	newDB := func() *database {
+		db := NewDB(WithNoReadsAfterWritesInTransaction()).(*database)
+		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &thing{Name: "before", Count: 1})))
+		return db
+	}
+
+	t.Run("read then write then reads fail", func(t *testing.T) {
+		db := newDB()
+		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			got := &thing{}
+			if err := tx.Get(ctx, dal.NewRecordWithData(key, got)); err != nil {
+				return err
+			}
+			if err := tx.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("Things", "new"), &thing{Name: "after"})); err != nil {
+				return err
+			}
+
+			_, err := tx.Exists(ctx, key)
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			err = tx.Get(ctx, dal.NewRecordWithData(key, &thing{}))
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			err = tx.GetMulti(ctx, []dal.Record{dal.NewRecordWithData(key, &thing{})})
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			q := dal.From(dal.NewRootCollectionRef("Things", "")).NewQuery().SelectKeysOnly(reflect.String)
+			_, err = tx.ExecuteQueryToRecordsReader(ctx, q)
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			_, err = tx.ExecuteQueryToRecordsetReader(ctx, q)
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			return nil
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("each write operation blocks subsequent reads", func(t *testing.T) {
+		writes := map[string]func(dal.ReadwriteTransaction) error{
+			"Set": func(tx dal.ReadwriteTransaction) error {
+				return tx.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("Things", "set"), &thing{}))
+			},
+			"SetMulti": func(tx dal.ReadwriteTransaction) error {
+				return tx.SetMulti(ctx, []dal.Record{dal.NewRecordWithData(dal.NewKeyWithID("Things", "set-multi"), &thing{})})
+			},
+			"Insert": func(tx dal.ReadwriteTransaction) error {
+				return tx.Insert(ctx, dal.NewRecordWithData(dal.NewKeyWithID("Things", "insert"), &thing{}))
+			},
+			"InsertMulti": func(tx dal.ReadwriteTransaction) error {
+				return tx.InsertMulti(ctx, []dal.Record{dal.NewRecordWithData(dal.NewKeyWithID("Things", "insert-multi"), &thing{})})
+			},
+			"Update": func(tx dal.ReadwriteTransaction) error {
+				return tx.Update(ctx, key, []update.Update{update.ByFieldName("Count", 2)})
+			},
+			"UpdateRecord": func(tx dal.ReadwriteTransaction) error {
+				return tx.UpdateRecord(ctx, dal.NewRecordWithData(key, &thing{}), []update.Update{update.ByFieldName("Count", 2)})
+			},
+			"UpdateMulti": func(tx dal.ReadwriteTransaction) error {
+				return tx.UpdateMulti(ctx, []*dal.Key{key}, []update.Update{update.ByFieldName("Count", 2)})
+			},
+			"Delete":      func(tx dal.ReadwriteTransaction) error { return tx.Delete(ctx, key) },
+			"DeleteMulti": func(tx dal.ReadwriteTransaction) error { return tx.DeleteMulti(ctx, []*dal.Key{key}) },
+		}
+
+		for name, write := range writes {
+			t.Run(name, func(t *testing.T) {
+				db := newDB()
+				err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+					if err := write(tx); err != nil {
+						return err
+					}
+					_, err := tx.Exists(ctx, key)
+					require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+					return nil
+				})
+				require.NoError(t, err)
+			})
+		}
+	})
+
+	t.Run("default remains permissive", func(t *testing.T) {
+		db := NewDB().(*database)
+		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			if err := tx.Set(ctx, dal.NewRecordWithData(key, &thing{Name: "stored"})); err != nil {
+				return err
+			}
+			return tx.Get(ctx, dal.NewRecordWithData(key, &thing{}))
+		})
+		require.NoError(t, err)
+	})
+}
+
 // TestConcurrentReadonlyQueriesInitializeEnginesSafely verifies that queries
 // against previously unseen collections can initialize their storage engines
 // concurrently. It is intended to run under the race detector.
