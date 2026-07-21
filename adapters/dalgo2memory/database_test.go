@@ -10,7 +10,7 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/end2end"
-	"github.com/dal-go/record"
+	dalrecord "github.com/dal-go/record"
 	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
@@ -44,18 +44,18 @@ func TestUnsupportedRecordsetReader(t *testing.T) {
 func TestTopLevelWriteMethods(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := record.NewKeyWithID("Things", "one")
-	rec := record.NewRecordWithData(key, &thing{Name: "first", Count: 1})
+	key := dalrecord.NewKeyWithID("Things", "one")
+	rec := dalrecord.NewRecordWithData(key, &thing{Name: "first", Count: 1})
 
 	require.NoError(t, db.Set(ctx, rec))
 	require.NoError(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Name", "updated")}))
 
 	var data thing
-	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &data)))
+	require.NoError(t, db.Get(ctx, dalrecord.NewRecordWithData(key, &data)))
 	require.Equal(t, "updated", data.Name)
 
-	require.NoError(t, db.UpdateRecord(ctx, record.NewRecordWithData(key, &thing{}), []update.Update{update.ByFieldName("Count", 2)}))
-	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &data)))
+	require.NoError(t, db.UpdateRecord(ctx, dalrecord.NewRecordWithData(key, &thing{}), []update.Update{update.ByFieldName("Count", 2)}))
+	require.NoError(t, db.Get(ctx, dalrecord.NewRecordWithData(key, &data)))
 	require.Equal(t, 2, data.Count)
 
 	require.NoError(t, db.Delete(ctx, key))
@@ -67,22 +67,22 @@ func TestTopLevelWriteMethods(t *testing.T) {
 func TestTopLevelMultiMethods(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	keys := []*record.Key{
-		record.NewKeyWithID("Things", "one"),
-		record.NewKeyWithID("Things", "two"),
+	keys := []*dalrecord.Key{
+		dalrecord.NewKeyWithID("Things", "one"),
+		dalrecord.NewKeyWithID("Things", "two"),
 	}
-	records := []record.Record{
-		record.NewRecordWithData(keys[0], &thing{Name: "first", Count: 1}),
-		record.NewRecordWithData(keys[1], &thing{Name: "second", Count: 2}),
+	records := []dalrecord.Record{
+		dalrecord.NewRecordWithData(keys[0], &thing{Name: "first", Count: 1}),
+		dalrecord.NewRecordWithData(keys[1], &thing{Name: "second", Count: 2}),
 	}
 
 	require.NoError(t, db.SetMulti(ctx, records))
 	require.NoError(t, db.UpdateMulti(ctx, keys, []update.Update{update.ByFieldName("Count", 3)}))
 
 	data := []thing{{}, {}}
-	require.NoError(t, db.GetMulti(ctx, []record.Record{
-		record.NewRecordWithData(keys[0], &data[0]),
-		record.NewRecordWithData(keys[1], &data[1]),
+	require.NoError(t, db.GetMulti(ctx, []dalrecord.Record{
+		dalrecord.NewRecordWithData(keys[0], &data[0]),
+		dalrecord.NewRecordWithData(keys[1], &data[1]),
 	}))
 	require.Equal(t, 3, data[0].Count)
 	require.Equal(t, 3, data[1].Count)
@@ -107,35 +107,35 @@ func TestTransactionMetadata(t *testing.T) {
 func TestInsertDuplicateAndMissingUpdate(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := record.NewKeyWithID("Things", "one")
-	rec := record.NewRecordWithData(key, &thing{Name: "first"})
+	key := dalrecord.NewKeyWithID("Things", "one")
+	rec := dalrecord.NewRecordWithData(key, &thing{Name: "first"})
 
 	require.NoError(t, db.Insert(ctx, rec))
 	err := db.Insert(ctx, rec)
 	require.Error(t, err)
 	require.True(t, isDuplicate(err))
 
-	err = db.Update(ctx, record.NewKeyWithID("Things", "missing"), []update.Update{update.ByFieldName("Name", "x")})
+	err = db.Update(ctx, dalrecord.NewKeyWithID("Things", "missing"), []update.Update{update.ByFieldName("Name", "x")})
 	require.Error(t, err)
-	require.True(t, record.IsNotFound(err))
+	require.True(t, dalrecord.IsNotFound(err))
 }
 
 func TestMultiMethodsStopOnError(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	badRecord := record.NewRecordWithData(record.NewKeyWithID("Bad", "json"), func() {})
+	badRecord := dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Bad", "json"), func() {})
 
-	require.Error(t, db.SetMulti(ctx, []record.Record{badRecord}))
-	require.Error(t, db.UpdateMulti(ctx, []*record.Key{record.NewKeyWithID("Missing", "one")}, []update.Update{update.ByFieldName("Name", "x")}))
+	require.Error(t, db.SetMulti(ctx, []dalrecord.Record{badRecord}))
+	require.Error(t, db.UpdateMulti(ctx, []*dalrecord.Key{dalrecord.NewKeyWithID("Missing", "one")}, []update.Update{update.ByFieldName("Name", "x")}))
 }
 
 func TestInsertMultiStopsOnError(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := record.NewKeyWithID("Things", "one")
-	records := []record.Record{
-		record.NewRecordWithData(key, &thing{Name: "first"}),
-		record.NewRecordWithData(key, &thing{Name: "duplicate"}),
+	key := dalrecord.NewKeyWithID("Things", "one")
+	records := []dalrecord.Record{
+		dalrecord.NewRecordWithData(key, &thing{Name: "first"}),
+		dalrecord.NewRecordWithData(key, &thing{Name: "duplicate"}),
 	}
 	err := db.InsertMulti(ctx, records)
 	require.Error(t, err)
@@ -145,9 +145,9 @@ func TestInsertMultiSuccess(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return tx.InsertMulti(ctx, []record.Record{
-			record.NewRecordWithData(record.NewKeyWithID("Things", "one"), &thing{Name: "first"}),
-			record.NewRecordWithData(record.NewKeyWithID("Things", "two"), &thing{Name: "second"}),
+		return tx.InsertMulti(ctx, []dalrecord.Record{
+			dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Things", "one"), &thing{Name: "first"}),
+			dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Things", "two"), &thing{Name: "second"}),
 		})
 	}))
 }
@@ -155,7 +155,7 @@ func TestInsertMultiSuccess(t *testing.T) {
 func TestBadRecordDataAndUnsupportedQuery(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	err := db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("Bad", "json"), func() {}))
+	err := db.Set(ctx, dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Bad", "json"), func() {}))
 	require.Error(t, err)
 
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, textQuery{})
@@ -166,11 +166,11 @@ func TestBadRecordDataAndUnsupportedQuery(t *testing.T) {
 func TestMalformedStoredData(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := record.NewKeyWithID("Bad", "json")
+	key := dalrecord.NewKeyWithID("Bad", "json")
 	db.collections[key.Collection()] = &serializedEngine{records: map[string][]byte{keyID(key): []byte("{")}}
 
-	require.Error(t, db.Get(ctx, record.NewRecordWithData(key, &thing{})))
-	require.Error(t, db.GetMulti(ctx, []record.Record{record.NewRecordWithData(key, &thing{})}))
+	require.Error(t, db.Get(ctx, dalrecord.NewRecordWithData(key, &thing{})))
+	require.Error(t, db.GetMulti(ctx, []dalrecord.Record{dalrecord.NewRecordWithData(key, &thing{})}))
 	require.Error(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Name", "x")}))
 
 	q := dal.From(dal.NewRootCollectionRef("Bad", "")).NewQuery().SelectKeysOnly(reflect.String)
@@ -178,12 +178,12 @@ func TestMalformedStoredData(t *testing.T) {
 	require.Nil(t, reader)
 	require.Error(t, err)
 
-	goodKey := record.NewKeyWithID("Good", "json")
-	require.NoError(t, db.Set(ctx, record.NewRecordWithData(goodKey, &thing{Name: "ok"})))
+	goodKey := dalrecord.NewKeyWithID("Good", "json")
+	require.NoError(t, db.Set(ctx, dalrecord.NewRecordWithData(goodKey, &thing{Name: "ok"})))
 	require.Error(t, db.Update(ctx, goodKey, []update.Update{update.ByFieldName("Bad", func() {})}))
 
-	q = dal.From(dal.NewRootCollectionRef("Good", "")).NewQuery().SelectIntoRecord(func() record.Record {
-		return record.NewRecordWithIncompleteKey("Good", reflect.String, &badTarget{})
+	q = dal.From(dal.NewRootCollectionRef("Good", "")).NewQuery().SelectIntoRecord(func() dalrecord.Record {
+		return dalrecord.NewRecordWithIncompleteKey("Good", reflect.String, &badTarget{})
 	})
 	reader, err = db.ExecuteQueryToRecordsReader(ctx, q)
 	require.Nil(t, reader)
@@ -197,6 +197,98 @@ func TestQueryEmptyCollection(t *testing.T) {
 	record, err := reader.Next()
 	require.Nil(t, record)
 	require.ErrorIs(t, err, dal.ErrNoMoreRecords)
+}
+
+func TestNoReadsAfterWritesInTransaction(t *testing.T) {
+	ctx := context.Background()
+	key := dalrecord.NewKeyWithID("Things", "existing")
+
+	newDB := func() *database {
+		db := NewDB(WithNoReadsAfterWritesInTransaction()).(*database)
+		require.NoError(t, db.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "before", Count: 1})))
+		return db
+	}
+
+	t.Run("read then write then reads fail", func(t *testing.T) {
+		db := newDB()
+		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			got := &thing{}
+			if err := tx.Get(ctx, dalrecord.NewRecordWithData(key, got)); err != nil {
+				return err
+			}
+			if err := tx.Set(ctx, dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Things", "new"), &thing{Name: "after"})); err != nil {
+				return err
+			}
+
+			_, err := tx.Exists(ctx, key)
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			err = tx.Get(ctx, dalrecord.NewRecordWithData(key, &thing{}))
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			err = tx.GetMulti(ctx, []dalrecord.Record{dalrecord.NewRecordWithData(key, &thing{})})
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			q := dal.From(dal.NewRootCollectionRef("Things", "")).NewQuery().SelectKeysOnly(reflect.String)
+			_, err = tx.ExecuteQueryToRecordsReader(ctx, q)
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			_, err = tx.ExecuteQueryToRecordsetReader(ctx, q)
+			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			return nil
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("each write operation blocks subsequent reads", func(t *testing.T) {
+		writes := map[string]func(dal.ReadwriteTransaction) error{
+			"Set": func(tx dal.ReadwriteTransaction) error {
+				return tx.Set(ctx, dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Things", "set"), &thing{}))
+			},
+			"SetMulti": func(tx dal.ReadwriteTransaction) error {
+				return tx.SetMulti(ctx, []dalrecord.Record{dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Things", "set-multi"), &thing{})})
+			},
+			"Insert": func(tx dal.ReadwriteTransaction) error {
+				return tx.Insert(ctx, dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Things", "insert"), &thing{}))
+			},
+			"InsertMulti": func(tx dal.ReadwriteTransaction) error {
+				return tx.InsertMulti(ctx, []dalrecord.Record{dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Things", "insert-multi"), &thing{})})
+			},
+			"Update": func(tx dal.ReadwriteTransaction) error {
+				return tx.Update(ctx, key, []update.Update{update.ByFieldName("Count", 2)})
+			},
+			"UpdateRecord": func(tx dal.ReadwriteTransaction) error {
+				return tx.UpdateRecord(ctx, dalrecord.NewRecordWithData(key, &thing{}), []update.Update{update.ByFieldName("Count", 2)})
+			},
+			"UpdateMulti": func(tx dal.ReadwriteTransaction) error {
+				return tx.UpdateMulti(ctx, []*dalrecord.Key{key}, []update.Update{update.ByFieldName("Count", 2)})
+			},
+			"Delete":      func(tx dal.ReadwriteTransaction) error { return tx.Delete(ctx, key) },
+			"DeleteMulti": func(tx dal.ReadwriteTransaction) error { return tx.DeleteMulti(ctx, []*dalrecord.Key{key}) },
+		}
+
+		for name, write := range writes {
+			t.Run(name, func(t *testing.T) {
+				db := newDB()
+				err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+					if err := write(tx); err != nil {
+						return err
+					}
+					_, err := tx.Exists(ctx, key)
+					require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+					return nil
+				})
+				require.NoError(t, err)
+			})
+		}
+	})
+
+	t.Run("default remains permissive", func(t *testing.T) {
+		db := NewDB().(*database)
+		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			if err := tx.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "stored"})); err != nil {
+				return err
+			}
+			return tx.Get(ctx, dalrecord.NewRecordWithData(key, &thing{}))
+		})
+		require.NoError(t, err)
+	})
 }
 
 // TestConcurrentReadonlyQueriesInitializeEnginesSafely verifies that queries

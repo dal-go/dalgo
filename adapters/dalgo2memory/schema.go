@@ -10,6 +10,17 @@ import (
 // Option configures an in-memory database created by NewDB.
 type Option func(*database)
 
+// WithNoReadsAfterWritesInTransaction enables Firestore-compatible transaction
+// ordering for this in-memory database. In a read-write transaction, every
+// read after the first successful write returns ErrReadAfterWriteInTransaction.
+// It is intended for tests that need to catch Firestore-only ordering errors;
+// the default in-memory behavior remains permissive.
+func WithNoReadsAfterWritesInTransaction() Option {
+	return func(db *database) {
+		db.noReadsAfterWritesInTransaction = true
+	}
+}
+
 // collectionDef describes a single collection in an in-memory schema.
 // It is produced by WithCollection and consumed by WithSchema.
 type collectionDef struct {

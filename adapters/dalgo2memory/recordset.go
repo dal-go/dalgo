@@ -24,6 +24,9 @@ import (
 // (any) columns, matching the adapter's schemaless JSON storage. A non-
 // structured query is not supported.
 func (s session) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
+	if err := s.allowRead(); err != nil {
+		return nil, err
+	}
 	q, ok := query.(dal.StructuredQuery)
 	if !ok {
 		return nil, dal.ErrNotSupported
