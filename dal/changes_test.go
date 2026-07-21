@@ -67,7 +67,7 @@ func TestChangesRejectsNilRecord(t *testing.T) {
 
 func TestApplyChangesRejectsNilChangeSet(t *testing.T) {
 	assert.PanicsWithValue(t, "changes == nil", func() {
-		dal.ApplyChanges(context.Background(), nil, nil)
+		_ = dal.ApplyChanges(context.Background(), nil, nil)
 	})
 }
 
