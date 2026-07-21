@@ -3,6 +3,8 @@ package dal
 import (
 	"context"
 	"fmt"
+
+	"github.com/dal-go/record"
 )
 
 // DataWrapper is a wrapper for data transfer objects (DTOs).
@@ -12,16 +14,16 @@ type DataWrapper interface {
 }
 
 type RecordBeforeSaveHook interface {
-	BeforeSave(ctx context.Context, key *Key) (err error)
+	BeforeSave(ctx context.Context, key *record.Key) (err error)
 }
 
 type RecordAfterLoadHook interface {
-	AfterLoad(ctx context.Context, key *Key) (err error)
+	AfterLoad(ctx context.Context, key *record.Key) (err error)
 }
 
-type RecordHook = func(ctx context.Context, record Record) error
+type RecordHook = func(ctx context.Context, record record.Record) error
 
-type RecordDataHook = func(ctx context.Context, db DB, key *Key, data any) (err error)
+type RecordDataHook = func(ctx context.Context, db DB, key *record.Key, data any) (err error)
 
 type recordData struct {
 	data       any
@@ -37,14 +39,14 @@ func (v recordData) String() string {
 	return fmt.Sprintf("%v", v.data)
 }
 
-func (v recordData) BeforeSave(ctx context.Context, db DB, key *Key) (err error) {
+func (v recordData) BeforeSave(ctx context.Context, db DB, key *record.Key) (err error) {
 	if v.beforeSave != nil {
 		err = v.beforeSave(ctx, db, key, v.data)
 	}
 	return
 }
 
-func (v recordData) AfterLoad(ctx context.Context, db DB, key *Key) (err error) {
+func (v recordData) AfterLoad(ctx context.Context, db DB, key *record.Key) (err error) {
 	if v.afterLoad != nil {
 		err = v.afterLoad(ctx, db, key, v.data)
 	}
@@ -80,10 +82,10 @@ func WithAfterLoad(hook RecordDataHook) func(rd *recordData) {
 //
 //type RecordFields = map[string]any
 //
-//func (RecordFields) BeforeSave(key *Key) (err error) {
+//func (RecordFields) BeforeSave(key *record.Key) (err error) {
 //	return nil
 //}
 //
-//func (RecordFields) AfterLoad(key *Key) (err error) {
+//func (RecordFields) AfterLoad(key *record.Key) (err error) {
 //	return nil
 //}

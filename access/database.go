@@ -6,6 +6,7 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 )
 
 type secureDBOptions struct {
@@ -97,15 +98,15 @@ func (db *securedDB) SupportsConcurrentConnections() bool {
 	return db.db.SupportsConcurrentConnections()
 }
 
-func (db *securedDB) Exists(ctx context.Context, key *dal.Key) (bool, error) {
+func (db *securedDB) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	return securedReadSession{session: db.db, guard: db.guard}.Exists(ctx, key)
 }
 
-func (db *securedDB) Get(ctx context.Context, record dal.Record) error {
+func (db *securedDB) Get(ctx context.Context, record record.Record) error {
 	return securedReadSession{session: db.db, guard: db.guard}.Get(ctx, record)
 }
 
-func (db *securedDB) GetMulti(ctx context.Context, records []dal.Record) error {
+func (db *securedDB) GetMulti(ctx context.Context, records []record.Record) error {
 	return securedReadSession{session: db.db, guard: db.guard}.GetMulti(ctx, records)
 }
 

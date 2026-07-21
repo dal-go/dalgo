@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
 func singleOperationsTest(ctx context.Context, t *testing.T, db dal.DB) {
 	t.Run("single", func(t *testing.T) {
 		const id = "r0"
-		key := dal.NewKeyWithID(E2ETestKind1, id)
+		key := record.NewKeyWithID(E2ETestKind1, id)
 		t.Run("delete1", func(t *testing.T) {
 			singleDeleteTest(t, db, key)
 		})
@@ -41,7 +42,7 @@ func singleOperationsTest(ctx context.Context, t *testing.T, db dal.DB) {
 	})
 }
 
-func singleDeleteTest(t *testing.T, db dal.DB, key *dal.Key) {
+func singleDeleteTest(t *testing.T, db dal.DB, key *record.Key) {
 	ctx := context.Background()
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.Delete(ctx, key)
@@ -49,17 +50,17 @@ func singleDeleteTest(t *testing.T, db dal.DB, key *dal.Key) {
 	require.NoError(t, err)
 }
 
-func singleExistsTest(ctx context.Context, t *testing.T, db dal.DB, key *dal.Key, expectedToExist bool) {
+func singleExistsTest(ctx context.Context, t *testing.T, db dal.DB, key *record.Key, expectedToExist bool) {
 	exists, err := db.Exists(ctx, key)
 	require.NoError(t, err)
 	require.Equal(t, expectedToExist, exists)
 }
 
-func singleGetTest(ctx context.Context, t *testing.T, db dal.DB, key *dal.Key, mustExists bool) {
+func singleGetTest(ctx context.Context, t *testing.T, db dal.DB, key *record.Key, mustExists bool) {
 	var data = new(TestData)
-	record := dal.NewRecordWithData(key, data)
-	err := db.Get(ctx, record)
-	if dal.IsNotFound(err) {
+	rec := record.NewRecordWithData(key, data)
+	err := db.Get(ctx, rec)
+	if record.IsNotFound(err) {
 		require.False(t, mustExists, "record expected to exist but received error: %v", err)
 		return
 	}
@@ -69,12 +70,12 @@ func singleGetTest(ctx context.Context, t *testing.T, db dal.DB, key *dal.Key, m
 	require.True(t, mustExists, "record unexpectedly found")
 }
 
-func singleCreateWithPredefinedIDTest(ctx context.Context, t *testing.T, db dal.DB, key *dal.Key) {
+func singleCreateWithPredefinedIDTest(ctx context.Context, t *testing.T, db dal.DB, key *record.Key) {
 	data := TestData{
 		StringProp:  "str1",
 		IntegerProp: 1,
 	}
-	record := dal.NewRecordWithData(key, &data)
+	record := record.NewRecordWithData(key, &data)
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.Insert(ctx, record)
 	}, dal.TxWithMessage("singleCreateWithPredefinedIDTest"))

@@ -1,8 +1,9 @@
 package mock_update
 
 import (
-	"go.uber.org/mock/gomock"
 	"testing"
+
+	"go.uber.org/mock/gomock"
 )
 
 func TestMockUpdate(t *testing.T) {

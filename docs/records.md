@@ -37,32 +37,32 @@ stateDiagram-v2
 
 ```go
 // 1. Record with data (for Set operations)
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 user := &User{Name: "Alice", Email: "alice@example.com"}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 
 // 2. Record without data (for Get operations)
-key := dal.NewKeyWithID("users", "user123")
-record := dal.NewRecord(key)
+key := record.NewKeyWithID("users", "user123")
+record := record.NewRecord(key)
 
 // 3. Record with incomplete key (for query results)
-record := dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+record := record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
 
 // 4. Record without any key (unusual, for special cases)
-record := dal.NewRecordWithoutKey(&User{})
+record := record.NewRecordWithoutKey(&User{})
 ```
 
 ### Reading Records
 
 ```go
 // Prepare record for reading
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 user := &User{}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 
 // Fetch from database
 err := db.Get(ctx, record)
-if err != nil && !dal.IsNotFound(err) {
+if err != nil && !record.IsNotFound(err) {
     return fmt.Errorf("failed to get user: %w", err)
 }
 
@@ -79,8 +79,8 @@ if record.Exists() {
 ```go
 // Create new record
 user := &User{Name: "Bob", Email: "bob@example.com"}
-key := dal.NewKeyWithID("users", "user456")
-record := dal.NewRecordWithData(key, user)
+key := record.NewKeyWithID("users", "user456")
+record := record.NewRecordWithData(key, user)
 
 // Save to database (creates or overwrites)
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -94,8 +94,8 @@ Insert ensures the record doesn't already exist:
 
 ```go
 user := &User{Name: "Charlie", Email: "charlie@example.com"}
-key := dal.NewKeyWithID("users", "user789")
-record := dal.NewRecordWithData(key, user)
+key := record.NewKeyWithID("users", "user789")
+record := record.NewRecordWithData(key, user)
 
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
     return tx.Insert(ctx, record)
@@ -111,8 +111,8 @@ if err != nil {
 user := &User{Name: "Diana", Email: "diana@example.com"}
 
 // Create incomplete key (ID will be generated)
-key := dal.NewIncompleteKey("users", reflect.String, nil)
-record := dal.NewRecordWithData(key, user)
+key := record.NewIncompleteKey("users", reflect.String, nil)
+record := record.NewRecordWithData(key, user)
 
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
     // Insert with ID generator
@@ -134,15 +134,15 @@ Keys uniquely identify records in the database.
 
 ```go
 // String ID
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 
 // Integer ID
-key := dal.NewKeyWithID("posts", 42)
+key := record.NewKeyWithID("posts", 42)
 
 // UUID ID
 import "github.com/google/uuid"
 id := uuid.New()
-key := dal.NewKeyWithID("sessions", id)
+key := record.NewKeyWithID("sessions", id)
 ```
 
 ### Composite Keys
@@ -151,13 +151,13 @@ For tables with multi-column primary keys:
 
 ```go
 // Define composite key fields
-fields := []dal.FieldVal{
+fields := []record.FieldVal{
     {Name: "tenant_id", Value: "tenant1"},
     {Name: "user_id", Value: "user123"},
 }
 
 // Create key with fields
-key := dal.NewKeyWithFields("tenant_users", fields...)
+key := record.NewKeyWithFields("tenant_users", fields...)
 
 // Key path: tenant_users/tenant1/user123
 fmt.Println(key.String())
@@ -166,7 +166,7 @@ fmt.Println(key.String())
 ### Key Validation
 
 ```go
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 
 // Validate key structure
 if err := key.Validate(); err != nil {
@@ -179,9 +179,9 @@ if err := key.Validate(); err != nil {
 ### Key Comparison
 
 ```go
-key1 := dal.NewKeyWithID("users", "user123")
-key2 := dal.NewKeyWithID("users", "user123")
-key3 := dal.NewKeyWithID("users", "user456")
+key1 := record.NewKeyWithID("users", "user123")
+key2 := record.NewKeyWithID("users", "user123")
+key3 := record.NewKeyWithID("users", "user456")
 
 // Compare keys
 if key1.Equal(key2) {
@@ -189,7 +189,7 @@ if key1.Equal(key2) {
 }
 
 // Alternative comparison
-if dal.EqualKeys(key1, key3) {
+if record.EqualKeys(key1, key3) {
     fmt.Println("Keys are equal")
 } else {
     fmt.Println("Keys are different")
@@ -199,7 +199,7 @@ if dal.EqualKeys(key1, key3) {
 ### Key Properties
 
 ```go
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 
 // Get collection name
 collection := key.Collection() // "users"
@@ -226,7 +226,7 @@ The `record` package provides helpers for working with strongly typed records.
 ### WithID Helper
 
 ```go
-import "github.com/dal-go/dalgo/record"
+import "github.com/dal-go/record"
 
 // Define your data type
 type UserDto struct {
@@ -242,12 +242,12 @@ type User struct {
 
 // Create a user instance
 func NewUser(id string, dto *UserDto) User {
-    key := dal.NewKeyWithID("users", id)
+    key := record.NewKeyWithID("users", id)
     return User{
         WithID: record.WithID[string]{
             ID:     id,
             Key:    key,
-            Record: dal.NewRecordWithData(key, dto),
+            Record: record.NewRecordWithData(key, dto),
         },
         Dto: dto,
     }
@@ -271,7 +271,7 @@ err := db.Get(ctx, user.Record)
 ### DataWithID Helper
 
 ```go
-import "github.com/dal-go/dalgo/record"
+import "github.com/dal-go/record"
 
 // Alternative: embed data directly
 type User struct {
@@ -299,7 +299,7 @@ err := db.Get(ctx, user.Record)
 Track changes to records:
 
 ```go
-import "github.com/dal-go/dalgo/record"
+import "github.com/dal-go/record"
 
 type User struct {
     record.WithRecordChanges
@@ -330,7 +330,7 @@ Records maintain state information throughout their lifecycle.
 ### Existence State
 
 ```go
-record := dal.NewRecord(key)
+record := record.NewRecord(key)
 
 // Before Get/Set - will panic
 // exists := record.Exists() // PANIC!
@@ -347,13 +347,13 @@ if record.Exists() {
 ### Error State
 
 ```go
-record := dal.NewRecord(key)
+record := record.NewRecord(key)
 
 // Get the record
 err := db.Get(ctx, record)
 
 // Check error from operation
-if err != nil && !dal.IsNotFound(err) {
+if err != nil && !record.IsNotFound(err) {
     return err
 }
 
@@ -366,7 +366,7 @@ if err := record.Error(); err != nil {
 ### Changed State
 
 ```go
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 
 // Check if changed
 if record.HasChanged() {
@@ -385,7 +385,7 @@ if record.HasChanged() {
 ### Accessing Data
 
 ```go
-record := dal.NewRecordWithData(key, &User{})
+record := record.NewRecordWithData(key, &User{})
 
 // Before Get - will panic
 // data := record.Data() // PANIC!
@@ -410,11 +410,11 @@ DALgo provides efficient batch operations for multiple records.
 ```go
 // Prepare multiple records
 keys := []string{"user1", "user2", "user3"}
-records := make([]dal.Record, len(keys))
+records := make([]record.Record, len(keys))
 
 for i, id := range keys {
-    key := dal.NewKeyWithID("users", id)
-    records[i] = dal.NewRecordWithData(key, &User{})
+    key := record.NewKeyWithID("users", id)
+    records[i] = record.NewRecordWithData(key, &User{})
 }
 
 // Fetch all at once
@@ -447,10 +447,10 @@ users := []*User{
     {Name: "Bob", Email: "bob@example.com"},
 }
 
-records := make([]dal.Record, len(users))
+records := make([]record.Record, len(users))
 for i, user := range users {
-    key := dal.NewKeyWithID("users", fmt.Sprintf("user%d", i))
-    records[i] = dal.NewRecordWithData(key, user)
+    key := record.NewKeyWithID("users", fmt.Sprintf("user%d", i))
+    records[i] = record.NewRecordWithData(key, user)
 }
 
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -461,10 +461,10 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 ### DeleteMulti
 
 ```go
-keys := []*dal.Key{
-    dal.NewKeyWithID("users", "user1"),
-    dal.NewKeyWithID("users", "user2"),
-    dal.NewKeyWithID("users", "user3"),
+keys := []*record.Key{
+    record.NewKeyWithID("users", "user1"),
+    record.NewKeyWithID("users", "user2"),
+    record.NewKeyWithID("users", "user3"),
 }
 
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -482,14 +482,14 @@ DALgo supports parent-child relationships through hierarchical keys.
 
 ```go
 // Create parent
-teamKey := dal.NewKeyWithID("teams", "engineering")
+teamKey := record.NewKeyWithID("teams", "engineering")
 team := &Team{Name: "Engineering"}
-teamRecord := dal.NewRecordWithData(teamKey, team)
+teamRecord := record.NewRecordWithData(teamKey, team)
 
 // Create child with parent reference
-memberKey := dal.NewKeyWithParentAndID(teamKey, "members", "alice")
+memberKey := record.NewKeyWithParentAndID(teamKey, "members", "alice")
 member := &Member{Name: "Alice", Role: "Engineer"}
-memberRecord := dal.NewRecordWithData(memberKey, member)
+memberRecord := record.NewRecordWithData(memberKey, member)
 
 // Save both
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -504,15 +504,15 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 
 ```go
 // Query all members of a team
-teamKey := dal.NewKeyWithID("teams", "engineering")
+teamKey := record.NewKeyWithID("teams", "engineering")
 
 query := dal.From(dal.CollectionRef{
     Path:   teamKey.String() + "/members",
     Parent: teamKey,
 }).
     Limit(100).
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("members", reflect.String, &Member{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("members", reflect.String, &Member{})
     })
 
 reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
@@ -531,7 +531,7 @@ for {
 ### Navigating Hierarchies
 
 ```go
-memberKey := dal.NewKeyWithParentAndID(teamKey, "members", "alice")
+memberKey := record.NewKeyWithParentAndID(teamKey, "members", "alice")
 
 // Get parent key
 parent := memberKey.Parent() // teamKey
@@ -555,9 +555,9 @@ collPath := memberKey.CollectionPath() // "teams/members"
 ```go
 // Good: propagate context from caller
 func GetUser(ctx context.Context, db dal.DB, userID string) (*User, error) {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     user := &User{}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     if err := db.Get(ctx, record); err != nil {
         return nil, err
@@ -577,7 +577,7 @@ func GetUser(db dal.DB, userID string) (*User, error) {
 ```go
 // Good: distinguish not-found from other errors
 err := db.Get(ctx, record)
-if err != nil && !dal.IsNotFound(err) {
+if err != nil && !record.IsNotFound(err) {
     return fmt.Errorf("failed to get record: %w", err)
 }
 
@@ -606,7 +606,7 @@ user := NewUser("user123", &UserDto{Name: "Alice"})
 name := user.Dto.Name // No type assertion!
 
 // Less ideal: type assertions everywhere
-record := dal.NewRecordWithData(key, &UserDto{})
+record := record.NewRecordWithData(key, &UserDto{})
 name := record.Data().(*UserDto).Name // Requires assertion
 ```
 
@@ -614,11 +614,11 @@ name := record.Data().(*UserDto).Name // Requires assertion
 
 ```go
 // Good: validate at creation
-func NewUserKey(id string) (*dal.Key, error) {
+func NewUserKey(id string) (*record.Key, error) {
     if id == "" {
         return nil, errors.New("user ID cannot be empty")
     }
-    key := dal.NewKeyWithID("users", id)
+    key := record.NewKeyWithID("users", id)
     if err := key.Validate(); err != nil {
         return nil, fmt.Errorf("invalid key: %w", err)
     }
@@ -627,7 +627,7 @@ func NewUserKey(id string) (*dal.Key, error) {
 
 // Bad: let invalid keys propagate
 func GetUser(id string) {
-    key := dal.NewKeyWithID("users", id) // May panic if id is invalid
+    key := record.NewKeyWithID("users", id) // May panic if id is invalid
     // ...
 }
 ```
@@ -636,17 +636,17 @@ func GetUser(id string) {
 
 ```go
 // Good: use GetMulti for multiple records
-records := make([]dal.Record, len(userIDs))
+records := make([]record.Record, len(userIDs))
 for i, id := range userIDs {
-    key := dal.NewKeyWithID("users", id)
-    records[i] = dal.NewRecordWithData(key, &User{})
+    key := record.NewKeyWithID("users", id)
+    records[i] = record.NewRecordWithData(key, &User{})
 }
 err := db.GetMulti(ctx, records)
 
 // Bad: loop with individual Gets
 for _, id := range userIDs {
-    key := dal.NewKeyWithID("users", id)
-    record := dal.NewRecordWithData(key, &User{})
+    key := record.NewKeyWithID("users", id)
+    record := record.NewRecordWithData(key, &User{})
     err := db.Get(ctx, record) // Many round trips!
 }
 ```

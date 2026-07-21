@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // ResourceKind distinguishes ordinary hierarchical paths from query resources
@@ -63,7 +63,7 @@ func (r Resource) String() string {
 			}
 			value := fmt.Sprint(segment.value)
 			if segment.kind == idSegment {
-				value = dal.EscapeID(value)
+				value = record.EscapeID(value)
 			}
 			parts[i] = value
 		}
@@ -72,13 +72,13 @@ func (r Resource) String() string {
 }
 
 // RecordResource returns the structural path represented by key.
-func RecordResourceForKey(key *dal.Key) Resource {
+func RecordResourceForKey(key *record.Key) Resource {
 	return Resource{kind: PathResource, path: segmentsForKey(key)}
 }
 
 // CollectionResourceFor returns the structural collection path under parent.
 // A nil parent denotes a root collection.
-func CollectionResourceFor(parent *dal.Key, collection string) Resource {
+func CollectionResourceFor(parent *record.Key, collection string) Resource {
 	segments := segmentsForKey(parent)
 	segments = append(segments, pathSegment{kind: collectionSegment, value: collection})
 	return Resource{kind: PathResource, path: segments}
@@ -94,11 +94,11 @@ func OpaqueQuery(description string) Resource {
 	return Resource{kind: OpaqueQueryResource, name: description}
 }
 
-func segmentsForKey(key *dal.Key) []pathSegment {
+func segmentsForKey(key *record.Key) []pathSegment {
 	if key == nil {
 		return nil
 	}
-	keys := make([]*dal.Key, 0, key.Level()+1)
+	keys := make([]*record.Key, 0, key.Level()+1)
 	for current := key; current != nil; current = current.Parent() {
 		keys = append(keys, current)
 	}

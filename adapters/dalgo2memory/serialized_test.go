@@ -7,7 +7,8 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,13 +33,13 @@ func TestSerialized_StoredAsDecodableBytes(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("users", "u1")
+	key := record.NewKeyWithID("users", "u1")
 	written := &user{Name: "Alice", Role: "admin"}
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, written)))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, written)))
 
 	// Get reconstructs equal data.
 	var got user
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, *written, got)
 
 	// The stored form is a byte buffer, not the original value; decoding those
@@ -69,22 +70,22 @@ func TestSerialized_DefaultAndSchemalessCapable(t *testing.T) {
 	)).(*database)
 
 	// Schema-typed collection selected via WithSerializedStorage().
-	typedKey := dal.NewKeyWithID("users", "u1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(typedKey, &user{Name: "Alice", Role: "admin"})))
+	typedKey := record.NewKeyWithID("users", "u1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(typedKey, &user{Name: "Alice", Role: "admin"})))
 	_, typedIsSerialized := db.collections["users"].(*serializedEngine)
 	require.True(t, typedIsSerialized)
 	var typedGot user
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(typedKey, &typedGot)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(typedKey, &typedGot)))
 	require.Equal(t, "Alice", typedGot.Name)
 
 	// Unregistered, schemaless collection (allowed by allowUndefinedCollections).
-	schemalessKey := dal.NewKeyWithID("ad-hoc", "x1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(schemalessKey, map[string]any{"anything": "goes"})))
+	schemalessKey := record.NewKeyWithID("ad-hoc", "x1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(schemalessKey, map[string]any{"anything": "goes"})))
 	engine, schemalessIsSerialized := db.collections["ad-hoc"].(*serializedEngine)
 	require.True(t, schemalessIsSerialized)
 	require.Nil(t, engine.factory, "schemaless collection has no record factory")
 	var schemalessGot map[string]any
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(schemalessKey, &schemalessGot)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(schemalessKey, &schemalessGot)))
 	require.Equal(t, "goes", schemalessGot["anything"])
 }
 
@@ -96,17 +97,17 @@ func TestSerialized_MutationAfterWriteIsolated(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("profiles", "p1")
+	key := record.NewKeyWithID("profiles", "p1")
 
 	written := &profile{Name: "Alice", Tags: []string{"a", "b"}, Address: address{City: "Paris"}}
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, written)))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, written)))
 
 	// Mutate nested slice element and nested struct field after Set returns.
 	written.Tags[0] = "MUTATED"
 	written.Address.City = "MUTATED"
 
 	var got profile
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, []string{"a", "b"}, got.Tags)
 	require.Equal(t, "Paris", got.Address.City)
 }
@@ -118,13 +119,13 @@ func TestSerialized_TwoReadsIndependent(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("profiles", "p1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key,
+	key := record.NewKeyWithID("profiles", "p1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key,
 		&profile{Name: "Alice", Tags: []string{"a", "b"}, Address: address{City: "Paris"}})))
 
 	var first, second profile
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &first)))
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &second)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &first)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &second)))
 
 	first.Tags[0] = "MUTATED"
 	first.Address.City = "MUTATED"
@@ -141,8 +142,8 @@ func TestSerialized_NonSerializableWriteErrors(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("bad", "ch")
-	record := dal.NewRecordWithData(key, map[string]any{"ch": make(chan int)})
+	key := record.NewKeyWithID("bad", "ch")
+	record := record.NewRecordWithData(key, map[string]any{"ch": make(chan int)})
 
 	err := db.Set(ctx, record)
 	require.Error(t, err)
@@ -165,18 +166,18 @@ func TestSerialized_UnknownFieldRejectedWhenTyped(t *testing.T) {
 
 	// Schema-typed collection rejects the unknown field, naming the collection.
 	typedDB := NewDB(WithSchema(false, WithCollection[user]("users", nil))).(*database)
-	typedKey := dal.NewKeyWithID("users", "u1")
-	err := typedDB.Set(ctx, dal.NewRecordWithData(typedKey, data))
+	typedKey := record.NewKeyWithID("users", "u1")
+	err := typedDB.Set(ctx, record.NewRecordWithData(typedKey, data))
 	require.Error(t, err)
 	require.ErrorContains(t, err, "users", "error names the collection")
 	require.Empty(t, typedDB.collections["users"].(*serializedEngine).records)
 
 	// Schemaless collection accepts the same data.
 	schemalessDB := NewDB().(*database)
-	schemalessKey := dal.NewKeyWithID("users", "u1")
-	require.NoError(t, schemalessDB.Set(ctx, dal.NewRecordWithData(schemalessKey, data)))
+	schemalessKey := record.NewKeyWithID("users", "u1")
+	require.NoError(t, schemalessDB.Set(ctx, record.NewRecordWithData(schemalessKey, data)))
 	var got map[string]any
-	require.NoError(t, schemalessDB.Get(ctx, dal.NewRecordWithData(schemalessKey, &got)))
+	require.NoError(t, schemalessDB.Get(ctx, record.NewRecordWithData(schemalessKey, &got)))
 	require.EqualValues(t, 1, got["Undefined"])
 }
 
@@ -188,22 +189,22 @@ func TestSerialized_InsertDuplicateErrors(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("users", "u1")
-	require.NoError(t, db.Insert(ctx, dal.NewRecordWithData(key, &user{Name: "Alice", Role: "admin"})))
+	key := record.NewKeyWithID("users", "u1")
+	require.NoError(t, db.Insert(ctx, record.NewRecordWithData(key, &user{Name: "Alice", Role: "admin"})))
 
 	// Insert on the existing id fails with an "already exists" error.
-	err := db.Insert(ctx, dal.NewRecordWithData(key, &user{Name: "Bob", Role: "member"}))
+	err := db.Insert(ctx, record.NewRecordWithData(key, &user{Name: "Bob", Role: "member"}))
 	require.Error(t, err)
 	require.ErrorContains(t, err, "already exists")
 
 	// The existing record is unchanged.
 	var got user
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, user{Name: "Alice", Role: "admin"}, got)
 
 	// Set for that id overwrites successfully.
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &user{Name: "Bob", Role: "member"})))
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &user{Name: "Bob", Role: "member"})))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, user{Name: "Bob", Role: "member"}, got)
 }
 
@@ -214,15 +215,15 @@ func TestSerialized_GetAbsentNotFound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("users", "absent")
+	key := record.NewKeyWithID("users", "absent")
 
-	record := dal.NewRecordWithData(key, &user{})
-	err := db.Get(ctx, record)
+	rec := record.NewRecordWithData(key, &user{})
+	err := db.Get(ctx, rec)
 	require.Error(t, err)
-	require.True(t, dal.IsNotFound(err))
+	require.True(t, record.IsNotFound(err))
 	// The not-found error is set on the record: the record reports it does not
-	// exist (dal.Record.Error() normalizes a not-found error to a false Exists).
-	require.False(t, record.Exists(), "the not-found error is set on the record")
+	// exist (record.Record.Error() normalizes a not-found error to a false Exists).
+	require.False(t, rec.Exists(), "the not-found error is set on the record")
 
 	exists, existsErr := db.Exists(ctx, key)
 	require.NoError(t, existsErr)
@@ -240,17 +241,17 @@ func TestSerialized_QueryDecodesRows(t *testing.T) {
 		WithCollection[profile]("profiles", nil),
 	)).(*database)
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("profiles", "p1"),
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("profiles", "p1"),
 		&profile{Name: "shared", Tags: []string{"x"}, Address: address{City: "Paris"}})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("profiles", "p2"),
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("profiles", "p2"),
 		&profile{Name: "shared", Tags: []string{"y"}, Address: address{City: "Lyon"}})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("profiles", "p3"),
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("profiles", "p3"),
 		&profile{Name: "other", Tags: []string{"z"}, Address: address{City: "Nice"}})))
 
 	q := dal.From(dal.NewRootCollectionRef("profiles", "")).NewQuery().
 		WhereField("Name", dal.Equal, "shared").
-		SelectIntoRecord(func() dal.Record {
-			return dal.NewRecordWithIncompleteKey("profiles", reflect.String, &profile{})
+		SelectIntoRecord(func() record.Record {
+			return record.NewRecordWithIncompleteKey("profiles", reflect.String, &profile{})
 		})
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
 	require.NoError(t, err)
@@ -284,14 +285,14 @@ func TestSerialized_UpdateAppliesAndRevalidates(t *testing.T) {
 	db := NewDB(WithSchema(false,
 		WithCollection[user]("users", nil),
 	)).(*database)
-	key := dal.NewKeyWithID("users", "u1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &user{Name: "Alice", Role: "admin"})))
+	key := record.NewKeyWithID("users", "u1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &user{Name: "Alice", Role: "admin"})))
 
 	// A defined-field change is read-modified-written and persisted; the
 	// untouched field (Name) survives the read-modify-write.
 	require.NoError(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Role", "member")}))
 	var got user
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, user{Name: "Alice", Role: "member"}, got)
 
 	// An update introducing an undefined field is rejected, naming the
@@ -299,14 +300,14 @@ func TestSerialized_UpdateAppliesAndRevalidates(t *testing.T) {
 	err := db.Update(ctx, key, []update.Update{update.ByFieldName("Undefined", 1)})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "users")
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, user{Name: "Alice", Role: "member"}, got)
 
 	// Update on an absent id returns not-found and stores nothing.
-	absentKey := dal.NewKeyWithID("users", "absent")
+	absentKey := record.NewKeyWithID("users", "absent")
 	err = db.Update(ctx, absentKey, []update.Update{update.ByFieldName("Role", "x")})
 	require.Error(t, err)
-	require.True(t, dal.IsNotFound(err))
+	require.True(t, record.IsNotFound(err))
 	exists, existsErr := db.Exists(ctx, absentKey)
 	require.NoError(t, existsErr)
 	require.False(t, exists)

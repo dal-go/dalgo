@@ -2,16 +2,17 @@ package mock_dal
 
 import (
 	"errors"
-	"github.com/dal-go/dalgo/dal"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/dal-go/record"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func TestNewRecordsReader(t *testing.T) {
-	record := dal.NewRecordWithIncompleteKey("TestCollection", reflect.String, &struct{}{})
+	record := record.NewRecordWithIncompleteKey("TestCollection", reflect.String, &struct{}{})
 	reader := NewRecordsReader(0, record)
 	assert.NotNil(t, reader)
 }
@@ -46,7 +47,7 @@ func TestNewSelectResult(t *testing.T) {
 
 func TestRecordReader_Methods(t *testing.T) {
 	t.Run("close", func(t *testing.T) {
-		record := dal.NewRecord(dal.NewKeyWithID("test", "id1"))
+		record := record.NewRecord(record.NewKeyWithID("test", "id1"))
 		reader := NewRecordsReader(0, record)
 
 		err := reader.Close()
@@ -54,7 +55,7 @@ func TestRecordReader_Methods(t *testing.T) {
 	})
 
 	t.Run("cursor", func(t *testing.T) {
-		record := dal.NewRecord(dal.NewKeyWithID("test", "id1"))
+		record := record.NewRecord(record.NewKeyWithID("test", "id1"))
 		reader := NewRecordsReader(0, record)
 
 		cursor, err := reader.Cursor()
@@ -63,8 +64,8 @@ func TestRecordReader_Methods(t *testing.T) {
 	})
 
 	t.Run("next_with_records", func(t *testing.T) {
-		record1 := dal.NewRecord(dal.NewKeyWithID("test", "id1"))
-		record2 := dal.NewRecord(dal.NewKeyWithID("test", "id2"))
+		record1 := record.NewRecord(record.NewKeyWithID("test", "id1"))
+		record2 := record.NewRecord(record.NewKeyWithID("test", "id2"))
 		reader := NewRecordsReader(0, record1, record2)
 
 		// First record
@@ -84,7 +85,7 @@ func TestRecordReader_Methods(t *testing.T) {
 	})
 
 	t.Run("next_after_cursor", func(t *testing.T) {
-		record := dal.NewRecord(dal.NewKeyWithID("test", "id1"))
+		record := record.NewRecord(record.NewKeyWithID("test", "id1"))
 		reader := NewRecordsReader(0, record)
 
 		// Call cursor to close reader
@@ -98,7 +99,7 @@ func TestRecordReader_Methods(t *testing.T) {
 	})
 
 	t.Run("next_with_delay", func(t *testing.T) {
-		record := dal.NewRecord(dal.NewKeyWithID("test", "id-delayed"))
+		record := record.NewRecord(record.NewKeyWithID("test", "id-delayed"))
 		reader := NewRecordsReader(1*time.Millisecond, record)
 
 		result, err := reader.Next()

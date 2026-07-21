@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -140,8 +141,8 @@ func insertTaggedThings(t *testing.T, db *database) {
 		"t2": {Name: "second", Rank: 2, Tags: []string{"blue", "green"}},
 		"t3": {Name: "third", Rank: 3, Tags: nil},
 	} {
-		key := dal.NewKeyWithID("tagged", id)
-		require.NoError(t, db.Insert(ctx, dal.NewRecordWithData(key, data)))
+		key := record.NewKeyWithID("tagged", id)
+		require.NoError(t, db.Insert(ctx, record.NewRecordWithData(key, data)))
 	}
 }
 
@@ -232,8 +233,8 @@ func insertTimedThings(t *testing.T, db *database) {
 		"zero":    {DtNext: zero},
 		"nonzero": {DtNext: nonZero},
 	} {
-		key := dal.NewKeyWithID("timed", id)
-		require.NoError(t, db.Insert(ctx, dal.NewRecordWithData(key, data)))
+		key := record.NewKeyWithID("timed", id)
+		require.NoError(t, db.Insert(ctx, record.NewRecordWithData(key, data)))
 	}
 }
 

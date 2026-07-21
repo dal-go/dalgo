@@ -28,8 +28,8 @@ query := dal.From(dal.CollectionRef{Name: "users"}).
     WhereField("email", dal.Equal, "alice@example.com").
     OrderBy(dal.Ascending("created_at")).
     Limit(10).
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     })
 ```
 
@@ -99,8 +99,8 @@ Query a specific collection:
 source := dal.CollectionRef{Name: "users"}
 query := dal.From(source).
     WhereField("status", dal.Equal, "active").
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     })
 ```
 
@@ -113,8 +113,8 @@ Query across all collections with the same name:
 source := dal.CollectionGroupRef{Name: "comments"}
 query := dal.From(source).
     WhereField("author_id", dal.Equal, "user123").
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("comments", reflect.String, &Comment{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("comments", reflect.String, &Comment{})
     })
 ```
 
@@ -123,14 +123,14 @@ query := dal.From(source).
 Query a child collection under a specific parent:
 
 ```go
-teamKey := dal.NewKeyWithID("teams", "engineering")
+teamKey := record.NewKeyWithID("teams", "engineering")
 source := dal.CollectionRef{
     Name:   "members",
     Parent: teamKey,
 }
 query := dal.From(source).
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("members", reflect.String, &Member{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("members", reflect.String, &Member{})
     })
 ```
 
@@ -142,9 +142,9 @@ Returns individual records with full data:
 
 ```go
 query := dal.From(dal.CollectionRef{Name: "users"}).
-    SelectIntoRecord(func() dal.Record {
+    SelectIntoRecord(func() record.Record {
         // This factory is called for each result row
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     })
 
 reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
@@ -165,7 +165,7 @@ for {
 Returns columnar data (more efficient for analytics):
 
 ```go
-import "github.com/dal-go/dalgo/recordset"
+import "github.com/dal-go/recordset"
 
 query := dal.From(dal.CollectionRef{Name: "users"}).
     SelectIntoRecordset()
@@ -197,7 +197,7 @@ query := dal.From(dal.CollectionRef{Name: "users"}).
 reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
 defer reader.Close()
 
-keys := make([]*dal.Key, 0)
+keys := make([]*record.Key, 0)
 for {
     record, err := reader.Next()
     if err == dal.ErrNoMoreRecords {
@@ -258,8 +258,8 @@ query := dal.From(dal.CollectionRef{Name: "products"}).
     WhereField("category", dal.Equal, "electronics").
     WhereField("price", dal.LessThen, 500.0).
     WhereField("in_stock", dal.Equal, true).
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("products", reflect.String, &Product{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("products", reflect.String, &Product{})
     })
 ```
 
@@ -424,8 +424,8 @@ Returns records one by one:
 
 ```go
 query := dal.From(dal.CollectionRef{Name: "users"}).
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     })
 
 // Execute query
@@ -455,7 +455,7 @@ for {
 Returns columnar data:
 
 ```go
-import "github.com/dal-go/dalgo/recordset"
+import "github.com/dal-go/recordset"
 
 query := dal.From(dal.CollectionRef{Name: "users"}).
     SelectIntoRecordset(
@@ -524,8 +524,8 @@ func FindUserByEmail(ctx context.Context, db dal.DB, email string) (*User, error
     query := dal.From(dal.CollectionRef{Name: "users"}).
         WhereField("email", dal.Equal, email).
         Limit(1).
-        SelectIntoRecord(func() dal.Record {
-            return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+        SelectIntoRecord(func() record.Record {
+            return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
         })
     
     reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
@@ -536,7 +536,7 @@ func FindUserByEmail(ctx context.Context, db dal.DB, email string) (*User, error
     
     record, err := reader.Next()
     if err == dal.ErrNoMoreRecords {
-        return nil, dal.ErrRecordNotFound
+        return nil, record.ErrRecordNotFound
     }
     if err != nil {
         return nil, err
@@ -580,7 +580,7 @@ func CountActiveUsers(ctx context.Context, db dal.DB) (int, error) {
 
 ```go
 type Page struct {
-    Records    []dal.Record
+    Records    []record.Record
     NextCursor string
     HasMore    bool
 }
@@ -594,8 +594,8 @@ func ListUsers(ctx context.Context, db dal.DB, cursor string, pageSize int) (*Pa
         builder = builder.StartFrom(dal.Cursor(cursor))
     }
     
-    query := builder.SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+    query := builder.SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     })
     
     reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
@@ -604,7 +604,7 @@ func ListUsers(ctx context.Context, db dal.DB, cursor string, pageSize int) (*Pa
     }
     defer reader.Close()
     
-    records := make([]dal.Record, 0, pageSize)
+    records := make([]record.Record, 0, pageSize)
     for {
         record, err := reader.Next()
         if err == dal.ErrNoMoreRecords {
@@ -632,7 +632,7 @@ func ListUsers(ctx context.Context, db dal.DB, cursor string, pageSize int) (*Pa
 ### Complex Filtering
 
 ```go
-func FindProducts(ctx context.Context, db dal.DB, filters ProductFilters) ([]dal.Record, error) {
+func FindProducts(ctx context.Context, db dal.DB, filters ProductFilters) ([]record.Record, error) {
     builder := dal.From(dal.CollectionRef{Name: "products"})
     
     // Apply optional filters
@@ -668,8 +668,8 @@ func FindProducts(ctx context.Context, db dal.DB, filters ProductFilters) ([]dal
         builder = builder.Offset(filters.Offset)
     }
     
-    query := builder.SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("products", reflect.String, &Product{})
+    query := builder.SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("products", reflect.String, &Product{})
     })
     
     reader, err := db.ExecuteQueryToRecordsReader(ctx, query)

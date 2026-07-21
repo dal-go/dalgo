@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -26,7 +27,7 @@ func TestMockReadSession_Exists(t *testing.T) {
 
 	mockSession := NewMockReadSession(ctrl)
 	ctx := context.Background()
-	key := &dal.Key{}
+	key := &record.Key{}
 
 	t.Run("exists returns true", func(t *testing.T) {
 		mockSession.EXPECT().Exists(ctx, key).Return(true, nil)
@@ -77,7 +78,7 @@ func TestMockReadSession_GetMulti(t *testing.T) {
 
 	mockSession := NewMockReadSession(ctrl)
 	ctx := context.Background()
-	records := []dal.Record{NewMockRecord(ctrl)}
+	records := []record.Record{NewMockRecord(ctrl)}
 
 	t.Run("get multi success", func(t *testing.T) {
 		mockSession.EXPECT().GetMulti(ctx, gomock.Any()).Return(nil)
@@ -111,7 +112,7 @@ func TestMockWriteSession_Delete(t *testing.T) {
 
 	mockSession := NewMockWriteSession(ctrl)
 	ctx := context.Background()
-	key := &dal.Key{}
+	key := &record.Key{}
 
 	t.Run("delete success", func(t *testing.T) {
 		mockSession.EXPECT().Delete(ctx, key).Return(nil)
@@ -130,14 +131,14 @@ func TestMockWriteSession_Delete(t *testing.T) {
 	})
 
 	t.Run("delete multi success", func(t *testing.T) {
-		keys := []*dal.Key{key}
+		keys := []*record.Key{key}
 		mockSession.EXPECT().DeleteMulti(ctx, gomock.Any()).Return(nil)
 		err := mockSession.DeleteMulti(ctx, keys)
 		assert.NoError(t, err)
 	})
 
 	t.Run("delete multi error", func(t *testing.T) {
-		keys := []*dal.Key{key}
+		keys := []*record.Key{key}
 		expectedErr := errors.New("delete multi error")
 		mockSession.EXPECT().DeleteMulti(ctx, gomock.Any()).Return(expectedErr)
 		err := mockSession.DeleteMulti(ctx, keys)
@@ -170,13 +171,13 @@ func TestMockWriteSession_Insert(t *testing.T) {
 	})
 
 	t.Run("insert multi success", func(t *testing.T) {
-		records := []dal.Record{NewMockRecord(ctrl)}
+		records := []record.Record{NewMockRecord(ctrl)}
 		mockSession.EXPECT().InsertMulti(ctx, gomock.Any()).Return(nil)
 		err := mockSession.InsertMulti(ctx, records)
 		assert.NoError(t, err)
 	})
 	t.Run("insert multi error", func(t *testing.T) {
-		records := []dal.Record{NewMockRecord(ctrl)}
+		records := []record.Record{NewMockRecord(ctrl)}
 		expectedErr := errors.New("insert multi error")
 		mockSession.EXPECT().InsertMulti(ctx, gomock.Any()).Return(expectedErr)
 		err := mockSession.InsertMulti(ctx, records)
@@ -209,14 +210,14 @@ func TestMockWriteSession_Set(t *testing.T) {
 	})
 
 	t.Run("set multi success", func(t *testing.T) {
-		records := []dal.Record{NewMockRecord(ctrl)}
+		records := []record.Record{NewMockRecord(ctrl)}
 		mockSession.EXPECT().SetMulti(ctx, gomock.Any()).Return(nil)
 		err := mockSession.SetMulti(ctx, records)
 		assert.NoError(t, err)
 	})
 
 	t.Run("set multi error", func(t *testing.T) {
-		records := []dal.Record{NewMockRecord(ctrl)}
+		records := []record.Record{NewMockRecord(ctrl)}
 		expectedErr := errors.New("set multi error")
 		mockSession.EXPECT().SetMulti(ctx, gomock.Any()).Return(expectedErr)
 		err := mockSession.SetMulti(ctx, records)
@@ -231,7 +232,7 @@ func TestMockWriteSession_Update(t *testing.T) {
 
 	mockSession := NewMockWriteSession(ctrl)
 	ctx := context.Background()
-	key := &dal.Key{}
+	key := &record.Key{}
 	updates := []update.Update{}
 
 	t.Run("update success", func(t *testing.T) {
@@ -251,14 +252,14 @@ func TestMockWriteSession_Update(t *testing.T) {
 	})
 
 	t.Run("update multi success", func(t *testing.T) {
-		keys := []*dal.Key{key}
+		keys := []*record.Key{key}
 		mockSession.EXPECT().UpdateMulti(ctx, gomock.Any(), gomock.Any()).Return(nil)
 		err := mockSession.UpdateMulti(ctx, keys, updates)
 		assert.NoError(t, err)
 	})
 
 	t.Run("update multi error", func(t *testing.T) {
-		keys := []*dal.Key{key}
+		keys := []*record.Key{key}
 		expectedErr := errors.New("update multi error")
 		mockSession.EXPECT().UpdateMulti(ctx, gomock.Any(), gomock.Any()).Return(expectedErr)
 		err := mockSession.UpdateMulti(ctx, keys, updates)
@@ -298,7 +299,7 @@ func TestMockReadwriteSession_Exists(t *testing.T) {
 
 	mockSession := NewMockReadwriteSession(ctrl)
 	ctx := context.Background()
-	key := &dal.Key{}
+	key := &record.Key{}
 
 	t.Run("exists returns true", func(t *testing.T) {
 		mockSession.EXPECT().Exists(ctx, key).Return(true, nil)
@@ -333,7 +334,7 @@ func TestMockReadwriteSession_ReadQuery(t *testing.T) {
 	})
 
 	t.Run("get multi success", func(t *testing.T) {
-		records := []dal.Record{NewMockRecord(ctrl)}
+		records := []record.Record{NewMockRecord(ctrl)}
 		s.EXPECT().GetMulti(ctx, gomock.Any()).Return(nil)
 		err := s.GetMulti(ctx, records)
 		assert.NoError(t, err)
@@ -346,14 +347,14 @@ func TestMockReadwriteSession_Writes(t *testing.T) {
 
 	s := NewMockReadwriteSession(ctrl)
 	ctx := context.Background()
-	key := &dal.Key{}
+	key := &record.Key{}
 	updates := []update.Update{}
 
 	t.Run("delete/deleteMulti", func(t *testing.T) {
 		s.EXPECT().Delete(ctx, key).Return(nil)
 		assert.NoError(t, s.Delete(ctx, key))
 
-		keys := []*dal.Key{key}
+		keys := []*record.Key{key}
 		s.EXPECT().DeleteMulti(ctx, gomock.Any()).Return(nil)
 		assert.NoError(t, s.DeleteMulti(ctx, keys))
 	})
@@ -362,7 +363,7 @@ func TestMockReadwriteSession_Writes(t *testing.T) {
 		s.EXPECT().Insert(ctx, gomock.Any()).Return(nil)
 		assert.NoError(t, s.Insert(ctx, NewMockRecord(ctrl)))
 
-		records := []dal.Record{NewMockRecord(ctrl)}
+		records := []record.Record{NewMockRecord(ctrl)}
 		s.EXPECT().InsertMulti(ctx, gomock.Any()).Return(nil)
 		assert.NoError(t, s.InsertMulti(ctx, records))
 	})
@@ -371,7 +372,7 @@ func TestMockReadwriteSession_Writes(t *testing.T) {
 		s.EXPECT().Set(ctx, gomock.Any()).Return(nil)
 		assert.NoError(t, s.Set(ctx, NewMockRecord(ctrl)))
 
-		records := []dal.Record{NewMockRecord(ctrl)}
+		records := []record.Record{NewMockRecord(ctrl)}
 		s.EXPECT().SetMulti(ctx, gomock.Any()).Return(nil)
 		assert.NoError(t, s.SetMulti(ctx, records))
 	})
@@ -380,7 +381,7 @@ func TestMockReadwriteSession_Writes(t *testing.T) {
 		s.EXPECT().Update(ctx, key, updates).Return(nil)
 		assert.NoError(t, s.Update(ctx, key, updates))
 
-		keys := []*dal.Key{key}
+		keys := []*record.Key{key}
 		s.EXPECT().UpdateMulti(ctx, gomock.Any(), gomock.Any()).Return(nil)
 		assert.NoError(t, s.UpdateMulti(ctx, keys, updates))
 
@@ -395,7 +396,7 @@ func TestMockWriteSession_VariadicArgs(t *testing.T) {
 	defer ctrl.Finish()
 	ws := NewMockWriteSession(ctrl)
 	ctx := context.Background()
-	key := &dal.Key{}
+	key := &record.Key{}
 	rec := NewMockRecord(ctrl)
 	updates := []update.Update{}
 
@@ -406,7 +407,7 @@ func TestMockWriteSession_VariadicArgs(t *testing.T) {
 
 	// InsertMulti with one option
 	ws.EXPECT().InsertMulti(ctx, gomock.Any(), gomock.Any()).Return(nil)
-	records := []dal.Record{rec}
+	records := []record.Record{rec}
 	assert.NoError(t, ws.InsertMulti(ctx, records, opt))
 
 	// Update with one precondition
@@ -416,7 +417,7 @@ func TestMockWriteSession_VariadicArgs(t *testing.T) {
 
 	// UpdateMulti with one precondition
 	ws.EXPECT().UpdateMulti(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-	keys := []*dal.Key{key}
+	keys := []*record.Key{key}
 	assert.NoError(t, ws.UpdateMulti(ctx, keys, updates, pc))
 
 	// UpdateRecord with one precondition
@@ -430,7 +431,7 @@ func TestMockReadwriteSession_VariadicArgs(t *testing.T) {
 	defer ctrl.Finish()
 	s := NewMockReadwriteSession(ctrl)
 	ctx := context.Background()
-	key := &dal.Key{}
+	key := &record.Key{}
 	rec := NewMockRecord(ctrl)
 	updates := []update.Update{}
 
@@ -441,7 +442,7 @@ func TestMockReadwriteSession_VariadicArgs(t *testing.T) {
 
 	// InsertMulti with one option
 	s.EXPECT().InsertMulti(ctx, gomock.Any(), gomock.Any()).Return(nil)
-	records := []dal.Record{rec}
+	records := []record.Record{rec}
 	assert.NoError(t, s.InsertMulti(ctx, records, opt))
 
 	// Update with one precondition
@@ -451,7 +452,7 @@ func TestMockReadwriteSession_VariadicArgs(t *testing.T) {
 
 	// UpdateMulti with one precondition
 	s.EXPECT().UpdateMulti(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-	keys := []*dal.Key{key}
+	keys := []*record.Key{key}
 	assert.NoError(t, s.UpdateMulti(ctx, keys, updates, pc))
 
 	// UpdateRecord with one precondition

@@ -4,15 +4,16 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewSchema(t *testing.T) {
-	keyToFieldsFunc := func(key *Key, data any) ([]ExtraField, error) {
+	keyToFieldsFunc := func(key *record.Key, data any) ([]ExtraField, error) {
 		return []ExtraField{NewExtraField("test", "value")}, nil
 	}
 
-	dataToKey := func(incompleteKey *Key, data any) (key *Key, err error) {
+	dataToKey := func(incompleteKey *record.Key, data any) (key *record.Key, err error) {
 		return
 	}
 
@@ -25,31 +26,31 @@ func TestSchema_KeyToField(t *testing.T) {
 	tests := []struct {
 		name            string
 		keyToFieldsFunc KeyToFieldsFunc
-		key             *Key
+		key             *record.Key
 		expectedFields  []ExtraField
 		expectedError   error
 	}{
 		{
 			name: "successful_mapping",
-			keyToFieldsFunc: func(key *Key, data any) ([]ExtraField, error) {
+			keyToFieldsFunc: func(key *record.Key, data any) ([]ExtraField, error) {
 				return []ExtraField{NewExtraField("testField", "testValue")}, nil
 			},
-			key:            NewKeyWithID("TestKind", "test123"),
+			key:            record.NewKeyWithID("TestKind", "test123"),
 			expectedFields: []ExtraField{NewExtraField("testField", "testValue")},
 			expectedError:  nil,
 		},
 		{
 			name: "error_in_mapping",
-			keyToFieldsFunc: func(key *Key, data any) ([]ExtraField, error) {
+			keyToFieldsFunc: func(key *record.Key, data any) ([]ExtraField, error) {
 				return nil, errors.New("mapping error")
 			},
-			key:            NewKeyWithID("TestKind", "test123"),
+			key:            record.NewKeyWithID("TestKind", "test123"),
 			expectedFields: nil,
 			expectedError:  errors.New("mapping error"),
 		},
 		{
 			name: "nil_key",
-			keyToFieldsFunc: func(key *Key, data any) ([]ExtraField, error) {
+			keyToFieldsFunc: func(key *record.Key, data any) ([]ExtraField, error) {
 				if key == nil {
 					return nil, errors.New("key is nil")
 				}
@@ -61,7 +62,7 @@ func TestSchema_KeyToField(t *testing.T) {
 		},
 		{
 			name: "different_field_types",
-			keyToFieldsFunc: func(key *Key, data any) ([]ExtraField, error) {
+			keyToFieldsFunc: func(key *record.Key, data any) ([]ExtraField, error) {
 				switch key.ID {
 				case "string":
 					return []ExtraField{NewExtraField("stringField", "stringValue")}, nil
@@ -73,7 +74,7 @@ func TestSchema_KeyToField(t *testing.T) {
 					return []ExtraField{NewExtraField("defaultField", nil)}, nil
 				}
 			},
-			key:            NewKeyWithID("TestKind", "int"),
+			key:            record.NewKeyWithID("TestKind", "int"),
 			expectedFields: []ExtraField{NewExtraField("intField", 42)},
 			expectedError:  nil,
 		},
@@ -103,7 +104,7 @@ func TestSchema_KeyToField(t *testing.T) {
 }
 
 func TestSchema_KeyToField_WithComplexKey(t *testing.T) {
-	keyToFieldFunc := func(key *Key, data any) ([]ExtraField, error) {
+	keyToFieldFunc := func(key *record.Key, data any) ([]ExtraField, error) {
 		// Create field based on key properties
 		fieldName := key.Collection()
 		fieldValue := key.ID
@@ -113,8 +114,8 @@ func TestSchema_KeyToField_WithComplexKey(t *testing.T) {
 	schema := NewSchema(keyToFieldFunc, nil)
 
 	// Test with parent-child key relationship
-	parentKey := NewKeyWithID("Parent", "parent123")
-	complexKey := NewKeyWithParentAndID(parentKey, "Child", "child456")
+	parentKey := record.NewKeyWithID("Parent", "parent123")
+	complexKey := record.NewKeyWithParentAndID(parentKey, "Child", "child456")
 
 	fields, err := schema.KeyToFields(complexKey, nil)
 
@@ -126,7 +127,7 @@ func TestSchema_KeyToField_WithComplexKey(t *testing.T) {
 }
 
 func TestSchema_KeyToField_WithDataParameter(t *testing.T) {
-	keyToFieldFunc := func(key *Key, data any) ([]ExtraField, error) {
+	keyToFieldFunc := func(key *record.Key, data any) ([]ExtraField, error) {
 		// Use data parameter to modify field value
 		if data != nil {
 			if prefix, ok := data.(string); ok {
@@ -137,7 +138,7 @@ func TestSchema_KeyToField_WithDataParameter(t *testing.T) {
 	}
 
 	schema := NewSchema(keyToFieldFunc, nil)
-	testKey := NewKeyWithID("TestKind", "test123")
+	testKey := record.NewKeyWithID("TestKind", "test123")
 
 	// Test with nil data
 	fields1, err1 := schema.KeyToFields(testKey, nil)
@@ -165,49 +166,49 @@ func TestSchema_DataToKey(t *testing.T) {
 	tests := []struct {
 		name          string
 		dataToKeyFunc DataToKeyFunc
-		incompleteKey *Key
+		incompleteKey *record.Key
 		data          any
-		expectedKey   *Key
+		expectedKey   *record.Key
 		expectedError error
 	}{
 		{
 			name: "successful_mapping",
-			dataToKeyFunc: func(incompleteKey *Key, data any) (*Key, error) {
+			dataToKeyFunc: func(incompleteKey *record.Key, data any) (*record.Key, error) {
 				if dataMap, ok := data.(map[string]any); ok {
 					if id, exists := dataMap["id"]; exists {
-						return NewKeyWithID("TestKind", id), nil
+						return record.NewKeyWithID("TestKind", id), nil
 					}
 				}
 				return nil, errors.New("id not found in data")
 			},
-			incompleteKey: NewKeyWithID("TestKind", ""),
+			incompleteKey: record.NewKeyWithID("TestKind", ""),
 			data:          map[string]any{"id": "test123", "name": "test"},
-			expectedKey:   NewKeyWithID("TestKind", "test123"),
+			expectedKey:   record.NewKeyWithID("TestKind", "test123"),
 			expectedError: nil,
 		},
 		{
 			name: "error_in_mapping",
-			dataToKeyFunc: func(incompleteKey *Key, data any) (*Key, error) {
+			dataToKeyFunc: func(incompleteKey *record.Key, data any) (*record.Key, error) {
 				return nil, errors.New("mapping error")
 			},
-			incompleteKey: NewKeyWithID("TestKind", ""),
+			incompleteKey: record.NewKeyWithID("TestKind", ""),
 			data:          map[string]any{"name": "test"},
 			expectedKey:   nil,
 			expectedError: errors.New("mapping error"),
 		},
 		{
 			name: "use_incomplete_key_collection",
-			dataToKeyFunc: func(incompleteKey *Key, data any) (*Key, error) {
+			dataToKeyFunc: func(incompleteKey *record.Key, data any) (*record.Key, error) {
 				if dataMap, ok := data.(map[string]any); ok {
 					if id, exists := dataMap["id"]; exists {
-						return NewKeyWithID(incompleteKey.Collection(), id), nil
+						return record.NewKeyWithID(incompleteKey.Collection(), id), nil
 					}
 				}
 				return nil, errors.New("id not found in data")
 			},
-			incompleteKey: NewKeyWithID("CustomKind", ""),
+			incompleteKey: record.NewKeyWithID("CustomKind", ""),
 			data:          map[string]any{"id": "custom123"},
-			expectedKey:   NewKeyWithID("CustomKind", "custom123"),
+			expectedKey:   record.NewKeyWithID("CustomKind", "custom123"),
 			expectedError: nil,
 		},
 	}

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"go.uber.org/mock/gomock"
 )
 
@@ -18,10 +19,10 @@ func TestNewMockReader(t *testing.T) {
 
 	var i int
 
-	readerMock.EXPECT().Next().DoAndReturn(func() (dal.Record, error) {
+	readerMock.EXPECT().Next().DoAndReturn(func() (record.Record, error) {
 		i++
-		key := dal.NewKeyWithID("tests", i)
-		return dal.NewRecord(key), nil
+		key := record.NewKeyWithID("tests", i)
+		return record.NewRecord(key), nil
 	})
 
 	var reader dal.RecordsReader = readerMock

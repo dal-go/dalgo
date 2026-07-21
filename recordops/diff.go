@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"iter"
 
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 )
 
 // Diff compares baseline against candidates via K-way merge over

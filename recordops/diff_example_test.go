@@ -6,9 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
 	"github.com/dal-go/dalgo/recordops"
+	"github.com/dal-go/record"
 )
 
 // ExampleDiffFunc shows the canonical DiffFunc use case: comparing two
@@ -21,8 +20,8 @@ func ExampleDiffFunc() {
 	u2 := uuid{0x02}
 
 	mk := func(id uuid) record.WithID[uuid] {
-		key := dal.NewKeyWithID("Users", hex.EncodeToString(id[:]))
-		r := dal.NewRecordWithData(key, map[string]any{"name": "alice"})
+		key := record.NewKeyWithID("Users", hex.EncodeToString(id[:]))
+		r := record.NewRecordWithData(key, map[string]any{"name": "alice"})
 		r.SetError(nil)
 		return record.WithID[uuid]{ID: id, Record: r}
 	}

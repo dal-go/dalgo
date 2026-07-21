@@ -139,11 +139,11 @@ func main() {
     ctx := context.Background()
     
     // Create a key for the "users" collection with ID "user123"
-    key := dal.NewKeyWithID("users", "user123")
+    key := record.NewKeyWithID("users", "user123")
     
     // Create a record with data
     user := &User{Name: "Alice", Email: "alice@example.com"}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     // 3. Use with any database adapter
     // db := ... (initialize your database adapter)
@@ -153,7 +153,7 @@ func main() {
     
     // Retrieve the record
     // err = db.Get(ctx, record)
-    // if err != nil && !dal.IsNotFound(err) {
+    // if err != nil && !record.IsNotFound(err) {
     //     // handle error
     // }
     // if record.Exists() {
@@ -176,14 +176,14 @@ Every database operation works with **Records**. A record consists of:
 
 ```go
 // Simple key
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 
 // Hierarchical key (parent/child relationship)
-parentKey := dal.NewKeyWithID("teams", "team456")
-childKey := dal.NewKeyWithParentAndID(parentKey, "members", "member789")
+parentKey := record.NewKeyWithID("teams", "team456")
+childKey := record.NewKeyWithParentAndID(parentKey, "members", "member789")
 
 // Record with data
-record := dal.NewRecordWithData(key, &User{Name: "Bob"})
+record := record.NewRecordWithData(key, &User{Name: "Bob"})
 ```
 
 ### Sessions and Transactions
@@ -221,8 +221,8 @@ Build queries using the query builder API:
 query := dal.From(dal.CollectionRef{Name: "users"}).
     WhereField("email", dal.Equal, "alice@example.com").
     Limit(10).
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     })
 
 reader, err := db.ExecuteQueryToRecordsReader(ctx, query)

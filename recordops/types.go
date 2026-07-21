@@ -4,7 +4,7 @@ package recordops
 import (
 	"iter"
 
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 )
 
 // RecordSeq is the streaming input shape for Diff and DiffFunc.

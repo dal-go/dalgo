@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // joinedRow is one row of a join result: the base record id, the per-source
@@ -107,18 +108,18 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 	}
 
 	columns := q.Columns()
-	records := make([]dal.Record, 0, len(filtered))
+	records := make([]record.Record, 0, len(filtered))
 	for _, row := range filtered {
-		key := dal.NewKeyWithID(base.Name(), row.baseID)
+		key := record.NewKeyWithID(base.Name(), row.baseID)
 		if len(columns) > 0 {
-			records = append(records, dal.NewRecordWithData(key, projectRow(columns, row.sources)).SetError(nil))
+			records = append(records, record.NewRecordWithData(key, projectRow(columns, row.sources)).SetError(nil))
 			continue
 		}
 		if q.IntoRecord() == nil {
-			records = append(records, dal.NewRecord(key).SetError(nil))
+			records = append(records, record.NewRecord(key).SetError(nil))
 			continue
 		}
-		records = append(records, dal.NewRecordWithData(key, row.merged).SetError(nil))
+		records = append(records, record.NewRecordWithData(key, row.merged).SetError(nil))
 	}
 	return dal.NewRecordsReader(records), nil
 }

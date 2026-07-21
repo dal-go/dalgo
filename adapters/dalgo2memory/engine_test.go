@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,12 +21,12 @@ type countingEngine struct {
 
 func (e *countingEngine) exists(id string) bool { return e.inner.exists(id) }
 
-func (e *countingEngine) store(id string, record dal.Record, overwrite bool) error {
+func (e *countingEngine) store(id string, record record.Record, overwrite bool) error {
 	e.writes++
 	return e.inner.store(id, record, overwrite)
 }
 
-func (e *countingEngine) load(id string, record dal.Record) error { return e.inner.load(id, record) }
+func (e *countingEngine) load(id string, record record.Record) error { return e.inner.load(id, record) }
 
 func (e *countingEngine) delete(id string) { e.inner.delete(id) }
 
@@ -55,8 +56,8 @@ func TestSerializedStorageMatchesDefault(t *testing.T) {
 		db := NewDB(WithSchema(false,
 			WithCollection[user]("users", nil, opts...),
 		)).(*database)
-		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &user{Name: "Alice", Role: "admin"})))
-		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "u2"), &user{Name: "Bob", Role: "member"})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &user{Name: "Alice", Role: "admin"})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u2"), &user{Name: "Bob", Role: "member"})))
 
 		q := dal.From(dal.NewRootCollectionRef("users", "")).NewQuery().WhereField("Role", dal.Equal, "admin").SelectKeysOnly(reflect.String)
 		reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
@@ -85,9 +86,9 @@ func TestMixedEnginesInOneDB(t *testing.T) {
 		WithCollection[user]("b", nil, withCountingStorage()),
 	)).(*database)
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("a", "a1"), &user{Name: "Alice"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("b", "b1"), &user{Name: "Bob"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("b", "b2"), &user{Name: "Carol"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("a", "a1"), &user{Name: "Alice"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("b", "b1"), &user{Name: "Bob"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("b", "b2"), &user{Name: "Carol"})))
 
 	// Collection a uses the Serialized engine.
 	_, isSerialized := db.collections["a"].(*serializedEngine)
@@ -100,13 +101,13 @@ func TestMixedEnginesInOneDB(t *testing.T) {
 
 	// Each retrieves its own records; operations on one do not affect the other.
 	var a1 user
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("a", "a1"), &a1)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("a", "a1"), &a1)))
 	require.Equal(t, "Alice", a1.Name)
 	var b1 user
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("b", "b1"), &b1)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("b", "b1"), &b1)))
 	require.Equal(t, "Bob", b1.Name)
 
-	existsA, err := db.Exists(ctx, dal.NewKeyWithID("a", "b1"))
+	existsA, err := db.Exists(ctx, record.NewKeyWithID("a", "b1"))
 	require.NoError(t, err)
 	require.False(t, existsA)
 }
@@ -118,12 +119,12 @@ func TestUnregisteredCollectionUsesSerialized(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("ad-hoc", "x1"), &user{Name: "Alice"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("ad-hoc", "x1"), &user{Name: "Alice"})))
 	_, isSerialized := db.collections["ad-hoc"].(*serializedEngine)
 	require.True(t, isSerialized)
 
 	var got user
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("ad-hoc", "x1"), &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("ad-hoc", "x1"), &got)))
 	require.Equal(t, "Alice", got.Name)
 }
 

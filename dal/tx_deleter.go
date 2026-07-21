@@ -1,17 +1,21 @@
 package dal
 
-import "context"
+import (
+	"context"
+
+	"github.com/dal-go/record"
+)
 
 // Deleter defines a function to delete a single record from database by key
 type Deleter interface {
 
 	// Delete deletes a single record from database by key
-	Delete(ctx context.Context, key *Key) error
+	Delete(ctx context.Context, key *record.Key) error
 }
 
 // MultiDeleter defines a function to delete multiple records from database by keys
 type MultiDeleter interface {
 
 	// DeleteMulti deletes multiple records from database by keys
-	DeleteMulti(ctx context.Context, keys []*Key) error
+	DeleteMulti(ctx context.Context, keys []*record.Key) error
 }

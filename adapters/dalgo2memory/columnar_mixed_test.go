@@ -8,7 +8,8 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,14 +37,14 @@ func serMapDB(t *testing.T) *database {
 func setMap(t *testing.T, db *database, id string, data map[string]any) {
 	t.Helper()
 	require.NoError(t, db.Set(context.Background(),
-		dal.NewRecordWithData(dal.NewKeyWithID("m", id), data)))
+		record.NewRecordWithData(record.NewKeyWithID("m", id), data)))
 }
 
 func getMap(t *testing.T, db *database, id string) map[string]any {
 	t.Helper()
 	got := map[string]any{}
 	require.NoError(t, db.Get(context.Background(),
-		dal.NewRecordWithData(dal.NewKeyWithID("m", id), &got)))
+		record.NewRecordWithData(record.NewKeyWithID("m", id), &got)))
 	return got
 }
 
@@ -63,7 +64,7 @@ func TestMixed_RequiresDeclaredColumn(t *testing.T) {
 
 	// With no declared column the selection fails with a descriptive error.
 	noColDB := mixedDB(t)
-	err := noColDB.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("m", "x"), map[string]any{"a": 1}))
+	err := noColDB.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("m", "x"), map[string]any{"a": 1}))
 	require.Error(t, err)
 	require.ErrorContains(t, err, "m")
 	require.ErrorContains(t, err, "declared column")
@@ -79,7 +80,7 @@ func TestMixed_DeclaredValueWrongTypeErrors(t *testing.T) {
 	ctx := context.Background()
 	db := mixedDB(t, WithDeclaredColumn[int]("age"))
 
-	err := db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("m", "u1"),
+	err := db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("m", "u1"),
 		map[string]any{"age": "old", "name": "Alice"}))
 	require.Error(t, err)
 	require.ErrorContains(t, err, "age")
@@ -87,7 +88,7 @@ func TestMixed_DeclaredValueWrongTypeErrors(t *testing.T) {
 	// Nothing was stored for that id: neither dropped nor coerced.
 	eng := db.engine("m").(*columnarEngine)
 	require.NotContains(t, eng.idToSlot, "u1")
-	exists, existsErr := db.Exists(ctx, dal.NewKeyWithID("m", "u1"))
+	exists, existsErr := db.Exists(ctx, record.NewKeyWithID("m", "u1"))
 	require.NoError(t, existsErr)
 	require.False(t, exists)
 }
@@ -145,7 +146,7 @@ func TestMixed_SlotSyncedThroughDeleteAndCompaction(t *testing.T) {
 
 	// Delete b: its slot is freed for reuse.
 	freed := eng.idToSlot["b"]
-	require.NoError(t, db.Delete(ctx, dal.NewKeyWithID("m", "b")))
+	require.NoError(t, db.Delete(ctx, record.NewKeyWithID("m", "b")))
 	require.NotContains(t, eng.idToSlot, "b")
 
 	// Reuse the freed slot with a new record; its declared value and leftover
@@ -156,8 +157,8 @@ func TestMixed_SlotSyncedThroughDeleteAndCompaction(t *testing.T) {
 	require.Equal(t, map[string]any{"name": "Eve"}, eng.leftover[freed])
 
 	// Delete two more to cross the compaction threshold (2 dead of 4 live+dead).
-	require.NoError(t, db.Delete(ctx, dal.NewKeyWithID("m", "c")))
-	require.NoError(t, db.Delete(ctx, dal.NewKeyWithID("m", "d")))
+	require.NoError(t, db.Delete(ctx, record.NewKeyWithID("m", "c")))
+	require.NoError(t, db.Delete(ctx, record.NewKeyWithID("m", "d")))
 	require.Equal(t, 0, eng.deadCount, "compaction reclaimed dead slots")
 	require.Len(t, eng.leftover, len(eng.live), "leftover stays the same length as the slot vector")
 
@@ -187,8 +188,8 @@ func TestMixed_ReadReconstructsFullRecord(t *testing.T) {
 	// A query reassembles the same full record (materialized into a map target).
 	q := dal.From(dal.NewRootCollectionRef("m", "")).NewQuery().
 		WhereField("name", dal.Equal, "Alice").
-		SelectIntoRecord(func() dal.Record {
-			return dal.NewRecordWithIncompleteKey("m", reflect.String, &map[string]any{})
+		SelectIntoRecord(func() record.Record {
+			return record.NewRecordWithIncompleteKey("m", reflect.String, &map[string]any{})
 		})
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
 	require.NoError(t, err)
@@ -314,11 +315,11 @@ func TestMixed_ParityAndFidelity(t *testing.T) {
 	// Faithful mixed-mode collection declaring a reference-bearing column
 	// (tags) alongside an undeclared reference-bearing field (meta).
 	db := mixedDB(t, WithDeclaredColumn[[]string]("tags"))
-	key := dal.NewKeyWithID("m", "u1")
+	key := record.NewKeyWithID("m", "u1")
 	tags := []string{"a", "b"}
 	meta := map[string]any{"city": "Paris"}
 	written := map[string]any{"tags": tags, "meta": meta}
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, written)))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, written)))
 
 	// Mutate both the declared and the undeclared reference after the write.
 	tags[0] = "MUTATED"
@@ -332,14 +333,14 @@ func TestMixed_ParityAndFidelity(t *testing.T) {
 	// Get-absent is not-found.
 	serDB := serMapDB(t)
 	for _, target := range []*database{db, serDB} {
-		k := dal.NewKeyWithID("m", "p1")
-		require.NoError(t, target.Set(ctx, dal.NewRecordWithData(k, map[string]any{"tags": []string{"x"}})))
-		require.NoError(t, target.Set(ctx, dal.NewRecordWithData(k, map[string]any{"tags": []string{"y"}})))
-		dup := target.Insert(ctx, dal.NewRecordWithData(k, map[string]any{"tags": []string{"z"}}))
+		k := record.NewKeyWithID("m", "p1")
+		require.NoError(t, target.Set(ctx, record.NewRecordWithData(k, map[string]any{"tags": []string{"x"}})))
+		require.NoError(t, target.Set(ctx, record.NewRecordWithData(k, map[string]any{"tags": []string{"y"}})))
+		dup := target.Insert(ctx, record.NewRecordWithData(k, map[string]any{"tags": []string{"z"}}))
 		require.Error(t, dup)
 		require.ErrorContains(t, dup, "already exists")
-		absent := target.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("m", "absent"), &map[string]any{}))
-		require.True(t, dal.IsNotFound(absent))
+		absent := target.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("m", "absent"), &map[string]any{}))
+		require.True(t, record.IsNotFound(absent))
 	}
 }
 
@@ -350,7 +351,7 @@ func TestMixed_UpdateAddsAndChangesFields(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := mixedDB(t, WithDeclaredColumn[int]("age"))
-	key := dal.NewKeyWithID("m", "u1")
+	key := record.NewKeyWithID("m", "u1")
 	setMap(t, db, "u1", map[string]any{"age": 1, "name": "Alice"})
 
 	// Update a declared column and add a new leftover field (map-backed accepts
@@ -432,7 +433,7 @@ func TestMixed_DecodeMapFieldsErrors(t *testing.T) {
 	db := mixedDB(t, WithDeclaredColumn[int]("age"))
 
 	// Non-serializable value -> json.Marshal error.
-	marshalErr := db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("m", "u1"),
+	marshalErr := db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("m", "u1"),
 		map[string]any{"age": 1, "bad": make(chan int)}))
 	require.Error(t, marshalErr)
 
@@ -467,12 +468,12 @@ func TestMixed_RaceInterleavesOperations(t *testing.T) {
 				id := ids[(seed+round)%n]
 				switch round % 4 {
 				case 0:
-					_ = db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("m", id), &map[string]any{}))
+					_ = db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("m", id), &map[string]any{}))
 				case 1:
-					_ = db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("m", id),
+					_ = db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("m", id),
 						map[string]any{"age": round, "name": id}))
 				case 2:
-					_ = db.Delete(ctx, dal.NewKeyWithID("m", id))
+					_ = db.Delete(ctx, record.NewKeyWithID("m", id))
 				case 3:
 					q := dal.From(dal.NewRootCollectionRef("m", "")).NewQuery().
 						WhereField("age", dal.Equal, 0).

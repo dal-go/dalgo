@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // TestType_String_Unknown exercises the default arm of Type.String for
@@ -48,7 +49,7 @@ func TestDefaultCurrentTimestamp_DefaultExpr(t *testing.T) {
 
 func TestListCollections_Dispatches(t *testing.T) {
 	db := newReaderStubDB("stub-driver")
-	parent := &dal.Key{}
+	parent := &record.Key{}
 	_, err := ListCollections(context.Background(), db, parent)
 	assert.NoError(t, err)
 	assert.Equal(t, "ListCollections", db.lastOp)

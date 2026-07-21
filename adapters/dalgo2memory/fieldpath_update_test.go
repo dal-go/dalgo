@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,9 +15,9 @@ func TestFieldPathUpdate_SetsNestedValue(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("docs", "d1")
+	key := record.NewKeyWithID("docs", "d1")
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, map[string]any{
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
 		"meta": map[string]any{"version": 1},
 	})))
 
@@ -26,7 +26,7 @@ func TestFieldPathUpdate_SetsNestedValue(t *testing.T) {
 	}))
 
 	var got map[string]any
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	meta, ok := got["meta"].(map[string]any)
 	require.True(t, ok, "meta should still be a map")
 	require.EqualValues(t, 2, meta["version"], "nested value should be updated to 2")
@@ -38,9 +38,9 @@ func TestFieldPathUpdate_DeleteFieldByFieldName(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("docs", "d1")
+	key := record.NewKeyWithID("docs", "d1")
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, map[string]any{
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
 		"keep": "yes",
 		"drop": "goodbye",
 	})))
@@ -50,7 +50,7 @@ func TestFieldPathUpdate_DeleteFieldByFieldName(t *testing.T) {
 	}))
 
 	var got map[string]any
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, "yes", got["keep"], "unaffected key must survive")
 	_, hasDropped := got["drop"]
 	require.False(t, hasDropped, "deleted key must not be present")
@@ -64,9 +64,9 @@ func TestFieldPathUpdate_DeleteFieldByFieldPath(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("docs", "d1")
+	key := record.NewKeyWithID("docs", "d1")
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, map[string]any{
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
 		"members": map[string]any{
 			"alice": true,
 			"bob":   true,
@@ -78,7 +78,7 @@ func TestFieldPathUpdate_DeleteFieldByFieldPath(t *testing.T) {
 	}))
 
 	var got map[string]any
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	members, ok := got["members"].(map[string]any)
 	require.True(t, ok, "members should still be a map")
 	_, alicePresent := members["alice"]
@@ -93,10 +93,10 @@ func TestFieldPathUpdate_NonMapIntermediateReturnsError(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("docs", "d1")
+	key := record.NewKeyWithID("docs", "d1")
 
 	// "meta" is a string, not a map — navigating through it must fail gracefully.
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, map[string]any{
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
 		"meta": "just a string",
 	})))
 
@@ -113,9 +113,9 @@ func TestFieldPathUpdate_PlainFieldNameStillWorks(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("docs", "d1")
+	key := record.NewKeyWithID("docs", "d1")
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, map[string]any{
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
 		"title": "original",
 		"count": 1,
 	})))
@@ -125,7 +125,7 @@ func TestFieldPathUpdate_PlainFieldNameStillWorks(t *testing.T) {
 	}))
 
 	var got map[string]any
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, "updated", got["title"])
 	require.EqualValues(t, 1, got["count"], "untouched field must survive")
 }
@@ -136,16 +136,16 @@ func TestFieldPathUpdate_CreatesMissingIntermediates(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("docs", "d5")
+	key := record.NewKeyWithID("docs", "d5")
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, map[string]any{"title": "x"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{"title": "x"})))
 
 	require.NoError(t, db.Update(ctx, key, []update.Update{
 		update.ByFieldPath(update.FieldPath{"meta", "nested", "flag"}, true),
 	}))
 
 	var got map[string]any
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	meta, ok := got["meta"].(map[string]any)
 	require.True(t, ok, "meta should be created as a map")
 	nested, ok := meta["nested"].(map[string]any)
@@ -177,8 +177,8 @@ func TestColumnar_FieldPathUpdateThroughNonMapFails(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	key := dal.NewKeyWithID("items", "i9")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &item{Name: "a", Count: 1})))
+	key := record.NewKeyWithID("items", "i9")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &item{Name: "a", Count: 1})))
 
 	err := db.Update(ctx, key, []update.Update{
 		update.ByFieldPath(update.FieldPath{"Name", "sub"}, 1),

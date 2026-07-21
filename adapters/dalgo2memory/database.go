@@ -11,7 +11,8 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 )
 
 // NewDB creates an in-memory DALgo database.
@@ -75,19 +76,19 @@ func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorke
 	}})
 }
 
-func (db *database) Exists(ctx context.Context, key *dal.Key) (bool, error) {
+func (db *database) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return session{db: db}.Exists(ctx, key)
 }
 
-func (db *database) Get(ctx context.Context, record dal.Record) error {
+func (db *database) Get(ctx context.Context, record record.Record) error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return session{db: db}.Get(ctx, record)
 }
 
-func (db *database) GetMulti(ctx context.Context, records []dal.Record) error {
+func (db *database) GetMulti(ctx context.Context, records []record.Record) error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return session{db: db}.GetMulti(ctx, records)
@@ -105,55 +106,55 @@ func (db *database) ExecuteQueryToRecordsetReader(ctx context.Context, query dal
 	return session{db: db}.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
-func (db *database) Set(ctx context.Context, record dal.Record) error {
+func (db *database) Set(ctx context.Context, record record.Record) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.Set(ctx, record)
 }
 
-func (db *database) SetMulti(ctx context.Context, records []dal.Record) error {
+func (db *database) SetMulti(ctx context.Context, records []record.Record) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.SetMulti(ctx, records)
 }
 
-func (db *database) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
+func (db *database) Insert(ctx context.Context, record record.Record, opts ...dal.InsertOption) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.Insert(ctx, record, opts...)
 }
 
-func (db *database) InsertMulti(ctx context.Context, records []dal.Record, opts ...dal.InsertOption) error {
+func (db *database) InsertMulti(ctx context.Context, records []record.Record, opts ...dal.InsertOption) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.InsertMulti(ctx, records, opts...)
 }
 
-func (db *database) Delete(ctx context.Context, key *dal.Key) error {
+func (db *database) Delete(ctx context.Context, key *record.Key) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.Delete(ctx, key)
 }
 
-func (db *database) DeleteMulti(ctx context.Context, keys []*dal.Key) error {
+func (db *database) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.DeleteMulti(ctx, keys)
 }
 
-func (db *database) Update(ctx context.Context, key *dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+func (db *database) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.Update(ctx, key, updates, preconditions...)
 }
 
-func (db *database) UpdateRecord(ctx context.Context, record dal.Record, updates []update.Update, preconditions ...dal.Precondition) error {
+func (db *database) UpdateRecord(ctx context.Context, record record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.UpdateRecord(ctx, record, updates, preconditions...)
 }
 
-func (db *database) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+func (db *database) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.UpdateMulti(ctx, keys, updates, preconditions...)
@@ -196,51 +197,51 @@ func (s session) Options() dal.TransactionOptions {
 	return nil
 }
 
-func (s session) Exists(_ context.Context, key *dal.Key) (bool, error) {
+func (s session) Exists(_ context.Context, key *record.Key) (bool, error) {
 	if err := s.allowRead(); err != nil {
 		return false, err
 	}
 	return s.db.engine(key.Collection()).exists(keyID(key)), nil
 }
 
-func (s session) Get(_ context.Context, record dal.Record) error {
+func (s session) Get(_ context.Context, rec record.Record) error {
 	if err := s.allowRead(); err != nil {
-		record.SetError(err)
+		rec.SetError(err)
 		return err
 	}
-	if err := s.db.guardCollection(record.Key().Collection()); err != nil {
-		record.SetError(err)
+	if err := s.db.guardCollection(rec.Key().Collection()); err != nil {
+		rec.SetError(err)
 		return err
 	}
-	record.SetError(nil)
-	if err := s.db.engine(record.Key().Collection()).load(keyID(record.Key()), record); err != nil {
-		record.SetError(err)
+	rec.SetError(nil)
+	if err := s.db.engine(rec.Key().Collection()).load(keyID(rec.Key()), rec); err != nil {
+		rec.SetError(err)
 		return err
 	}
 	return nil
 }
 
-func (s session) GetMulti(ctx context.Context, records []dal.Record) error {
+func (s session) GetMulti(ctx context.Context, records []record.Record) error {
 	if err := s.allowRead(); err != nil {
 		return err
 	}
-	for _, record := range records {
-		if err := s.Get(ctx, record); err != nil && !dal.IsNotFound(err) {
+	for _, rec := range records {
+		if err := s.Get(ctx, rec); err != nil && !record.IsNotFound(err) {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s session) Set(_ context.Context, record dal.Record) error {
-	if err := s.save(record, true); err != nil {
+func (s session) Set(_ context.Context, rec record.Record) error {
+	if err := s.save(rec, true); err != nil {
 		return err
 	}
 	s.markWrite()
 	return nil
 }
 
-func (s session) SetMulti(ctx context.Context, records []dal.Record) error {
+func (s session) SetMulti(ctx context.Context, records []record.Record) error {
 	for _, record := range records {
 		if err := s.Set(ctx, record); err != nil {
 			return err
@@ -256,7 +257,7 @@ func (s session) SetMulti(ctx context.Context, records []dal.Record) error {
 // rare, so a generous bound is effectively only hit by deterministic generators.
 const insertWithGeneratorMaxAttempts = 100
 
-func (s session) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
+func (s session) Insert(ctx context.Context, rec record.Record, opts ...dal.InsertOption) error {
 	options := dal.NewInsertOptions(opts...)
 	gen := options.IDGenerator()
 	if gen == nil && options.PreferAdapterGeneratedID() {
@@ -265,14 +266,14 @@ func (s session) Insert(ctx context.Context, record dal.Record, opts ...dal.Inse
 		gen = dal.NewInsertOptions(dal.WithRandomStringKey(dal.DefaultRandomStringIDLength, 5)).IDGenerator()
 	}
 	if gen != nil {
-		err := dal.InsertWithIdGenerator(ctx, record, gen, insertWithGeneratorMaxAttempts,
-			func(key *dal.Key) error {
+		err := dal.InsertWithIdGenerator(ctx, rec, gen, insertWithGeneratorMaxAttempts,
+			func(key *record.Key) error {
 				if s.db.engine(key.Collection()).exists(keyID(key)) {
 					return nil // id is taken: signal "exists" so generation retries
 				}
-				return dal.ErrRecordNotFound // id is free: signal "not found" so it is inserted
+				return record.ErrRecordNotFound // id is free: signal "not found" so it is inserted
 			},
-			func(r dal.Record) error {
+			func(r record.Record) error {
 				return s.save(r, false)
 			},
 		)
@@ -281,14 +282,14 @@ func (s session) Insert(ctx context.Context, record dal.Record, opts ...dal.Inse
 		}
 		return err
 	}
-	if err := s.save(record, false); err != nil {
+	if err := s.save(rec, false); err != nil {
 		return err
 	}
 	s.markWrite()
 	return nil
 }
 
-func (s session) InsertMulti(ctx context.Context, records []dal.Record, opts ...dal.InsertOption) error {
+func (s session) InsertMulti(ctx context.Context, records []record.Record, opts ...dal.InsertOption) error {
 	for _, record := range records {
 		if err := s.Insert(ctx, record, opts...); err != nil {
 			return err
@@ -297,25 +298,25 @@ func (s session) InsertMulti(ctx context.Context, records []dal.Record, opts ...
 	return nil
 }
 
-func (s session) Delete(_ context.Context, key *dal.Key) error {
+func (s session) Delete(_ context.Context, key *record.Key) error {
 	s.db.engine(key.Collection()).delete(keyID(key))
 	s.markWrite()
 	return nil
 }
 
-func (s session) DeleteMulti(ctx context.Context, keys []*dal.Key) error {
+func (s session) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	for _, key := range keys {
 		_ = s.Delete(ctx, key)
 	}
 	return nil
 }
 
-func (s session) Update(ctx context.Context, key *dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
-	record := dal.NewRecordWithData(key, map[string]any{})
+func (s session) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+	record := record.NewRecordWithData(key, map[string]any{})
 	return s.UpdateRecord(ctx, record, updates, preconditions...)
 }
 
-func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []update.Update, _ ...dal.Precondition) error {
+func (s session) UpdateRecord(_ context.Context, record record.Record, updates []update.Update, _ ...dal.Precondition) error {
 	collectionName := record.Key().Collection()
 	if err := s.db.guardCollection(collectionName); err != nil {
 		return err
@@ -327,7 +328,7 @@ func (s session) UpdateRecord(_ context.Context, record dal.Record, updates []up
 	return nil
 }
 
-func (s session) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+func (s session) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	for _, key := range keys {
 		if err := s.Update(ctx, key, updates, preconditions...); err != nil {
 			return err
@@ -358,7 +359,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		return nil, err
 	}
 	if len(allRows) == 0 {
-		return dal.NewRecordsReader([]dal.Record{}), nil
+		return dal.NewRecordsReader([]record.Record{}), nil
 	}
 	known := map[string]bool{"": true, base.Name(): true}
 	if a := base.Alias(); a != "" {
@@ -373,7 +374,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 			return nil, err
 		}
 	}
-	var parent *dal.Key
+	var parent *record.Key
 	if cr, ok := base.(dal.CollectionRef); ok {
 		parent = cr.Parent()
 	}
@@ -406,11 +407,11 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		rows = rows[:limit]
 	}
 	columns := q.Columns()
-	records := make([]dal.Record, len(rows))
+	records := make([]record.Record, len(rows))
 	for i, row := range rows {
 		key := resultKey(row, collectionName)
 		if len(columns) > 0 {
-			records[i] = dal.NewRecordWithData(key, projectRow(columns, baseSources(base, row.data))).SetError(nil)
+			records[i] = record.NewRecordWithData(key, projectRow(columns, baseSources(base, row.data))).SetError(nil)
 			continue
 		}
 		template := q.IntoRecord()
@@ -419,18 +420,18 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 			if err := row.materialize(data); err != nil {
 				return nil, err
 			}
-			records[i] = dal.NewRecordWithData(key, data).SetError(nil)
+			records[i] = record.NewRecordWithData(key, data).SetError(nil)
 			continue
 		}
 		if template == nil {
-			records[i] = dal.NewRecord(key).SetError(nil)
+			records[i] = record.NewRecord(key).SetError(nil)
 			continue
 		}
 		data := template.Data()
 		if err := row.materialize(data); err != nil {
 			return nil, err
 		}
-		records[i] = dal.NewRecordWithData(key, data).SetError(nil)
+		records[i] = record.NewRecordWithData(key, data).SetError(nil)
 	}
 	return dal.NewRecordsReader(records), nil
 }
@@ -441,10 +442,10 @@ type memoryRow struct {
 	id          string
 	data        map[string]any
 	materialize func(target any) error
-	key         *dal.Key
+	key         *record.Key
 }
 
-func (s session) save(record dal.Record, overwrite bool) error {
+func (s session) save(record record.Record, overwrite bool) error {
 	collectionName := record.Key().Collection()
 	if err := s.db.guardCollection(collectionName); err != nil {
 		record.SetError(err)
@@ -466,7 +467,7 @@ func (s session) save(record dal.Record, overwrite bool) error {
 // the bare leaf id (backward compatible, and what the white-box engine tests
 // address records by); nested records are keyed by their full parent-chain path
 // so the same leaf id under different parents no longer collides.
-func keyID(key *dal.Key) string {
+func keyID(key *record.Key) string {
 	if key.Parent() == nil {
 		return fmt.Sprint(key.ID)
 	}
@@ -474,10 +475,10 @@ func keyID(key *dal.Key) string {
 }
 
 // keyPath builds a record's full "collection/id/collection/id/…" path from the
-// root down. Unlike dal.Key.String it performs no validation and so never
+// root down. Unlike record.Key.String it performs no validation and so never
 // panics on an incomplete key — keyID can run on the insert-generator path
 // before a generated id is finalized.
-func keyPath(key *dal.Key) string {
+func keyPath(key *record.Key) string {
 	var parts []string
 	for k := key; k != nil; k = k.Parent() {
 		parts = append([]string{k.Collection() + "/" + fmt.Sprint(k.ID)}, parts...)
@@ -487,17 +488,17 @@ func keyPath(key *dal.Key) string {
 
 // resultKey returns the stored full key (with its parent chain) for a query
 // result row, falling back to a leaf-only key when a row carries none.
-func resultKey(row memoryRow, collectionName string) *dal.Key {
+func resultKey(row memoryRow, collectionName string) *record.Key {
 	if row.key != nil {
 		return row.key
 	}
-	return dal.NewKeyWithID(collectionName, row.id)
+	return record.NewKeyWithID(collectionName, row.id)
 }
 
 // isChildOf reports whether key's immediate parent is the given parent (by full
 // path) — used to scope a parent-anchored collection query. Both keys come from
 // stored records / collection refs and so are valid.
-func isChildOf(key, parent *dal.Key) bool {
+func isChildOf(key, parent *record.Key) bool {
 	if key == nil || parent == nil {
 		return false
 	}
@@ -684,5 +685,5 @@ func number(v any) (float64, bool) {
 }
 
 func isDuplicate(err error) bool {
-	return err != nil && !errors.Is(err, dal.ErrRecordNotFound)
+	return err != nil && !errors.Is(err, record.ErrRecordNotFound)
 }

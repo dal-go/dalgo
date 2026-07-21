@@ -10,13 +10,14 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/end2end/models"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func selectAllCities(ctx context.Context, db dal.DB) (records []dal.Record, err error) {
-	q := dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "")).NewQuery().SelectIntoRecord(func() dal.Record {
-		return dal.NewRecordWithIncompleteKey(models.CitiesCollection, reflect.String, &models.City{})
+func selectAllCities(ctx context.Context, db dal.DB) (records []record.Record, err error) {
+	q := dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "")).NewQuery().SelectIntoRecord(func() record.Record {
+		return record.NewRecordWithIncompleteKey(models.CitiesCollection, reflect.String, &models.City{})
 	})
 	err = db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 		records, err = dal.ExecuteQueryAndReadAllToRecords(ctx, q, tx)
@@ -37,8 +38,8 @@ func queryOperationsTest(ctx context.Context, t *testing.T, db dal.DB, eventuall
 		require.NoError(t, err, "load all cities")
 	}
 
-	var newCityRecord = func() dal.Record {
-		return dal.NewRecordWithIncompleteKey(models.CitiesCollection, reflect.String, &models.City{})
+	var newCityRecord = func() record.Record {
+		return record.NewRecordWithIncompleteKey(models.CitiesCollection, reflect.String, &models.City{})
 	}
 	t.Run(`SELECT ID FROM Cities`, func(t *testing.T) {
 		qb := dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "")).NewQuery()
@@ -122,9 +123,9 @@ func queryOperationsTest(ctx context.Context, t *testing.T, db dal.DB, eventuall
 				ids, err = dal.SelectAllIDs[string](ctx, reader, dal.WithLimit(q.Limit()))
 				require.NoError(t, err)
 				expectedIDs := []string{
-					dal.EscapeID("Istanbul_Istanbul"),
-					dal.EscapeID("Sindh_Karachi"),
-					dal.EscapeID("Dhaka_Dhaka"),
+					record.EscapeID("Istanbul_Istanbul"),
+					record.EscapeID("Sindh_Karachi"),
+					record.EscapeID("Dhaka_Dhaka"),
 				}
 				assert.Equal(t, expectedIDs, ids)
 				return nil
@@ -146,9 +147,9 @@ func queryOperationsTest(ctx context.Context, t *testing.T, db dal.DB, eventuall
 				ids, err = dal.SelectAllIDs[string](ctx, reader, dal.WithLimit(q.Limit()))
 				require.NoError(t, err)
 				expectedIDs := []string{
-					dal.EscapeID("Tokyo_Tokyo"),
-					dal.EscapeID("Delhi_Delhi"),
-					dal.EscapeID("Shanghai_Shanghai"),
+					record.EscapeID("Tokyo_Tokyo"),
+					record.EscapeID("Delhi_Delhi"),
+					record.EscapeID("Shanghai_Shanghai"),
 				}
 				assert.Equal(t, expectedIDs, ids)
 				return nil
@@ -172,8 +173,8 @@ func queryOperationsTest(ctx context.Context, t *testing.T, db dal.DB, eventuall
 				require.NoError(t, err)
 				sort.Strings(ids)
 				expectedIDs := []string{
-					dal.EscapeID("Delhi_Delhi"),
-					dal.EscapeID("Maharashtra_Mumbai"),
+					record.EscapeID("Delhi_Delhi"),
+					record.EscapeID("Maharashtra_Mumbai"),
 				}
 				assert.Equal(t, expectedIDs, ids)
 				return nil
@@ -204,9 +205,9 @@ func deleteAllCities(ctx context.Context, db dal.DB) (err error) {
 		if ids, err = dal.SelectAllIDs[string](ctx, reader, dal.WithLimit(q.Limit())); err != nil {
 			return fmt.Errorf("failed to query all cities: %w", err)
 		}
-		keys := make([]*dal.Key, len(ids))
+		keys := make([]*record.Key, len(ids))
 		for i, id := range ids {
-			keys[i] = dal.NewKeyWithID(models.CitiesCollection, id)
+			keys[i] = record.NewKeyWithID(models.CitiesCollection, id)
 		}
 		if len(ids) == 0 {
 			return nil
@@ -224,10 +225,10 @@ func setupDataForQueryTests(ctx context.Context, db dal.DB) (err error) {
 		return err
 	}
 	return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		records := make([]dal.Record, len(models.Cities))
+		records := make([]record.Record, len(models.Cities))
 		for i := range models.Cities { // Do not use value `for _, city` variable as all record will have same pointer to last city
-			records[i] = dal.NewRecordWithData(
-				dal.NewKeyWithID(models.CitiesCollection, models.CityID(models.Cities[i])),
+			records[i] = record.NewRecordWithData(
+				record.NewKeyWithID(models.CitiesCollection, models.CityID(models.Cities[i])),
 				&models.Cities[i],
 			)
 		}

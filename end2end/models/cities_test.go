@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,7 +41,7 @@ func TestSortedCityIDs(t *testing.T) {
 	// Build expected list
 	expected := make([]string, len(Cities))
 	for i, city := range Cities {
-		expected[i] = dal.EscapeID(CityID(city))
+		expected[i] = record.EscapeID(CityID(city))
 	}
 	sort.Strings(expected)
 

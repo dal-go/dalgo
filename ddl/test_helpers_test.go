@@ -6,6 +6,7 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 )
 
 // minStubAdapter implements dal.Adapter with a controllable name.
@@ -41,11 +42,13 @@ func (s *minStubDB) RunReadonlyTransaction(_ context.Context, _ dal.ROTxWorker, 
 func (s *minStubDB) RunReadwriteTransaction(_ context.Context, _ dal.RWTxWorker, _ ...dal.TransactionOption) error {
 	return errors.New("not used in tests")
 }
-func (s *minStubDB) Get(_ context.Context, _ dal.Record) error { return errors.New("not used") }
-func (s *minStubDB) Exists(_ context.Context, _ *dal.Key) (bool, error) {
+func (s *minStubDB) Get(_ context.Context, _ record.Record) error { return errors.New("not used") }
+func (s *minStubDB) Exists(_ context.Context, _ *record.Key) (bool, error) {
 	return false, errors.New("not used")
 }
-func (s *minStubDB) GetMulti(_ context.Context, _ []dal.Record) error { return errors.New("not used") }
+func (s *minStubDB) GetMulti(_ context.Context, _ []record.Record) error {
+	return errors.New("not used")
+}
 func (s *minStubDB) ExecuteQueryToRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsReader, error) {
 	return nil, errors.New("not used")
 }

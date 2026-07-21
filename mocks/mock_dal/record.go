@@ -12,7 +12,7 @@ package mock_dal
 import (
 	reflect "reflect"
 
-	dal "github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -97,10 +97,10 @@ func (mr *MockRecordMockRecorder) HasChanged() *gomock.Call {
 }
 
 // Key mocks base method.
-func (m *MockRecord) Key() *dal.Key {
+func (m *MockRecord) Key() *record.Key {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Key")
-	ret0, _ := ret[0].(*dal.Key)
+	ret0, _ := ret[0].(*record.Key)
 	return ret0
 }
 
@@ -123,10 +123,10 @@ func (mr *MockRecordMockRecorder) MarkAsChanged() *gomock.Call {
 }
 
 // SetError mocks base method.
-func (m *MockRecord) SetError(err error) dal.Record {
+func (m *MockRecord) SetError(err error) record.Record {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetError", err)
-	ret0, _ := ret[0].(dal.Record)
+	ret0, _ := ret[0].(record.Record)
 	return ret0
 }
 

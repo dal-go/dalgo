@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // backendName extracts the driver name from db.Adapter() if non-nil,
@@ -31,7 +32,7 @@ func notSupportedReader(op string, db dal.DB) error {
 
 // ListCollections type-asserts db to SchemaReader and delegates;
 // returns *NotSupportedError if the assertion fails.
-func ListCollections(ctx context.Context, db dal.DB, parent *dal.Key) ([]dal.CollectionRef, error) {
+func ListCollections(ctx context.Context, db dal.DB, parent *record.Key) ([]dal.CollectionRef, error) {
 	r, ok := db.(SchemaReader)
 	if !ok {
 		return nil, notSupportedReader("ListCollections", db)

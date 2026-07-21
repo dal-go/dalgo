@@ -134,6 +134,11 @@ func TestGetNonTransactionalContext(t *testing.T) {
 	if actual != ctx {
 		t.Errorf("transactional context does not provide original context")
 	}
+
+	nestedTxCtx := NewContextWithTransaction(txCtx, mockTx{options: NewTransactionOptions()})
+	if actual := GetNonTransactionalContext(nestedTxCtx); actual != ctx {
+		t.Errorf("nested transactional context does not preserve original context")
+	}
 }
 
 func TestTxWithIsolationLevel(t *testing.T) {

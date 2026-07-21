@@ -8,6 +8,7 @@ import (
 	"github.com/dal-go/dalgo/adapters/dalgo2memory"
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/mocks/mock_dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
@@ -21,9 +22,9 @@ func TestErrorReturnBranches(t *testing.T) {
 		db := mock_dal.NewMockDB(ctrl)
 		db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(dal.ErrNotSupported)
 		update2records(t, db,
-			dal.NewKeyWithID(E2ETestKind1, "k1"),
-			dal.NewKeyWithID(E2ETestKind1, "k2"),
-			dal.NewKeyWithID(E2ETestKind2, "k3"),
+			record.NewKeyWithID(E2ETestKind1, "k1"),
+			record.NewKeyWithID(E2ETestKind1, "k2"),
+			record.NewKeyWithID(E2ETestKind2, "k3"),
 		)
 	})
 
@@ -59,8 +60,8 @@ func TestErrorReturnBranches(t *testing.T) {
 		db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadwriteTransaction(ctrl)
-				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(dal.NewRecordsReader([]dal.Record{
-					dal.NewRecord(dal.NewKeyWithID("Cities", "one")).SetError(nil),
+				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(dal.NewRecordsReader([]record.Record{
+					record.NewRecord(record.NewKeyWithID("Cities", "one")).SetError(nil),
 				}), nil)
 				tx.EXPECT().DeleteMulti(gomock.Any(), gomock.Any()).Return(boom)
 				return f(ctx, tx)

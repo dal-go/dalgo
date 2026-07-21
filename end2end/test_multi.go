@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
 
-func deleteAllRecords(ctx context.Context, t *testing.T, db dal.DB, keys []*dal.Key) {
+func deleteAllRecords(ctx context.Context, t *testing.T, db dal.DB, keys []*record.Key) {
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.DeleteMulti(ctx, keys)
 	}, dal.TxWithMessage("deleteAllRecords"))
@@ -20,11 +21,11 @@ func deleteAllRecords(ctx context.Context, t *testing.T, db dal.DB, keys []*dal.
 
 func multiOperationsTest(ctx context.Context, t *testing.T, db dal.DB) {
 
-	var k1r1Key = dal.NewKeyWithID(E2ETestKind1, "k1r1")
-	var k1r2Key = dal.NewKeyWithID(E2ETestKind1, "k1r2")
-	var k2r1Key = dal.NewKeyWithID(E2ETestKind2, "k2r1")
+	var k1r1Key = record.NewKeyWithID(E2ETestKind1, "k1r1")
+	var k1r2Key = record.NewKeyWithID(E2ETestKind1, "k1r2")
+	var k2r1Key = record.NewKeyWithID(E2ETestKind2, "k2r1")
 
-	var allKeys = []*dal.Key{
+	var allKeys = []*record.Key{
 		k1r1Key,
 		k1r2Key,
 		k2r1Key,
@@ -58,17 +59,17 @@ func multiOperationsTest(ctx context.Context, t *testing.T, db dal.DB) {
 	})
 }
 
-func getMulti2existing2missingRecords(t *testing.T, db dal.DB, k1r1Key, k1r2Key *dal.Key) {
-	keys := []*dal.Key{
+func getMulti2existing2missingRecords(t *testing.T, db dal.DB, k1r1Key, k1r2Key *record.Key) {
+	keys := []*record.Key{
 		k1r1Key,
 		k1r2Key,
-		dal.NewKeyWithID(E2ETestKind1, "k1r9"),
-		dal.NewKeyWithID(E2ETestKind2, "k2r9"),
+		record.NewKeyWithID(E2ETestKind1, "k1r9"),
+		record.NewKeyWithID(E2ETestKind2, "k2r9"),
 	}
 	data := make([]TestData, len(keys))
-	records := make([]dal.Record, len(keys))
+	records := make([]record.Record, len(keys))
 	for i, key := range keys {
-		records[i] = dal.NewRecordWithData(key, &data[i])
+		records[i] = record.NewRecordWithData(key, &data[i])
 	}
 	ctx := context.Background()
 	require.NoError(t, db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
@@ -84,10 +85,10 @@ func getMulti2existing2missingRecords(t *testing.T, db dal.DB, k1r1Key, k1r2Key 
 }
 
 func get3NonExistingRecords(t *testing.T, db dal.DB) {
-	records := make([]dal.Record, 3)
+	records := make([]record.Record, 3)
 	for i := 0; i < 3; i++ {
-		records[i] = dal.NewRecordWithData(
-			dal.NewKeyWithID("NonExistingKind", fmt.Sprintf("non_existing_id_%v", i)),
+		records[i] = record.NewRecordWithData(
+			record.NewKeyWithID("NonExistingKind", fmt.Sprintf("non_existing_id_%v", i)),
 			&TestData{},
 		)
 	}
@@ -99,13 +100,13 @@ func get3NonExistingRecords(t *testing.T, db dal.DB) {
 	recordsMustNotExist(t, records)
 
 }
-func setMulti(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *dal.Key) {
-	newRecord := func(key *dal.Key) dal.Record {
-		return dal.NewRecordWithData(key, &TestData{
+func setMulti(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *record.Key) {
+	newRecord := func(key *record.Key) record.Record {
+		return record.NewRecordWithData(key, &TestData{
 			StringProp: fmt.Sprintf("%vstr", key.ID),
 		})
 	}
-	records := []dal.Record{
+	records := []record.Record{
 		newRecord(k1r1Key),
 		newRecord(k1r2Key),
 		newRecord(k2r1Key),
@@ -117,13 +118,13 @@ func setMulti(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *dal.Key) {
 	require.NoError(t, err)
 }
 
-func cleanupDelete(t *testing.T, db dal.DB, allKeys []*dal.Key) {
+func cleanupDelete(t *testing.T, db dal.DB, allKeys []*record.Key) {
 	ctx := context.Background()
 	deleteAllRecords(ctx, t, db, allKeys)
 	data := make([]struct{}, len(allKeys))
-	records := make([]dal.Record, len(allKeys))
+	records := make([]record.Record, len(allKeys))
 	for i := range records {
-		records[i] = dal.NewRecordWithData(allKeys[i], &data[i])
+		records[i] = record.NewRecordWithData(allKeys[i], &data[i])
 	}
 	require.NoError(t, db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 		return tx.GetMulti(ctx, records)
@@ -131,25 +132,25 @@ func cleanupDelete(t *testing.T, db dal.DB, allKeys []*dal.Key) {
 	recordsMustNotExist(t, records)
 }
 
-func update2records(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *dal.Key) {
+func update2records(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *record.Key) {
 	const newValue = "UpdateD"
 	updates := []update.Update{
 		update.ByFieldName("StringProp", newValue),
 	}
-	newRecords := func() []dal.Record {
+	newRecords := func() []record.Record {
 		data := make([]*TestData, 3)
 		for i := range data {
 			data[i] = new(TestData)
 		}
-		return []dal.Record{
-			dal.NewRecordWithData(k1r1Key, data[0]),
-			dal.NewRecordWithData(k1r2Key, data[1]),
-			dal.NewRecordWithData(k2r1Key, data[2]),
+		return []record.Record{
+			record.NewRecordWithData(k1r1Key, data[0]),
+			record.NewRecordWithData(k1r2Key, data[1]),
+			record.NewRecordWithData(k2r1Key, data[2]),
 		}
 	}
 	ctx := context.Background()
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return tx.UpdateMulti(ctx, []*dal.Key{k1r1Key, k1r2Key}, updates)
+		return tx.UpdateMulti(ctx, []*record.Key{k1r1Key, k1r2Key}, updates)
 	}, dal.TxWithMessage("update2records"))
 	if errors.Is(err, dal.ErrNotSupported) {
 		t.Log(err)
@@ -169,7 +170,7 @@ func update2records(t *testing.T, db dal.DB, k1r1Key, k1r2Key, k2r1Key *dal.Key)
 	asserRecord(2, "k2r1str")
 }
 
-func recordsMustExist(t *testing.T, records []dal.Record) (missingCount int) {
+func recordsMustExist(t *testing.T, records []record.Record) (missingCount int) {
 	for _, record := range records {
 		require.NoError(t, record.Error())
 		require.True(t, record.Exists(), "record was expected to exist, key: %v", record.Key())
@@ -177,7 +178,7 @@ func recordsMustExist(t *testing.T, records []dal.Record) (missingCount int) {
 	return 0
 }
 
-func recordsMustNotExist(t *testing.T, records []dal.Record) (hasError bool) {
+func recordsMustNotExist(t *testing.T, records []record.Record) (hasError bool) {
 	t.Helper()
 	for _, record := range records {
 		require.NoError(t, record.Error())
@@ -186,14 +187,14 @@ func recordsMustNotExist(t *testing.T, records []dal.Record) (hasError bool) {
 	return false
 }
 
-func getMulti3existingRecords(t *testing.T, allKeys []*dal.Key, db dal.DB) {
+func getMulti3existingRecords(t *testing.T, allKeys []*record.Key, db dal.DB) {
 	var data []TestData
-	records := make([]dal.Record, len(allKeys))
+	records := make([]record.Record, len(allKeys))
 	assetProps := func(t *testing.T) {
 		//if recordsMustExist(t, records) > 0 {
 		//	return
 		//}
-		assertStringProp := func(i int, record dal.Record) {
+		assertStringProp := func(i int, record record.Record) {
 			id := record.Key().ID.(string)
 			require.Equal(t, id+"str", data[i].StringProp)
 		}
@@ -204,7 +205,7 @@ func getMulti3existingRecords(t *testing.T, allKeys []*dal.Key, db dal.DB) {
 	t.Run("using_records_with_data", func(t *testing.T) {
 		data = make([]TestData, len(allKeys))
 		for i := range records {
-			records[i] = dal.NewRecordWithData(allKeys[i], &data[i])
+			records[i] = record.NewRecordWithData(allKeys[i], &data[i])
 		}
 		ctx := context.Background()
 		require.NoError(t, db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
@@ -215,7 +216,7 @@ func getMulti3existingRecords(t *testing.T, allKeys []*dal.Key, db dal.DB) {
 	})
 	//t.Run("using_DataTo", func(t *testing.T) {
 	//	for i := range records {
-	//		records[i] = dal.NewRecord(allKeys[i])
+	//		records[i] = record.NewRecord(allKeys[i])
 	//	}
 	//	if err := db.GetMulti(ctx, records); err != nil {
 	//		t.Fatalf("failed to get multiple records at once: %v", err)

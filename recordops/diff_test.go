@@ -9,19 +9,18 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// mkRec constructs a record.WithID carrying a real dal.Record with a stable
+// mkRec constructs a record.WithID carrying a real record.Record with a stable
 // Data() value. Task 4's classify path calls Data() on both sides, so a nil
 // Record would panic. The data value is deterministic per ID so two records
 // with the same ID compare Matched.
 func mkRec[K comparable](id K) record.WithID[K] {
-	key := dal.NewKeyWithID("Things", fmt.Sprintf("%v", id))
-	rec := dal.NewRecordWithData(key, map[string]any{"id": fmt.Sprintf("%v", id)})
+	key := record.NewKeyWithID("Things", fmt.Sprintf("%v", id))
+	rec := record.NewRecordWithData(key, map[string]any{"id": fmt.Sprintf("%v", id)})
 	rec.SetError(nil)
 	return record.WithID[K]{ID: id, Record: rec}
 }

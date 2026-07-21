@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -50,7 +51,7 @@ func TestMockDB_Exists(t *testing.T) {
 
 	mockDB := NewMockDB(ctrl)
 	ctx := context.Background()
-	key := &dal.Key{}
+	key := &record.Key{}
 
 	t.Run("exists returns true", func(t *testing.T) {
 		mockDB.EXPECT().Exists(ctx, key).Return(true, nil)
@@ -109,7 +110,7 @@ func TestMockDB_GetMulti(t *testing.T) {
 
 	mockDB := NewMockDB(ctrl)
 	ctx := context.Background()
-	records := []dal.Record{NewMockRecord(ctrl), NewMockRecord(ctrl)}
+	records := []record.Record{NewMockRecord(ctrl), NewMockRecord(ctrl)}
 
 	t.Run("get multi success", func(t *testing.T) {
 		mockDB.EXPECT().GetMulti(ctx, gomock.Any()).Return(nil)

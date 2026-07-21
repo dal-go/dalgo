@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,9 +16,9 @@ type user struct {
 	Role string
 }
 
-func readAll(t *testing.T, reader dal.RecordsReader) []dal.Record {
+func readAll(t *testing.T, reader dal.RecordsReader) []record.Record {
 	t.Helper()
-	var records []dal.Record
+	var records []record.Record
 	for {
 		record, err := reader.Next()
 		if err != nil {
@@ -41,8 +42,8 @@ func TestSchemaTypedQueryResults(t *testing.T) {
 		WithCollection[thing]("things", nil),
 	)).(*database)
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &user{Name: "Alice", Role: "admin"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "u2"), &user{Name: "Bob"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &user{Name: "Alice", Role: "admin"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u2"), &user{Name: "Bob"})))
 
 	q := dal.From(dal.NewRootCollectionRef("users", "")).NewQuery().SelectKeysOnly(reflect.String)
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
@@ -68,7 +69,7 @@ func TestSchemaNilFactoryUsesZeroValue(t *testing.T) {
 		WithCollection[thing]("things", nil),
 	)).(*database)
 
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("things", "t1"), &thing{Name: "x", Count: 7})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("things", "t1"), &thing{Name: "x", Count: 7})))
 
 	q := dal.From(dal.NewRootCollectionRef("things", "")).NewQuery().SelectKeysOnly(reflect.String)
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
@@ -87,12 +88,12 @@ func TestSchemaUndefinedCollectionErrors(t *testing.T) {
 	db := NewDB(WithSchema(false,
 		WithCollection[user]("users", nil),
 	)).(*database)
-	key := dal.NewKeyWithID("orphans", "o1")
+	key := record.NewKeyWithID("orphans", "o1")
 
 	// All write/read operations on an undefined collection are rejected.
-	require.Error(t, db.Set(ctx, dal.NewRecordWithData(key, &thing{Name: "x"})))
-	require.Error(t, db.Insert(ctx, dal.NewRecordWithData(key, &thing{Name: "x"})))
-	require.Error(t, db.Get(ctx, dal.NewRecordWithData(key, &thing{})))
+	require.Error(t, db.Set(ctx, record.NewRecordWithData(key, &thing{Name: "x"})))
+	require.Error(t, db.Insert(ctx, record.NewRecordWithData(key, &thing{Name: "x"})))
+	require.Error(t, db.Get(ctx, record.NewRecordWithData(key, &thing{})))
 	require.Error(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Name", "x")}))
 
 	// Nothing was written despite the Set/Insert attempts.
@@ -110,26 +111,26 @@ func TestSchemaRejectsUndefinedFieldsOnWrite(t *testing.T) {
 	db := NewDB(WithSchema(false,
 		WithCollection[user]("users", nil),
 	)).(*database)
-	key := dal.NewKeyWithID("users", "u1")
+	key := record.NewKeyWithID("users", "u1")
 
 	// A field that does not exist on the user type must be rejected.
-	bad := dal.NewRecordWithData(key, map[string]any{"Name": "Alice", "Unknown": 1})
+	bad := record.NewRecordWithData(key, map[string]any{"Name": "Alice", "Unknown": 1})
 	require.Error(t, db.Set(ctx, bad))
 	require.Error(t, db.Insert(ctx, bad))
 	require.Empty(t, db.collections["users"].(*serializedEngine).records)
 
 	// A payload that only uses defined fields is accepted.
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, map[string]any{"Name": "Alice", "Role": "admin"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{"Name": "Alice", "Role": "admin"})))
 
 	// Updating an undefined field is rejected; the stored record is unchanged.
 	require.Error(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Unknown", 1)}))
 	var got user
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, user{Name: "Alice", Role: "admin"}, got)
 
 	// Updating a defined field succeeds.
 	require.NoError(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Role", "member")}))
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, "member", got.Role)
 }
 
@@ -138,7 +139,7 @@ func TestSchemaQueryMalformedStoredData(t *testing.T) {
 	db := NewDB(WithSchema(false,
 		WithCollection[thing]("things", nil),
 	)).(*database)
-	key := dal.NewKeyWithID("things", "bad")
+	key := record.NewKeyWithID("things", "bad")
 	// Decodes fine into map[string]any, but Count("x") fails to decode into thing.
 	db.collections["things"] = &serializedEngine{records: map[string][]byte{keyID(key): []byte(`{"Count":"x"}`)}}
 
@@ -153,7 +154,7 @@ func TestSchemaAllowUndefinedFallsBack(t *testing.T) {
 	db := NewDB(WithSchema(true,
 		WithCollection[user]("users", nil),
 	)).(*database)
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orphans", "o1"), &thing{Name: "x"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orphans", "o1"), &thing{Name: "x"})))
 
 	q := dal.From(dal.NewRootCollectionRef("orphans", "")).NewQuery().SelectKeysOnly(reflect.String)
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
@@ -169,10 +170,10 @@ func TestSchemaIntoRecordTakesPrecedence(t *testing.T) {
 	db := NewDB(WithSchema(false,
 		WithCollection[user]("users", nil),
 	)).(*database)
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &user{Name: "Alice"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &user{Name: "Alice"})))
 
-	q := dal.From(dal.NewRootCollectionRef("users", "")).NewQuery().SelectIntoRecord(func() dal.Record {
-		return dal.NewRecordWithIncompleteKey("users", reflect.String, &map[string]any{})
+	q := dal.From(dal.NewRootCollectionRef("users", "")).NewQuery().SelectIntoRecord(func() record.Record {
+		return record.NewRecordWithIncompleteKey("users", reflect.String, &map[string]any{})
 	})
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
 	require.NoError(t, err)
@@ -186,7 +187,7 @@ func TestNoSchemaUnaffected(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
 	require.Nil(t, db.schema)
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &user{Name: "Alice"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &user{Name: "Alice"})))
 
 	q := dal.From(dal.NewRootCollectionRef("users", "")).NewQuery().SelectKeysOnly(reflect.String)
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)

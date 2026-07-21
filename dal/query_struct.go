@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 )
 
 var _ StructuredQuery = (*structuredQuery)(nil)
@@ -33,7 +34,7 @@ type structuredQuery struct {
 	// Columns define what columns to return
 	columns []Column
 
-	intoRecord       func() Record
+	intoRecord       func() record.Record
 	recordsetOptions []recordset.Option
 
 	// Offset specifies the number of records to skip
@@ -84,7 +85,7 @@ func (q structuredQuery) Columns() []Column {
 	return q.columns[:]
 }
 
-func (q structuredQuery) IntoRecord() Record {
+func (q structuredQuery) IntoRecord() record.Record {
 	if q.intoRecord == nil {
 		return nil
 	}

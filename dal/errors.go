@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/dal-go/record"
 )
 
 // ErrNotSupported - return this if db name does not support requested operation.
@@ -26,32 +28,14 @@ type ErrDuplicateUser struct {
 	DuplicateUserIDs []string
 }
 
-var ErrNoError = errors.New("no error")
-
 // Error implements error interface
 func (err ErrDuplicateUser) Error() string {
 	return fmt.Sprintf("multiple users by given search criteria[%v]: %v", err.SearchCriteria, strings.Join(err.DuplicateUserIDs, ","))
 }
 
-var (
-	// ErrRecordNotFound is returned when a DB record is not found
-	ErrRecordNotFound = errors.New("record not found")
-)
-
-// IsNotFound check if underlying error is ErrRecordNotFound
-func IsNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, ErrRecordNotFound) {
-		return true
-	}
-	return false
-}
-
 // ErrNotFoundByKey indicates error was not found by value
 type ErrNotFoundByKey interface {
-	Key() *Key
+	Key() *record.Key
 	Cause() error
 	error
 }
@@ -59,17 +43,17 @@ type ErrNotFoundByKey interface {
 var _ ErrNotFoundByKey = (*errNotFoundByKey)(nil)
 
 type errNotFoundByKey struct {
-	key   *Key
+	key   *record.Key
 	cause error
 }
 
-func (e errNotFoundByKey) Key() *Key {
+func (e errNotFoundByKey) Key() *record.Key {
 	return e.key
 }
 
 func (e errNotFoundByKey) Cause() error {
 	if e.cause == nil {
-		return ErrRecordNotFound
+		return record.ErrRecordNotFound
 	}
 	return e.cause
 }
@@ -79,22 +63,22 @@ func (e errNotFoundByKey) Unwrap() error {
 }
 
 func (e errNotFoundByKey) Error() string {
-	if errors.Is(e.cause, ErrRecordNotFound) {
+	if errors.Is(e.cause, record.ErrRecordNotFound) {
 		return fmt.Sprintf("%v: by key=%v", e.cause, e.key)
 	}
 	return fmt.Sprintf("%v: not found by key=%v", e.Cause(), e.key)
 }
 
 // NewErrNotFoundByKey creates an error that indicates that entity was not found by value
-func NewErrNotFoundByKey(key *Key, cause error) error {
+func NewErrNotFoundByKey(key *record.Key, cause error) error {
 	return errNotFoundByKey{key: key, cause: errNotFoundCause(cause)}
 }
 
 func errNotFoundCause(cause error) error {
-	if cause == nil || cause.(any) == ErrRecordNotFound.(any) {
-		return ErrRecordNotFound
+	if cause == nil || cause.(any) == record.ErrRecordNotFound.(any) {
+		return record.ErrRecordNotFound
 	}
-	return fmt.Errorf("%w: %v", ErrRecordNotFound, cause)
+	return fmt.Errorf("%w: %v", record.ErrRecordNotFound, cause)
 }
 
 type rollbackError struct {

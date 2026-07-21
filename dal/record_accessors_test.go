@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,8 +30,8 @@ func TestCollection_GetRecordWithID(t *testing.T) {
 	// not-found returns the zero value + the session not-found error.
 	missing, err := users.GetRecordWithID(ctx, db, "missing")
 	require.Error(t, err)
-	assert.True(t, dal.IsNotFound(err))
-	assert.Equal(t, dal.RecordWithID[string]{}, missing)
+	assert.True(t, record.IsNotFound(err))
+	assert.Equal(t, record.WithID[string]{}, missing)
 }
 
 func TestCollection_GetRecordWithDataAndID(t *testing.T) {
@@ -48,14 +49,14 @@ func TestCollection_GetRecordWithDataAndID(t *testing.T) {
 	assert.Equal(t, "users/u1", got.Key.String())
 	require.NotNil(t, got.Data)
 	assert.Equal(t, "Alice", got.Data.Name)
-	// Data is the same *T the Record holds (no copy).
+	// Data is the same *T the record.Record holds (no copy).
 	assert.Same(t, got.Data, got.Record.Data().(*User))
 
 	// not-found returns the zero value + the session not-found error.
 	missing, err := users.GetRecordWithDataAndID(ctx, db, "missing")
 	require.Error(t, err)
-	assert.True(t, dal.IsNotFound(err))
-	assert.Equal(t, dal.RecordWithDataAndID[string, *User]{}, missing)
+	assert.True(t, record.IsNotFound(err))
+	assert.Equal(t, record.DataWithID[string, *User]{}, missing)
 }
 
 func TestGetRecordWithIDIntoData(t *testing.T) {
@@ -67,7 +68,7 @@ func TestGetRecordWithIDIntoData(t *testing.T) {
 		return users.SetByID(ctx, tx, "u1", User{Name: "Alice"})
 	})
 
-	key := dal.NewKeyWithID("users", "u1")
+	key := record.NewKeyWithID("users", "u1")
 
 	// Concrete pointer data: decoded INTO the provided value.
 	into := &User{}
@@ -85,12 +86,12 @@ func TestGetRecordWithIDIntoData(t *testing.T) {
 	assert.Equal(t, "Alice", gotIface.Data.(*User).Name)
 
 	// not-found returns the built value + the session not-found error.
-	_, err = dal.GetRecordWithIDIntoData(ctx, db, dal.NewKeyWithID("users", "missing"), "missing", &User{})
+	_, err = dal.GetRecordWithIDIntoData(ctx, db, record.NewKeyWithID("users", "missing"), "missing", &User{})
 	require.Error(t, err)
-	assert.True(t, dal.IsNotFound(err))
+	assert.True(t, record.IsNotFound(err))
 
 	// invalid data (not a pointer/interface to struct/map) panics via
-	// NewRecordWithDataAndID.
+	// record.NewDataWithID.
 	assert.Panics(t, func() {
 		_, _ = dal.GetRecordWithIDIntoData(ctx, db, key, "u1", User{})
 	})

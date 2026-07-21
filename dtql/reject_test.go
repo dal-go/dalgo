@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // TestSerialize_acceptsInScope confirms a fully in-scope query serializes.
@@ -28,7 +29,7 @@ func TestSerialize_acceptsInScope(t *testing.T) {
 // TestSerialize_rejectsOutOfScopeConstructs covers every rejection branch of the
 // single validating build pass via the public Serialize entry point.
 func TestSerialize_rejectsOutOfScopeConstructs(t *testing.T) {
-	parentKey := dal.NewKeyWithID("orgs", "org1")
+	parentKey := record.NewKeyWithID("orgs", "org1")
 	badCmp := dal.Comparison{Operator: "!=", Left: dal.Field("a"), Right: dal.Constant{Value: 1}}
 	tests := []struct {
 		name    string

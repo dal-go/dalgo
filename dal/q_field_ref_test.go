@@ -3,6 +3,7 @@ package dal
 import (
 	"testing"
 
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -223,7 +224,7 @@ func TestWhereField(t *testing.T) {
 			args: args{
 				name:     "f1",
 				operator: Equal,
-				v:        &Key{},
+				v:        &record.Key{},
 			},
 			shouldPanic: true, // TODO: might be wrong, we might want to  filter by key value?
 		},

@@ -1,6 +1,10 @@
 package dal
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/dal-go/record"
+)
 
 var _ RecordsetSource = (*CollectionRef)(nil)
 
@@ -8,12 +12,12 @@ var _ RecordsetSource = (*CollectionRef)(nil)
 //	fmt.Stringer
 //	Name() string
 //	Alias() string
-//	Parent() *Key
+//	Parent() *record.Key
 //}
 //
 //var _ ICollectionRef = (*CollectionRef)(nil)
 
-func NewCollectionRef(name, alias string, parent *Key) (collectionRef CollectionRef) {
+func NewCollectionRef(name, alias string, parent *record.Key) (collectionRef CollectionRef) {
 	return newCollectionRef(name, alias, parent)
 }
 
@@ -21,7 +25,7 @@ func NewRootCollectionRef(name, alias string) CollectionRef {
 	return newCollectionRef(name, alias, nil)
 }
 
-func newCollectionRef(name, alias string, parent *Key) CollectionRef {
+func newCollectionRef(name, alias string, parent *record.Key) CollectionRef {
 	if name == "" {
 		panic("name is required parameter for NewCollectionRef()")
 	}
@@ -39,7 +43,7 @@ func newCollectionRef(name, alias string, parent *Key) CollectionRef {
 type CollectionRef struct {
 	name   string
 	alias  string
-	parent *Key
+	parent *record.Key
 }
 
 func (v CollectionRef) Equal(other CollectionRef, ignoreAlias bool) bool {
@@ -58,7 +62,7 @@ func (v CollectionRef) Alias() string {
 	return v.alias
 }
 
-func (v CollectionRef) Parent() *Key {
+func (v CollectionRef) Parent() *record.Key {
 	return v.parent
 }
 

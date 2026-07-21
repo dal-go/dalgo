@@ -8,7 +8,7 @@ import "github.com/dal-go/dalgo/dal"
 // FieldDef is the schema-DEFINITION shape. It is distinct from the
 // unrelated runtime types in the dal package: [dal.Column] (a
 // SELECT-clause expression+alias), [dal.FieldRef] (a query field
-// reference), [dal.FieldVal] (a runtime name+value pair). Those exist
+// reference), [record.FieldVal] (a runtime name+value pair). Those exist
 // for query and runtime concerns; FieldDef exists to describe a
 // column's structure in a portable way.
 //

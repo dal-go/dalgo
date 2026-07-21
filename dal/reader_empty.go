@@ -1,10 +1,12 @@
 package dal
 
+import "github.com/dal-go/record"
+
 var _ RecordsReader = (*EmptyReader)(nil)
 
 type EmptyReader struct{}
 
-func (e EmptyReader) Next() (Record, error) {
+func (e EmptyReader) Next() (record.Record, error) {
 	return nil, ErrNoMoreRecords
 }
 

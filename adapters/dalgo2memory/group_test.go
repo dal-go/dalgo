@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,10 +15,10 @@ func seedSales(t *testing.T) (*database, context.Context) {
 	t.Helper()
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": 10})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": 20})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "3"), &map[string]any{"category": "A", "amount": nil})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "4"), &map[string]any{"category": "B", "amount": 5})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": 10})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": 20})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "3"), &map[string]any{"category": "A", "amount": nil})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "4"), &map[string]any{"category": "B", "amount": 5})))
 	return db, ctx
 }
 
@@ -69,8 +70,8 @@ func TestGroupBy_SingleSourceAggregates(t *testing.T) {
 func TestGroupBy_AllNullGroup(t *testing.T) {
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": nil})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": nil})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": nil})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": nil})))
 
 	countAll := dal.Count()
 	countAll.Alias = "n"
@@ -165,7 +166,7 @@ func TestGroupBy_OrderAndLimit(t *testing.T) {
 	ctx := context.Background()
 	// 5 rows in A, 3 in B, 1 in C.
 	add := func(id, cat string) {
-		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", id), &map[string]any{"category": cat})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", id), &map[string]any{"category": cat})))
 	}
 	add("a1", "A")
 	add("a2", "A")
@@ -209,13 +210,13 @@ func TestGroupBy_EmptyUnchanged(t *testing.T) {
 func TestGroupBy_JoinQualified(t *testing.T) {
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "country": "US"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "country": "US"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "3"), &map[string]any{"id": 3, "country": "DE"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "b"), &map[string]any{"userId": 2})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "c"), &map[string]any{"userId": 3})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "d"), &map[string]any{"userId": 1})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "country": "US"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "country": "US"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "3"), &map[string]any{"id": 3, "country": "DE"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "b"), &map[string]any{"userId": 2})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "c"), &map[string]any{"userId": 3})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "d"), &map[string]any{"userId": 1})))
 
 	join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner,
 		dal.NewComparison(dal.NewFieldRef("u", "id"), dal.Equal, dal.NewFieldRef("o", "userId")))

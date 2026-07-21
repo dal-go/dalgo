@@ -5,19 +5,18 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
 // recStructured is a local helper for building a record.WithID[string]
-// carrying a dal.Record whose Data() returns the supplied map. The
+// carrying a record.Record whose Data() returns the supplied map. The
 // per-test-file name avoids collisions with helpers in sibling test files.
 func recStructured(id string, data map[string]any) record.WithID[string] {
-	key := dal.NewKeyWithID("Users", id)
-	r := dal.NewRecordWithData(key, data)
+	key := record.NewKeyWithID("Users", id)
+	r := record.NewRecordWithData(key, data)
 	r.SetError(nil)
 	return record.WithID[string]{ID: id, Record: r}
 }

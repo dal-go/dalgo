@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,17 +18,17 @@ func seedUsersOrders(t *testing.T) (*database, context.Context) {
 	t.Helper()
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "status": "active"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "status": "active"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1, "status": "shipped"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "b"), &map[string]any{"userId": 1, "status": "shipped"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "c"), &map[string]any{"userId": 9, "status": "shipped"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "status": "active"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "status": "active"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1, "status": "shipped"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "b"), &map[string]any{"userId": 1, "status": "shipped"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "c"), &map[string]any{"userId": 9, "status": "shipped"})))
 	return db, ctx
 }
 
-func intoMapRecord() func() dal.Record {
-	return func() dal.Record {
-		return dal.NewRecordWithIncompleteKey("users", reflect.String, &map[string]any{})
+func intoMapRecord() func() record.Record {
+	return func() record.Record {
+		return record.NewRecordWithIncompleteKey("users", reflect.String, &map[string]any{})
 	}
 }
 
@@ -225,7 +226,7 @@ func TestExecuteJoin_EdgeCases(t *testing.T) {
 		db := NewDB().(*database)
 		ctx := context.Background()
 		db.collections["users"] = &serializedEngine{records: map[string][]byte{"1": []byte("{")}}
-		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1})))
 		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
 		q := dal.From(usersAlias()).Join(join).NewQuery().SelectIntoRecord(intoMapRecord())
 		reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
@@ -236,7 +237,7 @@ func TestExecuteJoin_EdgeCases(t *testing.T) {
 	t.Run("malformed join row errors", func(t *testing.T) {
 		db := NewDB().(*database)
 		ctx := context.Background()
-		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "1"), &map[string]any{"id": 1})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1})))
 		db.collections["orders"] = &serializedEngine{records: map[string][]byte{"a": []byte("{")}}
 		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
 		q := dal.From(usersAlias()).Join(join).NewQuery().SelectIntoRecord(intoMapRecord())
@@ -252,11 +253,11 @@ func seedForOrdering(t *testing.T) (*database, context.Context) {
 	t.Helper()
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "status": "zuser"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "status": "zuser"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "oa"), &map[string]any{"userId": 1, "amount": 30, "status": "c"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "ob"), &map[string]any{"userId": 1, "amount": 10, "status": "a"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("orders", "oc"), &map[string]any{"userId": 2, "amount": 20, "status": "b"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "status": "zuser"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "status": "zuser"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "oa"), &map[string]any{"userId": 1, "amount": 30, "status": "c"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "ob"), &map[string]any{"userId": 1, "amount": 10, "status": "a"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "oc"), &map[string]any{"userId": 2, "amount": 20, "status": "b"})))
 	return db, ctx
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // SchemaReader is the capability interface for schema introspection.
@@ -28,7 +29,7 @@ type SchemaReader interface {
 	// db. The optional parent key narrows scope when the backend
 	// supports hierarchical addressing (e.g. SQL catalog/schema).
 	// Pass nil for "everything visible."
-	ListCollections(ctx context.Context, parent *dal.Key) ([]dal.CollectionRef, error)
+	ListCollections(ctx context.Context, parent *record.Key) ([]dal.CollectionRef, error)
 
 	// DescribeCollection returns the structural definition of one
 	// collection, including its fields, primary key, and inline

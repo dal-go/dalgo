@@ -15,6 +15,7 @@ import (
 
 	dal "github.com/dal-go/dalgo/dal"
 	recordset "github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -92,7 +93,7 @@ func (mr *MockDBMockRecorder) ExecuteQueryToRecordsetReader(ctx, query any, opti
 }
 
 // Exists mocks base method.
-func (m *MockDB) Exists(ctx context.Context, key *dal.Key) (bool, error) {
+func (m *MockDB) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Exists", ctx, key)
 	ret0, _ := ret[0].(bool)
@@ -107,7 +108,7 @@ func (mr *MockDBMockRecorder) Exists(ctx, key any) *gomock.Call {
 }
 
 // Get mocks base method.
-func (m *MockDB) Get(ctx context.Context, record dal.Record) error {
+func (m *MockDB) Get(ctx context.Context, record record.Record) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", ctx, record)
 	ret0, _ := ret[0].(error)
@@ -121,7 +122,7 @@ func (mr *MockDBMockRecorder) Get(ctx, record any) *gomock.Call {
 }
 
 // GetMulti mocks base method.
-func (m *MockDB) GetMulti(ctx context.Context, records []dal.Record) error {
+func (m *MockDB) GetMulti(ctx context.Context, records []record.Record) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMulti", ctx, records)
 	ret0, _ := ret[0].(error)

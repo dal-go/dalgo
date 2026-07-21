@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -151,7 +152,7 @@ func TestSelect(t *testing.T) {
 				}
 			})
 			t.Run("IntoRecord_coverage", func(t *testing.T) {
-				q := structuredQuery{intoRecord: func() Record { return nil }}
+				q := structuredQuery{intoRecord: func() record.Record { return nil }}
 				assert.Nil(t, q.IntoRecord())
 			})
 			t.Run("IDKind", func(t *testing.T) {

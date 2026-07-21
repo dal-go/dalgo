@@ -15,7 +15,8 @@ import (
 
 	dal "github.com/dal-go/dalgo/dal"
 	recordset "github.com/dal-go/dalgo/recordset"
-	update "github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	update "github.com/dal-go/record/update"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -82,7 +83,7 @@ func (m *MockReadTransaction) EXPECT() *MockReadTransactionMockRecorder {
 }
 
 // Exists mocks base method.
-func (m *MockReadTransaction) Exists(ctx context.Context, key *dal.Key) (bool, error) {
+func (m *MockReadTransaction) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Exists", ctx, key)
 	ret0, _ := ret[0].(bool)
@@ -97,7 +98,7 @@ func (mr *MockReadTransactionMockRecorder) Exists(ctx, key any) *gomock.Call {
 }
 
 // Get mocks base method.
-func (m *MockReadTransaction) Get(ctx context.Context, record dal.Record) error {
+func (m *MockReadTransaction) Get(ctx context.Context, record record.Record) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", ctx, record)
 	ret0, _ := ret[0].(error)
@@ -111,7 +112,7 @@ func (mr *MockReadTransactionMockRecorder) Get(ctx, record any) *gomock.Call {
 }
 
 // GetMulti mocks base method.
-func (m *MockReadTransaction) GetMulti(ctx context.Context, records []dal.Record) error {
+func (m *MockReadTransaction) GetMulti(ctx context.Context, records []record.Record) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMulti", ctx, records)
 	ret0, _ := ret[0].(error)
@@ -198,7 +199,7 @@ func (m *MockReadwriteTransaction) EXPECT() *MockReadwriteTransactionMockRecorde
 }
 
 // Delete mocks base method.
-func (m *MockReadwriteTransaction) Delete(ctx context.Context, key *dal.Key) error {
+func (m *MockReadwriteTransaction) Delete(ctx context.Context, key *record.Key) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", ctx, key)
 	ret0, _ := ret[0].(error)
@@ -212,7 +213,7 @@ func (mr *MockReadwriteTransactionMockRecorder) Delete(ctx, key any) *gomock.Cal
 }
 
 // DeleteMulti mocks base method.
-func (m *MockReadwriteTransaction) DeleteMulti(ctx context.Context, keys []*dal.Key) error {
+func (m *MockReadwriteTransaction) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteMulti", ctx, keys)
 	ret0, _ := ret[0].(error)
@@ -226,7 +227,7 @@ func (mr *MockReadwriteTransactionMockRecorder) DeleteMulti(ctx, keys any) *gomo
 }
 
 // Exists mocks base method.
-func (m *MockReadwriteTransaction) Exists(ctx context.Context, key *dal.Key) (bool, error) {
+func (m *MockReadwriteTransaction) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Exists", ctx, key)
 	ret0, _ := ret[0].(bool)
@@ -241,7 +242,7 @@ func (mr *MockReadwriteTransactionMockRecorder) Exists(ctx, key any) *gomock.Cal
 }
 
 // Get mocks base method.
-func (m *MockReadwriteTransaction) Get(ctx context.Context, record dal.Record) error {
+func (m *MockReadwriteTransaction) Get(ctx context.Context, record record.Record) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", ctx, record)
 	ret0, _ := ret[0].(error)
@@ -255,7 +256,7 @@ func (mr *MockReadwriteTransactionMockRecorder) Get(ctx, record any) *gomock.Cal
 }
 
 // GetMulti mocks base method.
-func (m *MockReadwriteTransaction) GetMulti(ctx context.Context, records []dal.Record) error {
+func (m *MockReadwriteTransaction) GetMulti(ctx context.Context, records []record.Record) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMulti", ctx, records)
 	ret0, _ := ret[0].(error)
@@ -318,7 +319,7 @@ func (mr *MockReadwriteTransactionMockRecorder) ID() *gomock.Call {
 }
 
 // Insert mocks base method.
-func (m *MockReadwriteTransaction) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
+func (m *MockReadwriteTransaction) Insert(ctx context.Context, record record.Record, opts ...dal.InsertOption) error {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, record}
 	for _, a := range opts {
@@ -337,7 +338,7 @@ func (mr *MockReadwriteTransactionMockRecorder) Insert(ctx, record any, opts ...
 }
 
 // InsertMulti mocks base method.
-func (m *MockReadwriteTransaction) InsertMulti(ctx context.Context, records []dal.Record, opts ...dal.InsertOption) error {
+func (m *MockReadwriteTransaction) InsertMulti(ctx context.Context, records []record.Record, opts ...dal.InsertOption) error {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, records}
 	for _, a := range opts {
@@ -370,7 +371,7 @@ func (mr *MockReadwriteTransactionMockRecorder) Options() *gomock.Call {
 }
 
 // Set mocks base method.
-func (m *MockReadwriteTransaction) Set(ctx context.Context, record dal.Record) error {
+func (m *MockReadwriteTransaction) Set(ctx context.Context, record record.Record) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Set", ctx, record)
 	ret0, _ := ret[0].(error)
@@ -384,7 +385,7 @@ func (mr *MockReadwriteTransactionMockRecorder) Set(ctx, record any) *gomock.Cal
 }
 
 // SetMulti mocks base method.
-func (m *MockReadwriteTransaction) SetMulti(ctx context.Context, records []dal.Record) error {
+func (m *MockReadwriteTransaction) SetMulti(ctx context.Context, records []record.Record) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetMulti", ctx, records)
 	ret0, _ := ret[0].(error)
@@ -398,7 +399,7 @@ func (mr *MockReadwriteTransactionMockRecorder) SetMulti(ctx, records any) *gomo
 }
 
 // Update mocks base method.
-func (m *MockReadwriteTransaction) Update(ctx context.Context, key *dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+func (m *MockReadwriteTransaction) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, key, updates}
 	for _, a := range preconditions {
@@ -417,7 +418,7 @@ func (mr *MockReadwriteTransactionMockRecorder) Update(ctx, key, updates any, pr
 }
 
 // UpdateMulti mocks base method.
-func (m *MockReadwriteTransaction) UpdateMulti(ctx context.Context, keys []*dal.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+func (m *MockReadwriteTransaction) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, keys, updates}
 	for _, a := range preconditions {
@@ -436,7 +437,7 @@ func (mr *MockReadwriteTransactionMockRecorder) UpdateMulti(ctx, keys, updates a
 }
 
 // UpdateRecord mocks base method.
-func (m *MockReadwriteTransaction) UpdateRecord(ctx context.Context, record dal.Record, updates []update.Update, preconditions ...dal.Precondition) error {
+func (m *MockReadwriteTransaction) UpdateRecord(ctx context.Context, record record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, record, updates}
 	for _, a := range preconditions {

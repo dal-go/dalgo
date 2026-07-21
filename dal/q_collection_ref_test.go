@@ -3,6 +3,7 @@ package dal
 import (
 	"testing"
 
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,12 +14,12 @@ func TestNewCollectionRef(t *testing.T) {
 		})
 	})
 
-	someParentKey := NewKeyWithID("some_parent", "some_id")
+	someParentKey := record.NewKeyWithID("some_parent", "some_id")
 
 	type args struct {
 		name   string
 		alias  string
-		parent *Key
+		parent *record.Key
 	}
 
 	tests := []struct {
@@ -82,7 +83,7 @@ func TestCollectionRef(t *testing.T) {
 			name: "single_parent",
 			collectionRef: CollectionRef{
 				name:   "collection1",
-				parent: &Key{collection: "collection2", ID: "id2"},
+				parent: record.NewKeyWithID("collection2", "id2"),
 			},
 			expected: expected{
 				string: "collection2/id2/collection1",
@@ -94,7 +95,7 @@ func TestCollectionRef(t *testing.T) {
 			collectionRef: CollectionRef{
 				name:   "collection1",
 				alias:  "c1",
-				parent: &Key{collection: "collection2", ID: "id2"},
+				parent: record.NewKeyWithID("collection2", "id2"),
 			},
 			expected: expected{
 				string: "collection2/id2/collection1 AS c1",
@@ -152,12 +153,12 @@ func TestCollectionRef_Alias(t *testing.T) {
 }
 
 func TestCollectionRef_Parent(t *testing.T) {
-	parentKey := NewKeyWithID("parent_collection", "parent_id")
+	parentKey := record.NewKeyWithID("parent_collection", "parent_id")
 
 	tests := []struct {
 		name     string
 		ref      CollectionRef
-		expected *Key
+		expected *record.Key
 	}{
 		{
 			name:     "with parent",
@@ -257,7 +258,7 @@ func TestCollectionRef_Equal(t *testing.T) {
 	}
 	// Replace the placeholder complex cases with concrete ones using shared parent pointers
 	{
-		p := NewKeyWithID("parent", "1")
+		p := record.NewKeyWithID("parent", "1")
 		tests = append(tests,
 			struct {
 				name string
@@ -273,7 +274,7 @@ func TestCollectionRef_Equal(t *testing.T) {
 		)
 	}
 	{
-		p := NewKeyWithID("parent", "1")
+		p := record.NewKeyWithID("parent", "1")
 		tests = append(tests,
 			struct {
 				name string
@@ -289,7 +290,7 @@ func TestCollectionRef_Equal(t *testing.T) {
 		)
 	}
 	{
-		p := NewKeyWithID("parent", "1")
+		p := record.NewKeyWithID("parent", "1")
 		tests = append(tests,
 			struct {
 				name string
@@ -299,7 +300,7 @@ func TestCollectionRef_Equal(t *testing.T) {
 			}{
 				name: "same values but different parent pointers -> not equal",
 				v:    CollectionRef{name: "books", alias: "b", parent: p},
-				args: args{other: CollectionRef{name: "books", alias: "b", parent: NewKeyWithID("parent", "1")}, ignoreAlias: false},
+				args: args{other: CollectionRef{name: "books", alias: "b", parent: record.NewKeyWithID("parent", "1")}, ignoreAlias: false},
 				want: false,
 			},
 		)
@@ -313,14 +314,14 @@ func TestCollectionRef_Equal(t *testing.T) {
 				want bool
 			}{
 				name: "one has parent, other has nil parent -> not equal",
-				v:    CollectionRef{name: "books", alias: "b", parent: NewKeyWithID("parent", "1")},
+				v:    CollectionRef{name: "books", alias: "b", parent: record.NewKeyWithID("parent", "1")},
 				args: args{other: CollectionRef{name: "books", alias: "b", parent: nil}, ignoreAlias: false},
 				want: false,
 			},
 		)
 	}
 	{
-		p := NewKeyWithID("parent", "1")
+		p := record.NewKeyWithID("parent", "1")
 		tests = append(tests,
 			struct {
 				name string
@@ -336,8 +337,8 @@ func TestCollectionRef_Equal(t *testing.T) {
 		)
 	}
 	{
-		p1 := NewKeyWithID("parent", "1")
-		p2 := NewKeyWithID("parent", "2")
+		p1 := record.NewKeyWithID("parent", "1")
+		p2 := record.NewKeyWithID("parent", "2")
 		tests = append(tests,
 			struct {
 				name string
