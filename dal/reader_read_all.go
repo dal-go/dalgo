@@ -7,16 +7,17 @@ import (
 	"io"
 
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 )
 
-// SelectAll reads records from the provided RecordsReader and converts each Record to T using getItem.
+// SelectAll reads records from the provided RecordsReader and converts each record.Record to T using getItem.
 // Behavior and caveats:
 // - Panics if reader is nil (existing behavior).
 // - Respects WithOffset by discarding the first offset records.
 // - If WithLimit <= 0, reads until RecordsReader.Next() returns ErrNoMoreRecords.
 // - Ensures reader.Close() is called; if Close returns an error and no prior error occurred, that error is returned.
 // - Any panic inside getItem will propagate to the caller.
-func SelectAll(ctx context.Context, reader RecordsReader, addItem func(r Record), options ...ReaderOption) (err error) {
+func SelectAll(ctx context.Context, reader RecordsReader, addItem func(r record.Record), options ...ReaderOption) (err error) {
 	if reader == nil {
 		panic("reader is a required parameter, got nil")
 	}
@@ -97,7 +98,7 @@ func SelectAllIDs[T comparable](ctx context.Context, reader RecordsReader, optio
 	return ids, SelectAll(
 		ctx,
 		reader,
-		func(r Record) {
+		func(r record.Record) {
 			ids = append(ids, r.Key().ID.(T))
 		},
 		options...,
@@ -105,18 +106,18 @@ func SelectAllIDs[T comparable](ctx context.Context, reader RecordsReader, optio
 }
 
 // ReadAllToRecords is a helper method that for a given reader returns all records as a slice.
-func ReadAllToRecords(ctx context.Context, reader RecordsReader, options ...ReaderOption) (records []Record, err error) {
+func ReadAllToRecords(ctx context.Context, reader RecordsReader, options ...ReaderOption) (records []record.Record, err error) {
 	return records, SelectAll(
 		ctx,
 		reader,
-		func(r Record) {
+		func(r record.Record) {
 			records = append(records, r)
 		},
 		options...,
 	)
 }
 
-func ExecuteQueryAndReadAllToRecords(ctx context.Context, query Query, qe QueryExecutor, options ...ReaderOption) (records []Record, err error) {
+func ExecuteQueryAndReadAllToRecords(ctx context.Context, query Query, qe QueryExecutor, options ...ReaderOption) (records []record.Record, err error) {
 	var reader RecordsReader
 	if reader, err = qe.ExecuteQueryToRecordsReader(ctx, query); err != nil {
 		return nil, err

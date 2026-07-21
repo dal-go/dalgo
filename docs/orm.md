@@ -156,13 +156,13 @@ func (c UserCollection) Query() *dal.QueryBuilder {
     return dal.From(c.CollectionRef())
 }
 
-func (c UserCollection) NewKey(id string) *dal.Key {
-    return dal.NewKeyWithID(c.CollectionRef().Name, id)
+func (c UserCollection) NewKey(id string) *record.Key {
+    return record.NewKeyWithID(c.CollectionRef().Name, id)
 }
 
-func (c UserCollection) NewRecord(id string, data *User) dal.Record {
+func (c UserCollection) NewRecord(id string, data *User) record.Record {
     key := c.NewKey(id)
-    return dal.NewRecordWithData(key, data)
+    return record.NewRecordWithData(key, data)
 }
 
 // Usage
@@ -198,7 +198,7 @@ func (c TeamCollection) CollectionRef() dal.CollectionRef {
     return dal.CollectionRef{Name: "teams"}
 }
 
-func (c MemberCollection) CollectionRef(teamKey *dal.Key) dal.CollectionRef {
+func (c MemberCollection) CollectionRef(teamKey *record.Key) dal.CollectionRef {
     return dal.CollectionRef{
         Name:   "members",
         Parent: teamKey,
@@ -221,7 +221,7 @@ var Teams = TeamCollection{
 }
 
 // Usage
-teamKey := dal.NewKeyWithID("teams", "team123")
+teamKey := record.NewKeyWithID("teams", "team123")
 query := dal.From(Teams.Members.CollectionRef(teamKey)).
     Where(Teams.Members.Fields.Role.EqualTo("admin"))
 ```
@@ -264,8 +264,8 @@ query := Users.Query().
     Where(Users.Fields.Verified.EqualTo(true)).
     OrderBy(dal.Ascending(Users.Fields.CreatedAt.Name())).
     Limit(100).
-    SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+    SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     })
 ```
 
@@ -375,9 +375,9 @@ func (c UserCollection) FindVerifiedUsers() dal.StructuredQuery {
         SelectIntoRecord(c.NewRecordFactory())
 }
 
-func (c UserCollection) NewRecordFactory() func() dal.Record {
-    return func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+func (c UserCollection) NewRecordFactory() func() record.Record {
+    return func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     }
 }
 
@@ -464,8 +464,8 @@ func (qb *UserQueryBuilder) OnlyVerified() *UserQueryBuilder {
 }
 
 func (qb *UserQueryBuilder) Build() dal.StructuredQuery {
-    return qb.SelectIntoRecord(func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+    return qb.SelectIntoRecord(func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     })
 }
 
@@ -529,9 +529,9 @@ func (c UserCollection) FindVerifiedAdults() dal.StructuredQuery {
         SelectIntoRecord(c.recordFactory())
 }
 
-func (c UserCollection) recordFactory() func() dal.Record {
-    return func() dal.Record {
-        return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+func (c UserCollection) recordFactory() func() record.Record {
+    return func() record.Record {
+        return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
     }
 }
 
@@ -559,7 +559,7 @@ func FindUserByEmail(ctx context.Context, db dal.DB, email string) (*User, error
     
     record, err := reader.Next()
     if err == dal.ErrNoMoreRecords {
-        return nil, dal.ErrRecordNotFound
+        return nil, record.ErrRecordNotFound
     }
     if err != nil {
         return nil, err

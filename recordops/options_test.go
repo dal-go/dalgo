@@ -5,8 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,8 +48,8 @@ func TestOptionsConstructors_DoNotPanic(t *testing.T) {
 // by option semantic tests that need to vary Data() between baseline and
 // candidate (mkRec from diff_test.go derives Data() deterministically from id).
 func mkRecData(id string, data any) record.WithID[string] {
-	key := dal.NewKeyWithID("Things", id)
-	rec := dal.NewRecordWithData(key, data)
+	key := record.NewKeyWithID("Things", id)
+	rec := record.NewRecordWithData(key, data)
 	rec.SetError(nil)
 	return record.WithID[string]{ID: id, Record: rec}
 }

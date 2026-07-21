@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,14 +38,14 @@ func TestSliceToSeq_EmptyAndNil(t *testing.T) {
 
 // fakeReader is a minimal dal.RecordsReader for ReaderToSeq tests.
 type fakeReader struct {
-	records  []dal.Record
+	records  []record.Record
 	idx      int
 	err      error // returned at position errAt (after records[errAt-1] is yielded)
 	errAt    int
 	closeCnt int
 }
 
-func (r *fakeReader) Next() (dal.Record, error) {
+func (r *fakeReader) Next() (record.Record, error) {
 	if r.err != nil && r.idx == r.errAt {
 		return nil, r.err
 	}
@@ -60,13 +60,13 @@ func (r *fakeReader) Cursor() (string, error) { return "", nil }
 func (r *fakeReader) Close() error            { r.closeCnt++; return nil }
 
 func TestReaderToSeq_PropagatesUpstreamError(t *testing.T) {
-	rec1 := dal.NewRecordWithData(dal.NewKeyWithID("Things", "a"), &struct{}{})
+	rec1 := record.NewRecordWithData(record.NewKeyWithID("Things", "a"), &struct{}{})
 	r := &fakeReader{
-		records: []dal.Record{rec1},
+		records: []record.Record{rec1},
 		err:     io.ErrUnexpectedEOF,
 		errAt:   1,
 	}
-	idOf := func(_ dal.Record) (string, error) { return "a", nil }
+	idOf := func(_ record.Record) (string, error) { return "a", nil }
 
 	var firstErr error
 	count := 0
@@ -90,8 +90,8 @@ func TestReaderToSeq_ClosesOnAllPaths(t *testing.T) {
 		{
 			name: "exhaustion",
 			setup: func() *fakeReader {
-				rec := dal.NewRecordWithData(dal.NewKeyWithID("Things", "a"), &struct{}{})
-				return &fakeReader{records: []dal.Record{rec}}
+				rec := record.NewRecordWithData(record.NewKeyWithID("Things", "a"), &struct{}{})
+				return &fakeReader{records: []record.Record{rec}}
 			},
 			consume: func(seq RecordSeq[string]) {
 				for range seq { /* drain */
@@ -101,9 +101,9 @@ func TestReaderToSeq_ClosesOnAllPaths(t *testing.T) {
 		{
 			name: "early-break",
 			setup: func() *fakeReader {
-				rec1 := dal.NewRecordWithData(dal.NewKeyWithID("Things", "a"), &struct{}{})
-				rec2 := dal.NewRecordWithData(dal.NewKeyWithID("Things", "b"), &struct{}{})
-				return &fakeReader{records: []dal.Record{rec1, rec2}}
+				rec1 := record.NewRecordWithData(record.NewKeyWithID("Things", "a"), &struct{}{})
+				rec2 := record.NewRecordWithData(record.NewKeyWithID("Things", "b"), &struct{}{})
+				return &fakeReader{records: []record.Record{rec1, rec2}}
 			},
 			consume: func(seq RecordSeq[string]) {
 				for range seq {
@@ -115,7 +115,7 @@ func TestReaderToSeq_ClosesOnAllPaths(t *testing.T) {
 			name: "upstream-error",
 			setup: func() *fakeReader {
 				return &fakeReader{
-					records: []dal.Record{dal.NewRecordWithData(dal.NewKeyWithID("Things", "a"), &struct{}{})},
+					records: []record.Record{record.NewRecordWithData(record.NewKeyWithID("Things", "a"), &struct{}{})},
 					err:     io.ErrUnexpectedEOF,
 					errAt:   1,
 				}
@@ -127,7 +127,7 @@ func TestReaderToSeq_ClosesOnAllPaths(t *testing.T) {
 		},
 	}
 
-	idOf := func(_ dal.Record) (string, error) { return "a", nil }
+	idOf := func(_ record.Record) (string, error) { return "a", nil }
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

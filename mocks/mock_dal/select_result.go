@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // SelectResult is a helper class that can be used in test definitions (TT)
@@ -23,7 +24,7 @@ var _ dal.Reader = (*recordReader)(nil)
 type recordReader struct {
 	i       int
 	delay   time.Duration
-	records []dal.Record
+	records []record.Record
 }
 
 func (reader *recordReader) Close() error {
@@ -36,7 +37,7 @@ func (reader *recordReader) Cursor() (string, error) {
 	return "", nil
 }
 
-func (reader *recordReader) Next() (record dal.Record, err error) {
+func (reader *recordReader) Next() (record record.Record, err error) {
 	if reader.i == -1 {
 		return nil, errors.New("reader is closed")
 	}
@@ -52,6 +53,6 @@ func (reader *recordReader) Next() (record dal.Record, err error) {
 }
 
 // NewRecordsReader creates a reader that returns given records
-func NewRecordsReader(delay time.Duration, records ...dal.Record) dal.RecordsReader {
+func NewRecordsReader(delay time.Duration, records ...record.Record) dal.RecordsReader {
 	return &recordReader{delay: delay, records: records}
 }

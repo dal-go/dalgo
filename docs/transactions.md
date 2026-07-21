@@ -49,7 +49,7 @@ sequenceDiagram
 ```go
 // ❌ Without transaction: race condition possible
 user := &User{}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 db.Get(ctx, record)
 user.Balance += 100  // Another process might modify balance here
 db.Set(ctx, record)  // Might overwrite other changes!
@@ -57,7 +57,7 @@ db.Set(ctx, record)  // Might overwrite other changes!
 // ✅ With transaction: atomic operation
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
     user := &User{}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     if err := tx.Get(ctx, record); err != nil {
         return err
@@ -79,12 +79,12 @@ Read-only transactions provide consistent snapshots of data.
 ```go
 err := db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
     // All reads see consistent snapshot
-    record1 := dal.NewRecordWithData(key1, &User{})
+    record1 := record.NewRecordWithData(key1, &User{})
     if err := tx.Get(ctx, record1); err != nil {
         return err
     }
     
-    record2 := dal.NewRecordWithData(key2, &User{})
+    record2 := record.NewRecordWithData(key2, &User{})
     if err := tx.Get(ctx, record2); err != nil {
         return err
     }
@@ -129,8 +129,8 @@ func GetRelatedData(ctx context.Context, db dal.DB, userID string) (*UserData, e
     
     err := db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
         // Get user
-        userKey := dal.NewKeyWithID("users", userID)
-        userRecord := dal.NewRecordWithData(userKey, &userData.User)
+        userKey := record.NewKeyWithID("users", userID)
+        userRecord := record.NewRecordWithData(userKey, &userData.User)
         if err := tx.Get(ctx, userRecord); err != nil {
             return err
         }
@@ -138,8 +138,8 @@ func GetRelatedData(ctx context.Context, db dal.DB, userID string) (*UserData, e
         // Get user's posts (consistent with user data)
         query := dal.From(dal.CollectionRef{Name: "posts"}).
             WhereField("user_id", dal.Equal, userID).
-            SelectIntoRecord(func() dal.Record {
-                return dal.NewRecordWithIncompleteKey("posts", reflect.String, &Post{})
+            SelectIntoRecord(func() record.Record {
+                return record.NewRecordWithIncompleteKey("posts", reflect.String, &Post{})
             })
         
         reader, err := tx.ExecuteQueryToRecordsReader(ctx, query)
@@ -182,7 +182,7 @@ Read-write transactions allow both reading and modifying data atomically.
 ```go
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
     // Read
-    record := dal.NewRecordWithData(key, &User{})
+    record := record.NewRecordWithData(key, &User{})
     if err := tx.Get(ctx, record); err != nil {
         return err
     }
@@ -202,8 +202,8 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 func TransferBalance(ctx context.Context, db dal.DB, fromID, toID string, amount float64) error {
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         // Get sender account
-        fromKey := dal.NewKeyWithID("accounts", fromID)
-        fromRecord := dal.NewRecordWithData(fromKey, &Account{})
+        fromKey := record.NewKeyWithID("accounts", fromID)
+        fromRecord := record.NewRecordWithData(fromKey, &Account{})
         if err := tx.Get(ctx, fromRecord); err != nil {
             return fmt.Errorf("failed to get sender account: %w", err)
         }
@@ -215,8 +215,8 @@ func TransferBalance(ctx context.Context, db dal.DB, fromID, toID string, amount
         }
         
         // Get receiver account
-        toKey := dal.NewKeyWithID("accounts", toID)
-        toRecord := dal.NewRecordWithData(toKey, &Account{})
+        toKey := record.NewKeyWithID("accounts", toID)
+        toRecord := record.NewRecordWithData(toKey, &Account{})
         if err := tx.Get(ctx, toRecord); err != nil {
             return fmt.Errorf("failed to get receiver account: %w", err)
         }
@@ -249,8 +249,8 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
         CreatedAt: time.Now(),
     }
     
-    key := dal.NewKeyWithID("users", "user123")
-    record := dal.NewRecordWithData(key, user)
+    key := record.NewKeyWithID("users", "user123")
+    record := record.NewRecordWithData(key, user)
     
     // Insert will fail if record already exists
     return tx.Insert(ctx, record)
@@ -261,7 +261,7 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 
 ```go
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-    key := dal.NewKeyWithID("users", "user123")
+    key := record.NewKeyWithID("users", "user123")
     
     // Partial update without reading full record
     updates := []update.Update{
@@ -277,7 +277,7 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 
 ```go
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-    key := dal.NewKeyWithID("users", "user123")
+    key := record.NewKeyWithID("users", "user123")
     return tx.Delete(ctx, key)
 })
 ```
@@ -287,10 +287,10 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 ```go
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
     // Create multiple records
-    records := make([]dal.Record, 0, len(users))
+    records := make([]record.Record, 0, len(users))
     for i, user := range users {
-        key := dal.NewKeyWithID("users", fmt.Sprintf("user%d", i))
-        record := dal.NewRecordWithData(key, user)
+        key := record.NewKeyWithID("users", fmt.Sprintf("user%d", i))
+        record := record.NewRecordWithData(key, user)
         records = append(records, record)
     }
     
@@ -341,14 +341,14 @@ Prevents dirty reads but allows non-repeatable reads:
 err := db.RunReadwriteTransaction(ctx,
     func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         // First read
-        record1 := dal.NewRecordWithData(key, &User{})
+        record1 := record.NewRecordWithData(key, &User{})
         tx.Get(ctx, record1)
         user1 := record1.Data().(*User)
         
         // Another transaction might modify this record here
         
         // Second read might see different data
-        record2 := dal.NewRecordWithData(key, &User{})
+        record2 := record.NewRecordWithData(key, &User{})
         tx.Get(ctx, record2)
         user2 := record2.Data().(*User)
         
@@ -367,12 +367,12 @@ Prevents dirty and non-repeatable reads:
 err := db.RunReadwriteTransaction(ctx,
     func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         // Multiple reads of the same record will return the same data
-        record1 := dal.NewRecordWithData(key, &User{})
+        record1 := record.NewRecordWithData(key, &User{})
         tx.Get(ctx, record1)
         
         // Even if another transaction modifies the record,
         // our subsequent reads will see the same data
-        record2 := dal.NewRecordWithData(key, &User{})
+        record2 := record.NewRecordWithData(key, &User{})
         tx.Get(ctx, record2)
         
         // Guaranteed: record1 data == record2 data
@@ -495,10 +495,10 @@ if err != nil {
 
 ```go
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-    record := dal.NewRecordWithData(key, &User{})
+    record := record.NewRecordWithData(key, &User{})
     
     if err := tx.Get(ctx, record); err != nil {
-        if dal.IsNotFound(err) {
+        if record.IsNotFound(err) {
             // Record doesn't exist, create it
             user := record.Data().(*User)
             user.Name = "New User"
@@ -518,7 +518,7 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 
 ```go
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-    records := []dal.Record{record1, record2, record3}
+    records := []record.Record{record1, record2, record3}
     
     if err := tx.GetMulti(ctx, records); err != nil {
         return err
@@ -527,7 +527,7 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
     // Check individual record errors
     for i, record := range records {
         if err := record.Error(); err != nil {
-            if dal.IsNotFound(err) {
+            if record.IsNotFound(err) {
                 log.Printf("Record %d not found", i)
                 continue
             }
@@ -597,7 +597,7 @@ user := &User{
 validateUser(user) // Do this outside transaction
 
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     return tx.Set(ctx, record)
 })
 
@@ -606,7 +606,7 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
     user := &User{}
     user.Email = normalizeEmail(email) // Do this outside!
     user.PasswordHash = hashPassword(password) // Expensive!
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     return tx.Set(ctx, record)
 })
 ```

@@ -7,6 +7,7 @@ import (
 
 	"github.com/dal-go/dalgo/adapters/dalgo2memory"
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +27,7 @@ func TestCollection_Insert_EndToEnd(t *testing.T) {
 	users := dal.CollectionAt[string, genUser]("e2eusers")
 
 	// Default generator (no options).
-	var k1 *dal.Key
+	var k1 *record.Key
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		k1, err = users.Insert(ctx, tx, genUser{Name: "Alice"})
@@ -41,7 +42,7 @@ func TestCollection_Insert_EndToEnd(t *testing.T) {
 	assert.Equal(t, "Alice", got1.Name)
 
 	// Explicit generator with a custom length.
-	var k2 *dal.Key
+	var k2 *record.Key
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		k2, err = users.Insert(ctx, tx, genUser{Name: "Bob"}, dal.WithRandomStringKey(24, 5))
@@ -63,20 +64,20 @@ func TestSession_Insert_GeneratesViaInsertOption(t *testing.T) {
 	ctx := context.Background()
 	db := dalgo2memory.NewDB()
 
-	var record dal.Record
+	var rec record.Record
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		record = dal.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Alice"})
-		return tx.Insert(ctx, record, dal.WithRandomStringKey(16, 5))
+		rec = record.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Alice"})
+		return tx.Insert(ctx, rec, dal.WithRandomStringKey(16, 5))
 	}))
 
-	id, ok := record.Key().ID.(string)
+	id, ok := rec.Key().ID.(string)
 	require.True(t, ok, "generated id must be a string")
 	require.NotEmpty(t, id)
 	assert.Len(t, id, 16)
 
 	// Retrievable by the generated id.
 	out := &genUser{}
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", id), out)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("users", id), out)))
 	assert.Equal(t, "Alice", out.Name)
 }
 
@@ -89,20 +90,20 @@ func TestSession_Insert_WithAdapterGeneratedID(t *testing.T) {
 	ctx := context.Background()
 	db := dalgo2memory.NewDB()
 
-	var record dal.Record
+	var rec record.Record
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		record = dal.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Alice"})
-		return tx.Insert(ctx, record, dal.WithAdapterGeneratedID())
+		rec = record.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Alice"})
+		return tx.Insert(ctx, rec, dal.WithAdapterGeneratedID())
 	}))
 
-	id, ok := record.Key().ID.(string)
+	id, ok := rec.Key().ID.(string)
 	require.True(t, ok, "generated id must be a string")
 	require.NotEmpty(t, id)
 	assert.Len(t, id, dal.DefaultRandomStringIDLength)
 
 	// Retrievable by the generated id.
 	out := &genUser{}
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", id), out)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("users", id), out)))
 	assert.Equal(t, "Alice", out.Name)
 }
 
@@ -113,18 +114,18 @@ func TestSession_Insert_WithAdapterGeneratedID_ExplicitGeneratorWins(t *testing.
 	ctx := context.Background()
 	db := dalgo2memory.NewDB()
 
-	var record dal.Record
+	var rec record.Record
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		record = dal.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Bob"})
-		return tx.Insert(ctx, record, dal.WithAdapterGeneratedID(), dal.WithRandomStringKey(24, 5))
+		rec = record.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Bob"})
+		return tx.Insert(ctx, rec, dal.WithAdapterGeneratedID(), dal.WithRandomStringKey(24, 5))
 	}))
 
-	id, ok := record.Key().ID.(string)
+	id, ok := rec.Key().ID.(string)
 	require.True(t, ok, "generated id must be a string")
 	assert.Len(t, id, 24, "explicit generator must win over WithAdapterGeneratedID")
 
 	out := &genUser{}
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("users", id), out)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("users", id), out)))
 	assert.Equal(t, "Bob", out.Name)
 }
 
@@ -136,12 +137,12 @@ func TestSession_Insert_GenerationPrecedesStorage_NoNilID(t *testing.T) {
 	db := dalgo2memory.NewDB()
 
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		record := dal.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Alice"})
-		return tx.Insert(ctx, record, dal.WithRandomStringKey(16, 5))
+		rec := record.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Alice"})
+		return tx.Insert(ctx, rec, dal.WithRandomStringKey(16, 5))
 	}))
 
 	// No record was ever stored under a "<nil>" id (fmt.Sprint(nil)).
-	exists, err := db.Exists(ctx, dal.NewKeyWithID("users", "<nil>"))
+	exists, err := db.Exists(ctx, record.NewKeyWithID("users", "<nil>"))
 	require.NoError(t, err)
 	assert.False(t, exists, "no record must be stored under a <nil> id")
 }
@@ -159,19 +160,19 @@ func TestSession_Insert_GeneratorExhaustion(t *testing.T) {
 	// First insert succeeds and occupies the day's id.
 	var firstID any
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		record := dal.NewRecordWithIncompleteKey("days", reflect.String, &genUser{Name: "first"})
-		if err := tx.Insert(ctx, record, gen); err != nil {
+		rec := record.NewRecordWithIncompleteKey("days", reflect.String, &genUser{Name: "first"})
+		if err := tx.Insert(ctx, rec, gen); err != nil {
 			return err
 		}
-		firstID = record.Key().ID
+		firstID = rec.Key().ID
 		return nil
 	}))
 	require.NotNil(t, firstID)
 
 	// Second insert collides on every attempt and must exhaust without persisting.
-	var second dal.Record
+	var second record.Record
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		second = dal.NewRecordWithIncompleteKey("days", reflect.String, &genUser{Name: "second"})
+		second = record.NewRecordWithIncompleteKey("days", reflect.String, &genUser{Name: "second"})
 		return tx.Insert(ctx, second, gen)
 	})
 	require.Error(t, err)
@@ -180,6 +181,6 @@ func TestSession_Insert_GeneratorExhaustion(t *testing.T) {
 
 	// Nothing was overwritten: the first record is intact.
 	out := &genUser{}
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(dal.NewKeyWithID("days", firstID.(string)), out)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("days", firstID.(string)), out)))
 	assert.Equal(t, "first", out.Name)
 }

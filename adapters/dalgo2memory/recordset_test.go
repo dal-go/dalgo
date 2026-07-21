@@ -8,6 +8,7 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,8 +86,8 @@ func TestRecordset_GroupByAggregation(t *testing.T) {
 func TestRecordset_SelectStar(t *testing.T) {
 	db, ctx := seedPeople(t)
 	q := dal.From(dal.NewRootCollectionRef("people", "")).NewQuery().
-		SelectIntoRecord(func() dal.Record {
-			return dal.NewRecordWithIncompleteKey("people", reflect.String, &map[string]any{})
+		SelectIntoRecord(func() record.Record {
+			return record.NewRecordWithIncompleteKey("people", reflect.String, &map[string]any{})
 		})
 	rs := drainRecordset(t, db, ctx, q)
 	require.Equal(t, 2, rs.RowsCount())
@@ -135,10 +136,10 @@ func TestRecordset_ExecutionError(t *testing.T) {
 
 // recordToMap covers every record-body shape.
 func TestRecordToMap(t *testing.T) {
-	key := dal.NewKeyWithID("c", "k1")
+	key := record.NewKeyWithID("c", "k1")
 
-	withData := func(data any) dal.Record {
-		return dal.NewRecordWithData(key, data).SetError(nil)
+	withData := func(data any) record.Record {
+		return record.NewRecordWithData(key, data).SetError(nil)
 	}
 
 	t.Run("map", func(t *testing.T) {
@@ -157,7 +158,7 @@ func TestRecordToMap(t *testing.T) {
 		require.Empty(t, m)
 	})
 	t.Run("nil data exposes key as ID", func(t *testing.T) {
-		m, err := recordToMap(dal.NewRecord(key).SetError(nil))
+		m, err := recordToMap(record.NewRecord(key).SetError(nil))
 		require.NoError(t, err)
 		require.Equal(t, map[string]any{"ID": "k1"}, m)
 	})
@@ -229,8 +230,8 @@ func TestBuildRecordsetReader_ReaderError(t *testing.T) {
 func TestBuildRecordsetReader_RecordConversionError(t *testing.T) {
 	q := dal.From(dal.NewRootCollectionRef("people", "")).NewQuery().
 		SelectColumns(dal.Column{Expression: dal.Field("name")})
-	bad := dal.NewRecordWithData(dal.NewKeyWithID("people", "1"), make(chan int)).SetError(nil)
-	reader := dal.NewRecordsReader([]dal.Record{bad})
+	bad := record.NewRecordWithData(record.NewKeyWithID("people", "1"), make(chan int)).SetError(nil)
+	reader := dal.NewRecordsReader([]record.Record{bad})
 	_, err := buildRecordsetReader(context.Background(), q, reader)
 	require.Error(t, err)
 }
@@ -238,9 +239,9 @@ func TestBuildRecordsetReader_RecordConversionError(t *testing.T) {
 // errRecordsReader is a RecordsReader whose Next always fails.
 type errRecordsReader struct{}
 
-func (errRecordsReader) Next() (dal.Record, error) { return nil, errors.New("boom") }
-func (errRecordsReader) Cursor() (string, error)   { return "", nil }
-func (errRecordsReader) Close() error              { return nil }
+func (errRecordsReader) Next() (record.Record, error) { return nil, errors.New("boom") }
+func (errRecordsReader) Cursor() (string, error)      { return "", nil }
+func (errRecordsReader) Close() error                 { return nil }
 
 // columnNames lists a recordset's column names in order.
 func columnNames(rs recordset.Recordset) []string {

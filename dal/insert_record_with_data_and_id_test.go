@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,10 +16,10 @@ func TestInsertRecordWithDataAndID(t *testing.T) {
 	users := dal.CollectionOf[string, User]()
 
 	// Concrete pointer data.
-	var got dal.RecordWithDataAndID[string, *User]
+	var got record.DataWithID[string, *User]
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
-		got, err = dal.InsertRecordWithDataAndID(ctx, tx, dal.NewKeyWithID("users", "u1"), "u1", &User{Name: "Alice"})
+		got, err = dal.InsertRecordWithDataAndID(ctx, tx, record.NewKeyWithID("users", "u1"), "u1", &User{Name: "Alice"})
 		return err
 	})
 	assert.Equal(t, "u1", got.ID)
@@ -32,7 +33,7 @@ func TestInsertRecordWithDataAndID(t *testing.T) {
 	// pointer — the case Collection.InsertWithID can't serve cleanly.
 	var iface any = &User{Name: "Bob"}
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		_, err := dal.InsertRecordWithDataAndID(ctx, tx, dal.NewKeyWithID("users", "u2"), "u2", iface)
+		_, err := dal.InsertRecordWithDataAndID(ctx, tx, record.NewKeyWithID("users", "u2"), "u2", iface)
 		return err
 	})
 	stored2, err := users.GetData(ctx, db, "u2")
@@ -42,16 +43,16 @@ func TestInsertRecordWithDataAndID(t *testing.T) {
 	// Insert error path: inserting again at an existing id surfaces the session
 	// Insert error.
 	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		_, e := dal.InsertRecordWithDataAndID(ctx, tx, dal.NewKeyWithID("users", "u1"), "u1", &User{Name: "Dup"})
+		_, e := dal.InsertRecordWithDataAndID(ctx, tx, record.NewKeyWithID("users", "u1"), "u1", &User{Name: "Dup"})
 		return e
 	})
 	require.Error(t, err)
 
 	// Invalid data (not a pointer/interface to struct/map) panics via
-	// NewRecordWithDataAndID.
+	// record.NewDataWithID.
 	assert.Panics(t, func() {
 		_ = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-			_, e := dal.InsertRecordWithDataAndID(ctx, tx, dal.NewKeyWithID("users", "u3"), "u3", User{})
+			_, e := dal.InsertRecordWithDataAndID(ctx, tx, record.NewKeyWithID("users", "u3"), "u3", User{})
 			return e
 		})
 	})

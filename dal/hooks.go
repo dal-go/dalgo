@@ -3,6 +3,8 @@ package dal
 import (
 	"context"
 	"fmt"
+
+	"github.com/dal-go/record"
 )
 
 type ValidatableRecord interface {
@@ -11,14 +13,14 @@ type ValidatableRecord interface {
 
 var beforeSafeHooks []RecordHook
 
-func BeforeSave(ctx context.Context, db DB, record Record) error {
+func BeforeSave(ctx context.Context, db DB, record record.Record) error {
 	if err := beforeSafe(ctx, db, record); err != nil {
 		return err
 	}
 	return callRecordHooks(ctx, record, beforeSafeHooks)
 }
 
-func callRecordHooks(ctx context.Context, record Record, hooks []RecordHook) error {
+func callRecordHooks(ctx context.Context, record record.Record, hooks []RecordHook) error {
 	//errs := make([]error, 0, len(hooks))
 	for _, hook := range hooks {
 		if err := hook(ctx, record); err != nil {
@@ -31,7 +33,7 @@ func callRecordHooks(ctx context.Context, record Record, hooks []RecordHook) err
 	return nil
 }
 
-func beforeSafe(_ context.Context, _ DB, record Record) error {
+func beforeSafe(_ context.Context, _ DB, record record.Record) error {
 	data := record.Data()
 	if validatable, ok := data.(ValidatableRecord); ok {
 		if err := validatable.Validate(); err != nil {

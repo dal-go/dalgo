@@ -1,6 +1,9 @@
 package dal
 
-import "github.com/dal-go/dalgo/recordset"
+import (
+	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
+)
 
 type Reader interface {
 	// Cursor points to a position in the result set. This can be used for pagination.
@@ -10,12 +13,12 @@ type Reader interface {
 	Close() error
 }
 
-// RecordsReader reads records one by one into Record
+// RecordsReader reads records one by one into record.Record
 type RecordsReader interface {
 	Reader
 	// Next returns the next record for a query.
 	// If no more records, a nil record and ErrNoMoreRecords are returned.
-	Next() (Record, error)
+	Next() (record.Record, error)
 }
 
 // RecordsetReader reads records one by one into recordset.Recordset

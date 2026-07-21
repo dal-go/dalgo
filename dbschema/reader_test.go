@@ -7,6 +7,7 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,11 +34,11 @@ func (s *stubDB) RunReadonlyTransaction(_ context.Context, _ dal.ROTxWorker, _ .
 func (s *stubDB) RunReadwriteTransaction(_ context.Context, _ dal.RWTxWorker, _ ...dal.TransactionOption) error {
 	return errors.New("not used in tests")
 }
-func (s *stubDB) Get(_ context.Context, _ dal.Record) error { return errors.New("not used") }
-func (s *stubDB) Exists(_ context.Context, _ *dal.Key) (bool, error) {
+func (s *stubDB) Get(_ context.Context, _ record.Record) error { return errors.New("not used") }
+func (s *stubDB) Exists(_ context.Context, _ *record.Key) (bool, error) {
 	return false, errors.New("not used")
 }
-func (s *stubDB) GetMulti(_ context.Context, _ []dal.Record) error { return errors.New("not used") }
+func (s *stubDB) GetMulti(_ context.Context, _ []record.Record) error { return errors.New("not used") }
 func (s *stubDB) ExecuteQueryToRecordsReader(_ context.Context, _ dal.Query) (dal.RecordsReader, error) {
 	return nil, errors.New("not used")
 }
@@ -51,7 +52,7 @@ type recordingReader struct {
 	lastArg any
 }
 
-func (r *recordingReader) ListCollections(_ context.Context, parent *dal.Key) ([]dal.CollectionRef, error) {
+func (r *recordingReader) ListCollections(_ context.Context, parent *record.Key) ([]dal.CollectionRef, error) {
 	r.lastOp = "ListCollections"
 	r.lastArg = parent
 	return nil, nil

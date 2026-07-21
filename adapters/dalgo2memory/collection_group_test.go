@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,25 +14,25 @@ type cgItem struct {
 	Name string `json:"name"`
 }
 
-func cgKey(space, id string) *dal.Key {
-	return dal.NewKeyWithParentAndID(dal.NewKeyWithID("spaces", space), "items", id)
+func cgKey(space, id string) *record.Key {
+	return record.NewKeyWithParentAndID(record.NewKeyWithID("spaces", space), "items", id)
 }
 
 func cgSeed(t *testing.T, db dal.DB, space, id, name string) {
 	t.Helper()
-	rec := dal.NewRecordWithData(cgKey(space, id), &cgItem{Name: name})
+	rec := record.NewRecordWithData(cgKey(space, id), &cgItem{Name: name})
 	require.NoError(t, db.RunReadwriteTransaction(context.Background(), func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.Set(ctx, rec)
 	}))
 }
 
-func cgQuery(collection string, parent *dal.Key) dal.Query {
+func cgQuery(collection string, parent *record.Key) dal.Query {
 	ref := dal.NewRootCollectionRef(collection, "")
 	if parent != nil {
 		ref = dal.NewCollectionRef(collection, "", parent)
 	}
-	return dal.From(ref).NewQuery().SelectIntoRecord(func() dal.Record {
-		return dal.NewRecordWithData(dal.NewIncompleteKey(collection, reflect.String, nil), &cgItem{}).SetError(nil)
+	return dal.From(ref).NewQuery().SelectIntoRecord(func() record.Record {
+		return record.NewRecordWithData(record.NewIncompleteKey(collection, reflect.String, nil), &cgItem{}).SetError(nil)
 	})
 }
 
@@ -68,7 +69,7 @@ func TestParentScopedQueryFiltersByParent(t *testing.T) {
 	cgSeed(t, db, "spaceA", "i1", "a1")
 	cgSeed(t, db, "spaceB", "i2", "b2")
 
-	parentA := dal.NewKeyWithID("spaces", "spaceA")
+	parentA := record.NewKeyWithID("spaces", "spaceA")
 	records, err := dal.ExecuteQueryAndReadAllToRecords(ctx, cgQuery("items", parentA), db)
 	require.NoError(t, err)
 	require.Len(t, records, 1)
@@ -79,7 +80,7 @@ func TestParentScopedQueryFiltersByParent(t *testing.T) {
 func cgGet(t *testing.T, db dal.DB, space, id string) (*cgItem, error) {
 	t.Helper()
 	got := &cgItem{}
-	rec := dal.NewRecordWithData(cgKey(space, id), got)
+	rec := record.NewRecordWithData(cgKey(space, id), got)
 	err := db.RunReadonlyTransaction(context.Background(), func(ctx context.Context, tx dal.ReadTransaction) error {
 		return tx.Get(ctx, rec)
 	})
@@ -126,7 +127,7 @@ func TestSameLeafIdDifferentParentsDoNotCollide(t *testing.T) {
 	_, err = cgGet(t, db, "spaceA", "i1")
 	require.NoError(t, err)
 	_, err = cgGet(t, db, "spaceB", "i1")
-	require.True(t, dal.IsNotFound(err))
+	require.True(t, record.IsNotFound(err))
 }
 
 // The columnar engine must also keep same-leaf-id-across-parents distinct, and
@@ -139,7 +140,7 @@ func TestColumnarSameLeafIdSurvivesCompaction(t *testing.T) {
 	))
 	seed := func(space, id, name string) {
 		require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-			return tx.Set(ctx, dal.NewRecordWithData(cgKey(space, id), &cgItem{Name: name}))
+			return tx.Set(ctx, record.NewRecordWithData(cgKey(space, id), &cgItem{Name: name}))
 		}))
 	}
 	seed("spaceA", "i1", "a1")
@@ -162,19 +163,19 @@ func TestColumnarSameLeafIdSurvivesCompaction(t *testing.T) {
 
 func TestKeyIDRootAndNested(t *testing.T) {
 	// Root-level key keeps the bare leaf id (backward compatible).
-	require.Equal(t, "i1", keyID(dal.NewKeyWithID("items", "i1")))
+	require.Equal(t, "i1", keyID(record.NewKeyWithID("items", "i1")))
 	// Nested key uses the full parent-chain path so it is globally unique.
 	require.Equal(t, "spaces/spaceA/items/i1", keyID(cgKey("spaceA", "i1")))
 }
 
 func TestIsChildOf(t *testing.T) {
-	space := dal.NewKeyWithID("spaces", "s")
-	child := dal.NewKeyWithParentAndID(space, "items", "i1")
-	require.False(t, isChildOf(nil, space))                                 // nil key
-	require.False(t, isChildOf(child, nil))                                 // nil parent
-	require.False(t, isChildOf(dal.NewKeyWithID("items", "i1"), space))     // key has no parent
-	require.False(t, isChildOf(child, dal.NewKeyWithID("spaces", "other"))) // different parent
-	require.True(t, isChildOf(child, space))                                // match
+	space := record.NewKeyWithID("spaces", "s")
+	child := record.NewKeyWithParentAndID(space, "items", "i1")
+	require.False(t, isChildOf(nil, space))                                    // nil key
+	require.False(t, isChildOf(child, nil))                                    // nil parent
+	require.False(t, isChildOf(record.NewKeyWithID("items", "i1"), space))     // key has no parent
+	require.False(t, isChildOf(child, record.NewKeyWithID("spaces", "other"))) // different parent
+	require.True(t, isChildOf(child, space))                                   // match
 }
 
 func TestColumnarSlotKeyOutOfRange(t *testing.T) {

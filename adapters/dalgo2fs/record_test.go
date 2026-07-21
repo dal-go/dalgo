@@ -5,19 +5,19 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewFileRecord(t *testing.T) {
-	key := dal.NewKeyWithID("test-collection", "test-id")
+	key := record.NewKeyWithID("test-collection", "test-id")
 	record := NewFileRecord(key)
 	assert.NotNil(t, record)
 	assert.Equal(t, key, record.Key())
 }
 
 func TestFileRecord_Key(t *testing.T) {
-	key := dal.NewKeyWithID("test-collection", "test-id")
+	key := record.NewKeyWithID("test-collection", "test-id")
 	record := &fileRecord{key: key}
 	assert.Equal(t, key, record.Key())
 }
@@ -46,13 +46,13 @@ func TestFileRecord_Exists(t *testing.T) {
 }
 
 func TestFileRecord_SetError(t *testing.T) {
-	record := &fileRecord{}
+	fileRec := &fileRecord{}
 	err := errors.New("test error")
-	record.SetError(err)
-	assert.Equal(t, err, record.Error())
+	fileRec.SetError(err)
+	assert.Equal(t, err, fileRec.Error())
 
-	record.SetError(nil)
-	assert.Equal(t, dal.ErrNoError, record.Error())
+	fileRec.SetError(nil)
+	assert.Equal(t, record.ErrNoError, fileRec.Error())
 }
 
 func TestFileRecord_Data(t *testing.T) {

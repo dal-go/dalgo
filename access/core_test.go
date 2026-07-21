@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 func TestOperationsComplete(t *testing.T) {
@@ -58,8 +58,8 @@ type signedID int32
 type unsignedID uint16
 
 func TestResourcesAndPatternsComplete(t *testing.T) {
-	parent := dal.NewKeyWithID("spaces", stringID("a/b"))
-	key := dal.NewKeyWithParentAndID(parent, "ext", signedID(7))
+	parent := record.NewKeyWithID("spaces", stringID("a/b"))
+	key := record.NewKeyWithParentAndID(parent, "ext", signedID(7))
 	for _, tc := range []struct {
 		r    Resource
 		kind ResourceKind
@@ -134,17 +134,17 @@ func TestPolicyHierarchyErrorsAndAudit(t *testing.T) {
 		t.Fatal("identity")
 	}
 	ctx := context.Background()
-	mine := RecordResourceForKey(dal.NewKeyWithParentAndID(dal.NewKeyWithID("spaces", "one"), "ext", "mine"))
+	mine := RecordResourceForKey(record.NewKeyWithParentAndID(record.NewKeyWithID("spaces", "one"), "ext", "mine"))
 	if d := p.Decide(ctx, Request{Operation: Get, Resources: []Resource{mine}}); !d.Allowed || d.Rule != "mine" {
 		t.Fatalf("allow: %+v", d)
 	}
-	if d := p.Decide(ctx, Request{Operation: Delete, Resources: []Resource{RecordResourceForKey(dal.NewKeyWithID("spaces", "one"))}}); d.Allowed || d.Rule != "specific-deny" {
+	if d := p.Decide(ctx, Request{Operation: Delete, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("spaces", "one"))}}); d.Allowed || d.Rule != "specific-deny" {
 		t.Fatalf("deny %+v", d)
 	}
 	if !p.Decide(ctx, Request{Operation: Query, Resources: []Resource{CollectionGroup("events")}}).Allowed || !p.Decide(ctx, Request{Operation: Query, Resources: []Resource{OpaqueQuery("q")}}).Allowed {
 		t.Fatal("special")
 	}
-	for _, req := range []Request{{Operation: Read}, {Operation: Get}, {Operation: Get, Resources: []Resource{mine, RecordResourceForKey(dal.NewKeyWithID("root", "x"))}}} {
+	for _, req := range []Request{{Operation: Read}, {Operation: Get}, {Operation: Get, Resources: []Resource{mine, RecordResourceForKey(record.NewKeyWithID("root", "x"))}}} {
 		d := p.Decide(ctx, req)
 		if d.Allowed {
 			t.Fatalf("should deny %+v", d)
@@ -166,13 +166,13 @@ func TestPolicyHierarchyErrorsAndAudit(t *testing.T) {
 	if a.Name() != "audit" || a.Source() != "" {
 		t.Fatal("audit identity")
 	}
-	if !a.Classify(ctx, Request{Operation: Insert, Resources: []Resource{RecordResourceForKey(dal.NewKeyWithID("users", "u"))}}).Audit {
+	if !a.Classify(ctx, Request{Operation: Insert, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("users", "u"))}}).Audit {
 		t.Fatal("audit")
 	}
-	if a.Classify(ctx, Request{Operation: Insert, Resources: []Resource{RecordResourceForKey(dal.NewKeyWithID("audit", "a"))}}).Audit {
+	if a.Classify(ctx, Request{Operation: Insert, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("audit", "a"))}}).Audit {
 		t.Fatal("ignore")
 	}
-	for _, r := range []Request{{Operation: Read}, {Operation: Get}, {Operation: Get, Resources: []Resource{RecordResourceForKey(dal.NewKeyWithID("x", "1"))}}} {
+	for _, r := range []Request{{Operation: Read}, {Operation: Get}, {Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("x", "1"))}}} {
 		_ = a.Classify(ctx, r)
 	}
 	defer func() {

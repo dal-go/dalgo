@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 type failingCodec struct{ decode, encode error }
@@ -141,19 +142,19 @@ func TestRemainingCoreBranches(t *testing.T) {
 	_ = resourceDescription(OpaqueQueryResource, "", PathPattern{})
 	// Exercise literal and lexical tie breakers as well as the no-match path.
 	p := MustPolicy("ties", Scope("x", AnyID, Allow(Get, "z")), Scope("x", "one", Allow(Get, "b"), Allow(Get, "a")))
-	if d := p.Decide(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(dal.NewKeyWithID("x", "one"))}}); d.Rule != "a" {
+	if d := p.Decide(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("x", "one"))}}); d.Rule != "a" {
 		t.Fatal(d)
 	}
-	if err := p.Authorize(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(dal.NewKeyWithID("x", "one"))}}); err != nil {
+	if err := p.Authorize(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("x", "one"))}}); err != nil {
 		t.Fatal(err)
 	}
-	if MustPolicy("none").Decide(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(dal.NewKeyWithID("x", "1"))}}).Allowed {
+	if MustPolicy("none").Decide(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("x", "1"))}}).Allowed {
 		t.Fatal()
 	}
-	_ = MustPolicy("tie-deny", Root(Allow(Get, "a"), Deny(Get, "d"))).Decide(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(dal.NewKeyWithID("x", "1"))}})
+	_ = MustPolicy("tie-deny", Root(Allow(Get, "a"), Deny(Get, "d"))).Decide(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("x", "1"))}})
 	badPattern := PathPattern{segments: []pathSegment{{kind: idSegment, value: "x"}}}
 	_ = patternsMatch(badPattern, CollectionResourceFor(nil, "x"))
-	_ = patternsMatch(Path("x", "no"), RecordResourceForKey(dal.NewKeyWithID("x", "yes")))
+	_ = patternsMatch(Path("x", "no"), RecordResourceForKey(record.NewKeyWithID("x", "yes")))
 	_, _ = NewPolicy("bad", CollectionGroupScope("g", OpaqueQueryScope(Allow(Query))))
 	var unknown dal.RecordsetSource
 	_ = resourceForRecordsetSource(unknown)
@@ -161,10 +162,10 @@ func TestRemainingCoreBranches(t *testing.T) {
 
 func TestAllSessionFailureBranches(t *testing.T) {
 	ctx := context.Background()
-	key := dal.NewKeyWithID("x", "1")
-	r := dal.NewRecord(key)
-	rs := []dal.Record{r}
-	ks := []*dal.Key{key}
+	key := record.NewKeyWithID("x", "1")
+	r := record.NewRecord(key)
+	rs := []record.Record{r}
+	ks := []*record.Key{key}
 	q := opaqueQ{}
 	for _, policy := range []*AccessPolicy{MustPolicy("deny", Root(Deny(ReadWrite, "no")), OpaqueQueryScope(Deny(Query, "noq"))), MustPolicy("allow", Root(Allow(ReadWrite, "yes")), OpaqueQueryScope(Allow(Query, "yesq")))} {
 		f := &fakeSession{}

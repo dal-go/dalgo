@@ -3,8 +3,8 @@ package dalgo2memory
 import (
 	"fmt"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 )
 
 // storageEngine is the internal, per-collection storage seam. It owns how one
@@ -22,11 +22,11 @@ type storageEngine interface {
 
 	// store writes the record's decoded data under id. When overwrite is false
 	// and a record with that id already exists, it returns a duplicate error.
-	store(id string, record dal.Record, overwrite bool) error
+	store(id string, record record.Record, overwrite bool) error
 
 	// load reads the record stored under id into the caller-provided record.
 	// It returns a not-found error when no record with that id is stored.
-	load(id string, record dal.Record) error
+	load(id string, record record.Record) error
 
 	// delete removes the record stored under id, if any.
 	delete(id string)
@@ -53,7 +53,7 @@ type engineRow struct {
 	id          string
 	data        map[string]any
 	materialize func(target any) error
-	key         *dal.Key
+	key         *record.Key
 }
 
 // applyUpdatesToMap applies a slice of Update values to a flat-or-nested

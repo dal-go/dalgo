@@ -1,9 +1,10 @@
 package recordset
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewTypedColumn_Options(t *testing.T) {

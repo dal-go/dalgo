@@ -3,6 +3,8 @@ package dal
 import (
 	"context"
 	"reflect"
+
+	"github.com/dal-go/record"
 )
 
 type Query interface {
@@ -48,7 +50,7 @@ type StructuredQuery interface {
 	Columns() []Column
 
 	// IntoRecord provides a function that creates a record for a new row
-	IntoRecord() Record // TODO: Should this be moved into Query.GetRecordsReader ?
+	IntoRecord() record.Record // TODO: Should this be moved into Query.GetRecordsReader ?
 
 	// IDKind defines the type of the ID
 	IDKind() reflect.Kind // TODO: what about composite keys?

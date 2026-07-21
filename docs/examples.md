@@ -30,7 +30,7 @@ import (
     "time"
     
     "github.com/dal-go/dalgo/dal"
-    "github.com/dal-go/dalgo/update"
+    "github.com/dal-go/record/update"
 )
 
 type User struct {
@@ -71,8 +71,8 @@ func CreateUser(ctx context.Context, db dal.DB, user *User) error {
     user.CreatedAt = now
     user.UpdatedAt = now
     
-    key := dal.NewKeyWithID("users", user.ID)
-    record := dal.NewRecordWithData(key, user)
+    key := record.NewKeyWithID("users", user.ID)
+    record := record.NewRecordWithData(key, user)
     
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         return tx.Insert(ctx, record)
@@ -84,12 +84,12 @@ func CreateUser(ctx context.Context, db dal.DB, user *User) error {
 
 ```go
 func GetUser(ctx context.Context, db dal.DB, userID string) (*User, error) {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     user := &User{}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     err := db.Get(ctx, record)
-    if dal.IsNotFound(err) {
+    if record.IsNotFound(err) {
         return nil, fmt.Errorf("user %s not found", userID)
     }
     if err != nil {
@@ -110,8 +110,8 @@ func UpdateUser(ctx context.Context, db dal.DB, user *User) error {
     
     user.UpdatedAt = time.Now()
     
-    key := dal.NewKeyWithID("users", user.ID)
-    record := dal.NewRecordWithData(key, user)
+    key := record.NewKeyWithID("users", user.ID)
+    record := record.NewRecordWithData(key, user)
     
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         return tx.Set(ctx, record)
@@ -120,7 +120,7 @@ func UpdateUser(ctx context.Context, db dal.DB, user *User) error {
 
 // Partial update (only specific fields)
 func UpdateUserEmail(ctx context.Context, db dal.DB, userID, newEmail string) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     updates := []update.Update{
         update.ByFieldName("email", newEmail),
         update.ByFieldName("updated_at", time.Now()),
@@ -136,7 +136,7 @@ func UpdateUserEmail(ctx context.Context, db dal.DB, userID, newEmail string) er
 
 ```go
 func DeleteUser(ctx context.Context, db dal.DB, userID string) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         return tx.Delete(ctx, key)
@@ -151,8 +151,8 @@ func ListUsers(ctx context.Context, db dal.DB, limit int) ([]*User, error) {
     query := dal.From(dal.CollectionRef{Name: "users"}).
         OrderBy(dal.Ascending("created_at")).
         Limit(limit).
-        SelectIntoRecord(func() dal.Record {
-            return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+        SelectIntoRecord(func() record.Record {
+            return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
         })
     
     reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
@@ -182,8 +182,8 @@ func FindUserByEmail(ctx context.Context, db dal.DB, email string) (*User, error
     query := dal.From(dal.CollectionRef{Name: "users"}).
         WhereField("email", dal.Equal, email).
         Limit(1).
-        SelectIntoRecord(func() dal.Record {
-            return dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+        SelectIntoRecord(func() record.Record {
+            return record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
         })
     
     reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
@@ -237,8 +237,8 @@ type Comment struct {
 func CreatePost(ctx context.Context, db dal.DB, post *Post) error {
     post.CreatedAt = time.Now()
     
-    key := dal.NewKeyWithID("posts", post.ID)
-    record := dal.NewRecordWithData(key, post)
+    key := record.NewKeyWithID("posts", post.ID)
+    record := record.NewRecordWithData(key, post)
     
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         return tx.Insert(ctx, record)
@@ -250,9 +250,9 @@ func AddComment(ctx context.Context, db dal.DB, postID string, comment *Comment)
     comment.CreatedAt = time.Now()
     
     // Hierarchical key: posts/{postID}/comments/{commentID}
-    postKey := dal.NewKeyWithID("posts", postID)
-    commentKey := dal.NewKeyWithParentAndID(postKey, "comments", comment.ID)
-    record := dal.NewRecordWithData(commentKey, comment)
+    postKey := record.NewKeyWithID("posts", postID)
+    commentKey := record.NewKeyWithParentAndID(postKey, "comments", comment.ID)
+    record := record.NewRecordWithData(commentKey, comment)
     
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         // Verify post exists
@@ -273,15 +273,15 @@ func AddComment(ctx context.Context, db dal.DB, postID string, comment *Comment)
 
 ```go
 func GetPostComments(ctx context.Context, db dal.DB, postID string) ([]*Comment, error) {
-    postKey := dal.NewKeyWithID("posts", postID)
+    postKey := record.NewKeyWithID("posts", postID)
     
     query := dal.From(dal.CollectionRef{
         Name:   "comments",
         Parent: postKey,
     }).
         OrderBy(dal.Ascending("created_at")).
-        SelectIntoRecord(func() dal.Record {
-            return dal.NewRecordWithIncompleteKey("comments", reflect.String, &Comment{})
+        SelectIntoRecord(func() record.Record {
+            return record.NewRecordWithIncompleteKey("comments", reflect.String, &Comment{})
         })
     
     reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
@@ -346,9 +346,9 @@ func PlaceOrder(ctx context.Context, db dal.DB, order *Order) error {
         // Calculate total and verify stock
         var total float64
         for _, item := range order.Items {
-            productKey := dal.NewKeyWithID("products", item.ProductID)
+            productKey := record.NewKeyWithID("products", item.ProductID)
             product := &Product{}
-            productRecord := dal.NewRecordWithData(productKey, product)
+            productRecord := record.NewRecordWithData(productKey, product)
             
             if err := tx.Get(ctx, productRecord); err != nil {
                 return fmt.Errorf("product %s not found: %w", item.ProductID, err)
@@ -374,8 +374,8 @@ func PlaceOrder(ctx context.Context, db dal.DB, order *Order) error {
         order.Status = "pending"
         order.CreatedAt = time.Now()
         
-        orderKey := dal.NewKeyWithID("orders", order.ID)
-        orderRecord := dal.NewRecordWithData(orderKey, order)
+        orderKey := record.NewKeyWithID("orders", order.ID)
+        orderRecord := record.NewRecordWithData(orderKey, order)
         
         return tx.Insert(ctx, orderRecord)
     })
@@ -388,9 +388,9 @@ func PlaceOrder(ctx context.Context, db dal.DB, order *Order) error {
 func CancelOrder(ctx context.Context, db dal.DB, orderID string) error {
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         // Get order
-        orderKey := dal.NewKeyWithID("orders", orderID)
+        orderKey := record.NewKeyWithID("orders", orderID)
         order := &Order{}
-        orderRecord := dal.NewRecordWithData(orderKey, order)
+        orderRecord := record.NewRecordWithData(orderKey, order)
         
         if err := tx.Get(ctx, orderRecord); err != nil {
             return fmt.Errorf("order not found: %w", err)
@@ -402,7 +402,7 @@ func CancelOrder(ctx context.Context, db dal.DB, orderID string) error {
         
         // Restore stock for all items
         for _, item := range order.Items {
-            productKey := dal.NewKeyWithID("products", item.ProductID)
+            productKey := record.NewKeyWithID("products", item.ProductID)
             updates := []update.Update{
                 update.ByFieldName("stock", update.Increment(item.Quantity)),
             }
@@ -443,14 +443,14 @@ type TenantUser struct {
 ```go
 func CreateTenantUser(ctx context.Context, db dal.DB, user *TenantUser) error {
     // Create composite key
-    fields := []dal.FieldVal{
+    fields := []record.FieldVal{
         {Name: "tenant_id", Value: user.TenantID},
         {Name: "user_id", Value: user.UserID},
     }
-    key := dal.NewKeyWithFields("tenant_users", fields...)
+    key := record.NewKeyWithFields("tenant_users", fields...)
     
     user.CreatedAt = time.Now()
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         return tx.Insert(ctx, record)
@@ -458,17 +458,17 @@ func CreateTenantUser(ctx context.Context, db dal.DB, user *TenantUser) error {
 }
 
 func GetTenantUser(ctx context.Context, db dal.DB, tenantID, userID string) (*TenantUser, error) {
-    fields := []dal.FieldVal{
+    fields := []record.FieldVal{
         {Name: "tenant_id", Value: tenantID},
         {Name: "user_id", Value: userID},
     }
-    key := dal.NewKeyWithFields("tenant_users", fields...)
+    key := record.NewKeyWithFields("tenant_users", fields...)
     
     user := &TenantUser{}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     err := db.Get(ctx, record)
-    if dal.IsNotFound(err) {
+    if record.IsNotFound(err) {
         return nil, fmt.Errorf("user not found in tenant %s", tenantID)
     }
     if err != nil {
@@ -482,8 +482,8 @@ func ListTenantUsers(ctx context.Context, db dal.DB, tenantID string) ([]*Tenant
     query := dal.From(dal.CollectionRef{Name: "tenant_users"}).
         WhereField("tenant_id", dal.Equal, tenantID).
         OrderBy(dal.Ascending("created_at")).
-        SelectIntoRecord(func() dal.Record {
-            return dal.NewRecordWithIncompleteKey("tenant_users", reflect.String, &TenantUser{})
+        SelectIntoRecord(func() record.Record {
+            return record.NewRecordWithIncompleteKey("tenant_users", reflect.String, &TenantUser{})
         })
     
     reader, err := db.ExecuteQueryToRecordsReader(ctx, query)
@@ -516,15 +516,15 @@ func ListTenantUsers(ctx context.Context, db dal.DB, tenantID string) ([]*Tenant
 
 ```go
 // With complete key and data
-key := dal.NewKeyWithID("users", "user123")
-record := dal.NewRecordWithData(key, &User{})
+key := record.NewKeyWithID("users", "user123")
+record := record.NewRecordWithData(key, &User{})
 
 // With incomplete key (for queries)
-record := dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+record := record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
 
 // Hierarchical key
-parentKey := dal.NewKeyWithID("teams", "team456")
-childKey := dal.NewKeyWithParentAndID(parentKey, "members", "member789")
+parentKey := record.NewKeyWithID("teams", "team456")
+childKey := record.NewKeyWithParentAndID(parentKey, "members", "member789")
 ```
 
 ### CRUD Operations

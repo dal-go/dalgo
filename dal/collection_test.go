@@ -9,7 +9,8 @@ import (
 	"github.com/dal-go/dalgo/adapters/dalgo2memory"
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,7 +56,7 @@ func TestCollectionOf_ConstructByConvention(t *testing.T) {
 	users := dal.CollectionOf[string, User]()
 
 	// The handle is a reusable value: insert two records via the same handle.
-	var key1, key2 *dal.Key
+	var key1, key2 *record.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		if key1, err = users.InsertWithID(ctx, tx, "u1", User{Name: "Alice"}); err != nil {
@@ -84,7 +85,7 @@ func TestCollectionAt_ConstructByExplicitName(t *testing.T) {
 
 	things := dal.CollectionAt[string, thing]("things")
 
-	var key *dal.Key
+	var key *record.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		key, err = things.InsertWithID(ctx, tx, "t1", thing{Name: "widget"})
@@ -116,7 +117,7 @@ func TestCollection_GetNotFound(t *testing.T) {
 
 	got, err := users.GetData(ctx, db, "missing")
 	require.Error(t, err)
-	assert.True(t, dal.IsNotFound(err), "error must be a not-found error from the Get call")
+	assert.True(t, record.IsNotFound(err), "error must be a not-found error from the Get call")
 	assert.Equal(t, User{}, got, "must return the zero value on not-found")
 }
 
@@ -138,11 +139,11 @@ func TestCollection_GetRecord(t *testing.T) {
 	// Not-found returns the record together with the not-found error.
 	rec2, err := users.GetRecord(ctx, db, "missing")
 	require.Error(t, err)
-	assert.True(t, dal.IsNotFound(err))
+	assert.True(t, record.IsNotFound(err))
 	require.NotNil(t, rec2)
 
 	// idToKey error path (incomplete parent) propagates as a nil record + error.
-	nested := dal.CollectionOf[string, Contact]().In(dal.NewIncompleteKey("users", reflect.String, nil))
+	nested := dal.CollectionOf[string, Contact]().In(record.NewIncompleteKey("users", reflect.String, nil))
 	rec3, err := nested.GetRecord(ctx, db, "c1")
 	require.Error(t, err)
 	assert.Nil(t, rec3)
@@ -153,10 +154,10 @@ func TestCollection_WithKeyOptions(t *testing.T) {
 	db := newMemoryDB(t)
 
 	// Collection-level key options are applied to every key the handle builds.
-	parent := dal.NewKeyWithID("tenants", "t1")
-	users := dal.CollectionOf[string, User](dal.WithKeyOptions(dal.WithParentKey(parent)))
+	parent := record.NewKeyWithID("tenants", "t1")
+	users := dal.CollectionOf[string, User](dal.WithKeyOptions(record.WithParentKey(parent)))
 
-	var key *dal.Key
+	var key *record.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		key, err = users.InsertWithID(ctx, tx, "u1", User{Name: "Alice"})
@@ -176,7 +177,7 @@ func TestCollection_KeyOptionError(t *testing.T) {
 
 	// A failing collection-level key option is surfaced by every terminal's id
 	// resolution.
-	badOpt := func(*dal.Key) error { return errors.New("boom") }
+	badOpt := func(*record.Key) error { return errors.New("boom") }
 	users := dal.CollectionOf[string, User](dal.WithKeyOptions(badOpt))
 
 	_, err := users.GetData(ctx, db, "u1")
@@ -212,11 +213,11 @@ func TestCollection_AllDistinct(t *testing.T) {
 // is unsupported, used to verify All surfaces dal.ErrNotSupported.
 type unsupportedReadSession struct{}
 
-func (unsupportedReadSession) Get(context.Context, dal.Record) error { return dal.ErrNotSupported }
-func (unsupportedReadSession) Exists(context.Context, *dal.Key) (bool, error) {
+func (unsupportedReadSession) Get(context.Context, record.Record) error { return dal.ErrNotSupported }
+func (unsupportedReadSession) Exists(context.Context, *record.Key) (bool, error) {
 	return false, dal.ErrNotSupported
 }
-func (unsupportedReadSession) GetMulti(context.Context, []dal.Record) error {
+func (unsupportedReadSession) GetMulti(context.Context, []record.Record) error {
 	return dal.ErrNotSupported
 }
 func (unsupportedReadSession) ExecuteQueryToRecordsReader(context.Context, dal.Query) (dal.RecordsReader, error) {
@@ -242,7 +243,7 @@ func TestCollection_InsertGeneratesKey(t *testing.T) {
 	db := newMemoryDB(t)
 	users := dal.CollectionOf[string, User]()
 
-	var key *dal.Key
+	var key *record.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		key, err = users.Insert(ctx, tx, User{Name: "Alice"})
@@ -263,7 +264,7 @@ func TestCollection_InsertWithExplicitOption(t *testing.T) {
 	db := newMemoryDB(t)
 	users := dal.CollectionOf[string, User]()
 
-	var key *dal.Key
+	var key *record.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		key, err = users.Insert(ctx, tx, User{Name: "Alice"}, dal.WithRandomStringKey(20, 5))
@@ -279,28 +280,28 @@ func TestCollection_InsertWithExplicitOption(t *testing.T) {
 // every other method is an unused no-op. It lets us drive Collection.Insert's
 // loud-failure guard and the underlying-insert error path without a real backend.
 type stubWriteSession struct {
-	insert func(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error
+	insert func(ctx context.Context, record record.Record, opts ...dal.InsertOption) error
 }
 
-func (s stubWriteSession) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
+func (s stubWriteSession) Insert(ctx context.Context, record record.Record, opts ...dal.InsertOption) error {
 	return s.insert(ctx, record, opts...)
 }
-func (stubWriteSession) InsertMulti(context.Context, []dal.Record, ...dal.InsertOption) error {
+func (stubWriteSession) InsertMulti(context.Context, []record.Record, ...dal.InsertOption) error {
 	return nil
 }
-func (stubWriteSession) Set(context.Context, dal.Record) error        { return nil }
-func (stubWriteSession) SetMulti(context.Context, []dal.Record) error { return nil }
-func (stubWriteSession) Delete(context.Context, *dal.Key) error       { return nil }
-func (stubWriteSession) DeleteMulti(context.Context, []*dal.Key) error {
+func (stubWriteSession) Set(context.Context, record.Record) error        { return nil }
+func (stubWriteSession) SetMulti(context.Context, []record.Record) error { return nil }
+func (stubWriteSession) Delete(context.Context, *record.Key) error       { return nil }
+func (stubWriteSession) DeleteMulti(context.Context, []*record.Key) error {
 	return nil
 }
-func (stubWriteSession) Update(context.Context, *dal.Key, []update.Update, ...dal.Precondition) error {
+func (stubWriteSession) Update(context.Context, *record.Key, []update.Update, ...dal.Precondition) error {
 	return nil
 }
-func (stubWriteSession) UpdateRecord(context.Context, dal.Record, []update.Update, ...dal.Precondition) error {
+func (stubWriteSession) UpdateRecord(context.Context, record.Record, []update.Update, ...dal.Precondition) error {
 	return nil
 }
-func (stubWriteSession) UpdateMulti(context.Context, []*dal.Key, []update.Update, ...dal.Precondition) error {
+func (stubWriteSession) UpdateMulti(context.Context, []*record.Key, []update.Update, ...dal.Precondition) error {
 	return nil
 }
 
@@ -311,7 +312,7 @@ func TestCollection_InsertLoudFailureOnNonHonoringAdapter(t *testing.T) {
 	users := dal.CollectionOf[string, User]()
 
 	// A WriteSession that ignores InsertOption leaves the key incomplete.
-	dropping := stubWriteSession{insert: func(context.Context, dal.Record, ...dal.InsertOption) error {
+	dropping := stubWriteSession{insert: func(context.Context, record.Record, ...dal.InsertOption) error {
 		return nil // success, but never assigns an id
 	}}
 
@@ -326,7 +327,7 @@ func TestCollection_InsertUnderlyingErrorPassthrough(t *testing.T) {
 	users := dal.CollectionOf[string, User]()
 
 	boom := errors.New("insert failed")
-	failing := stubWriteSession{insert: func(context.Context, dal.Record, ...dal.InsertOption) error {
+	failing := stubWriteSession{insert: func(context.Context, record.Record, ...dal.InsertOption) error {
 		return boom
 	}}
 
@@ -340,7 +341,7 @@ func TestCollection_InsertWithIDReturnsKey(t *testing.T) {
 	db := newMemoryDB(t)
 	users := dal.CollectionOf[string, User]()
 
-	var key *dal.Key
+	var key *record.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		key, err = users.InsertWithID(ctx, tx, "u1", User{Name: "Alice"})
@@ -361,7 +362,7 @@ func TestCollection_InsertRecord(t *testing.T) {
 	users := dal.CollectionOf[string, User]()
 
 	// Direct record insert (the primitive the other inserts delegate to).
-	rec := dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &User{Name: "Alice"})
+	rec := record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &User{Name: "Alice"})
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return users.InsertRecord(ctx, tx, rec)
 	})
@@ -370,8 +371,8 @@ func TestCollection_InsertRecord(t *testing.T) {
 	assert.Equal(t, "Alice", got.Name)
 
 	// guardParent error path: a record whose key has an incomplete parent.
-	badKey := dal.NewKeyWithParentAndID(dal.NewIncompleteKey("users", reflect.String, nil), "contacts", "c1")
-	badRec := dal.NewRecordWithData(badKey, &Contact{Email: "x@example.com"})
+	badKey := record.NewKeyWithParentAndID(record.NewIncompleteKey("users", reflect.String, nil), "contacts", "c1")
+	badRec := record.NewRecordWithData(badKey, &Contact{Email: "x@example.com"})
 	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return users.InsertRecord(ctx, tx, badRec)
 	})
@@ -405,7 +406,7 @@ func TestCollection_SetRecord(t *testing.T) {
 	db := newMemoryDB(t)
 	users := dal.CollectionOf[string, User]()
 
-	rec := dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &User{Name: "Alice"})
+	rec := record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &User{Name: "Alice"})
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return users.SetRecord(ctx, tx, rec)
 	})
@@ -414,8 +415,8 @@ func TestCollection_SetRecord(t *testing.T) {
 	assert.Equal(t, "Alice", got.Name)
 
 	// guardParent error path.
-	badKey := dal.NewKeyWithParentAndID(dal.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
-	badRec := dal.NewRecordWithData(badKey, &User{})
+	badKey := record.NewKeyWithParentAndID(record.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
+	badRec := record.NewRecordWithData(badKey, &User{})
 	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return users.SetRecord(ctx, tx, badRec)
 	})
@@ -450,14 +451,14 @@ func TestCollection_UpdateByKey(t *testing.T) {
 	})
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.UpdateByKey(ctx, tx, dal.NewKeyWithID("users", "u1"), []update.Update{update.ByFieldName("name", "Bob")})
+		return users.UpdateByKey(ctx, tx, record.NewKeyWithID("users", "u1"), []update.Update{update.ByFieldName("name", "Bob")})
 	})
 	got, err := users.GetData(ctx, db, "u1")
 	require.NoError(t, err)
 	assert.Equal(t, "Bob", got.Name)
 
 	// guardParent error path.
-	badKey := dal.NewKeyWithParentAndID(dal.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
+	badKey := record.NewKeyWithParentAndID(record.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
 	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return users.UpdateByKey(ctx, tx, badKey, []update.Update{update.ByFieldName("name", "X")})
 	})
@@ -478,7 +479,7 @@ func TestCollection_DeleteRemoves(t *testing.T) {
 	})
 
 	_, err := users.GetData(ctx, db, "u1")
-	assert.True(t, dal.IsNotFound(err), "record must be gone after Delete")
+	assert.True(t, record.IsNotFound(err), "record must be gone after Delete")
 }
 
 func TestCollection_DeleteByKey(t *testing.T) {
@@ -491,13 +492,13 @@ func TestCollection_DeleteByKey(t *testing.T) {
 	})
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return users.DeleteByKey(ctx, tx, dal.NewKeyWithID("users", "u1"))
+		return users.DeleteByKey(ctx, tx, record.NewKeyWithID("users", "u1"))
 	})
 	_, err := users.GetData(ctx, db, "u1")
-	assert.True(t, dal.IsNotFound(err))
+	assert.True(t, record.IsNotFound(err))
 
 	// guardParent error path.
-	badKey := dal.NewKeyWithParentAndID(dal.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
+	badKey := record.NewKeyWithParentAndID(record.NewIncompleteKey("users", reflect.String, nil), "users", "u2")
 	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return users.DeleteByKey(ctx, tx, badKey)
 	})
@@ -531,14 +532,14 @@ func TestCollection_DeprecatedAliasesDelegate(t *testing.T) {
 		return users.Delete(ctx, tx, "u1") //nolint:staticcheck // exercises deprecated alias
 	})
 	_, err = users.GetData(ctx, db, "u1")
-	assert.True(t, dal.IsNotFound(err))
+	assert.True(t, record.IsNotFound(err))
 }
 
 func TestCollection_NestedGet(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
 
-	parentKey := dal.NewKeyWithID("users", "u1")
+	parentKey := record.NewKeyWithID("users", "u1")
 	contacts := dal.CollectionOf[string, Contact]().In(parentKey)
 
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -559,7 +560,7 @@ func TestCollection_NestedIncompleteParentErrors(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
 
-	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
+	incompleteParent := record.NewIncompleteKey("users", reflect.String, nil)
 	contacts := dal.CollectionOf[string, Contact]().In(incompleteParent)
 
 	assert.NotPanics(t, func() {
@@ -590,7 +591,7 @@ func TestCollection_InsertWithIDDuplicateErrors(t *testing.T) {
 func TestCollection_WriteTerminalsIncompleteParentError(t *testing.T) {
 	ctx := context.Background()
 	db := newMemoryDB(t)
-	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
+	incompleteParent := record.NewIncompleteKey("users", reflect.String, nil)
 	contacts := dal.CollectionOf[string, Contact]().In(incompleteParent)
 
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -660,7 +661,7 @@ func TestCollection_ExistsTrueFalse(t *testing.T) {
 	assert.False(t, exists, "not-found must map to (false, nil)")
 
 	// idToKey error path: incomplete parent.
-	nested := dal.CollectionOf[string, Contact]().In(dal.NewIncompleteKey("users", reflect.String, nil))
+	nested := dal.CollectionOf[string, Contact]().In(record.NewIncompleteKey("users", reflect.String, nil))
 	_, err = nested.Exists(ctx, db, "c1")
 	require.Error(t, err)
 }
@@ -722,7 +723,7 @@ func TestCollection_InsertManyRoundtrips(t *testing.T) {
 	mi, ok := users.(dal.ManyInserter[string, User])
 	require.True(t, ok, "Collection[K, T] value must satisfy dal.ManyInserter[K, T]")
 
-	var keys []*dal.Key
+	var keys []*record.Key
 	write(t, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		var err error
 		keys, err = mi.InsertMany(ctx, tx,
@@ -749,7 +750,7 @@ func TestCollection_InsertManyErrorPaths(t *testing.T) {
 	db := newMemoryDB(t)
 
 	// idToKey error: incomplete parent.
-	incompleteParent := dal.NewIncompleteKey("users", reflect.String, nil)
+	incompleteParent := record.NewIncompleteKey("users", reflect.String, nil)
 	nested := dal.CollectionOf[string, Contact]().In(incompleteParent).(dal.ManyInserter[string, Contact])
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		_, e := nested.InsertMany(ctx, tx, dal.Item[string, Contact]{ID: "c1", Value: Contact{}})

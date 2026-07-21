@@ -9,6 +9,7 @@ import (
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/end2end/models"
 	"github.com/dal-go/dalgo/mocks/mock_dal"
+	"github.com/dal-go/record"
 	"go.uber.org/mock/gomock"
 )
 
@@ -41,17 +42,17 @@ func TestEndToEnd(t *testing.T) {
 
 	db := mock_dal.NewMockDB(dbCtrl)
 
-	keyOnlyRecord := func(collection, id string) dal.Record {
-		return dal.NewRecord(dal.NewKeyWithID(collection, dal.EscapeID(id)))
+	keyOnlyRecord := func(collection, id string) record.Record {
+		return record.NewRecord(record.NewKeyWithID(collection, record.EscapeID(id)))
 	}
 
 	var getNumber int
-	db.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, r dal.Record) error {
+	db.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, r record.Record) error {
 		getNumber++
 		switch getNumber {
 		case 1:
-			r.SetError(dal.ErrRecordNotFound)
-			return dal.ErrRecordNotFound
+			r.SetError(record.ErrRecordNotFound)
+			return record.ErrRecordNotFound
 		case 2:
 			r.SetError(nil)
 			data := r.Data().(*TestData)
@@ -63,7 +64,7 @@ func TestEndToEnd(t *testing.T) {
 	}).Times(2)
 
 	var existsCallNumber int
-	db.EXPECT().Exists(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, key *dal.Key) (bool, error) {
+	db.EXPECT().Exists(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, key *record.Key) (bool, error) {
 		existsCallNumber++
 		switch existsCallNumber {
 		case 1:
@@ -96,7 +97,7 @@ func TestEndToEnd(t *testing.T) {
 				if citiesCount := len(sortedCityIDs); limit == 0 || limit > citiesCount {
 					limit = citiesCount
 				}
-				reader.EXPECT().Next().DoAndReturn(func() (r dal.Record, err error) {
+				reader.EXPECT().Next().DoAndReturn(func() (r record.Record, err error) {
 					if i >= limit {
 						return nil, dal.ErrNoMoreRecords
 					}
@@ -127,21 +128,21 @@ func TestEndToEnd(t *testing.T) {
 		switch txName {
 		case "SELECT * FROM Cities: no_limit":
 			tx.EXPECT().GetRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, query dal.Query) (reader dal.RecordsReader, err error) {
-				records := make([]dal.Record, len(models.Cities))
+				records := make([]record.Record, len(models.Cities))
 				for i, city := range models.Cities {
-					key := dal.NewKeyWithID("c1", city)
-					records[i] = dal.NewRecordWithData(key, &city)
+					key := record.NewKeyWithID("c1", city)
+					records[i] = record.NewRecordWithData(key, &city)
 				}
 				return dal.NewRecordsReader(records), nil
 			})
 		case "SELECT * FROM Cities: limit=3":
 			tx.EXPECT().GetRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, query dal.Query) (reader dal.RecordsReader, err error) {
-				records := make([]dal.Record, 3)
+				records := make([]record.Record, 3)
 				for i, cityID := range models.SortedCityIDs[:3] {
-					key := dal.NewKeyWithID("c1", cityID)
+					key := record.NewKeyWithID("c1", cityID)
 					for _, city := range models.Cities {
 						if models.CityID(city) == cityID {
-							records[i] = dal.NewRecordWithData(key, &city)
+							records[i] = record.NewRecordWithData(key, &city)
 							break
 						}
 					}
@@ -199,22 +200,22 @@ func TestEndToEnd(t *testing.T) {
 			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 			tx.EXPECT().GetRecordsetReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 		case "verify_cleanupDelete":
-			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []dal.Record) error {
-				for _, record := range records {
-					record.SetError(dal.ErrRecordNotFound)
+			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []record.Record) error {
+				for _, rec := range records {
+					rec.SetError(record.ErrRecordNotFound)
 				}
 				return nil
 			}).Times(1)
 			//tx.EXPECT().QueryReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.SortedCityIDs))
 		case "get3NonExistingRecords":
-			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []dal.Record) error {
-				for _, record := range records {
-					record.SetError(dal.ErrRecordNotFound)
+			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []record.Record) error {
+				for _, rec := range records {
+					rec.SetError(record.ErrRecordNotFound)
 				}
 				return nil
 			}).Times(1)
 		case "using_records_with_data":
-			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []dal.Record) error {
+			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []record.Record) error {
 				for _, record := range records {
 					record.SetError(nil)
 					data := record.Data().(*TestData)
@@ -223,7 +224,7 @@ func TestEndToEnd(t *testing.T) {
 				return nil
 			}).Times(1)
 		case "getMulti2existing2missingRecords":
-			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []dal.Record) error {
+			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []record.Record) error {
 				r1 := records[0]
 				r1.SetError(nil)
 				d1 := r1.Data().(*TestData)
@@ -235,15 +236,15 @@ func TestEndToEnd(t *testing.T) {
 				d2.StringProp = "k1r2str"
 
 				r3 := records[2]
-				r3.SetError(dal.ErrRecordNotFound)
+				r3.SetError(record.ErrRecordNotFound)
 
 				r4 := records[3]
-				r4.SetError(dal.ErrRecordNotFound)
+				r4.SetError(record.ErrRecordNotFound)
 
 				return nil
 			}).Times(1)
 		case "getMultiNewRecords":
-			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []dal.Record) error {
+			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []record.Record) error {
 				//t.Log("len(records):", len(records))
 				r1 := records[0]
 				r1.SetError(nil)
@@ -264,10 +265,10 @@ func TestEndToEnd(t *testing.T) {
 			}).Times(1)
 		case "selectAllCities":
 			tx.EXPECT().GetRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, _ dal.Query) (dal.RecordsReader, error) {
-				records := make([]dal.Record, len(models.Cities))
+				records := make([]record.Record, len(models.Cities))
 				for i, city := range models.Cities {
-					key := dal.NewKeyWithID("c1", city)
-					records[i] = dal.NewRecordWithData(key, &city)
+					key := record.NewKeyWithID("c1", city)
+					records[i] = record.NewRecordWithData(key, &city)
 				}
 				return dal.NewRecordsReader(records), nil
 			}).Times(1)

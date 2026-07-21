@@ -7,6 +7,7 @@ import (
 
 	dalgo2memory2 "github.com/dal-go/dalgo/adapters/dalgo2memory"
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -73,10 +74,10 @@ func TestExternalStrategyPluggable(t *testing.T) {
 
 	seed := func(db dal.DB) {
 		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-			records := []dal.Record{
-				dal.NewRecordWithData(dal.NewKeyWithID("users", "u1"), &externalUser{Name: "Alice", Role: "admin"}),
-				dal.NewRecordWithData(dal.NewKeyWithID("users", "u2"), &externalUser{Name: "Bob", Role: "member"}),
-				dal.NewRecordWithData(dal.NewKeyWithID("users", "u3"), &externalUser{Name: "Carol", Role: "admin"}),
+			records := []record.Record{
+				record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &externalUser{Name: "Alice", Role: "admin"}),
+				record.NewRecordWithData(record.NewKeyWithID("users", "u2"), &externalUser{Name: "Bob", Role: "member"}),
+				record.NewRecordWithData(record.NewKeyWithID("users", "u3"), &externalUser{Name: "Carol", Role: "admin"}),
 			}
 			return tx.SetMulti(ctx, records)
 		})

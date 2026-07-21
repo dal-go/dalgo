@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +15,7 @@ func TestNewTextQuery_Basic(t *testing.T) {
 	args := []QueryArg{{Name: "author", Value: "Asimov"}, {Name: "year", Value: 1950}}
 
 	// getKey uses args to build a key deterministically so we can verify it is stored and usable
-	getKey := func(data any, a []QueryArg) *Key {
+	getKey := func(data any, a []QueryArg) *record.Key {
 		// Compose ID from args in order
 		id := ""
 		for i, qa := range a {
@@ -23,7 +24,7 @@ func TestNewTextQuery_Basic(t *testing.T) {
 			}
 			id += qa.Name + "=" + toString(qa.Value)
 		}
-		return NewKeyWithID("queries", id)
+		return record.NewKeyWithID("queries", id)
 	}
 
 	// Act
@@ -67,7 +68,7 @@ func TestTextQuery_Methods(t *testing.T) {
 }
 
 func TestTextQuery_NoArgs(t *testing.T) {
-	tq := NewTextQuery("DELETE FROM t WHERE 1=1", func(data any, args []QueryArg) *Key { return nil })
+	tq := NewTextQuery("DELETE FROM t WHERE 1=1", func(data any, args []QueryArg) *record.Key { return nil })
 	assert.NotNil(t, tq)
 	assert.Equal(t, 0, len(tq.Args()))
 }

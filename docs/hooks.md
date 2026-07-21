@@ -51,7 +51,7 @@ func (u *User) Validate() error {
 
 // Usage
 user := &User{Name: "Alice", Email: "alice@example.com", Age: 30}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
     // Validate() is called automatically before Set
@@ -104,7 +104,7 @@ Some records need to validate against their key:
 
 ```go
 type ValidatableWithKey interface {
-    ValidateWithKey(*dal.Key) error
+    ValidateWithKey(*record.Key) error
 }
 
 type Post struct {
@@ -114,7 +114,7 @@ type Post struct {
     Content string
 }
 
-func (p *Post) ValidateWithKey(key *dal.Key) error {
+func (p *Post) ValidateWithKey(key *record.Key) error {
     // Ensure ID in data matches key
     if key.ID != p.ID {
         return fmt.Errorf("ID mismatch: key=%s, data=%s", key.ID, p.ID)
@@ -167,7 +167,7 @@ if err != nil {
 Define custom record hooks:
 
 ```go
-type RecordHook func(ctx context.Context, record dal.Record) error
+type RecordHook func(ctx context.Context, record record.Record) error
 
 // Register custom hooks
 var customHooks []dal.RecordHook
@@ -176,7 +176,7 @@ func init() {
     customHooks = append(customHooks, timestampHook, auditLogHook)
 }
 
-func timestampHook(ctx context.Context, record dal.Record) error {
+func timestampHook(ctx context.Context, record record.Record) error {
     // Add timestamp to records
     data := record.Data()
     if timestamped, ok := data.(interface{ SetUpdatedAt(time.Time) }); ok {
@@ -185,7 +185,7 @@ func timestampHook(ctx context.Context, record dal.Record) error {
     return nil
 }
 
-func auditLogHook(ctx context.Context, record dal.Record) error {
+func auditLogHook(ctx context.Context, record record.Record) error {
     // Log all database operations
     log.Printf("Operation on record: %s", record.Key())
     return nil
@@ -208,7 +208,7 @@ type dbWithHooks struct {
     hooks []dal.RecordHook
 }
 
-func (db *dbWithHooks) Set(ctx context.Context, record dal.Record) error {
+func (db *dbWithHooks) Set(ctx context.Context, record record.Record) error {
     // Run hooks before operation
     for _, hook := range db.hooks {
         if err := hook(ctx, record); err != nil {

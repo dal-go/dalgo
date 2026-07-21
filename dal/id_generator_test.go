@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dal-go/record"
 )
 
 func TestWithRandomStringKey(t *testing.T) {
@@ -52,7 +54,7 @@ func getID(t *testing.T, idLen, maxAttempts int, f func(length, maxAttempts int)
 		t.Errorf("WithRandomStringKeyPrefixedByUnixTime() insertOptions.idGen = nil")
 	}
 	data := struct{}{}
-	rec := NewRecordWithIncompleteKey("recordsetSource", reflect.String, &data)
+	rec := record.NewRecordWithIncompleteKey("recordsetSource", reflect.String, &data)
 	if err := idGen(context.Background(), rec); err != nil {
 		t.Fatalf("idGen returend errr: %v", err)
 	}
@@ -139,14 +141,14 @@ func TestIdGenerator_GenerateID(t *testing.T) {
 			generator := &idGenerator{
 				maxAttempts: tt.maxAttempts,
 				attempts:    0,
-				f: func(ctx context.Context, record Record) error {
+				f: func(ctx context.Context, record record.Record) error {
 					record.Key().ID = "test-id"
 					return nil
 				},
 			}
 
 			data := struct{}{}
-			rec := NewRecordWithIncompleteKey("test", reflect.String, &data)
+			rec := record.NewRecordWithIncompleteKey("test", reflect.String, &data)
 
 			err := generator.GenerateID(context.Background(), rec)
 
@@ -236,7 +238,7 @@ func TestWithTimeStampStringID(t *testing.T) {
 			}
 
 			data := struct{}{}
-			rec := NewRecordWithIncompleteKey("test", reflect.String, &data)
+			rec := record.NewRecordWithIncompleteKey("test", reflect.String, &data)
 			if err := idGen(context.Background(), rec); err != nil {
 				t.Fatalf("idGen returned error: %v", err)
 			}
@@ -266,7 +268,7 @@ func TestWithTimeStampStringID_InvalidAccuracy(t *testing.T) {
 	idGen := io.IDGenerator()
 
 	data := struct{}{}
-	rec := NewRecordWithIncompleteKey("test", reflect.String, &data)
+	rec := record.NewRecordWithIncompleteKey("test", reflect.String, &data)
 	if err := idGen(context.Background(), rec); err != nil {
 		t.Fatalf("idGen returned error: %v", err)
 	}

@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 )
 
 // SliceToSeq turns an already-sorted slice into a RecordSeq.
@@ -22,7 +22,7 @@ func SliceToSeq[K comparable](records []record.WithID[K]) RecordSeq[K] {
 }
 
 // ReaderToSeq adapts a dalgo dal.RecordsReader to a RecordSeq.
-// idOf extracts the ID from each dal.Record yielded by the reader.
+// idOf extracts the ID from each record.Record yielded by the reader.
 // Reader errors propagate via the seq2 error channel.
 //
 // The underlying reader is Closed exactly once when iteration ends —
@@ -32,7 +32,7 @@ func SliceToSeq[K comparable](records []record.WithID[K]) RecordSeq[K] {
 // dal.Reader.Cursor() is NOT surfaced through this bridge in MVP;
 // callers needing pagination must drive the reader directly. See
 // spec/ideas/dal-records-reader-iter-seq.md.
-func ReaderToSeq[K comparable](r dal.RecordsReader, idOf func(dal.Record) (K, error)) RecordSeq[K] {
+func ReaderToSeq[K comparable](r dal.RecordsReader, idOf func(record.Record) (K, error)) RecordSeq[K] {
 	return func(yield func(record.WithID[K], error) bool) {
 		defer func() { _ = r.Close() }()
 		var zero record.WithID[K]

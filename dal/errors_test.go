@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewErrNotFoundByKey(t *testing.T) {
 	type args struct {
-		key   *Key
+		key   *record.Key
 		cause error
 	}
 	tests := []struct {
@@ -19,23 +20,23 @@ func TestNewErrNotFoundByKey(t *testing.T) {
 		args args
 	}{
 		{
-			name: "ErrRecordNotFound",
+			name: "record.ErrRecordNotFound",
 			args: args{
-				key:   NewKeyWithID("Foo", "bar"),
-				cause: ErrRecordNotFound,
+				key:   record.NewKeyWithID("Foo", "bar"),
+				cause: record.ErrRecordNotFound,
 			},
 		},
 		{
 			name: "nil",
 			args: args{
-				key:   NewKeyWithID("Foo", "bar"),
+				key:   record.NewKeyWithID("Foo", "bar"),
 				cause: nil,
 			},
 		},
 		{
 			name: "some_error",
 			args: args{
-				key:   NewKeyWithID("Foo", "bar"),
+				key:   record.NewKeyWithID("Foo", "bar"),
 				cause: errors.New("some error"),
 			},
 		},
@@ -43,10 +44,10 @@ func TestNewErrNotFoundByKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := NewErrNotFoundByKey(tt.args.key, tt.args.cause)
-			assert.True(t, IsNotFound(err))
+			assert.True(t, record.IsNotFound(err))
 
 			err2 := fmt.Errorf("wrapper: %w", err)
-			assert.True(t, IsNotFound(err2))
+			assert.True(t, record.IsNotFound(err2))
 		})
 	}
 }
@@ -110,13 +111,13 @@ func TestIsNotFound(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "ErrRecordNotFound",
-			err:  ErrRecordNotFound,
+			name: "record.ErrRecordNotFound",
+			err:  record.ErrRecordNotFound,
 			want: true,
 		},
 		{
 			name: "ErrNotFoundByKey",
-			err:  errNotFoundByKey{cause: ErrRecordNotFound},
+			err:  errNotFoundByKey{cause: record.ErrRecordNotFound},
 			want: true,
 		},
 		{
@@ -127,19 +128,19 @@ func TestIsNotFound(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, IsNotFound(tt.err))
+			assert.Equal(t, tt.want, record.IsNotFound(tt.err))
 		})
 	}
 }
 
 func TestErrNotFoundByKey_Key(t *testing.T) {
 	err := errNotFoundByKey{
-		key: &Key{ID: "id1", collection: "records"},
+		key: record.NewKeyWithID("records", "id1"),
 	}
 	key := err.Key()
 	assert.NotNil(t, key)
 	assert.Equal(t, "id1", key.ID)
-	assert.Equal(t, "records", key.collection)
+	assert.Equal(t, "records", key.Collection())
 }
 
 func TestErrNotFoundByKey_Cause(t *testing.T) {
@@ -158,13 +159,13 @@ func TestErrNotFoundByKey_Error(t *testing.T) {
 	tests := []test{
 		{
 			name: "no_cause",
-			err:  errNotFoundByKey{key: &Key{ID: "id1", collection: "records"}},
+			err:  errNotFoundByKey{key: record.NewKeyWithID("records", "id1")},
 		},
 		{
 			name: "cause_is_ErrRecordNotFound",
 			err: errNotFoundByKey{
-				key:   &Key{ID: "id1", collection: "records"},
-				cause: ErrRecordNotFound,
+				key:   record.NewKeyWithID("records", "id1"),
+				cause: record.ErrRecordNotFound,
 			},
 		},
 	}
@@ -172,7 +173,7 @@ func TestErrNotFoundByKey_Error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := tt.err.Error()
 			assert.True(t, strings.Contains(s, tt.err.key.ID.(string)))
-			assert.True(t, strings.Contains(s, tt.err.key.collection))
+			assert.True(t, strings.Contains(s, tt.err.key.Collection()))
 			if tt.err.cause == nil {
 				assert.True(t, strings.Contains(s, "record not found"))
 			} else {
