@@ -8,6 +8,7 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 )
 
 func NewDB(dirPath string) (db dal.DB, err error) {
@@ -60,7 +61,7 @@ func (d database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker,
 	return f(ctx, tx)
 }
 
-func (d database) Get(_ context.Context, record dal.Record) error {
+func (d database) Get(_ context.Context, record record.Record) error {
 	name := filepath.Join(d.path, record.Key().ID.(string))
 	fi, err := os.Stat(name)
 	if err != nil {
@@ -74,7 +75,7 @@ func (d database) Get(_ context.Context, record dal.Record) error {
 	return nil
 }
 
-func (d database) Exists(_ context.Context, key *dal.Key) (bool, error) {
+func (d database) Exists(_ context.Context, key *record.Key) (bool, error) {
 	name := filepath.Join(d.path, key.ID.(string))
 	_, err := os.Stat(name)
 	if err == nil {
@@ -86,7 +87,7 @@ func (d database) Exists(_ context.Context, key *dal.Key) (bool, error) {
 	return false, err
 }
 
-func (d database) GetMulti(ctx context.Context, records []dal.Record) error {
+func (d database) GetMulti(ctx context.Context, records []record.Record) error {
 	for _, record := range records {
 		if err := d.Get(ctx, record); err != nil {
 			return err

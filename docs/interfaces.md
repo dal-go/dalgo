@@ -103,23 +103,23 @@ type Record interface {
 #### With Complete Key and Data
 
 ```go
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 user := &User{Name: "Alice", Email: "alice@example.com"}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 ```
 
 #### With Incomplete Key (for queries)
 
 ```go
 // For queries where ID is not known in advance
-record := dal.NewRecordWithIncompleteKey("users", reflect.String, &User{})
+record := record.NewRecordWithIncompleteKey("users", reflect.String, &User{})
 ```
 
 #### Key Only (for existence checks or deletes)
 
 ```go
-key := dal.NewKeyWithID("users", "user123")
-record := dal.NewRecord(key)
+key := record.NewKeyWithID("users", "user123")
+record := record.NewRecord(key)
 ```
 
 ### Record State Management
@@ -129,7 +129,7 @@ Records track their state through operations:
 ```go
 // After Get operation
 err := db.Get(ctx, record)
-if err != nil && !dal.IsNotFound(err) {
+if err != nil && !record.IsNotFound(err) {
     // Handle actual error
 }
 
@@ -169,27 +169,27 @@ type Key struct {
 
 ```go
 // String ID
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 
 // Integer ID
-key := dal.NewKeyWithID("posts", 42)
+key := record.NewKeyWithID("posts", 42)
 
 // Composite key with multiple fields
-fields := []dal.FieldVal{
+fields := []record.FieldVal{
     {Name: "tenant_id", Value: "tenant1"},
     {Name: "user_id", Value: "user123"},
 }
-key := dal.NewKeyWithFields("users", fields...)
+key := record.NewKeyWithFields("users", fields...)
 ```
 
 #### Hierarchical Keys
 
 ```go
 // Create parent key
-teamKey := dal.NewKeyWithID("teams", "team456")
+teamKey := record.NewKeyWithID("teams", "team456")
 
 // Create child key with parent
-memberKey := dal.NewKeyWithParentAndID(teamKey, "members", "member789")
+memberKey := record.NewKeyWithParentAndID(teamKey, "members", "member789")
 
 // Path: teams/team456/members/member789
 fmt.Println(memberKey.String())
@@ -201,7 +201,7 @@ Used when the ID will be generated or determined later:
 
 ```go
 // For auto-generated IDs
-key := dal.NewIncompleteKey("users", reflect.String, nil)
+key := record.NewIncompleteKey("users", reflect.String, nil)
 
 // ID will be set during Insert operation
 ```
@@ -426,7 +426,7 @@ schema := dal.NewSchema(
     func(incompleteKey *Key, data any) (*Key, error) {
         // Extract ID from data
         user := data.(*User)
-        return dal.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
+        return record.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
     },
 )
 ```

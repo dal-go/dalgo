@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,7 +94,7 @@ func TestColumnar_CandidateSlotsNonMatchingShapes(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("items", "i1"), &item{Name: "a"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("items", "i1"), &item{Name: "a"})))
 	eng := db.collections["items"].(*columnarEngine)
 
 	// nil condition -> not a Comparison.
@@ -144,14 +145,14 @@ func TestColumnar_MaybeCompactNoTrigger(t *testing.T) {
 
 	// Three live, delete one: dead fraction 1/3 < 0.5, so no compaction.
 	for _, id := range []string{"a", "b", "c"} {
-		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("items", id), &item{Name: id})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("items", id), &item{Name: id})))
 	}
-	require.NoError(t, db.Delete(ctx, dal.NewKeyWithID("items", "a")))
+	require.NoError(t, db.Delete(ctx, record.NewKeyWithID("items", "a")))
 	require.Equal(t, 1, eng.deadCount)
 	require.Len(t, eng.live, 3, "no compaction below threshold")
 
 	// deadCount == 0 early return.
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("items", "d"), &item{Name: "d"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("items", "d"), &item{Name: "d"})))
 	require.Equal(t, 0, eng.deadCount)
 	eng.maybeCompact()
 	require.Len(t, eng.live, 3)
@@ -171,8 +172,8 @@ func TestColumnar_CompactRebuildsExternalStrategy(t *testing.T) {
 	seedQueryRows(t, db, "q")
 
 	// Delete two of four (>= threshold) to force compaction.
-	require.NoError(t, db.Delete(ctx, dal.NewKeyWithID("q", "r2")))
-	require.NoError(t, db.Delete(ctx, dal.NewKeyWithID("q", "r4")))
+	require.NoError(t, db.Delete(ctx, record.NewKeyWithID("q", "r2")))
+	require.NoError(t, db.Delete(ctx, record.NewKeyWithID("q", "r4")))
 	require.Equal(t, 0, eng.deadCount, "compaction reclaimed dead slots")
 
 	// The external strategy, rebuilt from compacted slices, still answers
@@ -188,11 +189,11 @@ func TestColumnar_UpdateRoundTrips(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	key := dal.NewKeyWithID("items", "i1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &item{Name: "a", Count: 1, Active: true})))
+	key := record.NewKeyWithID("items", "i1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &item{Name: "a", Count: 1, Active: true})))
 	require.NoError(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Count", 9)}))
 	var got item
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &got)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 	require.Equal(t, item{Name: "a", Count: 9, Active: true}, got)
 }
 
@@ -202,7 +203,7 @@ func TestColumnar_NonSerializableWriteErrors(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	err := db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("items", "i1"),
+	err := db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("items", "i1"),
 		map[string]any{"Extra": make(chan int)}))
 	require.Error(t, err)
 	require.ErrorContains(t, err, "json")
@@ -215,8 +216,8 @@ func TestColumnar_RowMarshalErrorPaths(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	key := dal.NewKeyWithID("items", "i1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &item{Name: "a"})))
+	key := record.NewKeyWithID("items", "i1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &item{Name: "a"})))
 	eng := db.collections["items"].(*columnarEngine)
 	slot := eng.idToSlot["i1"]
 
@@ -237,7 +238,7 @@ func TestColumnar_RowMarshalErrorPaths(t *testing.T) {
 	require.Error(t, err)
 
 	// load surfaces the reassembly error too.
-	require.Error(t, db.Get(ctx, dal.NewRecordWithData(key, &item{})))
+	require.Error(t, db.Get(ctx, record.NewRecordWithData(key, &item{})))
 }
 
 // TestColumnar_MaterializeUnmarshalError covers materializeSlot's final
@@ -247,8 +248,8 @@ func TestColumnar_MaterializeUnmarshalError(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	key := dal.NewKeyWithID("items", "i1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &item{Name: "a", Count: 3})))
+	key := record.NewKeyWithID("items", "i1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &item{Name: "a", Count: 3})))
 	eng := db.collections["items"].(*columnarEngine)
 	slot := eng.idToSlot["i1"]
 
@@ -269,8 +270,8 @@ func TestColumnar_DecodeFieldsAssignError(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	key := dal.NewKeyWithID("items", "i1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &item{Name: "a", Count: 1})))
+	key := record.NewKeyWithID("items", "i1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &item{Name: "a", Count: 1})))
 	err := db.Update(ctx, key, []update.Update{update.ByFieldName("Count", "not-an-int")})
 	require.Error(t, err)
 }
@@ -291,7 +292,7 @@ func TestColumnar_DecodeFieldsNonObjectErrors(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	err := db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("items", "i1"), []int{1, 2, 3}))
+	err := db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("items", "i1"), []int{1, 2, 3}))
 	require.Error(t, err)
 }
 
@@ -301,8 +302,8 @@ func TestColumnar_UpdateRowDataError(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	key := dal.NewKeyWithID("items", "i1")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &item{Name: "a"})))
+	key := record.NewKeyWithID("items", "i1")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &item{Name: "a"})))
 	eng := db.collections["items"].(*columnarEngine)
 	slot := eng.idToSlot["i1"]
 	eng.byName["Extra"].values.Index(slot).Set(reflect.ValueOf(any(make(chan int))))
@@ -317,7 +318,7 @@ func TestColumnar_QueryReassemblyErrorPropagates(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := columnarItemDB(t)
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("items", "i1"), &item{Name: "a"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("items", "i1"), &item{Name: "a"})))
 	eng := db.collections["items"].(*columnarEngine)
 	slot := eng.idToSlot["i1"]
 	eng.byName["Extra"].values.Index(slot).Set(reflect.ValueOf(any(make(chan int))))

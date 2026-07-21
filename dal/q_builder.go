@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 )
 
 type SingleSource interface {
@@ -24,7 +25,7 @@ type IQueryBuilder interface {
 	GroupBy(expressions ...Expression) IQueryBuilder
 	Having(conditions ...Condition) IQueryBuilder
 	OrderBy(expressions ...OrderExpression) IQueryBuilder
-	SelectIntoRecord(func() Record) StructuredQuery
+	SelectIntoRecord(func() record.Record) StructuredQuery
 	SelectIntoRecordset(options ...recordset.Option) StructuredQuery
 	SelectKeysOnly(idKind reflect.Kind) StructuredQuery
 	SelectColumns(columns ...Column) StructuredQuery
@@ -129,7 +130,7 @@ func (s *QueryBuilder) WhereArrayContainsAny(name string, values any) IQueryBuil
 	return s
 }
 
-func (s *QueryBuilder) SelectIntoRecord(into func() Record) StructuredQuery {
+func (s *QueryBuilder) SelectIntoRecord(into func() record.Record) StructuredQuery {
 	q := s.newQuery()
 	q.intoRecord = into
 	return q

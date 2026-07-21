@@ -7,15 +7,14 @@ import (
 	"iter"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func rec(id string, data map[string]any) record.WithID[string] {
-	key := dal.NewKeyWithID("Users", id)
-	r := dal.NewRecordWithData(key, data)
+	key := record.NewKeyWithID("Users", id)
+	r := record.NewRecordWithData(key, data)
 	r.SetError(nil)
 	return record.WithID[string]{ID: id, Record: r}
 }

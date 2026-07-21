@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"testing"
+
+	"github.com/dal-go/record"
 )
 
 // helper to build a simple Condition
@@ -97,7 +99,7 @@ type errReader struct {
 }
 
 func (e *errReader) ReadAll(_ func(dest any) error) (int, error) { return 0, errors.New("not used") }
-func (e *errReader) Next() (Record, error)                       { return nil, e.nextErr }
+func (e *errReader) Next() (record.Record, error)                { return nil, e.nextErr }
 func (e *errReader) Cursor() (string, error)                     { return "", nil }
 func (e *errReader) Close() error                                { e.closed = true; return e.closeErr }
 

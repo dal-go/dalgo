@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,9 +21,9 @@ func TestReadAllToRecords(t *testing.T) {
 	}{
 		{name: "nil_reader_no_limit", reader: nil, shouldPanic: true},
 		{name: "empty_reader", reader: &EmptyReader{}, expectedRecordsCount: 0},
-		{name: "2records", reader: NewRecordsReader([]Record{
-			NewRecord(NewKeyWithID("recordsetSource", 1)),
-			NewRecord(NewKeyWithID("recordsetSource", 2)),
+		{name: "2records", reader: NewRecordsReader([]record.Record{
+			record.NewRecord(record.NewKeyWithID("recordsetSource", 1)),
+			record.NewRecord(record.NewKeyWithID("recordsetSource", 2)),
 		}), expectedRecordsCount: 2},
 		{name: "fails in next", reader: NewRecordsReader(nil), expectedErrTexts: []string{"no records"}},
 	} {
@@ -52,8 +53,8 @@ func TestReadAllToRecords(t *testing.T) {
 	t.Run("context_canceled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		reader := NewRecordsReader([]Record{
-			NewRecord(NewKeyWithID("recordsetSource", 1)),
+		reader := NewRecordsReader([]record.Record{
+			record.NewRecord(record.NewKeyWithID("recordsetSource", 1)),
 		})
 		records, err := ReadAllToRecords(ctx, reader)
 		assert.Error(t, err)
@@ -69,7 +70,7 @@ func TestRecordsReader(t *testing.T) {
 		assert.Nil(t, err)
 	})
 	t.Run("Cursor", func(t *testing.T) {
-		reader := NewRecordsReader([]Record{NewRecord(NewKeyWithID("a", "b"))})
+		reader := NewRecordsReader([]record.Record{record.NewRecord(record.NewKeyWithID("a", "b"))})
 
 		cursor, err := reader.Cursor()
 		assert.True(t, errors.Is(err, ErrReaderNotStarted))
@@ -96,8 +97,8 @@ func TestRecordsReader(t *testing.T) {
 			expectedErrTexts []string
 		}{
 			{name: "no_records", reader: NewRecordsReader(nil), expectedErrTexts: []string{"no records"}},
-			{name: "empty_records", reader: NewRecordsReader([]Record{}), expectedErr: ErrNoMoreRecords},
-			{name: "single_record", reader: NewRecordsReader([]Record{NewRecord(NewKeyWithID("a", "b"))}), expectedErr: nil},
+			{name: "empty_records", reader: NewRecordsReader([]record.Record{}), expectedErr: ErrNoMoreRecords},
+			{name: "single_record", reader: NewRecordsReader([]record.Record{record.NewRecord(record.NewKeyWithID("a", "b"))}), expectedErr: nil},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
 				record, err := tt.reader.Next()
@@ -137,11 +138,11 @@ func TestSelectAll(t *testing.T) {
 	}
 
 	getRecordsReader := func() RecordsReader {
-		return NewRecordsReader([]Record{
-			&record{key: &Key{ID: 1, collection: "test"}},
-			&record{key: &Key{ID: 2, collection: "test"}},
-			&record{key: &Key{ID: 3, collection: "test"}},
-			&record{key: &Key{ID: 4, collection: "test"}},
+		return NewRecordsReader([]record.Record{
+			record.NewRecord(record.NewKeyWithID("test", 1)),
+			record.NewRecord(record.NewKeyWithID("test", 2)),
+			record.NewRecord(record.NewKeyWithID("test", 3)),
+			record.NewRecord(record.NewKeyWithID("test", 4)),
 		})
 	}
 
@@ -222,11 +223,11 @@ func TestSelectAll(t *testing.T) {
 
 func TestSelectAll_WithOffset(t *testing.T) {
 	getRecordsReader := func() RecordsReader {
-		return NewRecordsReader([]Record{
-			&record{key: &Key{ID: 1, collection: "test"}},
-			&record{key: &Key{ID: 2, collection: "test"}},
-			&record{key: &Key{ID: 3, collection: "test"}},
-			&record{key: &Key{ID: 4, collection: "test"}},
+		return NewRecordsReader([]record.Record{
+			record.NewRecord(record.NewKeyWithID("test", 1)),
+			record.NewRecord(record.NewKeyWithID("test", 2)),
+			record.NewRecord(record.NewKeyWithID("test", 3)),
+			record.NewRecord(record.NewKeyWithID("test", 4)),
 		})
 	}
 	// Offset only
@@ -250,7 +251,7 @@ func TestSelectAll_WithOffset(t *testing.T) {
 // errOnFirstNextReader returns a non-ErrNoMoreRecords error on first Next()
 type errOnFirstNextReader struct{ called bool }
 
-func (e *errOnFirstNextReader) Next() (Record, error) {
+func (e *errOnFirstNextReader) Next() (record.Record, error) {
 	if !e.called {
 		e.called = true
 		return nil, errors.New("next failed")
@@ -291,8 +292,8 @@ func TestExecuteQueryAndReadAllToRecords(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		db := mockDB{
 			executeQueryToRecordsReader: func(ctx context.Context, query Query) (RecordsReader, error) {
-				return NewRecordsReader([]Record{
-					NewRecord(NewKeyWithID("test", 1)),
+				return NewRecordsReader([]record.Record{
+					record.NewRecord(record.NewKeyWithID("test", 1)),
 				}), nil
 			},
 		}
@@ -522,7 +523,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 
 	t.Run("SelectAll_EOF", func(t *testing.T) {
 		reader := &mockRecordsReader{count: 1, errToReturn: io.EOF}
-		err := SelectAll(context.Background(), reader, func(r Record) {})
+		err := SelectAll(context.Background(), reader, func(r record.Record) {})
 		assert.NoError(t, err)
 	})
 
@@ -542,7 +543,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		reader := &mockRecordsReader{count: 5}
-		err := SelectAll(ctx, reader, func(r Record) {})
+		err := SelectAll(ctx, reader, func(r record.Record) {})
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, context.Canceled))
 	})
@@ -552,7 +553,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		cancel()
 		reader := &mockRecordsReader{count: 5}
 		ro := WithLimit(0)
-		err := SelectAll(ctx, reader, func(r Record) {}, ro)
+		err := SelectAll(ctx, reader, func(r record.Record) {}, ro)
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, context.Canceled))
 	})
@@ -562,7 +563,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		cancel()
 		reader := &mockRecordsReader{count: 5}
 		ro := WithLimit(2)
-		err := SelectAll(ctx, reader, func(r Record) {}, ro)
+		err := SelectAll(ctx, reader, func(r record.Record) {}, ro)
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, context.Canceled))
 	})
@@ -572,7 +573,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 		cancel()
 		reader := &mockRecordsReader{count: 5}
 		ro := WithOffset(2)
-		err := SelectAll(ctx, reader, func(r Record) {}, ro)
+		err := SelectAll(ctx, reader, func(r record.Record) {}, ro)
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, context.Canceled))
 	})
@@ -621,7 +622,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 
 	t.Run("SelectAll_CloseErrorWithPriorError", func(t *testing.T) {
 		reader := &mockRecordsReader{count: 1, errToReturn: errors.New("prior error"), closeErr: errors.New("close error")}
-		err := SelectAll(context.Background(), reader, func(r Record) {})
+		err := SelectAll(context.Background(), reader, func(r record.Record) {})
 		assert.Error(t, err)
 		assert.Equal(t, "prior error", err.Error())
 	})
@@ -678,7 +679,7 @@ func TestExecuteQueryAndReadAllToRecordset(t *testing.T) {
 
 	t.Run("SelectAll_Limited_NoMoreRecords", func(t *testing.T) {
 		reader := &mockRecordsReader{count: 2}
-		err := SelectAll(context.Background(), reader, func(r Record) {}, WithLimit(5))
+		err := SelectAll(context.Background(), reader, func(r record.Record) {}, WithLimit(5))
 		assert.NoError(t, err)
 		assert.Equal(t, 3, reader.nextCalled) // 1, 2, then ErrNoMoreRecords
 	})
@@ -764,7 +765,7 @@ type mockRecordsReader struct {
 	closeErr    error
 }
 
-func (m *mockRecordsReader) Next() (Record, error) {
+func (m *mockRecordsReader) Next() (record.Record, error) {
 	m.nextCalled++
 	if m.errToReturn != nil && m.nextCalled > m.count {
 		return nil, m.errToReturn
@@ -772,7 +773,7 @@ func (m *mockRecordsReader) Next() (Record, error) {
 	if m.nextCalled > m.count {
 		return nil, ErrNoMoreRecords
 	}
-	return &record{}, nil
+	return record.NewRecord(record.NewKeyWithID("mock", m.nextCalled)), nil
 }
 
 func (m *mockRecordsReader) Cursor() (string, error) {

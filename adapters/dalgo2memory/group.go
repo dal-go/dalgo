@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // rowSources is one input row's per-source resolution map — the same shape the
@@ -156,10 +157,10 @@ func executeGroupedReader(q dal.StructuredQuery, rows []rowSources, collection s
 		groups = groups[:limit]
 	}
 
-	records := make([]dal.Record, len(groups))
+	records := make([]record.Record, len(groups))
 	for i, g := range groups {
-		key := dal.NewKeyWithID(collection, fmt.Sprint(i))
-		records[i] = dal.NewRecordWithData(key, g.out).SetError(nil)
+		key := record.NewKeyWithID(collection, fmt.Sprint(i))
+		records[i] = record.NewRecordWithData(key, g.out).SetError(nil)
 	}
 	return dal.NewRecordsReader(records), nil
 }

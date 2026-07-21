@@ -6,16 +6,17 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dal-go/record"
 	"github.com/strongo/random"
 )
 
 type idGenerator struct {
 	maxAttempts int
 	attempts    int
-	f           func(ctx context.Context, record Record) error
+	f           func(ctx context.Context, record record.Record) error
 }
 
-func (v *idGenerator) GenerateID(ctx context.Context, record Record) error {
+func (v *idGenerator) GenerateID(ctx context.Context, record record.Record) error {
 	if v.attempts++; v.attempts > v.maxAttempts {
 		record.Key().ID = nil
 		return fmt.Errorf("%w to generate a record ID: %d", ErrExceedsMaxNumberOfAttempts, v.maxAttempts)
@@ -31,7 +32,7 @@ func NewIDGenerator(f IDGenerator, maxAttempts int) IDGenerator {
 func WithRandomStringKey(length, maxAttempts int) InsertOption {
 	return func(options *insertOptions) {
 		options.idGenerator = NewIDGenerator(
-			func(ctx context.Context, record Record) error {
+			func(ctx context.Context, record record.Record) error {
 				record.Key().ID = random.ID(length)
 				return nil
 			},
@@ -43,7 +44,7 @@ func WithRandomStringKey(length, maxAttempts int) InsertOption {
 func WithRandomStringKeyPrefixedByUnixTime(randomLength, maxAttempts int) InsertOption {
 	return func(options *insertOptions) {
 		options.idGenerator = NewIDGenerator(
-			func(ctx context.Context, record Record) error {
+			func(ctx context.Context, record record.Record) error {
 				record.Key().ID = fmt.Sprintf("%d_%s", time.Now().UTC().Unix(), random.ID(randomLength))
 				return nil
 			},
@@ -67,7 +68,7 @@ const (
 func WithTimeStampStringID(accuracy TimeStampAccuracy, base, maxAttempts int) InsertOption {
 	return func(options *insertOptions) {
 		options.idGenerator = NewIDGenerator(
-			func(ctx context.Context, record Record) error {
+			func(ctx context.Context, record record.Record) error {
 				now := time.Now().UTC()
 				var timestamp int64
 				switch accuracy {

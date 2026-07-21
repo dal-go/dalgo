@@ -3,10 +3,10 @@ package dalgo2fs
 import (
 	"os"
 
-	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
-func NewFileRecord(key *dal.Key) dal.Record {
+func NewFileRecord(key *record.Key) record.Record {
 	return &fileRecord{
 		key: key,
 	}
@@ -18,13 +18,13 @@ type fileData struct {
 }
 
 type fileRecord struct {
-	key     *dal.Key
+	key     *record.Key
 	data    fileData
 	changed bool
 	err     error
 }
 
-func (f *fileRecord) Key() *dal.Key {
+func (f *fileRecord) Key() *record.Key {
 	return f.key
 }
 
@@ -36,9 +36,9 @@ func (f *fileRecord) Exists() bool {
 	return f.err == nil && f.data.fi != nil
 }
 
-func (f *fileRecord) SetError(err error) dal.Record {
+func (f *fileRecord) SetError(err error) record.Record {
 	if err == nil {
-		err = dal.ErrNoError
+		err = record.ErrNoError
 	}
 	f.err = err
 	return f

@@ -8,7 +8,8 @@ import (
 	"strings"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 )
 
 // compactionThreshold is the dead-slot fraction that triggers compaction. When
@@ -47,7 +48,7 @@ type columnarEngine struct {
 	byName    map[string]*column
 	idToSlot  map[string]int
 	slotToID  []string                  // slotToID[slot] == "" when the slot is dead
-	slotToKey []*dal.Key                // slotToKey[slot] is the stored record's full key
+	slotToKey []*record.Key             // slotToKey[slot] is the stored record's full key
 	live      []bool                    // live[slot] reports whether the slot holds a record
 	freeList  []int                     // dead slots available for reuse
 	deadCount int                       // number of dead (tombstoned) slots
@@ -304,7 +305,7 @@ func (e *columnarEngine) exists(id string) bool {
 	return ok && e.live[slot]
 }
 
-func (e *columnarEngine) store(id string, record dal.Record, overwrite bool) error {
+func (e *columnarEngine) store(id string, record record.Record, overwrite bool) error {
 	if e.initErr != nil {
 		return e.initErr
 	}
@@ -325,7 +326,7 @@ func (e *columnarEngine) store(id string, record dal.Record, overwrite bool) err
 
 // setSlotKey records the stored record's full key at slot, growing the parallel
 // slice to cover newly-allocated slots.
-func (e *columnarEngine) setSlotKey(slot int, key *dal.Key) {
+func (e *columnarEngine) setSlotKey(slot int, key *record.Key) {
 	for len(e.slotToKey) <= slot {
 		e.slotToKey = append(e.slotToKey, nil)
 	}
@@ -333,14 +334,14 @@ func (e *columnarEngine) setSlotKey(slot int, key *dal.Key) {
 }
 
 // slotKey returns the stored full key at slot, or nil if none was recorded.
-func (e *columnarEngine) slotKey(slot int) *dal.Key {
+func (e *columnarEngine) slotKey(slot int) *record.Key {
 	if slot >= 0 && slot < len(e.slotToKey) {
 		return e.slotToKey[slot]
 	}
 	return nil
 }
 
-func (e *columnarEngine) load(id string, record dal.Record) error {
+func (e *columnarEngine) load(id string, record record.Record) error {
 	if e.initErr != nil {
 		return e.initErr
 	}
@@ -370,7 +371,7 @@ func (e *columnarEngine) update(id string, updates []update.Update) error {
 	}
 	slot, ok := e.idToSlot[id]
 	if !ok || !e.live[slot] {
-		return dal.NewErrNotFoundByKey(dal.NewKeyWithID(e.collection, id), nil)
+		return dal.NewErrNotFoundByKey(record.NewKeyWithID(e.collection, id), nil)
 	}
 	current, err := e.rowData(slot)
 	if err != nil {
@@ -770,7 +771,7 @@ func (e *columnarEngine) compact() {
 		}
 	}
 	newSlotToID := make([]string, newLen)
-	newSlotToKey := make([]*dal.Key, newLen)
+	newSlotToKey := make([]*record.Key, newLen)
 	newLive := make([]bool, newLen)
 	for newSlot, oldSlot := range liveSlots {
 		id := e.slotToID[oldSlot]

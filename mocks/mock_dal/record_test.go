@@ -2,10 +2,11 @@ package mock_dal
 
 import (
 	"errors"
-	"github.com/dal-go/dalgo/dal"
+	"testing"
+
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	"testing"
 )
 
 func TestNewMockRecord(t *testing.T) {
@@ -16,11 +17,11 @@ func TestNewMockRecord(t *testing.T) {
 	assert.NotNil(t, mockRecord)
 	assert.NotNil(t, mockRecord.EXPECT())
 
-	mockRecord.EXPECT().Key().Return(dal.NewKeyWithID("a", "v"))
+	mockRecord.EXPECT().Key().Return(record.NewKeyWithID("a", "v"))
 	assert.NotNil(t, mockRecord.Key())
 
-	mockRecord.EXPECT().SetError(dal.ErrRecordNotFound).Times(1)
-	mockRecord.SetError(dal.ErrRecordNotFound)
+	mockRecord.EXPECT().SetError(record.ErrRecordNotFound).Times(1)
+	mockRecord.SetError(record.ErrRecordNotFound)
 
 	data := []byte("abc")
 	mockRecord.EXPECT().Data().Return(data).Times(1)
@@ -96,7 +97,7 @@ func TestMockRecord_Key(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRecord := NewMockRecord(ctrl)
-	testKey := dal.NewKeyWithID("test", "id1")
+	testKey := record.NewKeyWithID("test", "id1")
 
 	mockRecord.EXPECT().Key().Return(testKey)
 

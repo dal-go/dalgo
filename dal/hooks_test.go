@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,7 +39,7 @@ func TestBeforeSave(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			data := test.data
-			err := BeforeSave(context.Background(), nil, NewRecordWithIncompleteKey("test", reflect.Struct, data).SetError(ErrNoError))
+			err := BeforeSave(context.Background(), nil, record.NewRecordWithIncompleteKey("test", reflect.Struct, data).SetError(record.ErrNoError))
 			if data.isValid {
 				assert.Nil(t, err)
 			} else {
@@ -67,7 +68,7 @@ func TestCallRecordHooks(t *testing.T) {
 		{
 			name: "one_hook_with_no_error",
 			hooks: []RecordHook{
-				func(ctx context.Context, record Record) error {
+				func(ctx context.Context, record record.Record) error {
 					return nil
 				},
 			},
@@ -76,7 +77,7 @@ func TestCallRecordHooks(t *testing.T) {
 		{
 			name: "one_hook_with_error",
 			hooks: []RecordHook{
-				func(ctx context.Context, record Record) error {
+				func(ctx context.Context, record record.Record) error {
 					return errors.New("error")
 				},
 			},

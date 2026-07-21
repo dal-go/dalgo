@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,15 +19,15 @@ func seedThings(t *testing.T) (*database, context.Context) {
 	t.Helper()
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("things", "1"), &orderThing{Name: "b"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("things", "2"), &orderThing{Name: "a"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("things", "1"), &orderThing{Name: "b"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("things", "2"), &orderThing{Name: "a"})))
 	return db, ctx
 }
 
 func thingsQuery(alias string, order ...dal.OrderExpression) dal.Query {
 	return dal.From(dal.NewRootCollectionRef("things", alias)).NewQuery().OrderBy(order...).
-		SelectIntoRecord(func() dal.Record {
-			return dal.NewRecordWithIncompleteKey("things", reflect.String, &orderThing{})
+		SelectIntoRecord(func() record.Record {
+			return record.NewRecordWithIncompleteKey("things", reflect.String, &orderThing{})
 		})
 }
 

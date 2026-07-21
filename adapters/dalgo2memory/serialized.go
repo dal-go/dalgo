@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 )
 
 // serializedEngine is the default storage engine: it stores each record as
@@ -21,7 +22,7 @@ type serializedEngine struct {
 	collection string
 	factory    func() any
 	records    map[string][]byte
-	keys       map[string]*dal.Key // full key (with parent chain) per stored id
+	keys       map[string]*record.Key // full key (with parent chain) per stored id
 }
 
 var _ storageEngine = (*serializedEngine)(nil)
@@ -33,7 +34,7 @@ func newSerializedEngine(collection string, factory func() any) *serializedEngin
 		collection: collection,
 		factory:    factory,
 		records:    make(map[string][]byte),
-		keys:       make(map[string]*dal.Key),
+		keys:       make(map[string]*record.Key),
 	}
 }
 
@@ -42,7 +43,7 @@ func (e *serializedEngine) exists(id string) bool {
 	return ok
 }
 
-func (e *serializedEngine) store(id string, record dal.Record, overwrite bool) error {
+func (e *serializedEngine) store(id string, record record.Record, overwrite bool) error {
 	if !overwrite {
 		if _, ok := e.records[id]; ok {
 			return fmt.Errorf("record already exists: %s", record.Key())
@@ -62,7 +63,7 @@ func (e *serializedEngine) store(id string, record dal.Record, overwrite bool) e
 	return nil
 }
 
-func (e *serializedEngine) load(id string, record dal.Record) error {
+func (e *serializedEngine) load(id string, record record.Record) error {
 	b, ok := e.records[id]
 	if !ok {
 		return dal.NewErrNotFoundByKey(record.Key(), nil)
@@ -78,7 +79,7 @@ func (e *serializedEngine) delete(id string) {
 func (e *serializedEngine) update(id string, updates []update.Update) error {
 	b, ok := e.records[id]
 	if !ok {
-		return dal.NewErrNotFoundByKey(dal.NewKeyWithID(e.collection, id), nil)
+		return dal.NewErrNotFoundByKey(record.NewKeyWithID(e.collection, id), nil)
 	}
 	var data map[string]any
 	if err := json.Unmarshal(b, &data); err != nil {

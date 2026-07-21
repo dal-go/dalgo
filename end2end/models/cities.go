@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 const CitiesCollection = "DalgoTest_Cities"
@@ -151,7 +151,7 @@ func init() {
 	SortedCityIDs = make([]string, len(Cities))
 	for i, city := range Cities {
 		SortedCityIDs[i] = CityID(city)
-		SortedCityIDs[i] = dal.EscapeID(CityID(city))
+		SortedCityIDs[i] = record.EscapeID(CityID(city))
 	}
 	sort.Strings(SortedCityIDs)
 

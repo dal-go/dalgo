@@ -3,10 +3,12 @@ package dal
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +30,7 @@ import (
 //type inserterMock struct {
 //}
 //
-//func (v inserterMock) Insert(ctx context.Context, record Record, opts ...InsertOption) error {
+//func (v inserterMock) Insert(ctx context.Context, record record.Record, opts ...InsertOption) error {
 //	options := NewInsertOptions(opts...)
 //	if idGenerator := options.IDGenerator(); idGenerator != nil {
 //		if err := idGenerator(ctx, record); err != nil {
@@ -40,7 +42,7 @@ import (
 
 type insertArgs struct {
 	ctx    context.Context
-	record Record
+	record record.Record
 	//generateID IDGenerator
 	attempts int
 }
@@ -63,7 +65,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			existsFalseOnAttemptNo: 1,
 			args: insertArgs{
 				ctx:      context.Background(),
-				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
+				record:   record.NewRecordWithData(record.NewIncompleteKey("test_kind", reflect.String, nil), new(map[string]any)),
 				attempts: 1,
 			},
 		},
@@ -74,7 +76,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			existsFalseOnAttemptNo: 1,
 			args: insertArgs{
 				ctx:      context.Background(),
-				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
+				record:   record.NewRecordWithData(record.NewIncompleteKey("test_kind", reflect.String, nil), new(map[string]any)),
 				attempts: 1,
 			},
 		},
@@ -83,7 +85,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			existsFalseOnAttemptNo: 7,
 			args: insertArgs{
 				ctx:      context.Background(),
-				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
+				record:   record.NewRecordWithData(record.NewIncompleteKey("test_kind", reflect.String, nil), new(map[string]any)),
 				attempts: 5,
 			},
 			generatorErr:     ErrExceedsMaxNumberOfAttempts,
@@ -95,7 +97,7 @@ func TestInsertWithRandomID(t *testing.T) {
 			generatorErr:            errors.New("test generator intentional error"),
 			args: insertArgs{
 				ctx:      context.Background(),
-				record:   NewRecordWithData(&Key{collection: "test_kind"}, new(map[string]any)),
+				record:   record.NewRecordWithData(record.NewIncompleteKey("test_kind", reflect.String, nil), new(map[string]any)),
 				attempts: 5,
 			},
 		},
@@ -103,7 +105,7 @@ func TestInsertWithRandomID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			attempt := 0
-			var generateID = func(ctx context.Context, record Record) error {
+			var generateID = func(ctx context.Context, record record.Record) error {
 				attempt++
 				if tt.generatorErrOnAttemptNo == attempt {
 					return tt.generatorErr
@@ -112,18 +114,18 @@ func TestInsertWithRandomID(t *testing.T) {
 				return nil
 			}
 
-			exists := func(key *Key) error {
+			exists := func(key *record.Key) error {
 				if tt.existsErrorOnAttemptNo == attempt {
 					return tt.existsError
 				}
 				if attempt < tt.existsFalseOnAttemptNo {
 					return nil
 				}
-				return ErrRecordNotFound
+				return record.ErrRecordNotFound
 			}
 
 			insertsCount := 0
-			insert := func(r Record) error {
+			insert := func(r record.Record) error {
 				insertsCount++
 				return nil
 			}
@@ -158,7 +160,7 @@ func TestInsertWithRandomID(t *testing.T) {
 
 func TestInsertOptions_IDGenerator(t *testing.T) {
 	err := errors.New("test error")
-	idGenerator := func(ctx context.Context, record Record) error {
+	idGenerator := func(ctx context.Context, record record.Record) error {
 		return err
 	}
 	io := insertOptions{
@@ -196,7 +198,7 @@ func TestNewInsertOptions(t *testing.T) {
 
 func TestWithRandomStringID(t *testing.T) {
 	const length = 10
-	key, err := NewKeyWithOptions("c1", WithRandomStringID(RandomLength(length)))
+	key, err := record.NewKeyWithOptions("c1", WithRandomStringID(RandomLength(length)))
 	assert.Nil(t, err)
 	assert.NotNil(t, key)
 	id := key.ID.(string)
@@ -205,7 +207,7 @@ func TestWithRandomStringID(t *testing.T) {
 }
 
 func TestWithPrefix(t *testing.T) {
-	key, err := NewKeyWithOptions("c1", WithRandomStringID(Prefix("prefix_")))
+	key, err := record.NewKeyWithOptions("c1", WithRandomStringID(Prefix("prefix_")))
 	assert.Nil(t, err)
 	assert.NotNil(t, key)
 	assert.True(t, strings.HasPrefix(key.ID.(string), "prefix_"))
@@ -215,13 +217,13 @@ func TestWithIDGenerator(t *testing.T) {
 
 	for _, tt := range []struct {
 		name        string
-		key         *Key
+		key         *record.Key
 		id          string
 		shouldPanic bool
 	}{
-		{name: "nil_id", shouldPanic: false, id: "id1", key: &Key{ID: nil, collection: "c1"}},
-		{name: "nil_generator", shouldPanic: true, id: "", key: &Key{ID: "id1", collection: "c1"}},
-		{name: "not_nil_id", shouldPanic: true, id: "id2", key: &Key{ID: "id1", collection: "c1"}},
+		{name: "nil_id", shouldPanic: false, id: "id1", key: record.NewIncompleteKey("c1", reflect.String, nil)},
+		{name: "nil_generator", shouldPanic: true, id: "", key: record.NewKeyWithID("c1", "id1")},
+		{name: "not_nil_id", shouldPanic: true, id: "id2", key: record.NewKeyWithID("c1", "id1")},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.shouldPanic {
@@ -234,7 +236,7 @@ func TestWithIDGenerator(t *testing.T) {
 			ctx := context.Background()
 			var idGenerator IDGenerator
 			if tt.id != "" {
-				idGenerator = func(ctx context.Context, record Record) error {
+				idGenerator = func(ctx context.Context, record record.Record) error {
 					record.Key().ID = tt.id
 					return nil
 				}

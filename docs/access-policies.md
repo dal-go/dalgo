@@ -52,8 +52,8 @@ secured := access.MustSecureDB(rawDB, access.RequireContextPolicy())
 ctx := access.WithPolicy(context.Background(), extension)
 
 err := secured.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-	key := dal.NewKeyWithID("users", "u1") // outside the capability
-	return tx.Set(ctx, dal.NewRecordWithData(key, user))
+	key := record.NewKeyWithID("users", "u1") // outside the capability
+	return tx.Set(ctx, record.NewRecordWithData(key, user))
 })
 // err matches access.ErrAccessDenied; the adapter did not receive Set.
 ```

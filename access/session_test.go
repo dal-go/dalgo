@@ -8,7 +8,8 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 )
 
 type fakeSession struct {
@@ -23,34 +24,36 @@ func (f *fakeSession) call(s string) error {
 	f.calls[s]++
 	return f.err
 }
-func (f *fakeSession) Exists(context.Context, *dal.Key) (bool, error) { return true, f.call("Exists") }
-func (f *fakeSession) Get(context.Context, dal.Record) error          { return f.call("Get") }
-func (f *fakeSession) GetMulti(context.Context, []dal.Record) error   { return f.call("GetMulti") }
+func (f *fakeSession) Exists(context.Context, *record.Key) (bool, error) {
+	return true, f.call("Exists")
+}
+func (f *fakeSession) Get(context.Context, record.Record) error        { return f.call("Get") }
+func (f *fakeSession) GetMulti(context.Context, []record.Record) error { return f.call("GetMulti") }
 func (f *fakeSession) ExecuteQueryToRecordsReader(context.Context, dal.Query) (dal.RecordsReader, error) {
 	return nil, f.call("QueryRecords")
 }
 func (f *fakeSession) ExecuteQueryToRecordsetReader(context.Context, dal.Query, ...recordset.Option) (dal.RecordsetReader, error) {
 	return nil, f.call("QueryRecordset")
 }
-func (f *fakeSession) Set(context.Context, dal.Record) error        { return f.call("Set") }
-func (f *fakeSession) SetMulti(context.Context, []dal.Record) error { return f.call("SetMulti") }
-func (f *fakeSession) Insert(context.Context, dal.Record, ...dal.InsertOption) error {
+func (f *fakeSession) Set(context.Context, record.Record) error        { return f.call("Set") }
+func (f *fakeSession) SetMulti(context.Context, []record.Record) error { return f.call("SetMulti") }
+func (f *fakeSession) Insert(context.Context, record.Record, ...dal.InsertOption) error {
 	return f.call("Insert")
 }
-func (f *fakeSession) InsertMulti(context.Context, []dal.Record, ...dal.InsertOption) error {
+func (f *fakeSession) InsertMulti(context.Context, []record.Record, ...dal.InsertOption) error {
 	return f.call("InsertMulti")
 }
-func (f *fakeSession) Update(context.Context, *dal.Key, []update.Update, ...dal.Precondition) error {
+func (f *fakeSession) Update(context.Context, *record.Key, []update.Update, ...dal.Precondition) error {
 	return f.call("Update")
 }
-func (f *fakeSession) UpdateRecord(context.Context, dal.Record, []update.Update, ...dal.Precondition) error {
+func (f *fakeSession) UpdateRecord(context.Context, record.Record, []update.Update, ...dal.Precondition) error {
 	return f.call("UpdateRecord")
 }
-func (f *fakeSession) UpdateMulti(context.Context, []*dal.Key, []update.Update, ...dal.Precondition) error {
+func (f *fakeSession) UpdateMulti(context.Context, []*record.Key, []update.Update, ...dal.Precondition) error {
 	return f.call("UpdateMulti")
 }
-func (f *fakeSession) Delete(context.Context, *dal.Key) error        { return f.call("Delete") }
-func (f *fakeSession) DeleteMulti(context.Context, []*dal.Key) error { return f.call("DeleteMulti") }
+func (f *fakeSession) Delete(context.Context, *record.Key) error        { return f.call("Delete") }
+func (f *fakeSession) DeleteMulti(context.Context, []*record.Key) error { return f.call("DeleteMulti") }
 
 type opaqueQ struct{}
 
@@ -108,18 +111,18 @@ func TestContextGuardComplete(t *testing.T) {
 	if err := g.checkContext(context.Background()); !errors.Is(err, ErrAccessDenied) {
 		t.Fatal(err)
 	}
-	if err := (guard{requireContext: true}).authorize(context.Background(), Get, RecordResourceForKey(dal.NewKeyWithID("x", "1"))); !errors.Is(err, ErrAccessDenied) {
+	if err := (guard{requireContext: true}).authorize(context.Background(), Get, RecordResourceForKey(record.NewKeyWithID("x", "1"))); !errors.Is(err, ErrAccessDenied) {
 		t.Fatal(err)
 	}
 	g = g.bind(ctx)
 	if err := g.checkContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.authorize(context.Background(), Get, RecordResourceForKey(dal.NewKeyWithID("x", "1"))); err != nil {
+	if err := g.authorize(context.Background(), Get, RecordResourceForKey(record.NewKeyWithID("x", "1"))); err != nil {
 		t.Fatal(err)
 	}
 	deny := MustPolicy("deny", Root(Deny(Get, "no")))
-	if err := (guard{databasePolicies: []Policy{deny}}).authorize(ctx, Get, RecordResourceForKey(dal.NewKeyWithID("x", "1"))); !errors.Is(err, ErrAccessDenied) {
+	if err := (guard{databasePolicies: []Policy{deny}}).authorize(ctx, Get, RecordResourceForKey(record.NewKeyWithID("x", "1"))); !errors.Is(err, ErrAccessDenied) {
 		t.Fatal(err)
 	}
 	if err := (guard{requireContext: true}).requireContextPolicy(Get, 1); err != nil {
@@ -132,10 +135,10 @@ func TestSecuredSessionsAllMethods(t *testing.T) {
 	f := &fakeSession{}
 	allow := MustPolicy("all", Root(Allow(ReadWrite, "all")), OpaqueQueryScope(Allow(Query, "opaque")), CollectionGroupScope("items", Allow(Query, "group")))
 	rw := SecureReadwriteSession(f, allow)
-	key := dal.NewKeyWithID("items", "1")
-	r := dal.NewRecord(key)
-	rs := []dal.Record{r}
-	keys := []*dal.Key{key}
+	key := record.NewKeyWithID("items", "1")
+	r := record.NewRecord(key)
+	rs := []record.Record{r}
+	keys := []*record.Key{key}
 	if ok, err := rw.Exists(ctx, key); !ok || err != nil {
 		t.Fatal(err)
 	}
@@ -278,14 +281,14 @@ func TestSecureDBAndTransactions(t *testing.T) {
 	if bound.ID() != "db" || bound.Adapter().Name() != "a" || bound.Schema() == nil || !bound.SupportsConcurrentConnections() {
 		t.Fatal("metadata")
 	}
-	r := dal.NewRecord(dal.NewKeyWithID("x", "1"))
+	r := record.NewRecord(record.NewKeyWithID("x", "1"))
 	if _, err := bound.Exists(context.Background(), r.Key()); err != nil {
 		t.Fatal(err)
 	}
 	if err := bound.Get(context.Background(), r); err != nil {
 		t.Fatal(err)
 	}
-	if err := bound.GetMulti(context.Background(), []dal.Record{r}); err != nil {
+	if err := bound.GetMulti(context.Background(), []record.Record{r}); err != nil {
 		t.Fatal(err)
 	}
 	q := dal.From(dal.NewRootCollectionRef("x", "")).NewQuery().SelectKeysOnly(reflect.String)

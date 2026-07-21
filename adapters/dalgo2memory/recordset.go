@@ -9,6 +9,7 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 )
 
 // ExecuteQueryToRecordsetReader executes a structured query and exposes its
@@ -115,7 +116,7 @@ func inferColumn(name string, rows []map[string]any) recordset.Column[any] {
 // Projected/aggregated records already carry a map; a keys-only record exposes
 // its key under "ID"; any other shape (e.g. a typed struct from a SELECT * with
 // IntoRecord) is converted via a JSON round-trip.
-func recordToMap(rec dal.Record) (map[string]any, error) {
+func recordToMap(rec record.Record) (map[string]any, error) {
 	switch d := rec.Data().(type) {
 	case map[string]any:
 		return d, nil

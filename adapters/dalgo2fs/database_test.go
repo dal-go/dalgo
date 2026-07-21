@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 func TestNewDB(t *testing.T) {
@@ -132,18 +133,18 @@ func TestDatabase_Methods(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		key := dal.NewKeyWithID("test", fileName)
-		record := NewFileRecord(key)
-		err := db.Get(context.Background(), record)
+		key := record.NewKeyWithID("test", fileName)
+		fileRec := NewFileRecord(key)
+		err := db.Get(context.Background(), fileRec)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
-		if !record.Exists() {
+		if !fileRec.Exists() {
 			t.Error("expected record to exist")
 		}
 
 		// Test non-existent file
-		key2 := dal.NewKeyWithID("test", "non-existent.txt")
+		key2 := record.NewKeyWithID("test", "non-existent.txt")
 		record2 := NewFileRecord(key2)
 		err = db.Get(context.Background(), record2)
 		if err == nil {
@@ -151,7 +152,7 @@ func TestDatabase_Methods(t *testing.T) {
 		}
 
 		// Test non-fileRecord
-		mockRecord := dal.NewRecordWithData(key, &struct{}{})
+		mockRecord := record.NewRecordWithData(key, &struct{}{})
 		err = db.Get(context.Background(), mockRecord)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
@@ -168,7 +169,7 @@ func TestDatabase_Methods(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		key := dal.NewKeyWithID("test", fileName)
+		key := record.NewKeyWithID("test", fileName)
 		exists, err := db.Exists(context.Background(), key)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
@@ -177,7 +178,7 @@ func TestDatabase_Methods(t *testing.T) {
 			t.Error("expected to exist")
 		}
 
-		key2 := dal.NewKeyWithID("test", "non-existent.txt")
+		key2 := record.NewKeyWithID("test", "non-existent.txt")
 		exists, err = db.Exists(context.Background(), key2)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
@@ -197,9 +198,9 @@ func TestDatabase_Methods(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		records := []dal.Record{
-			NewFileRecord(dal.NewKeyWithID("test", fileName1)),
-			NewFileRecord(dal.NewKeyWithID("test", fileName2)),
+		records := []record.Record{
+			NewFileRecord(record.NewKeyWithID("test", fileName1)),
+			NewFileRecord(record.NewKeyWithID("test", fileName2)),
 		}
 		err := db.GetMulti(context.Background(), records)
 		if err != nil {
@@ -212,7 +213,7 @@ func TestDatabase_Methods(t *testing.T) {
 		}
 
 		// Test with one missing
-		records = append(records, NewFileRecord(dal.NewKeyWithID("test", "missing.txt")))
+		records = append(records, NewFileRecord(record.NewKeyWithID("test", "missing.txt")))
 		err = db.GetMulti(context.Background(), records)
 		if err == nil {
 			t.Error("expected error for missing file in GetMulti")
@@ -252,7 +253,7 @@ func TestDatabase_Methods(t *testing.T) {
 	})
 
 	t.Run("Exists_Error", func(t *testing.T) {
-		key := dal.NewKeyWithID("test", "a/b/c\000") // Null character in path should cause error on some OSes
+		key := record.NewKeyWithID("test", "a/b/c\000") // Null character in path should cause error on some OSes
 		_, err := db.Exists(context.Background(), key)
 		if err == nil {
 			t.Log("Warning: could not trigger stat error with null character")

@@ -3,23 +3,25 @@ package dal
 import (
 	"context"
 	"fmt"
+
+	"github.com/dal-go/record"
 )
 
 // Inserter defines a function to insert a single record intoRecord a database
 type Inserter interface {
 
 	// Insert inserts a single record intoRecord a database
-	Insert(ctx context.Context, record Record, opts ...InsertOption) error
+	Insert(ctx context.Context, record record.Record, opts ...InsertOption) error
 }
 
 // MultiInserter defines a function to insert multiple records intoRecord a database
 type MultiInserter interface {
 	// InsertMulti inserts multiple record intoRecord a database at once if possible, or fallback to batch of single inserts
-	InsertMulti(ctx context.Context, records []Record, opts ...InsertOption) error
+	InsertMulti(ctx context.Context, records []record.Record, opts ...InsertOption) error
 }
 
 // IDGenerator defines a contract for ID generator function
-type IDGenerator = func(ctx context.Context, record Record) error
+type IDGenerator = func(ctx context.Context, record record.Record) error
 
 // InsertOptions defines interface for insert options
 type InsertOptions interface {
@@ -118,22 +120,22 @@ func RandomLength(length int) func(options *randomStringOptions) {
 type randomStringOption func(opts *randomStringOptions)
 
 // WithIDGenerator sets ID generator for a random string (usually random)
-func WithIDGenerator(ctx context.Context, g IDGenerator) KeyOption {
-	return func(key *Key) error {
+func WithIDGenerator(ctx context.Context, g IDGenerator) record.KeyOption {
+	return func(key *record.Key) error {
 		if key.ID != nil {
 			panic("an attempt to set ID generator for a child that already have an ID value")
 		}
-		return g(ctx, &record{key: key})
+		return g(ctx, record.NewRecord(key))
 	}
 }
 
 func InsertWithIdGenerator(
 	ctx context.Context,
-	r Record,
+	r record.Record,
 	generateID IDGenerator,
 	maxAttempts int,
-	exists func(*Key) error,
-	insert func(Record) error,
+	exists func(*record.Key) error,
+	insert func(record.Record) error,
 ) error {
 	key := r.Key()
 
@@ -143,14 +145,14 @@ func InsertWithIdGenerator(
 			return fmt.Errorf("failed to generate record key ID: %w", err)
 		}
 		r.SetError(nil)
-		if validatableWthKey, ok := r.Data().(interface{ ValidateWithKey(*Key) error }); ok {
+		if validatableWthKey, ok := r.Data().(interface{ ValidateWithKey(*record.Key) error }); ok {
 			if err := validatableWthKey.ValidateWithKey(key); err != nil {
 				return fmt.Errorf("failed to validate record key: %w", err)
 			}
 		}
 
 		if err := exists(key); err != nil {
-			if IsNotFound(err) {
+			if record.IsNotFound(err) {
 				return insert(r) // r shares child with tmp
 			}
 			key.ID = nil

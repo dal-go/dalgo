@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,8 +17,8 @@ func seedPeople(t *testing.T) (*database, context.Context) {
 	t.Helper()
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("people", "1"), &map[string]any{"id": 1, "name": "alice", "status": "active"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("people", "2"), &map[string]any{"id": 2, "name": "bob", "status": "active"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("people", "1"), &map[string]any{"id": 1, "name": "alice", "status": "active"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("people", "2"), &map[string]any{"id": 2, "name": "bob", "status": "active"})))
 	return db, ctx
 }
 
@@ -104,8 +105,8 @@ func TestJoin_UnknownColumnSourceErrors(t *testing.T) {
 // untouched.
 func TestSingleSource_EmptyColumnsUnchanged(t *testing.T) {
 	db, ctx := seedPeople(t)
-	q := dal.From(dal.NewRootCollectionRef("people", "")).NewQuery().SelectIntoRecord(func() dal.Record {
-		return dal.NewRecordWithIncompleteKey("people", reflect.String, &map[string]any{})
+	q := dal.From(dal.NewRootCollectionRef("people", "")).NewQuery().SelectIntoRecord(func() record.Record {
+		return record.NewRecordWithIncompleteKey("people", reflect.String, &map[string]any{})
 	})
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
 	require.NoError(t, err)

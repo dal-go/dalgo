@@ -2,48 +2,24 @@ package dal
 
 import (
 	"context"
-	"errors"
 	"reflect"
 
+	"github.com/dal-go/record"
 	"github.com/strongo/random"
 )
-
-// KeyOption defines contract for key option
-type KeyOption = func(*Key) error
-
-func setKeyOptions(key *Key, options ...KeyOption) error {
-	for _, o := range options {
-		if err := o(key); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// NewKeyWithOptions creates a new key with an ID
-func NewKeyWithOptions(collection string, options ...KeyOption) (key *Key, err error) {
-	if collection == "" {
-		return nil, errors.New("recordsetSource is a required parameter")
-	}
-	key = &Key{collection: collection}
-	if err = setKeyOptions(key, options...); err != nil {
-		return nil, err
-	}
-	return key, err
-}
 
 var DefaultRandomStringIDLength = 16
 
 // WithRandomStringID sets ID generator to random string
-func WithRandomStringID(options ...randomStringOption) KeyOption {
+func WithRandomStringID(options ...randomStringOption) record.KeyOption {
 	var rso randomStringOptions
 	for _, setOption := range options {
 		setOption(&rso)
 	}
-	return func(key *Key) error {
+	return func(key *record.Key) error {
 		key.IDKind = reflect.String
 		var ctx context.Context = nil // intentionally nil as isn't required by any option
-		return WithIDGenerator(ctx, func(_ context.Context, record Record) error {
+		return WithIDGenerator(ctx, func(_ context.Context, record record.Record) error {
 			length := rso.Length()
 			prefix := rso.Prefix()
 			key.ID = prefix + random.ID(length)
@@ -53,39 +29,10 @@ func WithRandomStringID(options ...randomStringOption) KeyOption {
 }
 
 //// WithParent sets Parent
-//func WithParent[T comparable](recordsetSource string, id T, options ...KeyOption) KeyOption {
-//	return func(key *Key) (err error) {
+//func WithParent[T comparable](recordsetSource string, id T, options ...KeyOption) record.KeyOption {
+//	return func(key *record.Key) (err error) {
 //		options = append(options, WithID(id))
-//		key.parent, err = NewKeyWithOptions(recordsetSource, options...)
+//		key.parent, err = record.NewKeyWithOptions(recordsetSource, options...)
 //		return err
 //	}
 //}
-
-// WithParentKey sets Parent key
-func WithParentKey(parent *Key) KeyOption {
-	if parent == nil {
-		panic("parent == nil")
-	}
-	return func(key *Key) error {
-		key.parent = parent
-		return nil
-	}
-}
-
-// WithStringID sets ID as a predefined string
-func WithStringID(id string) KeyOption {
-	return WithKeyID(id)
-}
-
-// WithIntID sets ID as a predefined int
-func WithIntID(id int) KeyOption {
-	return WithKeyID(id)
-}
-
-// WithKeyID sets ID as a predefined value. It's advised to use WithIntID and WithStringID when possible.
-func WithKeyID[T comparable](id T) KeyOption {
-	return func(key *Key) error {
-		key.ID = id
-		return nil
-	}
-}

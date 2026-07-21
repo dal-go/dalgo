@@ -10,7 +10,8 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/end2end"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,18 +44,18 @@ func TestUnsupportedRecordsetReader(t *testing.T) {
 func TestTopLevelWriteMethods(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("Things", "one")
-	record := dal.NewRecordWithData(key, &thing{Name: "first", Count: 1})
+	key := record.NewKeyWithID("Things", "one")
+	rec := record.NewRecordWithData(key, &thing{Name: "first", Count: 1})
 
-	require.NoError(t, db.Set(ctx, record))
+	require.NoError(t, db.Set(ctx, rec))
 	require.NoError(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Name", "updated")}))
 
 	var data thing
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &data)))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &data)))
 	require.Equal(t, "updated", data.Name)
 
-	require.NoError(t, db.UpdateRecord(ctx, dal.NewRecordWithData(key, &thing{}), []update.Update{update.ByFieldName("Count", 2)}))
-	require.NoError(t, db.Get(ctx, dal.NewRecordWithData(key, &data)))
+	require.NoError(t, db.UpdateRecord(ctx, record.NewRecordWithData(key, &thing{}), []update.Update{update.ByFieldName("Count", 2)}))
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &data)))
 	require.Equal(t, 2, data.Count)
 
 	require.NoError(t, db.Delete(ctx, key))
@@ -66,22 +67,22 @@ func TestTopLevelWriteMethods(t *testing.T) {
 func TestTopLevelMultiMethods(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	keys := []*dal.Key{
-		dal.NewKeyWithID("Things", "one"),
-		dal.NewKeyWithID("Things", "two"),
+	keys := []*record.Key{
+		record.NewKeyWithID("Things", "one"),
+		record.NewKeyWithID("Things", "two"),
 	}
-	records := []dal.Record{
-		dal.NewRecordWithData(keys[0], &thing{Name: "first", Count: 1}),
-		dal.NewRecordWithData(keys[1], &thing{Name: "second", Count: 2}),
+	records := []record.Record{
+		record.NewRecordWithData(keys[0], &thing{Name: "first", Count: 1}),
+		record.NewRecordWithData(keys[1], &thing{Name: "second", Count: 2}),
 	}
 
 	require.NoError(t, db.SetMulti(ctx, records))
 	require.NoError(t, db.UpdateMulti(ctx, keys, []update.Update{update.ByFieldName("Count", 3)}))
 
 	data := []thing{{}, {}}
-	require.NoError(t, db.GetMulti(ctx, []dal.Record{
-		dal.NewRecordWithData(keys[0], &data[0]),
-		dal.NewRecordWithData(keys[1], &data[1]),
+	require.NoError(t, db.GetMulti(ctx, []record.Record{
+		record.NewRecordWithData(keys[0], &data[0]),
+		record.NewRecordWithData(keys[1], &data[1]),
 	}))
 	require.Equal(t, 3, data[0].Count)
 	require.Equal(t, 3, data[1].Count)
@@ -106,35 +107,35 @@ func TestTransactionMetadata(t *testing.T) {
 func TestInsertDuplicateAndMissingUpdate(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("Things", "one")
-	record := dal.NewRecordWithData(key, &thing{Name: "first"})
+	key := record.NewKeyWithID("Things", "one")
+	rec := record.NewRecordWithData(key, &thing{Name: "first"})
 
-	require.NoError(t, db.Insert(ctx, record))
-	err := db.Insert(ctx, record)
+	require.NoError(t, db.Insert(ctx, rec))
+	err := db.Insert(ctx, rec)
 	require.Error(t, err)
 	require.True(t, isDuplicate(err))
 
-	err = db.Update(ctx, dal.NewKeyWithID("Things", "missing"), []update.Update{update.ByFieldName("Name", "x")})
+	err = db.Update(ctx, record.NewKeyWithID("Things", "missing"), []update.Update{update.ByFieldName("Name", "x")})
 	require.Error(t, err)
-	require.True(t, dal.IsNotFound(err))
+	require.True(t, record.IsNotFound(err))
 }
 
 func TestMultiMethodsStopOnError(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	badRecord := dal.NewRecordWithData(dal.NewKeyWithID("Bad", "json"), func() {})
+	badRecord := record.NewRecordWithData(record.NewKeyWithID("Bad", "json"), func() {})
 
-	require.Error(t, db.SetMulti(ctx, []dal.Record{badRecord}))
-	require.Error(t, db.UpdateMulti(ctx, []*dal.Key{dal.NewKeyWithID("Missing", "one")}, []update.Update{update.ByFieldName("Name", "x")}))
+	require.Error(t, db.SetMulti(ctx, []record.Record{badRecord}))
+	require.Error(t, db.UpdateMulti(ctx, []*record.Key{record.NewKeyWithID("Missing", "one")}, []update.Update{update.ByFieldName("Name", "x")}))
 }
 
 func TestInsertMultiStopsOnError(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("Things", "one")
-	records := []dal.Record{
-		dal.NewRecordWithData(key, &thing{Name: "first"}),
-		dal.NewRecordWithData(key, &thing{Name: "duplicate"}),
+	key := record.NewKeyWithID("Things", "one")
+	records := []record.Record{
+		record.NewRecordWithData(key, &thing{Name: "first"}),
+		record.NewRecordWithData(key, &thing{Name: "duplicate"}),
 	}
 	err := db.InsertMulti(ctx, records)
 	require.Error(t, err)
@@ -144,9 +145,9 @@ func TestInsertMultiSuccess(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		return tx.InsertMulti(ctx, []dal.Record{
-			dal.NewRecordWithData(dal.NewKeyWithID("Things", "one"), &thing{Name: "first"}),
-			dal.NewRecordWithData(dal.NewKeyWithID("Things", "two"), &thing{Name: "second"}),
+		return tx.InsertMulti(ctx, []record.Record{
+			record.NewRecordWithData(record.NewKeyWithID("Things", "one"), &thing{Name: "first"}),
+			record.NewRecordWithData(record.NewKeyWithID("Things", "two"), &thing{Name: "second"}),
 		})
 	}))
 }
@@ -154,7 +155,7 @@ func TestInsertMultiSuccess(t *testing.T) {
 func TestBadRecordDataAndUnsupportedQuery(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	err := db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("Bad", "json"), func() {}))
+	err := db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("Bad", "json"), func() {}))
 	require.Error(t, err)
 
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, textQuery{})
@@ -165,11 +166,11 @@ func TestBadRecordDataAndUnsupportedQuery(t *testing.T) {
 func TestMalformedStoredData(t *testing.T) {
 	ctx := context.Background()
 	db := NewDB().(*database)
-	key := dal.NewKeyWithID("Bad", "json")
+	key := record.NewKeyWithID("Bad", "json")
 	db.collections[key.Collection()] = &serializedEngine{records: map[string][]byte{keyID(key): []byte("{")}}
 
-	require.Error(t, db.Get(ctx, dal.NewRecordWithData(key, &thing{})))
-	require.Error(t, db.GetMulti(ctx, []dal.Record{dal.NewRecordWithData(key, &thing{})}))
+	require.Error(t, db.Get(ctx, record.NewRecordWithData(key, &thing{})))
+	require.Error(t, db.GetMulti(ctx, []record.Record{record.NewRecordWithData(key, &thing{})}))
 	require.Error(t, db.Update(ctx, key, []update.Update{update.ByFieldName("Name", "x")}))
 
 	q := dal.From(dal.NewRootCollectionRef("Bad", "")).NewQuery().SelectKeysOnly(reflect.String)
@@ -177,12 +178,12 @@ func TestMalformedStoredData(t *testing.T) {
 	require.Nil(t, reader)
 	require.Error(t, err)
 
-	goodKey := dal.NewKeyWithID("Good", "json")
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(goodKey, &thing{Name: "ok"})))
+	goodKey := record.NewKeyWithID("Good", "json")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(goodKey, &thing{Name: "ok"})))
 	require.Error(t, db.Update(ctx, goodKey, []update.Update{update.ByFieldName("Bad", func() {})}))
 
-	q = dal.From(dal.NewRootCollectionRef("Good", "")).NewQuery().SelectIntoRecord(func() dal.Record {
-		return dal.NewRecordWithIncompleteKey("Good", reflect.String, &badTarget{})
+	q = dal.From(dal.NewRootCollectionRef("Good", "")).NewQuery().SelectIntoRecord(func() record.Record {
+		return record.NewRecordWithIncompleteKey("Good", reflect.String, &badTarget{})
 	})
 	reader, err = db.ExecuteQueryToRecordsReader(ctx, q)
 	require.Nil(t, reader)
@@ -200,11 +201,11 @@ func TestQueryEmptyCollection(t *testing.T) {
 
 func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 	ctx := context.Background()
-	key := dal.NewKeyWithID("Things", "existing")
+	key := record.NewKeyWithID("Things", "existing")
 
 	newDB := func() *database {
 		db := NewDB(WithNoReadsAfterWritesInTransaction()).(*database)
-		require.NoError(t, db.Set(ctx, dal.NewRecordWithData(key, &thing{Name: "before", Count: 1})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &thing{Name: "before", Count: 1})))
 		return db
 	}
 
@@ -212,18 +213,18 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 		db := newDB()
 		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 			got := &thing{}
-			if err := tx.Get(ctx, dal.NewRecordWithData(key, got)); err != nil {
+			if err := tx.Get(ctx, record.NewRecordWithData(key, got)); err != nil {
 				return err
 			}
-			if err := tx.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("Things", "new"), &thing{Name: "after"})); err != nil {
+			if err := tx.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("Things", "new"), &thing{Name: "after"})); err != nil {
 				return err
 			}
 
 			_, err := tx.Exists(ctx, key)
 			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
-			err = tx.Get(ctx, dal.NewRecordWithData(key, &thing{}))
+			err = tx.Get(ctx, record.NewRecordWithData(key, &thing{}))
 			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
-			err = tx.GetMulti(ctx, []dal.Record{dal.NewRecordWithData(key, &thing{})})
+			err = tx.GetMulti(ctx, []record.Record{record.NewRecordWithData(key, &thing{})})
 			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
 			q := dal.From(dal.NewRootCollectionRef("Things", "")).NewQuery().SelectKeysOnly(reflect.String)
 			_, err = tx.ExecuteQueryToRecordsReader(ctx, q)
@@ -238,28 +239,28 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 	t.Run("each write operation blocks subsequent reads", func(t *testing.T) {
 		writes := map[string]func(dal.ReadwriteTransaction) error{
 			"Set": func(tx dal.ReadwriteTransaction) error {
-				return tx.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("Things", "set"), &thing{}))
+				return tx.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("Things", "set"), &thing{}))
 			},
 			"SetMulti": func(tx dal.ReadwriteTransaction) error {
-				return tx.SetMulti(ctx, []dal.Record{dal.NewRecordWithData(dal.NewKeyWithID("Things", "set-multi"), &thing{})})
+				return tx.SetMulti(ctx, []record.Record{record.NewRecordWithData(record.NewKeyWithID("Things", "set-multi"), &thing{})})
 			},
 			"Insert": func(tx dal.ReadwriteTransaction) error {
-				return tx.Insert(ctx, dal.NewRecordWithData(dal.NewKeyWithID("Things", "insert"), &thing{}))
+				return tx.Insert(ctx, record.NewRecordWithData(record.NewKeyWithID("Things", "insert"), &thing{}))
 			},
 			"InsertMulti": func(tx dal.ReadwriteTransaction) error {
-				return tx.InsertMulti(ctx, []dal.Record{dal.NewRecordWithData(dal.NewKeyWithID("Things", "insert-multi"), &thing{})})
+				return tx.InsertMulti(ctx, []record.Record{record.NewRecordWithData(record.NewKeyWithID("Things", "insert-multi"), &thing{})})
 			},
 			"Update": func(tx dal.ReadwriteTransaction) error {
 				return tx.Update(ctx, key, []update.Update{update.ByFieldName("Count", 2)})
 			},
 			"UpdateRecord": func(tx dal.ReadwriteTransaction) error {
-				return tx.UpdateRecord(ctx, dal.NewRecordWithData(key, &thing{}), []update.Update{update.ByFieldName("Count", 2)})
+				return tx.UpdateRecord(ctx, record.NewRecordWithData(key, &thing{}), []update.Update{update.ByFieldName("Count", 2)})
 			},
 			"UpdateMulti": func(tx dal.ReadwriteTransaction) error {
-				return tx.UpdateMulti(ctx, []*dal.Key{key}, []update.Update{update.ByFieldName("Count", 2)})
+				return tx.UpdateMulti(ctx, []*record.Key{key}, []update.Update{update.ByFieldName("Count", 2)})
 			},
 			"Delete":      func(tx dal.ReadwriteTransaction) error { return tx.Delete(ctx, key) },
-			"DeleteMulti": func(tx dal.ReadwriteTransaction) error { return tx.DeleteMulti(ctx, []*dal.Key{key}) },
+			"DeleteMulti": func(tx dal.ReadwriteTransaction) error { return tx.DeleteMulti(ctx, []*record.Key{key}) },
 		}
 
 		for name, write := range writes {
@@ -281,10 +282,10 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 	t.Run("default remains permissive", func(t *testing.T) {
 		db := NewDB().(*database)
 		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-			if err := tx.Set(ctx, dal.NewRecordWithData(key, &thing{Name: "stored"})); err != nil {
+			if err := tx.Set(ctx, record.NewRecordWithData(key, &thing{Name: "stored"})); err != nil {
 				return err
 			}
-			return tx.Get(ctx, dal.NewRecordWithData(key, &thing{}))
+			return tx.Get(ctx, record.NewRecordWithData(key, &thing{}))
 		})
 		require.NoError(t, err)
 	})

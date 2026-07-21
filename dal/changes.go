@@ -1,65 +1,51 @@
 package dal
 
-// Changes accumulates DB changes
-type Changes struct {
-	records []Record
-}
+import (
+	"context"
+	"fmt"
 
-// IsChanged returns true if entity changed
-func (changes *Changes) IsChanged(record Record) bool {
-	for _, r := range changes.records {
-		if r == record {
-			return true
-		} else if EqualKeys(r.Key(), record.Key()) {
-			return true
+	"github.com/dal-go/record"
+)
+
+// ApplyChanges applies a persistence-neutral record change set through tx.
+// It clears changes only after every queued operation succeeds.
+func ApplyChanges(ctx context.Context, tx ReadwriteTransaction, changes *record.Changes, excludeKeys ...*record.Key) error {
+	if changes == nil {
+		panic("changes == nil")
+	}
+	if records := excludeRecords(changes.RecordsToInsert(), excludeKeys); len(records) > 0 {
+		if err := tx.InsertMulti(ctx, records); err != nil {
+			return fmt.Errorf("failed to insert records: %w", err)
 		}
 	}
-	return false
-}
-
-// FlagAsChanged flags a record as changed
-func (changes *Changes) FlagAsChanged(record Record) {
-	if record == nil {
-		panic("record == nil")
-	}
-	record.MarkAsChanged()
-	for _, r := range changes.records {
-		if r == record {
-			return
-		} else if EqualKeys(record.Key(), r.Key()) {
-			return
+	for _, update := range changes.RecordsToUpdate {
+		key := update.Record.Key()
+		if err := tx.Update(ctx, key, update.Updates); err != nil {
+			return fmt.Errorf("failed to update record %s: %w", key, err)
 		}
 	}
-	changes.records = append(changes.records, record)
+	if len(changes.RecordsToDelete) > 0 {
+		if err := tx.DeleteMulti(ctx, changes.RecordsToDelete); err != nil {
+			return fmt.Errorf("failed to delete records: %w", err)
+		}
+	}
+	changes.Reset()
+	return nil
 }
 
-// Records returns list of entity holders
-func (changes *Changes) Records() (records []Record) {
-	records = make([]Record, len(changes.records))
-	copy(records, changes.records)
-	return records
-	//return changes.records[:]
+func excludeRecords(records []record.Record, excludeKeys []*record.Key) []record.Record {
+	if len(excludeKeys) == 0 {
+		return records
+	}
+	result := make([]record.Record, 0, len(records))
+outer:
+	for _, rec := range records {
+		for _, excludeKey := range excludeKeys {
+			if rec.Key() == excludeKey {
+				continue outer
+			}
+		}
+		result = append(result, rec)
+	}
+	return result
 }
-
-// HasChanges returns true if there are changes
-func (changes *Changes) HasChanges() bool {
-	return len(changes.records) > 0
-	//// Records are always marked as changed
-	//for _, r := range changes.records {
-	//	if r.HasChanged() {
-	//		return true
-	//	}
-	//}
-	//return false
-}
-
-// Remove as records are always marked as changed
-//// ChangedRecords returns slice of changed records
-//func (changes *Changes) ChangedRecords() (changed []Record) {
-//	for _, r := range changes.records {
-//		if r.HasChanged() {
-//			changed = append(changed, r)
-//		}
-//	}
-//	return changed
-//}

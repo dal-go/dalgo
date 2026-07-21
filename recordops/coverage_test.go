@@ -8,8 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,10 +111,10 @@ func TestCompareStruct_SkipsUnexported(t *testing.T) {
 
 // TestReaderToSeq_IDOfError reaches bridge.go:49-52 — idOf returns an error.
 func TestReaderToSeq_IDOfError(t *testing.T) {
-	rec1 := dal.NewRecordWithData(dal.NewKeyWithID("Things", "a"), &struct{}{})
-	r := &fakeReader{records: []dal.Record{rec1}}
+	rec1 := record.NewRecordWithData(record.NewKeyWithID("Things", "a"), &struct{}{})
+	r := &fakeReader{records: []record.Record{rec1}}
 	wantErr := errors.New("idof boom")
-	idOf := func(_ dal.Record) (string, error) { return "", wantErr }
+	idOf := func(_ record.Record) (string, error) { return "", wantErr }
 
 	var firstErr error
 	for _, err := range ReaderToSeq[string](r, idOf) {

@@ -13,6 +13,7 @@ import (
 	reflect "reflect"
 
 	dal "github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -41,10 +42,10 @@ func (m *MockSchema) EXPECT() *MockSchemaMockRecorder {
 }
 
 // DataToKey mocks base method.
-func (m *MockSchema) DataToKey(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+func (m *MockSchema) DataToKey(incompleteKey *record.Key, data any) (*record.Key, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DataToKey", incompleteKey, data)
-	ret0, _ := ret[0].(*dal.Key)
+	ret0, _ := ret[0].(*record.Key)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -56,7 +57,7 @@ func (mr *MockSchemaMockRecorder) DataToKey(incompleteKey, data any) *gomock.Cal
 }
 
 // KeyToFields mocks base method.
-func (m *MockSchema) KeyToFields(key *dal.Key, data any) ([]dal.ExtraField, error) {
+func (m *MockSchema) KeyToFields(key *record.Key, data any) ([]dal.ExtraField, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "KeyToFields", key, data)
 	ret0, _ := ret[0].([]dal.ExtraField)

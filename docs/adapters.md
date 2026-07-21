@@ -164,9 +164,9 @@ func main() {
     db := dalgo2firestore.NewDatabase(client, dal.NewAdapter("firestore", "1.0"))
     
     // Use db for operations
-    key := dal.NewKeyWithID("users", "user123")
+    key := record.NewKeyWithID("users", "user123")
     user := &User{Name: "Alice"}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         return tx.Set(ctx, record)
@@ -200,15 +200,15 @@ func main() {
     // Create schema mapper
     schema := dal.NewSchema(
         // KeyToFields: inject key ID into data
-        func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+        func(key *record.Key, data any) ([]dal.ExtraField, error) {
             return []dal.ExtraField{
                 {Name: "id", Value: key.ID},
             }, nil
         },
         // DataToKey: extract key ID from data
-        func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+        func(incompleteKey *record.Key, data any) (*record.Key, error) {
             user := data.(*User)
-            return dal.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
+            return record.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
         },
     )
     
@@ -237,9 +237,9 @@ func main() {
     db := dalgo2fs.NewDatabase("./data", dal.NewAdapter("fs", "1.0"))
     
     // Use db for operations
-    key := dal.NewKeyWithID("users", "user123")
+    key := record.NewKeyWithID("users", "user123")
     user := &User{Name: "Alice"}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         return tx.Set(ctx, record)
@@ -336,13 +336,13 @@ func (db *MyDatabase) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWor
 }
 
 // 3. Implement ReadSession (for direct DB operations)
-func (db *MyDatabase) Get(ctx context.Context, record dal.Record) error {
+func (db *MyDatabase) Get(ctx context.Context, record record.Record) error {
     // Implement get logic
     key := record.Key()
     data, err := db.client.Get(ctx, key)
     if err != nil {
         if isNotFound(err) {
-            return record.SetError(dal.ErrRecordNotFound)
+            return record.SetError(record.ErrRecordNotFound)
         }
         return err
     }
@@ -352,11 +352,11 @@ func (db *MyDatabase) Get(ctx context.Context, record dal.Record) error {
         return err
     }
     
-    record.SetError(dal.ErrNoError) // Mark as loaded
+    record.SetError(record.ErrNoError) // Mark as loaded
     return nil
 }
 
-func (db *MyDatabase) GetMulti(ctx context.Context, records []dal.Record) error {
+func (db *MyDatabase) GetMulti(ctx context.Context, records []record.Record) error {
     // Implement batch get
     for _, record := range records {
         if err := db.Get(ctx, record); err != nil {
@@ -385,7 +385,7 @@ type myReadTransaction struct {
 }
 
 // Implement ReadSession methods
-func (tx *myReadTransaction) Get(ctx context.Context, record dal.Record) error {
+func (tx *myReadTransaction) Get(ctx context.Context, record record.Record) error {
     // Use transaction handle
     return tx.client.Get(ctx, record.Key(), tx.tx)
 }
@@ -401,7 +401,7 @@ func (tx *myReadwriteTransaction) ID() string {
 }
 
 // Implement WriteSession methods
-func (tx *myReadwriteTransaction) Set(ctx context.Context, record dal.Record) error {
+func (tx *myReadwriteTransaction) Set(ctx context.Context, record record.Record) error {
     key := record.Key()
     data := record.Data()
     
@@ -415,7 +415,7 @@ func (tx *myReadwriteTransaction) Set(ctx context.Context, record dal.Record) er
     return tx.client.Set(ctx, key, bytes, tx.tx)
 }
 
-func (tx *myReadwriteTransaction) Insert(ctx context.Context, record dal.Record, opts ...dal.InsertOption) error {
+func (tx *myReadwriteTransaction) Insert(ctx context.Context, record record.Record, opts ...dal.InsertOption) error {
     // Check if exists
     exists, err := tx.Exists(ctx, record.Key())
     if err != nil {
@@ -429,7 +429,7 @@ func (tx *myReadwriteTransaction) Insert(ctx context.Context, record dal.Record,
     return tx.Set(ctx, record)
 }
 
-func (tx *myReadwriteTransaction) Update(ctx context.Context, key *dal.Key, updates []update.Update, preconds ...dal.Precondition) error {
+func (tx *myReadwriteTransaction) Update(ctx context.Context, key *record.Key, updates []update.Update, preconds ...dal.Precondition) error {
     // Implement partial update
     for _, upd := range updates {
         field := upd.FieldName()
@@ -442,7 +442,7 @@ func (tx *myReadwriteTransaction) Update(ctx context.Context, key *dal.Key, upda
     return nil
 }
 
-func (tx *myReadwriteTransaction) Delete(ctx context.Context, key *dal.Key) error {
+func (tx *myReadwriteTransaction) Delete(ctx context.Context, key *record.Key) error {
     return tx.client.Delete(ctx, key, tx.tx)
 }
 
@@ -471,7 +471,7 @@ type myRecordsReader struct {
     current int
 }
 
-func (r *myRecordsReader) Next() (dal.Record, error) {
+func (r *myRecordsReader) Next() (record.Record, error) {
     if r.current >= len(r.rows) {
         return nil, dal.ErrNoMoreRecords
     }
@@ -482,8 +482,8 @@ func (r *myRecordsReader) Next() (dal.Record, error) {
     // Create record from row
     key := rowToKey(row)
     data := rowToData(row)
-    record := dal.NewRecordWithData(key, data)
-    record.SetError(dal.ErrNoError)
+    record := record.NewRecordWithData(key, data)
+    record.SetError(record.ErrNoError)
     
     return record, nil
 }
@@ -512,7 +512,7 @@ For SQL databases, map keys to columns:
 func NewSQLSchema() dal.Schema {
     return dal.NewSchema(
         // KeyToFields: Add key as column
-        func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+        func(key *record.Key, data any) ([]dal.ExtraField, error) {
             fields := []dal.ExtraField{
                 {Name: "id", Value: key.ID},
             }
@@ -529,20 +529,20 @@ func NewSQLSchema() dal.Schema {
         },
         
         // DataToKey: Extract key from row
-        func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+        func(incompleteKey *record.Key, data any) (*record.Key, error) {
             // Use reflection or type assertion
             v := reflect.ValueOf(data).Elem()
             idField := v.FieldByName("ID")
             id := idField.Interface()
             
-            key := dal.NewKeyWithID(incompleteKey.Collection(), id)
+            key := record.NewKeyWithID(incompleteKey.Collection(), id)
             
             // Handle parent if needed
             parentField := v.FieldByName("ParentID")
             if parentField.IsValid() && !parentField.IsNil() {
                 parentID := parentField.Interface()
-                parentKey := dal.NewKeyWithID("parent", parentID)
-                key = dal.NewKeyWithParentAndID(parentKey, key.Collection(), id)
+                parentKey := record.NewKeyWithID("parent", parentID)
+                key = record.NewKeyWithParentAndID(parentKey, key.Collection(), id)
             }
             
             return key, nil
@@ -563,7 +563,7 @@ func translateError(err error) error {
     
     switch {
     case isNotFoundError(err):
-        return dal.ErrRecordNotFound
+        return record.ErrRecordNotFound
     case isDuplicateKeyError(err):
         return errors.New("duplicate key")
     case isDeadlockError(err):
@@ -582,7 +582,7 @@ type MyDatabase struct {
     // ...
 }
 
-func (db *MyDatabase) Get(ctx context.Context, record dal.Record) error {
+func (db *MyDatabase) Get(ctx context.Context, record record.Record) error {
     conn, err := db.pool.Acquire(ctx)
     if err != nil {
         return err
@@ -637,9 +637,9 @@ func cleanupTestDatabase(t *testing.T, db dal.DB) {
 func TestGet(t *testing.T) {
     db := &MyDatabase{client: mockClient}
     
-    key := dal.NewKeyWithID("users", "user123")
+    key := record.NewKeyWithID("users", "user123")
     user := &User{}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     err := db.Get(context.Background(), record)
     if err != nil {

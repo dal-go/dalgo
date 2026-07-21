@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -24,9 +25,9 @@ func TestMockSchema_Methods(t *testing.T) {
 	schema := NewMockSchema(ctrl)
 
 	// DataToKey
-	incomplete := &dal.Key{}
+	incomplete := &record.Key{}
 	data := map[string]any{"x": 1}
-	expectedKey := &dal.Key{}
+	expectedKey := &record.Key{}
 	schema.EXPECT().DataToKey(incomplete, data).Return(expectedKey, nil)
 	key, err := schema.DataToKey(incomplete, data)
 	assert.NoError(t, err)

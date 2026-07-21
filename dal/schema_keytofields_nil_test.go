@@ -1,10 +1,14 @@
 package dal
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/dal-go/record"
+)
 
 func TestSchema_KeyToFields_nil_func_returns_nil(t *testing.T) {
 	s := NewSchema(nil, nil)
-	fields, err := s.KeyToFields(NewKeyWithID("Kind", "1"), nil)
+	fields, err := s.KeyToFields(record.NewKeyWithID("Kind", "1"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

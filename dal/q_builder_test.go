@@ -4,11 +4,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestQueryBuilder(t *testing.T) {
-	newRecord := func() Record {
+	newRecord := func() record.Record {
 		return nil
 	}
 	var qb = From(NewRootCollectionRef("test", "t")).NewQuery().

@@ -30,7 +30,7 @@ package dal
 //			name: "beforeGet",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					BeforeGet(func(ctx context.Context, record Record) error { return nil }),
+//					BeforeGet(func(ctx context.Context, record record.Record) error { return nil }),
 //				},
 //			},
 //			assertHooks: func(tt *testing.T, hooks *Hooks) {
@@ -43,7 +43,7 @@ package dal
 //			name: "afterGet",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					AfterGet(func(ctx context.Context, record Record, err error) error { return nil }),
+//					AfterGet(func(ctx context.Context, record record.Record, err error) error { return nil }),
 //				},
 //			},
 //			assertHooks: func(tt *testing.T, hooks *Hooks) {
@@ -56,7 +56,7 @@ package dal
 //			name: "beforeGetMulti",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					BeforeGetMulti(func(ctx context.Context, records []Record) error { return nil }),
+//					BeforeGetMulti(func(ctx context.Context, records []record.Record) error { return nil }),
 //				},
 //			},
 //			assertHooks: func(tt *testing.T, hooks *Hooks) {
@@ -69,7 +69,7 @@ package dal
 //			name: "afterGetMulti",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					AfterGetMulti(func(ctx context.Context, records []Record, err error) error { return nil }),
+//					AfterGetMulti(func(ctx context.Context, records []record.Record, err error) error { return nil }),
 //				},
 //			},
 //			assertHooks: func(tt *testing.T, hooks *Hooks) {
@@ -82,7 +82,7 @@ package dal
 //			name: "beforeInsert",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					BeforeInsert(func(ctx context.Context, record Record) error { return nil }),
+//					BeforeInsert(func(ctx context.Context, record record.Record) error { return nil }),
 //				},
 //			},
 //			assertHooks: func(tt *testing.T, hooks *Hooks) {
@@ -95,7 +95,7 @@ package dal
 //			name: "afterInsert",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					AfterInsert(func(ctx context.Context, record Record, err error) error { return nil }),
+//					AfterInsert(func(ctx context.Context, record record.Record, err error) error { return nil }),
 //				},
 //			},
 //			assertHooks: func(tt *testing.T, hooks *Hooks) {
@@ -108,7 +108,7 @@ package dal
 //			name: "beforeSet",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					BeforeSet(func(ctx context.Context, record Record) error { return nil }),
+//					BeforeSet(func(ctx context.Context, record record.Record) error { return nil }),
 //				},
 //			},
 //			assertHooks: func(tt *testing.T, hooks *Hooks) {
@@ -121,7 +121,7 @@ package dal
 //			name: "afterSet",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					AfterSet(func(ctx context.Context, record Record, err error) error { return nil }),
+//					AfterSet(func(ctx context.Context, record record.Record, err error) error { return nil }),
 //				},
 //			},
 //			assertHooks: func(tt *testing.T, hooks *Hooks) {
@@ -134,7 +134,7 @@ package dal
 //			name: "beforeUpdate",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					BeforeUpdate(func(ctx context.Context, key *Key, updates []update, preconditions ...Precondition) error {
+//					BeforeUpdate(func(ctx context.Context, key *record.Key, updates []update, preconditions ...Precondition) error {
 //						return nil
 //					}),
 //				},
@@ -149,7 +149,7 @@ package dal
 //			name: "afterUpdate",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					AfterUpdate(func(ctx context.Context, key *Key, err error) error {
+//					AfterUpdate(func(ctx context.Context, key *record.Key, err error) error {
 //						return nil
 //					}),
 //				},
@@ -164,7 +164,7 @@ package dal
 //			name: "beforeDelete",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					BeforeDelete(func(ctx context.Context, key *Key) error {
+//					BeforeDelete(func(ctx context.Context, key *record.Key) error {
 //						return nil
 //					}),
 //				},
@@ -179,7 +179,7 @@ package dal
 //			name: "afterDelete",
 //			args: args{
 //				options: []func(bag *Hooks){
-//					AfterDelete(func(ctx context.Context, key *Key, err error) error {
+//					AfterDelete(func(ctx context.Context, key *record.Key, err error) error {
 //						return nil
 //					}),
 //				},

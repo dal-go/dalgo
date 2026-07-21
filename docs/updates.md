@@ -22,7 +22,7 @@ Updates allow modifying specific fields without reading the entire record.
 ```go
 // ❌ Without updates: full read-modify-write
 err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-    record := dal.NewRecordWithData(key, &User{})
+    record := record.NewRecordWithData(key, &User{})
     if err := tx.Get(ctx, record); err != nil {
         return err
     }
@@ -43,9 +43,9 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 ### Basic Update
 
 ```go
-import "github.com/dal-go/dalgo/update"
+import "github.com/dal-go/record/update"
 
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 updates := []update.Update{
     update.ByFieldName("email", "newemail@example.com"),
     update.ByFieldName("updated_at", time.Now()),
@@ -214,7 +214,7 @@ Preconditions ensure updates only happen if certain conditions are met.
 
 ```go
 // Only update if record exists
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 updates := []update.Update{
     update.ByFieldName("status", "deleted"),
 }
@@ -258,7 +258,7 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
 
 ```go
 func IncrementLoginCount(ctx context.Context, db dal.DB, userID string) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     updates := []update.Update{
         update.ByFieldName("login_count", update.Increment(1)),
         update.ByFieldName("last_login", time.Now()),
@@ -274,7 +274,7 @@ func IncrementLoginCount(ctx context.Context, db dal.DB, userID string) error {
 
 ```go
 func ActivateUser(ctx context.Context, db dal.DB, userID string, lastSeenTime time.Time) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     updates := []update.Update{
         update.ByFieldName("status", "active"),
         update.ByFieldName("activated_at", time.Now()),
@@ -299,9 +299,9 @@ func UpdateMultipleUsers(ctx context.Context, db dal.DB, userIDs []string, statu
         update.ByFieldName("updated_at", time.Now()),
     }
     
-    keys := make([]*dal.Key, len(userIDs))
+    keys := make([]*record.Key, len(userIDs))
     for i, id := range userIDs {
-        keys[i] = dal.NewKeyWithID("users", id)
+        keys[i] = record.NewKeyWithID("users", id)
     }
     
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -315,8 +315,8 @@ func UpdateMultipleUsers(ctx context.Context, db dal.DB, userIDs []string, statu
 ```go
 // Some adapters support UpdateRecord for caching strategies
 func UpdateUserEmail(ctx context.Context, db dal.DB, userID string, newEmail string) error {
-    key := dal.NewKeyWithID("users", userID)
-    record := dal.NewRecordWithData(key, &User{})
+    key := record.NewKeyWithID("users", userID)
+    record := record.NewRecordWithData(key, &User{})
     
     // Get current data (e.g., for cache)
     if err := db.Get(ctx, record); err != nil {
@@ -339,7 +339,7 @@ func UpdateUserEmail(ctx context.Context, db dal.DB, userID string, newEmail str
 
 ```go
 func SoftDeleteUser(ctx context.Context, db dal.DB, userID string) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     updates := []update.Update{
         update.ByFieldName("deleted", true),
         update.ByFieldName("deleted_at", time.Now()),
@@ -355,11 +355,11 @@ func SoftDeleteUser(ctx context.Context, db dal.DB, userID string) error {
 
 ```go
 func ToggleUserVerification(ctx context.Context, db dal.DB, userID string) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     
     return db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
         // Read current value
-        record := dal.NewRecordWithData(key, &User{})
+        record := record.NewRecordWithData(key, &User{})
         if err := tx.Get(ctx, record); err != nil {
             return err
         }
@@ -381,7 +381,7 @@ func ToggleUserVerification(ctx context.Context, db dal.DB, userID string) error
 
 ```go
 func UpdateAddress(ctx context.Context, db dal.DB, userID string, address Address) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     updates := []update.Update{
         update.ByFieldName("address", address), // Update entire nested object
         update.ByFieldName("address_updated_at", time.Now()),
@@ -394,7 +394,7 @@ func UpdateAddress(ctx context.Context, db dal.DB, userID string, address Addres
 
 // Or update individual nested fields
 func UpdateCity(ctx context.Context, db dal.DB, userID string, city string) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     updates := []update.Update{
         update.ByFieldName("address.city", city), // Only update one nested field
     }
@@ -419,7 +419,7 @@ updates := []update.Update{
 tx.Update(ctx, key, updates)
 
 // ❌ Bad: Full read-write for single field
-record := dal.NewRecordWithData(key, &User{})
+record := record.NewRecordWithData(key, &User{})
 tx.Get(ctx, record)
 user := record.Data().(*User)
 user.LastSeen = time.Now()
@@ -479,7 +479,7 @@ tx.Update(ctx, key, []update.Update{update.ByFieldName("email_updated_at", time.
 // ✅ Good: Handle precondition failures
 err := tx.Update(ctx, key, updates, dal.WithExistsPrecondition())
 if err != nil {
-    if dal.IsNotFound(err) {
+    if record.IsNotFound(err) {
         return errors.New("user not found")
     }
     if isPreconditionFailed(err) {
@@ -514,9 +514,9 @@ func UpdateUserCity(ctx context.Context, db dal.DB, userID, city string) error {
 ```go
 func TestUpdateUser(t *testing.T) {
     // Create test user
-    key := dal.NewKeyWithID("users", "test-user")
+    key := record.NewKeyWithID("users", "test-user")
     user := &User{Name: "Alice", Email: "old@example.com"}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     db.Set(ctx, record)
     
     // Update email
@@ -531,7 +531,7 @@ func TestUpdateUser(t *testing.T) {
     }
     
     // Verify update
-    updatedRecord := dal.NewRecordWithData(key, &User{})
+    updatedRecord := record.NewRecordWithData(key, &User{})
     db.Get(ctx, updatedRecord)
     updatedUser := updatedRecord.Data().(*User)
     

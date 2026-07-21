@@ -12,7 +12,7 @@ package mock_dal
 import (
 	reflect "reflect"
 
-	dal "github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -70,10 +70,10 @@ func (mr *MockRecordsReaderMockRecorder) Cursor() *gomock.Call {
 }
 
 // Next mocks base method.
-func (m *MockRecordsReader) Next() (dal.Record, error) {
+func (m *MockRecordsReader) Next() (record.Record, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Next")
-	ret0, _ := ret[0].(dal.Record)
+	ret0, _ := ret[0].(record.Record)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

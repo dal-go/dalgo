@@ -5,7 +5,8 @@ import (
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
-	"github.com/dal-go/dalgo/update"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 )
 
 var _ dal.ReadwriteTransaction = (*transaction)(nil)
@@ -21,15 +22,15 @@ func (t transaction) Options() dal.TransactionOptions {
 	return nil
 }
 
-func (t transaction) Get(_ context.Context, _ dal.Record) error {
+func (t transaction) Get(_ context.Context, _ record.Record) error {
 	return dal.ErrNotImplementedYet
 }
 
-func (t transaction) Exists(_ context.Context, _ *dal.Key) (bool, error) {
+func (t transaction) Exists(_ context.Context, _ *record.Key) (bool, error) {
 	return false, dal.ErrNotImplementedYet
 }
 
-func (t transaction) GetMulti(_ context.Context, _ []dal.Record) error {
+func (t transaction) GetMulti(_ context.Context, _ []record.Record) error {
 	return dal.ErrNotImplementedYet
 }
 
@@ -41,38 +42,38 @@ func (t transaction) ExecuteQueryToRecordsetReader(_ context.Context, _ dal.Quer
 	return nil, dal.ErrNotImplementedYet
 }
 
-func (t transaction) Set(_ context.Context, _ dal.Record) error {
+func (t transaction) Set(_ context.Context, _ record.Record) error {
 	return dal.ErrNotSupported
 }
 
-func (t transaction) SetMulti(_ context.Context, _ []dal.Record) error {
+func (t transaction) SetMulti(_ context.Context, _ []record.Record) error {
 	return dal.ErrNotSupported
 }
 
-func (t transaction) Delete(_ context.Context, _ *dal.Key) error {
+func (t transaction) Delete(_ context.Context, _ *record.Key) error {
 	return dal.ErrNotImplementedYet
 }
 
-func (t transaction) DeleteMulti(_ context.Context, _ []*dal.Key) error {
+func (t transaction) DeleteMulti(_ context.Context, _ []*record.Key) error {
 	return dal.ErrNotImplementedYet
 }
 
-func (t transaction) Update(_ context.Context, _ *dal.Key, _ []update.Update, _ ...dal.Precondition) error {
+func (t transaction) Update(_ context.Context, _ *record.Key, _ []update.Update, _ ...dal.Precondition) error {
 	return dal.ErrNotSupported
 }
 
-func (t transaction) UpdateRecord(_ context.Context, _ dal.Record, _ []update.Update, _ ...dal.Precondition) error {
+func (t transaction) UpdateRecord(_ context.Context, _ record.Record, _ []update.Update, _ ...dal.Precondition) error {
 	return dal.ErrNotSupported
 }
 
-func (t transaction) UpdateMulti(_ context.Context, _ []*dal.Key, _ []update.Update, _ ...dal.Precondition) error {
+func (t transaction) UpdateMulti(_ context.Context, _ []*record.Key, _ []update.Update, _ ...dal.Precondition) error {
 	return dal.ErrNotSupported
 }
 
-func (t transaction) Insert(_ context.Context, _ dal.Record, _ ...dal.InsertOption) error {
+func (t transaction) Insert(_ context.Context, _ record.Record, _ ...dal.InsertOption) error {
 	return dal.ErrNotImplementedYet
 }
 
-func (t transaction) InsertMulti(_ context.Context, _ []dal.Record, _ ...dal.InsertOption) error {
+func (t transaction) InsertMulti(_ context.Context, _ []record.Record, _ ...dal.InsertOption) error {
 	return dal.ErrNotImplementedYet
 }

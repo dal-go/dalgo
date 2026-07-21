@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -216,8 +217,8 @@ func TestGroupBy_MinBadSourceInProjection(t *testing.T) {
 func TestGroupBy_OrderByTie(t *testing.T) {
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "1"), &map[string]any{"category": "A"})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "2"), &map[string]any{"category": "B"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "1"), &map[string]any{"category": "A"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "2"), &map[string]any{"category": "B"})))
 	countAll := dal.Count()
 	countAll.Alias = "n"
 	q := salesQuery().
@@ -257,8 +258,8 @@ func TestGroupBy_OrderByBadSource(t *testing.T) {
 func TestGroupBy_SumSkipsNonNumeric(t *testing.T) {
 	db := NewDB().(*database)
 	ctx := context.Background()
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": 10})))
-	require.NoError(t, db.Set(ctx, dal.NewRecordWithData(dal.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": "oops"})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": 10})))
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": "oops"})))
 	q := salesQuery().
 		GroupBy(dal.Field("category")).
 		SelectColumns(dal.Column{Expression: dal.Field("category")}, dal.SumAs(dal.Field("amount"), "total"))

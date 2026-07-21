@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,18 +16,18 @@ type testUser struct {
 	Age       int
 }
 
-// mkDataRec wraps an arbitrary Data() value in a dal.Record. Data() requires
+// mkDataRec wraps an arbitrary Data() value in a record.Record. Data() requires
 // SetError(nil) to be invoked so the underlying record doesn't panic.
-func mkDataRec(t *testing.T, data any) dal.Record {
+func mkDataRec(t *testing.T, data any) record.Record {
 	t.Helper()
-	key := dal.NewKeyWithID("Things", "k")
-	rec := dal.NewRecordWithData(key, data)
+	key := record.NewKeyWithID("Things", "k")
+	rec := record.NewRecordWithData(key, data)
 	rec.SetError(nil)
 	return rec
 }
 
 // TestCompare_DataExtractedViaRecordData pins REQ field-comparison AC-1: the
-// comparator reads via Data(), not via the dal.Record interface header. Two
+// comparator reads via Data(), not via the record.Record interface header. Two
 // records with the same Data() compare Matched even though the wrappers are
 // distinct *record values.
 func TestCompare_DataExtractedViaRecordData(t *testing.T) {
@@ -162,13 +162,13 @@ func TestCompare_IncomparablePanicRecovered(t *testing.T) {
 // panicRecord.Data() panics — exercises the compareRecords recover path.
 type panicRecord struct{}
 
-func (panicRecord) Key() *dal.Key             { return nil }
-func (panicRecord) Data() any                 { panic("boom") }
-func (panicRecord) Error() error              { return nil }
-func (panicRecord) SetError(error) dal.Record { return panicRecord{} }
-func (panicRecord) Exists() bool              { return true }
-func (panicRecord) HasChanged() bool          { return false }
-func (panicRecord) MarkAsChanged()            {}
+func (panicRecord) Key() *record.Key             { return nil }
+func (panicRecord) Data() any                    { panic("boom") }
+func (panicRecord) Error() error                 { return nil }
+func (panicRecord) SetError(error) record.Record { return panicRecord{} }
+func (panicRecord) Exists() bool                 { return true }
+func (panicRecord) HasChanged() bool             { return false }
+func (panicRecord) MarkAsChanged()               {}
 
 // TestCompare_SliceDataEmitsValue — REQ field-comparison AC-4: slice Data()
 // emits one _value delta when the slices differ.

@@ -4,28 +4,28 @@ package dal
 //	"context"
 //)
 
-//type KeyOperation = func(ctx context.Context, key Key) (err error)
-//type GetFunc = func(ctx context.Context, record Record) (err error)
-//type SetFunc = func(ctx context.Context, record Record) (err error)
-//type DelFunc = func(ctx context.Context, key Key) (err error)
-//type UpdateFunc = func(ctx context.Context, key *Key, updates []update, preconditions ...Precondition) error
+//type KeyOperation = func(ctx context.Context, key record.Key) (err error)
+//type GetFunc = func(ctx context.Context, record record.Record) (err error)
+//type SetFunc = func(ctx context.Context, record record.Record) (err error)
+//type DelFunc = func(ctx context.Context, key record.Key) (err error)
+//type UpdateFunc = func(ctx context.Context, key *record.Key, updates []update, preconditions ...Precondition) error
 
 //type HookContext struct {
 //	context.Context
 //	IsInTransaction bool
 //}
 //
-//type BeforeKeyOperationHook = func(ctx HookContext, key *Key) error
-//type BeforeKeysOperationHook = func(ctx HookContext, keys []*Key) error
-//type BeforeRecordOperationHook = func(ctx HookContext, record Record) error
-//type BeforeRecordsOperationHook = func(ctx HookContext, records []Record) error
+//type BeforeKeyOperationHook = func(ctx HookContext, key *record.Key) error
+//type BeforeKeysOperationHook = func(ctx HookContext, keys []*record.Key) error
+//type BeforeRecordOperationHook = func(ctx HookContext, record record.Record) error
+//type BeforeRecordsOperationHook = func(ctx HookContext, records []record.Record) error
 //
-//type AfterKeyOperationHook = func(ctx HookContext, key *Key, err error) error
-//type AfterKeysOperationHook = func(ctx HookContext, keys []*Key, err error) error
-//type AfterRecordOperationHook = func(ctx HookContext, record Record, err error) error
-//type AfterRecordsOperationHook = func(ctx HookContext, records []Record, err error) error
+//type AfterKeyOperationHook = func(ctx HookContext, key *record.Key, err error) error
+//type AfterKeysOperationHook = func(ctx HookContext, keys []*record.Key, err error) error
+//type AfterRecordOperationHook = func(ctx HookContext, record record.Record, err error) error
+//type AfterRecordsOperationHook = func(ctx HookContext, records []record.Record, err error) error
 //
-//type BeforeUpdateHook = func(ctx HookContext, key *Key, updates []update, preconditions ...Precondition) error
+//type BeforeUpdateHook = func(ctx HookContext, key *record.Key, updates []update, preconditions ...Precondition) error
 //
 //type Hooks struct {
 //	beforeGet BeforeRecordOperationHook

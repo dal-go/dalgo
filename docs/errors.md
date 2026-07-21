@@ -19,7 +19,7 @@ This document covers error types and error handling patterns in DALgo.
 import "github.com/dal-go/dalgo/dal"
 
 // Record not found
-dal.ErrRecordNotFound
+record.ErrRecordNotFound
 
 // Operation not supported by adapter
 dal.ErrNotSupported
@@ -34,14 +34,14 @@ dal.ErrNoMoreRecords
 dal.ErrLimitReached
 
 // Internal marker (not an actual error)
-dal.ErrNoError
+record.ErrNoError
 ```
 
 ### Checking for Not Found
 
 ```go
 err := db.Get(ctx, record)
-if dal.IsNotFound(err) {
+if record.IsNotFound(err) {
     // Record doesn't exist
     fmt.Println("Record not found")
 } else if err != nil {
@@ -104,7 +104,7 @@ import "errors"
 err := db.Get(ctx, record)
 
 // Check for specific error
-if errors.Is(err, dal.ErrRecordNotFound) {
+if errors.Is(err, record.ErrRecordNotFound) {
     // Handle not found
 }
 
@@ -128,12 +128,12 @@ if errors.As(err, &notFoundErr) {
 
 ```go
 // Convenience function
-if dal.IsNotFound(err) {
+if record.IsNotFound(err) {
     // Record not found
 }
 
 // Equivalent to:
-if err != nil && errors.Is(err, dal.ErrRecordNotFound) {
+if err != nil && errors.Is(err, record.ErrRecordNotFound) {
     // Record not found
 }
 ```
@@ -145,7 +145,7 @@ if err != nil && errors.Is(err, dal.ErrRecordNotFound) {
 err := db.Get(ctx, record)
 
 // Method 1: Check returned error
-if err != nil && !dal.IsNotFound(err) {
+if err != nil && !record.IsNotFound(err) {
     return err
 }
 
@@ -163,7 +163,7 @@ if !record.Exists() {
 ### Checking Multi-Operation Errors
 
 ```go
-records := []dal.Record{record1, record2, record3}
+records := []record.Record{record1, record2, record3}
 err := db.GetMulti(ctx, records)
 
 // Check overall operation error
@@ -174,7 +174,7 @@ if err != nil {
 // Check individual record errors
 for i, record := range records {
     if err := record.Error(); err != nil {
-        if dal.IsNotFound(err) {
+        if record.IsNotFound(err) {
             fmt.Printf("Record %d not found\n", i)
         } else {
             fmt.Printf("Record %d error: %v\n", i, err)
@@ -196,12 +196,12 @@ if err := dal.AnyRecordWithError(records...); err != nil {
 
 ```go
 func GetUserProfile(ctx context.Context, db dal.DB, userID string) (*Profile, error) {
-    key := dal.NewKeyWithID("profiles", userID)
+    key := record.NewKeyWithID("profiles", userID)
     profile := &Profile{}
-    record := dal.NewRecordWithData(key, profile)
+    record := record.NewRecordWithData(key, profile)
     
     err := db.Get(ctx, record)
-    if dal.IsNotFound(err) {
+    if record.IsNotFound(err) {
         // Return default profile instead of error
         return &Profile{
             UserID: userID,
@@ -220,18 +220,18 @@ func GetUserProfile(ctx context.Context, db dal.DB, userID string) (*Profile, er
 
 ```go
 func GetOrCreateUser(ctx context.Context, db dal.DB, userID string) (*User, error) {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     user := &User{}
-    record := dal.NewRecordWithData(key, user)
+    record := record.NewRecordWithData(key, user)
     
     err := db.Get(ctx, record)
-    if dal.IsNotFound(err) {
+    if record.IsNotFound(err) {
         // Create new user
         user = &User{
             ID:        userID,
             CreatedAt: time.Now(),
         }
-        record = dal.NewRecordWithData(key, user)
+        record = record.NewRecordWithData(key, user)
         
         err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
             return tx.Insert(ctx, record)
@@ -290,10 +290,10 @@ func isTransientError(err error) bool {
 
 ```go
 func BatchCreate(ctx context.Context, db dal.DB, users []*User) error {
-    records := make([]dal.Record, len(users))
+    records := make([]record.Record, len(users))
     for i, user := range users {
-        key := dal.NewKeyWithID("users", user.ID)
-        records[i] = dal.NewRecordWithData(key, user)
+        key := record.NewKeyWithID("users", user.ID)
+        records[i] = record.NewRecordWithData(key, user)
     }
     
     err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -322,7 +322,7 @@ func BatchCreate(ctx context.Context, db dal.DB, users []*User) error {
 
 ```go
 func UpdateUserEmail(ctx context.Context, db dal.DB, userID, newEmail string) error {
-    key := dal.NewKeyWithID("users", userID)
+    key := record.NewKeyWithID("users", userID)
     updates := []update.Update{
         update.ByFieldName("email", newEmail),
     }
@@ -332,7 +332,7 @@ func UpdateUserEmail(ctx context.Context, db dal.DB, userID, newEmail string) er
     })
     
     if err != nil {
-        if dal.IsNotFound(err) {
+        if record.IsNotFound(err) {
             return fmt.Errorf("user %s not found", userID)
         }
         return fmt.Errorf("failed to update email for user %s: %w", userID, err)
@@ -374,7 +374,7 @@ if err != nil {
 ```go
 // ✅ Good: Check every error
 err := db.Get(ctx, record)
-if err != nil && !dal.IsNotFound(err) {
+if err != nil && !record.IsNotFound(err) {
     return fmt.Errorf("failed to get record: %w", err)
 }
 
@@ -388,7 +388,7 @@ db.Get(ctx, record)
 ```go
 // ✅ Good: Handle not found separately
 err := db.Get(ctx, record)
-if dal.IsNotFound(err) {
+if record.IsNotFound(err) {
     // Not found is expected in some cases
     return nil, nil
 } else if err != nil {
@@ -423,12 +423,12 @@ if err != nil {
 
 ```go
 // ✅ Good: Use errors.Is()
-if errors.Is(err, dal.ErrRecordNotFound) {
+if errors.Is(err, record.ErrRecordNotFound) {
     // Works even if err is wrapped
 }
 
 // ❌ Bad: Direct comparison
-if err == dal.ErrRecordNotFound {
+if err == record.ErrRecordNotFound {
     // Fails if error is wrapped
 }
 ```
@@ -438,7 +438,7 @@ if err == dal.ErrRecordNotFound {
 ```go
 // ✅ Good: Log with appropriate level
 err := db.Get(ctx, record)
-if dal.IsNotFound(err) {
+if record.IsNotFound(err) {
     log.Debug("User not found: %s", userID) // Debug level
 } else if err != nil {
     log.Error("Failed to get user %s: %v", userID, err) // Error level
@@ -458,7 +458,7 @@ if err != nil {
 ```go
 // ✅ Good: Propagate or handle errors
 err := db.Get(ctx, record)
-if err != nil && !dal.IsNotFound(err) {
+if err != nil && !record.IsNotFound(err) {
     return fmt.Errorf("failed to get record: %w", err)
 }
 
@@ -476,7 +476,7 @@ if err != nil {
 // ✅ Good: Handle precondition failures
 err := tx.Update(ctx, key, updates, dal.WithExistsPrecondition())
 if err != nil {
-    if dal.IsNotFound(err) {
+    if record.IsNotFound(err) {
         return errors.New("record does not exist")
     }
     if isPreconditionFailed(err) {
@@ -496,13 +496,13 @@ if err != nil {
 
 ```go
 func TestGetUser_NotFound(t *testing.T) {
-    key := dal.NewKeyWithID("users", "nonexistent")
-    record := dal.NewRecordWithData(key, &User{})
+    key := record.NewKeyWithID("users", "nonexistent")
+    record := record.NewRecordWithData(key, &User{})
     
     err := db.Get(ctx, record)
     
     // Test not found is handled correctly
-    if !dal.IsNotFound(err) {
+    if !record.IsNotFound(err) {
         t.Errorf("Expected not found error, got: %v", err)
     }
     
@@ -514,13 +514,13 @@ func TestGetUser_NotFound(t *testing.T) {
 func TestGetUser_DatabaseError(t *testing.T) {
     // Simulate database error (using mock)
     mockDB := &MockDB{
-        GetFunc: func(ctx context.Context, record dal.Record) error {
+        GetFunc: func(ctx context.Context, record record.Record) error {
             return errors.New("database connection failed")
         },
     }
     
-    key := dal.NewKeyWithID("users", "user123")
-    record := dal.NewRecordWithData(key, &User{})
+    key := record.NewKeyWithID("users", "user123")
+    record := record.NewRecordWithData(key, &User{})
     
     err := mockDB.Get(ctx, record)
     

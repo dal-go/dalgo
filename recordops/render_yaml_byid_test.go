@@ -4,18 +4,17 @@ package recordops
 import (
 	"testing"
 
-	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/record"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
-// recByID constructs a record.WithID whose dal.Record carries the given data
+// recByID constructs a record.WithID whose record.Record carries the given data
 // payload. Used to build inputs for the RenderYAMLByID tests.
 func recByID(id string, data map[string]any) record.WithID[string] {
-	key := dal.NewKeyWithID("Users", id)
-	rec := dal.NewRecordWithData(key, data)
+	key := record.NewKeyWithID("Users", id)
+	rec := record.NewRecordWithData(key, data)
 	rec.SetError(nil)
 	return record.WithID[string]{ID: id, Record: rec}
 }

@@ -86,9 +86,9 @@ schema := dal.NewSchema(nil, nil)
 
 ```go
 // Writing to Firestore
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 user := &User{Name: "Alice", Email: "alice@example.com"}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 
 // Firestore stores:
 // - Key: users/user123
@@ -96,7 +96,7 @@ record := dal.NewRecordWithData(key, user)
 // ID is NOT in the document!
 
 // Reading from Firestore
-record := dal.NewRecordWithData(key, &User{})
+record := record.NewRecordWithData(key, &User{})
 db.Get(ctx, record)
 // Key comes from document path, not from data
 ```
@@ -118,16 +118,16 @@ type User struct {
 
 schema := dal.NewSchema(
     // KeyToFields: Inject ID into data
-    func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+    func(key *record.Key, data any) ([]dal.ExtraField, error) {
         return []dal.ExtraField{
             {Name: "id", Value: key.ID},
         }, nil
     },
     
     // DataToKey: Extract ID from data
-    func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+    func(incompleteKey *record.Key, data any) (*record.Key, error) {
         user := data.(*User)
-        return dal.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
+        return record.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
     },
 )
 ```
@@ -137,9 +137,9 @@ schema := dal.NewSchema(
 #### Writing (Set)
 
 ```go
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 user := &User{Name: "Alice", Email: "alice@example.com"}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 
 db.Set(ctx, record)
 
@@ -153,9 +153,9 @@ db.Set(ctx, record)
 #### Reading (Get)
 
 ```go
-key := dal.NewKeyWithID("users", "user123")
+key := record.NewKeyWithID("users", "user123")
 user := &User{}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 
 db.Get(ctx, record)
 
@@ -181,8 +181,8 @@ type TenantUser struct {
 
 schema := dal.NewSchema(
     // KeyToFields: Inject both key fields
-    func(key *dal.Key, data any) ([]dal.ExtraField, error) {
-        fields := key.ID.([]dal.FieldVal)
+    func(key *record.Key, data any) ([]dal.ExtraField, error) {
+        fields := key.ID.([]record.FieldVal)
         extraFields := make([]dal.ExtraField, len(fields))
         for i, f := range fields {
             extraFields[i] = dal.ExtraField{
@@ -194,13 +194,13 @@ schema := dal.NewSchema(
     },
     
     // DataToKey: Extract both key fields
-    func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+    func(incompleteKey *record.Key, data any) (*record.Key, error) {
         user := data.(*TenantUser)
-        fields := []dal.FieldVal{
+        fields := []record.FieldVal{
             {Name: "tenant_id", Value: user.TenantID},
             {Name: "user_id", Value: user.UserID},
         }
-        return dal.NewKeyWithFields(incompleteKey.Collection(), fields...), nil
+        return record.NewKeyWithFields(incompleteKey.Collection(), fields...), nil
     },
 )
 ```
@@ -209,15 +209,15 @@ Usage:
 
 ```go
 // Create composite key
-fields := []dal.FieldVal{
+fields := []record.FieldVal{
     {Name: "tenant_id", Value: "tenant1"},
     {Name: "user_id", Value: "user123"},
 }
-key := dal.NewKeyWithFields("tenant_users", fields...)
+key := record.NewKeyWithFields("tenant_users", fields...)
 
 // Use normally
 user := &TenantUser{Name: "Alice", Email: "alice@example.com"}
-record := dal.NewRecordWithData(key, user)
+record := record.NewRecordWithData(key, user)
 db.Set(ctx, record)
 
 // Generates SQL:
@@ -235,14 +235,14 @@ type Post struct {
 }
 
 schema := dal.NewSchema(
-    func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+    func(key *record.Key, data any) ([]dal.ExtraField, error) {
         return []dal.ExtraField{
             {Name: "id", Value: key.ID},
         }, nil
     },
-    func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+    func(incompleteKey *record.Key, data any) (*record.Key, error) {
         post := data.(*Post)
-        return dal.NewKeyWithID(incompleteKey.Collection(), post.ID), nil
+        return record.NewKeyWithID(incompleteKey.Collection(), post.ID), nil
     },
 )
 ```
@@ -253,7 +253,7 @@ For databases with auto-increment IDs:
 
 ```go
 schema := dal.NewSchema(
-    func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+    func(key *record.Key, data any) ([]dal.ExtraField, error) {
         // For new records, ID might be 0 (to be auto-generated)
         if key.ID.(int) == 0 {
             return nil, nil // Let database generate ID
@@ -262,17 +262,17 @@ schema := dal.NewSchema(
             {Name: "id", Value: key.ID},
         }, nil
     },
-    func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+    func(incompleteKey *record.Key, data any) (*record.Key, error) {
         post := data.(*Post)
         // After insert, database sets ID
-        return dal.NewKeyWithID(incompleteKey.Collection(), post.ID), nil
+        return record.NewKeyWithID(incompleteKey.Collection(), post.ID), nil
     },
 )
 
 // Insert with auto-generated ID
 post := &Post{Title: "Hello", Content: "World"}
-key := dal.NewIncompleteKey("posts", reflect.Int, nil)
-record := dal.NewRecordWithData(key, post)
+key := record.NewIncompleteKey("posts", reflect.Int, nil)
+record := record.NewRecordWithData(key, post)
 
 db.Insert(ctx, record)
 // After insert, post.ID is set by database
@@ -292,19 +292,19 @@ import "reflect"
 
 func NewReflectionSchema(idFieldName string) dal.Schema {
     return dal.NewSchema(
-        func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+        func(key *record.Key, data any) ([]dal.ExtraField, error) {
             return []dal.ExtraField{
                 {Name: "id", Value: key.ID},
             }, nil
         },
-        func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+        func(incompleteKey *record.Key, data any) (*record.Key, error) {
             v := reflect.ValueOf(data).Elem()
             idField := v.FieldByName(idFieldName)
             if !idField.IsValid() {
                 return nil, fmt.Errorf("field %s not found", idFieldName)
             }
             id := idField.Interface()
-            return dal.NewKeyWithID(incompleteKey.Collection(), id), nil
+            return record.NewKeyWithID(incompleteKey.Collection(), id), nil
         },
     )
 }
@@ -326,7 +326,7 @@ type User struct {
 
 func NewTagBasedSchema() dal.Schema {
     return dal.NewSchema(
-        func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+        func(key *record.Key, data any) ([]dal.ExtraField, error) {
             fields := []dal.ExtraField{}
             v := reflect.ValueOf(data).Elem()
             t := v.Type()
@@ -345,7 +345,7 @@ func NewTagBasedSchema() dal.Schema {
             
             return fields, nil
         },
-        func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+        func(incompleteKey *record.Key, data any) (*record.Key, error) {
             // Extract key fields from struct
             // Similar reflection logic
             return nil, nil
@@ -367,7 +367,7 @@ type Member struct {
 }
 
 schema := dal.NewSchema(
-    func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+    func(key *record.Key, data any) ([]dal.ExtraField, error) {
         fields := []dal.ExtraField{
             {Name: "member_id", Value: key.ID},
         }
@@ -382,22 +382,22 @@ schema := dal.NewSchema(
         
         return fields, nil
     },
-    func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+    func(incompleteKey *record.Key, data any) (*record.Key, error) {
         member := data.(*Member)
         
         // Create parent key
-        teamKey := dal.NewKeyWithID("teams", member.TeamID)
+        teamKey := record.NewKeyWithID("teams", member.TeamID)
         
         // Create child key with parent
-        return dal.NewKeyWithParentAndID(teamKey, "members", member.MemberID), nil
+        return record.NewKeyWithParentAndID(teamKey, "members", member.MemberID), nil
     },
 )
 
 // Usage
-teamKey := dal.NewKeyWithID("teams", "engineering")
-memberKey := dal.NewKeyWithParentAndID(teamKey, "members", "alice")
+teamKey := record.NewKeyWithID("teams", "engineering")
+memberKey := record.NewKeyWithParentAndID(teamKey, "members", "alice")
 member := &Member{Name: "Alice", Role: "Engineer"}
-record := dal.NewRecordWithData(memberKey, member)
+record := record.NewRecordWithData(memberKey, member)
 
 db.Set(ctx, record)
 // Generates SQL:
@@ -418,14 +418,14 @@ type Entity struct {
 }
 
 schema := dal.NewSchema(
-    func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+    func(key *record.Key, data any) ([]dal.ExtraField, error) {
         return []dal.ExtraField{
             {Name: "id", Value: key.ID.(uuid.UUID).String()},
         }, nil
     },
-    func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+    func(incompleteKey *record.Key, data any) (*record.Key, error) {
         entity := data.(*Entity)
-        return dal.NewKeyWithID(incompleteKey.Collection(), entity.ID), nil
+        return record.NewKeyWithID(incompleteKey.Collection(), entity.ID), nil
     },
 )
 ```
@@ -440,14 +440,14 @@ schema := dal.NewSchema(
 // ✅ Good: Schema matches database structure
 // Database: users table with 'user_id' column
 schema := dal.NewSchema(
-    func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+    func(key *record.Key, data any) ([]dal.ExtraField, error) {
         return []dal.ExtraField{
             {Name: "user_id", Value: key.ID}, // Matches column name
         }, nil
     },
-    func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+    func(incompleteKey *record.Key, data any) (*record.Key, error) {
         user := data.(*User)
-        return dal.NewKeyWithID(incompleteKey.Collection(), user.UserID), nil
+        return record.NewKeyWithID(incompleteKey.Collection(), user.UserID), nil
     },
 )
 
@@ -459,7 +459,7 @@ schema := dal.NewSchema(
 
 ```go
 // ✅ Good: Check for incomplete keys
-func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+func(key *record.Key, data any) ([]dal.ExtraField, error) {
     if key.ID == nil {
         return nil, nil // Let database generate ID
     }
@@ -471,18 +471,18 @@ func(key *dal.Key, data any) ([]dal.ExtraField, error) {
 
 ```go
 // ✅ Good: Type assertions with checks
-func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+func(incompleteKey *record.Key, data any) (*record.Key, error) {
     user, ok := data.(*User)
     if !ok {
         return nil, fmt.Errorf("expected *User, got %T", data)
     }
-    return dal.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
+    return record.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
 }
 
 // ❌ Bad: Unsafe type assertion
-func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+func(incompleteKey *record.Key, data any) (*record.Key, error) {
     user := data.(*User) // Panics if wrong type
-    return dal.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
+    return record.NewKeyWithID(incompleteKey.Collection(), user.ID), nil
 }
 ```
 
@@ -492,11 +492,11 @@ func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
 // ✅ Good: Consistent naming across schema functions
 const idFieldName = "id"
 
-keyToFields := func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+keyToFields := func(key *record.Key, data any) ([]dal.ExtraField, error) {
     return []dal.ExtraField{{Name: idFieldName, Value: key.ID}}, nil
 }
 
-dataToKey := func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+dataToKey := func(incompleteKey *record.Key, data any) (*record.Key, error) {
     // Uses same field name
     return extractKeyFromField(data, idFieldName)
 }
@@ -513,12 +513,12 @@ dataToKey := func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
 // - No parent relationships
 func NewUserSchema() dal.Schema {
     return dal.NewSchema(
-        func(key *dal.Key, data any) ([]dal.ExtraField, error) {
+        func(key *record.Key, data any) ([]dal.ExtraField, error) {
             return []dal.ExtraField{{Name: "id", Value: key.ID}}, nil
         },
-        func(incompleteKey *dal.Key, data any) (*dal.Key, error) {
+        func(incompleteKey *record.Key, data any) (*record.Key, error) {
             user := data.(*User)
-            return dal.NewKeyWithID("users", user.ID), nil
+            return record.NewKeyWithID("users", user.ID), nil
         },
     )
 }
@@ -531,7 +531,7 @@ func TestSchema(t *testing.T) {
     schema := NewUserSchema()
     
     // Test KeyToFields
-    key := dal.NewKeyWithID("users", "user123")
+    key := record.NewKeyWithID("users", "user123")
     user := &User{Name: "Alice"}
     fields, err := schema.KeyToFields(key, user)
     if err != nil {
@@ -543,7 +543,7 @@ func TestSchema(t *testing.T) {
     
     // Test DataToKey
     user = &User{ID: "user456", Name: "Bob"}
-    incompleteKey := dal.NewIncompleteKey("users", reflect.String, nil)
+    incompleteKey := record.NewIncompleteKey("users", reflect.String, nil)
     key, err = schema.DataToKey(incompleteKey, user)
     if err != nil {
         t.Fatal(err)

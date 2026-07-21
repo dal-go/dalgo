@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
 )
 
 // compareRecords returns the per-field deltas between baseline's Data() and
@@ -18,7 +18,7 @@ import (
 //
 // On panic during reflect.DeepEqual (e.g., a func/chan field), returns
 // (nil, err wrapping ErrIncomparableField).
-func compareRecords(baseID any, baseRec, candRec dal.Record, cfg options) (deltas []FieldValue, err error) {
+func compareRecords(baseID any, baseRec, candRec record.Record, cfg options) (deltas []FieldValue, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("recordops: incomparable field in record %v: %v: %w", baseID, r, ErrIncomparableField)
@@ -51,7 +51,7 @@ func compareRecords(baseID any, baseRec, candRec dal.Record, cfg options) (delta
 // default, returns every field. With cfg.onlyChangedFields, returns only
 // fields that have a delta on at least one candidate; returns nil if no
 // candidate has any delta.
-func baselineFields(baseRec dal.Record, perCandidateDeltas [][]FieldValue, cfg options) []FieldValue {
+func baselineFields(baseRec record.Record, perCandidateDeltas [][]FieldValue, cfg options) []FieldValue {
 	all := extractAllFields(baseRec)
 	if !cfg.onlyChangedFields {
 		return all
@@ -78,7 +78,7 @@ func baselineFields(baseRec dal.Record, perCandidateDeltas [][]FieldValue, cfg o
 // baseline snapshot (default mode) and for the Extra-candidate Fields list.
 // Called by both baselineFields and classify (for the Extra branch in
 // diff.go) — do not add trimming logic here; trimming belongs in callers.
-func extractAllFields(rec dal.Record) []FieldValue {
+func extractAllFields(rec record.Record) []FieldValue {
 	v := deref(reflect.ValueOf(rec.Data()))
 	switch bucket(v) {
 	case bucketStruct:

@@ -1,9 +1,13 @@
 package dal
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/dal-go/record"
+)
 
 func TestRecord_Exists_panics_on_other_error(t *testing.T) {
-	r := (&record{key: NewKeyWithID("Kind1", "k1")}).setError(assertErr("boom"))
+	r := record.NewRecord(record.NewKeyWithID("Kind1", "k1")).SetError(assertErr("boom"))
 	defer func() {
 		if r := recover(); r == nil {
 			t.Errorf("expected panic when Exists() called with non-notfound error set")

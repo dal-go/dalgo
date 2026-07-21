@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 )
 
 var _ TextQuery = (*textQuery)(nil)
@@ -13,7 +14,7 @@ type textQuery struct {
 	args             []QueryArg
 	offset           int
 	limit            int
-	getKey           func(data any, args []QueryArg) *Key
+	getKey           func(data any, args []QueryArg) *record.Key
 	recordsetOptions []recordset.Option
 }
 
@@ -50,7 +51,7 @@ type QueryArg struct {
 	Value any
 }
 
-func NewTextQuery(text string, getKey func(data any, args []QueryArg) *Key, args ...QueryArg) TextQuery {
+func NewTextQuery(text string, getKey func(data any, args []QueryArg) *record.Key, args ...QueryArg) TextQuery {
 	return &textQuery{
 		text:   text,
 		args:   args,
