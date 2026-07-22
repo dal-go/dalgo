@@ -105,12 +105,10 @@ func validateSerializedConfiguration(db *database) error {
 		if factoryPC == serializedEngineFactoryPC {
 			continue
 		}
-		mode := "custom"
-		configured := factory(collection, db.schema.collections[collection], db.schemaRefBreaking)
-		if _, ok := configured.(*columnarEngine); ok {
-			mode = "columnar"
-		}
-		return unsupportedEngineMode(collection, mode)
+		// A non-serialized factory is user-supplied configuration. Do not call it
+		// merely to classify the unsupported mode: constructors may have side
+		// effects or panic. An initialized engine was classified above.
+		return unsupportedEngineMode(collection, "non-serialized")
 	}
 	return nil
 }

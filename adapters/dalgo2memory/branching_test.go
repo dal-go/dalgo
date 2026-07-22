@@ -209,10 +209,10 @@ func TestBranchingRejectsColumnarEngine(t *testing.T) {
 		initialize bool
 		wantMode   string
 	}{
-		{name: "configured columnar", collection: WithColumnarStorage(), wantMode: "columnar"},
+		{name: "configured columnar", collection: WithColumnarStorage(), wantMode: "non-serialized"},
 		{name: "initialized columnar", collection: WithColumnarStorage(), initialize: true, wantMode: "columnar"},
-		{name: "configured custom", collection: withBranchingCustomStorage(), wantMode: "custom"},
-		{name: "configured custom returning serialized", collection: withBranchingCustomSerializedStorage(), wantMode: "custom"},
+		{name: "configured custom", collection: withBranchingCustomStorage(), wantMode: "non-serialized"},
+		{name: "configured custom returning serialized", collection: withBranchingCustomSerializedStorage(), wantMode: "non-serialized"},
 		{name: "initialized custom", collection: withBranchingCustomStorage(), initialize: true, wantMode: "custom"},
 	}
 	for _, tc := range tests {
@@ -240,6 +240,34 @@ func TestBranchingRejectsColumnarEngine(t *testing.T) {
 				t.Fatalf("unsupported mode = %q, want %q", unsupported.Mode, tc.wantMode)
 			}
 		})
+	}
+}
+
+func TestBranchingRejectsConfiguredFactoryWithoutInvokingIt(t *testing.T) {
+	invoked := false
+	panicStorage := func(def *collectionDef) {
+		def.newEngine = func(string, func() any, bool) storageEngine {
+			invoked = true
+			panic("configured custom engine factory must not run during Capture")
+		}
+	}
+	db := NewDB(WithSchema(false,
+		WithCollection[branchingRecord]("items", nil, panicStorage),
+	))
+
+	checkpoint, err := NewBranchingProvider().Capture(context.Background(), db)
+	if checkpoint != nil {
+		t.Fatal("unsupported configured factory published a checkpoint")
+	}
+	var unsupported *branching.UnsupportedError
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("Capture() error = %v, want *branching.UnsupportedError", err)
+	}
+	if unsupported.Mode != "non-serialized" {
+		t.Fatalf("unsupported mode = %q, want %q", unsupported.Mode, "non-serialized")
+	}
+	if invoked {
+		t.Fatal("Capture invoked an unsupported configured engine factory")
 	}
 }
 
