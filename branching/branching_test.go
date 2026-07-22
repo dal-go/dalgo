@@ -42,3 +42,10 @@ func TestUnsupportedError(t *testing.T) {
 		t.Fatal("unsupported error is empty")
 	}
 }
+
+func TestUnsupportedErrorWithoutReason(t *testing.T) {
+	err := &branching.UnsupportedError{Provider: "memory", Mode: "custom"}
+	if got, want := err.Error(), `dalgo branching: unsupported capability: provider="memory" mode="custom"`; got != want {
+		t.Fatalf("Error() = %q, want %q", got, want)
+	}
+}
