@@ -24,7 +24,7 @@ func TestBranchingCaptureRejectsInvalidSources(t *testing.T) {
 
 	t.Run("typed nil", func(t *testing.T) {
 		var memoryDB *database
-		var source dal.DB = dal.NewDB(memoryDB)
+		source := dal.NewDB(memoryDB)
 		checkpoint, err := provider.Capture(context.Background(), source)
 		if checkpoint != nil || !errors.Is(err, branching.ErrNilSourceDB) {
 			t.Fatalf("Capture() = (%v, %v), want (nil, ErrNilSourceDB)", checkpoint, err)

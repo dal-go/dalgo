@@ -139,6 +139,37 @@ func TestAsFindsOptionalCapabilitiesThroughTheWrapper(t *testing.T) {
 	}
 }
 
+// capableDecorator advertises a capability of its own, on top of a DB.
+type capableDecorator struct {
+	dal.DB
+}
+
+func (capableDecorator) Capability() string { return "decorator-capability" }
+
+// TestAsPrefersTheOutermostImplementation: a decorator that adds or overrides a
+// capability must win over the backend it wraps, or a caching or policy layer
+// would be silently bypassed.
+func TestAsPrefersTheOutermostImplementation(t *testing.T) {
+	db := capableDecorator{DB: dal.NewDB(newSpyBackend())}
+	c, ok := dal.As[capability](db)
+	if !ok {
+		t.Fatal("dal.As did not find the decorator's own capability")
+	}
+	if got := c.Capability(); got != "decorator-capability" {
+		t.Fatalf("Capability() = %q, want the decorator's", got)
+	}
+}
+
+// TestBackendOfLeavesADecoratorAlone: a decorator is not a framework wrapper and
+// has no backend to unwrap, so BackendOf must return it unchanged rather than
+// reaching past it.
+func TestBackendOfLeavesADecoratorAlone(t *testing.T) {
+	db := &cachingDB{DB: dal.NewDB(newSpyBackend())}
+	if got := dal.BackendOf(db); got != dal.Backend(db) {
+		t.Fatalf("BackendOf(decorator) = %T, want the decorator itself", got)
+	}
+}
+
 // TestAsReportsMissingCapability keeps dal.As from being a blanket "yes".
 func TestAsReportsMissingCapability(t *testing.T) {
 	if _, ok := dal.As[capability](dal.NewDB(readOnlyBackend{})); ok {

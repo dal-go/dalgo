@@ -57,7 +57,7 @@ func TestSchemaModifier_InterfaceExists(t *testing.T) {
 
 func TestSchemaModifier_NotEmbeddedInDB(t *testing.T) {
 	// Per REQ:opt-in-not-embedded AC-1 + AC-2.
-	var db dal.DB = dal.NewDB(newMinStubDB("x"))
+	db := dal.NewDB(newMinStubDB("x"))
 	_, ok := db.(SchemaModifier)
 	assert.False(t, ok)
 }

@@ -109,16 +109,13 @@ type Check struct {
 func RunConformance(t *testing.T, newDB Factory, opts ...Option) {
 	t.Helper()
 	if newDB == nil {
-		t.Fatal("dalgotest: factory is required")
+		panic("dalgotest: RunConformance requires a Factory")
 	}
 	for _, check := range Checks(opts...) {
 		t.Run(check.Name, func(t *testing.T) {
 			db, cleanup := newDB(t)
 			if cleanup != nil {
 				defer cleanup()
-			}
-			if db == nil {
-				t.Fatal("dalgotest: factory returned a nil dal.DB")
 			}
 			if err := check.Run(context.Background(), db); err != nil {
 				t.Error(err)
@@ -130,7 +127,7 @@ func RunConformance(t *testing.T, newDB Factory, opts ...Option) {
 // Checks returns the conformance checks.
 func Checks(opts ...Option) []Check {
 	o := newOptions(opts...)
-	s := suite{collection: o.collection}
+	s := suite{options: o}
 
 	checks := []Check{
 		{"leaves records without validatable data alone", s.plainRecordIsUnaffected},
@@ -154,7 +151,7 @@ func Checks(opts ...Option) []Check {
 }
 
 type suite struct {
-	collection string
+	options
 }
 
 func (s suite) key(id string) *record.Key {
@@ -299,7 +296,7 @@ func (s suite) rejectedRecordIsNotPersisted(ctx context.Context, db dal.DB) erro
 		return tx.Insert(ctx, s.invalid("not-persisted"))
 	})
 	if !errors.Is(err, ErrInvalidRecord) {
-		return fmt.Errorf("Insert of an invalid record failed with %v, want the validation error", err)
+		return fmt.Errorf("an invalid record was accepted by Insert with %v, want the validation error", err)
 	}
 	exists, known, err := s.persisted(ctx, db, key)
 	if err != nil {
@@ -317,7 +314,7 @@ func (s suite) plainRecordIsUnaffected(ctx context.Context, db dal.DB) error {
 		return tx.Set(ctx, r)
 	})
 	if err != nil && !unsupported(err) {
-		return fmt.Errorf("Set of data that does not implement dal.ValidatableRecord failed with %v", err)
+		return fmt.Errorf("a Set of data that does not implement dal.ValidatableRecord failed with %v", err)
 	}
 	return nil
 }

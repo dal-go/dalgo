@@ -2,7 +2,6 @@ package dal
 
 import (
 	"context"
-	"fmt"
 )
 
 // NewDB wraps a storage adapter's Backend in the framework-owned write pipeline
@@ -117,7 +116,7 @@ var (
 
 func (db *validatedWriteDB) dalgoWithoutValidation() WriteSession {
 	unvalidated := *db
-	unvalidated.writePipeline.validate = false
+	unvalidated.validate = false
 	return &unvalidated
 }
 
@@ -146,10 +145,6 @@ var _ ReadwriteTransaction = validatedTx{}
 func (tx validatedTx) ID() string { return tx.rw.ID() }
 
 func (tx validatedTx) dalgoWithoutValidation() WriteSession {
-	tx.writePipeline.validate = false
+	tx.validate = false
 	return tx
-}
-
-func (tx validatedTx) String() string {
-	return fmt.Sprintf("dal.validatedTx{%v}", tx.rw)
 }
