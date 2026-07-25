@@ -13,7 +13,15 @@ This document covers data validation and operation hooks in DALgo.
 
 ## Validation
 
-DALgo automatically validates records before save operations if they implement the `ValidatableRecord` interface.
+DALgo validates a record before it is written whenever its data implements the
+`ValidatableRecord` interface. Enforcement belongs to the framework, not to the
+adapters: every write reachable through a `dal.DB` runs `dal.BeforeSave` before
+the storage adapter is entered, so an adapter cannot skip it and two adapters
+cannot disagree about whether a write is legal.
+
+Validation runs on `Insert`, `Set`, `UpdateRecord` and each `Multi*` variant.
+`Update` and `Delete` address records by key and carry no data to validate;
+`Delete` still runs its before-delete hooks.
 
 ### ValidatableRecord Interface
 
@@ -22,6 +30,28 @@ type ValidatableRecord interface {
     Validate() error
 }
 ```
+
+### Batches are rejected whole
+
+`InsertMulti` and `SetMulti` validate every record before writing any of them, so
+a batch whose last record is invalid writes none of them rather than being
+half-applied.
+
+### Skipping validation on purpose
+
+Some writes legitimately must skip validation: repair migrations, bulk import,
+writing a record that is *known* invalid in order to fix it later.
+`dal.WithoutValidation` is the sanctioned route. It is deliberately visible and
+greppable at the call site — the aim is not to prevent skipping but to stop it
+happening invisibly inside an adapter:
+
+```go
+err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+	return dal.WithoutValidation(tx).Set(ctx, knownBadRecord)
+})
+```
+
+Registered hooks still run: this opts out of validation, not out of the pipeline.
 
 ### Basic Validation
 
@@ -152,28 +182,33 @@ DALgo provides a hook system for executing code before/after database operations
 
 ### BeforeSave Hook
 
+`dal.BeforeSave` is the single enforcement point: it validates the record's data
+and then runs the registered before-save hooks. Applications do not call it —
+the write pipeline behind every `dal.DB` calls it for them.
+
 ```go
 import "github.com/dal-go/dalgo/dal"
 
-// Called automatically before Set operations
+// Called by the framework before every record-bearing write.
 err := dal.BeforeSave(ctx, db, record)
 if err != nil {
-    // Validation or hook failed
+    // Validation or a hook failed; the write never reached the adapter.
 }
 ```
 
 ### Custom Hooks
 
-Define custom record hooks:
+Register hooks once, at start-up. `dal.AddBeforeSaveHook` feeds the registry the
+write pipeline reads, and `dal.AddBeforeDeleteHook` its delete-side twin (which
+receives a record carrying only the key being deleted). A hook that returns an
+error aborts the operation with `dal.ErrHookFailed`, and the write never reaches
+the adapter.
 
 ```go
 type RecordHook func(ctx context.Context, record record.Record) error
 
-// Register custom hooks
-var customHooks []dal.RecordHook
-
 func init() {
-    customHooks = append(customHooks, timestampHook, auditLogHook)
+    dal.AddBeforeSaveHook(timestampHook, auditLogHook)
 }
 
 func timestampHook(ctx context.Context, record record.Record) error {

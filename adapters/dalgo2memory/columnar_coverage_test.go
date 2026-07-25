@@ -26,7 +26,7 @@ type tagged struct {
 // unexported skip) and the reference-bearing detection over a map field.
 func TestColumnar_BuildColumnsTagsAndRefTypes(t *testing.T) {
 	t.Parallel()
-	db := NewDB(WithSchema(false, WithCollection[tagged]("t", nil, WithColumnarStorage()))).(*database)
+	db := newDatabase(WithSchema(false, WithCollection[tagged]("t", nil, WithColumnarStorage())))
 	eng := db.engine("t").(*columnarEngine)
 
 	require.Contains(t, eng.byName, "renamed")
@@ -79,9 +79,9 @@ func TestColumnar_StructTypeOfErrors(t *testing.T) {
 func TestColumnar_ExplicitStrategyOption(t *testing.T) {
 	t.Parallel()
 	stgy := newRecordingStrategy(true, func(int) bool { return true })
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[user]("users", nil, WithColumnarStorage(WithColumnStrategy("Role", stgy))),
-	)).(*database)
+	))
 	eng := db.engine("users").(*columnarEngine)
 	require.Same(t, stgy, eng.byName["Role"].strategy)
 	require.Nil(t, eng.byName["Role"].defaultStgy)
@@ -164,7 +164,7 @@ func TestColumnar_MaybeCompactNoTrigger(t *testing.T) {
 func TestColumnar_CompactRebuildsExternalStrategy(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB(WithSchema(false, WithCollection[queryRow]("q", nil, WithColumnarStorage()))).(*database)
+	db := newDatabase(WithSchema(false, WithCollection[queryRow]("q", nil, WithColumnarStorage())))
 	eng := db.engine("q").(*columnarEngine)
 	stgy := newRecordingStrategy(true, func(slot int) bool { return slot < len(eng.live) && eng.live[slot] })
 	eng.byName["Group"].strategy = stgy
@@ -279,9 +279,9 @@ func TestColumnar_DecodeFieldsAssignError(t *testing.T) {
 // TestColumnar_UpdateOnBrokenEngine covers update()'s initErr branch.
 func TestColumnar_UpdateOnBrokenEngine(t *testing.T) {
 	t.Parallel()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[map[string]any]("blobs", nil, WithColumnarStorage()),
-	)).(*database)
+	))
 	eng := db.engine("blobs").(*columnarEngine)
 	require.Error(t, eng.update("x", []update.Update{update.ByFieldName("a", 1)}))
 }

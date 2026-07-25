@@ -35,7 +35,7 @@ func notSupportedModifier(op string, db dal.DB) error {
 // *dbschema.NotSupportedError if db does not implement
 // SchemaModifier.
 func CreateCollection(ctx context.Context, db dal.DB, c dbschema.CollectionDef, opts ...Option) error {
-	m, ok := db.(SchemaModifier)
+	m, ok := dal.As[SchemaModifier](db)
 	if !ok {
 		return notSupportedModifier("CreateCollection", db)
 	}
@@ -46,7 +46,7 @@ func CreateCollection(ctx context.Context, db dal.DB, c dbschema.CollectionDef, 
 // SchemaModifier. Returns *dbschema.NotSupportedError if db does not
 // implement SchemaModifier.
 func DropCollection(ctx context.Context, db dal.DB, name string, opts ...Option) error {
-	m, ok := db.(SchemaModifier)
+	m, ok := dal.As[SchemaModifier](db)
 	if !ok {
 		return notSupportedModifier("DropCollection", db)
 	}
@@ -63,7 +63,7 @@ func DropCollection(ctx context.Context, db dal.DB, name string, opts ...Option)
 // *PartialSuccessError. Consumers wanting strict atomicity should
 // check SupportsTransactionalDDL(db) before calling.
 func AlterCollection(ctx context.Context, db dal.DB, name string, ops ...AlterOp) error {
-	m, ok := db.(SchemaModifier)
+	m, ok := dal.As[SchemaModifier](db)
 	if !ok {
 		return notSupportedModifier("AlterCollection", db)
 	}

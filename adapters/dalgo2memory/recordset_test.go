@@ -116,7 +116,7 @@ func TestRecordset_NameOption(t *testing.T) {
 
 // A non-structured query is not supported by the recordset reader.
 func TestRecordset_NonStructuredUnsupported(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	_, err := db.ExecuteQueryToRecordsetReader(context.Background(), notStructuredQuery{})
 	require.ErrorIs(t, err, dal.ErrNotSupported)
 }

@@ -21,7 +21,8 @@ func TestEndToEnd_panics(t *testing.T) {
 			}
 		}()
 		ctrl := gomock.NewController(t)
-		db := mock_dal.NewMockDB(ctrl)
+		backend := mock_dal.NewMockBackend(ctrl)
+		db := dal.NewDB(backend)
 		TestDalgoDB(nil, db, nil, true)
 	})
 	t.Run("panics_on_nil_db", func(t *testing.T) {
@@ -40,14 +41,15 @@ func TestEndToEnd(t *testing.T) {
 
 	var controllers []*gomock.Controller
 
-	db := mock_dal.NewMockDB(dbCtrl)
+	backend := mock_dal.NewMockBackend(dbCtrl)
+	db := dal.NewDB(backend)
 
 	keyOnlyRecord := func(collection, id string) record.Record {
 		return record.NewRecord(record.NewKeyWithID(collection, record.EscapeID(id)))
 	}
 
 	var getNumber int
-	db.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, r record.Record) error {
+	backend.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, r record.Record) error {
 		getNumber++
 		switch getNumber {
 		case 1:
@@ -64,7 +66,7 @@ func TestEndToEnd(t *testing.T) {
 	}).Times(2)
 
 	var existsCallNumber int
-	db.EXPECT().Exists(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, key *record.Key) (bool, error) {
+	backend.EXPECT().Exists(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, key *record.Key) (bool, error) {
 		existsCallNumber++
 		switch existsCallNumber {
 		case 1:
@@ -115,7 +117,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	// Expectation for calls WITHOUT transaction options
-	db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
+	backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
 		ctrl := gomock.NewController(t)
 		controllers = append(controllers, ctrl)
 		tx := mock_dal.NewMockReadwriteTransaction(ctrl)
@@ -172,7 +174,7 @@ func TestEndToEnd(t *testing.T) {
 		return f(ctx, tx)
 	}).Times(13)
 
-	db.EXPECT().RunReadonlyTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, f dal.ROTxWorker, options ...dal.TransactionOption) error {
+	backend.EXPECT().RunReadonlyTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, f dal.ROTxWorker, options ...dal.TransactionOption) error {
 		ctrl := gomock.NewController(t)
 		controllers = append(controllers, ctrl)
 		tx := mock_dal.NewMockReadTransaction(ctrl)

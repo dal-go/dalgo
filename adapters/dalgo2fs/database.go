@@ -28,8 +28,10 @@ func NewDB(dirPath string) (db dal.DB, err error) {
 		return
 	}
 	fsFb.path = dirPath
-	return &fsFb, nil
+	return dal.NewDB(&fsFb), nil
 }
+
+var _ dal.Backend = (*database)(nil)
 
 type database struct {
 	// dal.NoConcurrency: file-backed store concurrency is unproven;

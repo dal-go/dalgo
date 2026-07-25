@@ -18,9 +18,9 @@ import (
 // strategy/ref-breaking override).
 func mixedDB(t *testing.T, opts ...ColumnOption) *database {
 	t.Helper()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[map[string]any]("m", nil, WithColumnarStorage(opts...)),
-	)).(*database)
+	))
 	return db
 }
 
@@ -28,9 +28,9 @@ func mixedDB(t *testing.T, opts ...ColumnOption) *database {
 // comparisons.
 func serMapDB(t *testing.T) *database {
 	t.Helper()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[map[string]any]("m", nil, WithSerializedStorage()),
-	)).(*database)
+	))
 	return db
 }
 
@@ -380,9 +380,9 @@ func TestMixed_LastDeclarationWins(t *testing.T) {
 // collection are accepted but the struct path still reflects over T.
 func TestMixed_DeclaredOnStructIsRedundant(t *testing.T) {
 	t.Parallel()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[item]("items", nil, WithColumnarStorage(WithDeclaredColumn[int]("Count"))),
-	)).(*database)
+	))
 	eng := db.engine("items").(*columnarEngine)
 	require.False(t, eng.mapBacked)
 	// Struct reflection still produced all columns (not just the declared one).

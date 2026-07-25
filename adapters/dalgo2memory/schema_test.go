@@ -30,17 +30,17 @@ func readAll(t *testing.T, reader dal.RecordsReader) []record.Record {
 }
 
 func TestNewDBIgnoresNilOption(t *testing.T) {
-	db := NewDB(nil, WithSchema(false, WithCollection[user]("users", nil)), nil).(*database)
+	db := newDatabase(nil, WithSchema(false, WithCollection[user]("users", nil)), nil)
 	require.NotNil(t, db.schema)
 	require.Contains(t, db.schema.collections, "users")
 }
 
 func TestSchemaTypedQueryResults(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[user]("users", func() *user { return &user{Role: "member"} }),
 		WithCollection[thing]("things", nil),
-	)).(*database)
+	))
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &user{Name: "Alice", Role: "admin"})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u2"), &user{Name: "Bob"})))
@@ -65,9 +65,9 @@ func TestSchemaTypedQueryResults(t *testing.T) {
 
 func TestSchemaNilFactoryUsesZeroValue(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[thing]("things", nil),
-	)).(*database)
+	))
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("things", "t1"), &thing{Name: "x", Count: 7})))
 
@@ -85,9 +85,9 @@ func TestSchemaNilFactoryUsesZeroValue(t *testing.T) {
 
 func TestSchemaUndefinedCollectionErrors(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[user]("users", nil),
-	)).(*database)
+	))
 	key := record.NewKeyWithID("orphans", "o1")
 
 	// All write/read operations on an undefined collection are rejected.
@@ -108,9 +108,9 @@ func TestSchemaUndefinedCollectionErrors(t *testing.T) {
 
 func TestSchemaRejectsUndefinedFieldsOnWrite(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[user]("users", nil),
-	)).(*database)
+	))
 	key := record.NewKeyWithID("users", "u1")
 
 	// A field that does not exist on the user type must be rejected.
@@ -136,9 +136,9 @@ func TestSchemaRejectsUndefinedFieldsOnWrite(t *testing.T) {
 
 func TestSchemaQueryMalformedStoredData(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[thing]("things", nil),
-	)).(*database)
+	))
 	key := record.NewKeyWithID("things", "bad")
 	// Decodes fine into map[string]any, but Count("x") fails to decode into thing.
 	db.collections["things"] = &serializedEngine{records: map[string][]byte{keyID(key): []byte(`{"Count":"x"}`)}}
@@ -151,9 +151,9 @@ func TestSchemaQueryMalformedStoredData(t *testing.T) {
 
 func TestSchemaAllowUndefinedFallsBack(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB(WithSchema(true,
+	db := newDatabase(WithSchema(true,
 		WithCollection[user]("users", nil),
-	)).(*database)
+	))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orphans", "o1"), &thing{Name: "x"})))
 
 	q := dal.From(dal.NewRootCollectionRef("orphans", "")).NewQuery().SelectKeysOnly(reflect.String)
@@ -167,9 +167,9 @@ func TestSchemaAllowUndefinedFallsBack(t *testing.T) {
 
 func TestSchemaIntoRecordTakesPrecedence(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[user]("users", nil),
-	)).(*database)
+	))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &user{Name: "Alice"})))
 
 	q := dal.From(dal.NewRootCollectionRef("users", "")).NewQuery().SelectIntoRecord(func() record.Record {
@@ -185,7 +185,7 @@ func TestSchemaIntoRecordTakesPrecedence(t *testing.T) {
 
 func TestNoSchemaUnaffected(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	require.Nil(t, db.schema)
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &user{Name: "Alice"})))
 

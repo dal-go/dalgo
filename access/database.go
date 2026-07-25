@@ -54,7 +54,7 @@ func SecureDB(db dal.DB, options ...DBOption) (dal.DB, error) {
 		}
 	}
 	return &securedDB{
-		db: db,
+		DB: db,
 		guard: guard{
 			databasePolicies: append([]Policy(nil), settings.databasePolicies...),
 			requireContext:   settings.requireContext,
@@ -80,42 +80,46 @@ func BindDB(db dal.DB, ctx context.Context) dal.DB {
 		bound.guard = secured.guard.bind(ctx)
 		return &bound
 	}
-	return &securedDB{db: db, guard: guard{}.bind(ctx)}
+	return &securedDB{DB: db, guard: guard{}.bind(ctx)}
 }
 
+// securedDB decorates a DB with access-policy enforcement. It embeds dal.DB
+// rather than holding it in a named field so that it satisfies the sealed
+// dal.DB interface: the unexported marker method is promoted along with every
+// method securedDB does not override.
 type securedDB struct {
-	db    dal.DB
+	dal.DB
 	guard guard
 }
 
-func (db *securedDB) ID() string { return db.db.ID() }
+func (db *securedDB) ID() string { return db.DB.ID() }
 
-func (db *securedDB) Adapter() dal.Adapter { return db.db.Adapter() }
+func (db *securedDB) Adapter() dal.Adapter { return db.DB.Adapter() }
 
-func (db *securedDB) Schema() dal.Schema { return db.db.Schema() }
+func (db *securedDB) Schema() dal.Schema { return db.DB.Schema() }
 
 func (db *securedDB) SupportsConcurrentConnections() bool {
-	return db.db.SupportsConcurrentConnections()
+	return db.DB.SupportsConcurrentConnections()
 }
 
 func (db *securedDB) Exists(ctx context.Context, key *record.Key) (bool, error) {
-	return securedReadSession{session: db.db, guard: db.guard}.Exists(ctx, key)
+	return securedReadSession{session: db.DB, guard: db.guard}.Exists(ctx, key)
 }
 
 func (db *securedDB) Get(ctx context.Context, record record.Record) error {
-	return securedReadSession{session: db.db, guard: db.guard}.Get(ctx, record)
+	return securedReadSession{session: db.DB, guard: db.guard}.Get(ctx, record)
 }
 
 func (db *securedDB) GetMulti(ctx context.Context, records []record.Record) error {
-	return securedReadSession{session: db.db, guard: db.guard}.GetMulti(ctx, records)
+	return securedReadSession{session: db.DB, guard: db.guard}.GetMulti(ctx, records)
 }
 
 func (db *securedDB) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
-	return securedReadSession{session: db.db, guard: db.guard}.ExecuteQueryToRecordsReader(ctx, query)
+	return securedReadSession{session: db.DB, guard: db.guard}.ExecuteQueryToRecordsReader(ctx, query)
 }
 
 func (db *securedDB) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
-	return securedReadSession{session: db.db, guard: db.guard}.ExecuteQueryToRecordsetReader(ctx, query, options...)
+	return securedReadSession{session: db.DB, guard: db.guard}.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
 func (db *securedDB) RunReadonlyTransaction(ctx context.Context, worker dal.ROTxWorker, options ...dal.TransactionOption) error {
@@ -123,7 +127,7 @@ func (db *securedDB) RunReadonlyTransaction(ctx context.Context, worker dal.ROTx
 		return err
 	}
 	captured := db.guard.bind(ctx)
-	return db.db.RunReadonlyTransaction(ctx, func(workerCtx context.Context, tx dal.ReadTransaction) error {
+	return db.DB.RunReadonlyTransaction(ctx, func(workerCtx context.Context, tx dal.ReadTransaction) error {
 		securedTx := &securedReadTransaction{
 			securedReadSession: securedReadSession{session: tx, guard: captured},
 			tx:                 tx,
@@ -138,7 +142,7 @@ func (db *securedDB) RunReadwriteTransaction(ctx context.Context, worker dal.RWT
 		return err
 	}
 	captured := db.guard.bind(ctx)
-	return db.db.RunReadwriteTransaction(ctx, func(workerCtx context.Context, tx dal.ReadwriteTransaction) error {
+	return db.DB.RunReadwriteTransaction(ctx, func(workerCtx context.Context, tx dal.ReadwriteTransaction) error {
 		securedTx := &securedReadwriteTransaction{
 			securedReadwriteSession: securedReadwriteSession{
 				securedReadSession:  securedReadSession{session: tx, guard: captured},

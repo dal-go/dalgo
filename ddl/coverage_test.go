@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dal-go/dalgo/dal"
 )
 
 // TestAlterOpMarkers exercises the unexported sealed marker method on
@@ -27,5 +29,5 @@ func TestBackendName_NilDB(t *testing.T) {
 // TestBackendName_NilAdapter covers the db.Adapter() == nil branch.
 func TestBackendName_NilAdapter(t *testing.T) {
 	db := newMinStubDBNilAdapter()
-	assert.Equal(t, "", backendName(db))
+	assert.Equal(t, "", backendName(dal.NewDB(db)))
 }

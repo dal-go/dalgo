@@ -24,7 +24,7 @@ func TestBranchingCaptureRejectsInvalidSources(t *testing.T) {
 
 	t.Run("typed nil", func(t *testing.T) {
 		var memoryDB *database
-		var source dal.DB = memoryDB
+		var source dal.DB = dal.NewDB(memoryDB)
 		checkpoint, err := provider.Capture(context.Background(), source)
 		if checkpoint != nil || !errors.Is(err, branching.ErrNilSourceDB) {
 			t.Fatalf("Capture() = (%v, %v), want (nil, ErrNilSourceDB)", checkpoint, err)
@@ -73,18 +73,18 @@ func TestBranchingCaptureHonorsContextAtBothBoundaries(t *testing.T) {
 
 func TestBranchingPreservesSerializedSchemaConfiguration(t *testing.T) {
 	ctx := context.Background()
-	source := NewDB(
+	source := newDatabase(
 		WithNoReadsAfterWritesInTransaction(),
 		WithoutSchemaRefBreaking(),
 		WithSchema(true,
 			WithCollection[branchingRecord]("items", nil, WithSerializedStorage()),
 		),
-	).(*database)
+	)
 	if err := source.Set(ctx, record.NewRecordWithData(branchingRootKey("milk"), &branchingRecord{Title: "milk"})); err != nil {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := NewBranchingProvider().Capture(ctx, source)
+	checkpoint, err := NewBranchingProvider().Capture(ctx, dal.NewDB(source))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestBranchingPreservesSerializedSchemaConfiguration(t *testing.T) {
 
 	first := mustBranch(t, checkpoint)
 	defer closeTestBranch(t, first)
-	firstDB := first.DB().(*database)
+	firstDB := dal.BackendOf(first.DB()).(*database)
 	assertSerializedSchemaClone(t, firstDB)
 
 	// A branch also owns its schema maps; sibling creation must clone them again.
@@ -105,7 +105,7 @@ func TestBranchingPreservesSerializedSchemaConfiguration(t *testing.T) {
 	delete(firstDB.schema.engines, "items")
 	second := mustBranch(t, checkpoint)
 	defer closeTestBranch(t, second)
-	assertSerializedSchemaClone(t, second.DB().(*database))
+	assertSerializedSchemaClone(t, dal.BackendOf(second.DB()).(*database))
 }
 
 func assertSerializedSchemaClone(t testing.TB, db *database) {

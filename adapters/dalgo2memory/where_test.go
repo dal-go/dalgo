@@ -150,7 +150,7 @@ func insertTaggedThings(t *testing.T, db *database) {
 // shape end to end: records persisted with a []string field (the serialized
 // engine decodes it back as []any of string) matched via WhereArrayContains.
 func TestQueryWhereArrayContainsEndToEnd(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	insertTaggedThings(t, db)
 
 	for _, tt := range []struct {
@@ -173,7 +173,7 @@ func TestQueryWhereArrayContainsEndToEnd(t *testing.T) {
 // TestQueryWhereArrayContainsAnyEndToEnd exercises the firestore
 // "array-contains-any" shape end to end.
 func TestQueryWhereArrayContainsAnyEndToEnd(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	insertTaggedThings(t, db)
 
 	for _, tt := range []struct {
@@ -196,7 +196,7 @@ func TestQueryWhereArrayContainsAnyEndToEnd(t *testing.T) {
 
 // TestQueryWhereOperatorsEndToEnd exercises ordering operators end to end.
 func TestQueryWhereOperatorsEndToEnd(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	insertTaggedThings(t, db)
 
 	for _, tt := range []struct {
@@ -255,7 +255,7 @@ func queryTimedThings(t *testing.T, db *database, where func(qb *dal.QueryBuilde
 // TestQueryWhereTimeEqualEndToEnd verifies that a time.Time constant in an
 // Equal filter matches the stored RFC3339-normalized value.
 func TestQueryWhereTimeEqualEndToEnd(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	insertTimedThings(t, db)
 
 	zero := time.Time{}
@@ -276,7 +276,7 @@ func TestQueryWhereTimeEqualEndToEnd(t *testing.T) {
 // time constant does NOT match rows whose DtNext is also zero, and that
 // chronological ordering is correct.
 func TestQueryWhereTimeGreaterThenEndToEnd(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	insertTimedThings(t, db)
 
 	zero := time.Time{}
@@ -289,7 +289,7 @@ func TestQueryWhereTimeGreaterThenEndToEnd(t *testing.T) {
 
 // TestQueryWhereTimeOrderingEndToEnd verifies chronological sort order.
 func TestQueryWhereTimeOrderingEndToEnd(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	insertTimedThings(t, db)
 
 	zero := time.Time{}
@@ -303,7 +303,7 @@ func TestQueryWhereTimeOrderingEndToEnd(t *testing.T) {
 // TestQueryWhereMultipleConditionsEndToEnd verifies that multiple Where
 // conditions (compiled into an AND GroupCondition) are all applied.
 func TestQueryWhereMultipleConditionsEndToEnd(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	insertTaggedThings(t, db)
 
 	ids := queryTaggedThings(t, db, func(qb *dal.QueryBuilder) dal.IQueryBuilder {

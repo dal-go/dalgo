@@ -30,46 +30,46 @@ func notSupportedReader(op string, db dal.DB) error {
 	}
 }
 
-// ListCollections type-asserts db to SchemaReader and delegates;
+// ListCollections resolves db to a SchemaReader (see dal.As) and delegates;
 // returns *NotSupportedError if the assertion fails.
 func ListCollections(ctx context.Context, db dal.DB, parent *record.Key) ([]dal.CollectionRef, error) {
-	r, ok := db.(SchemaReader)
+	r, ok := dal.As[SchemaReader](db)
 	if !ok {
 		return nil, notSupportedReader("ListCollections", db)
 	}
 	return r.ListCollections(ctx, parent)
 }
 
-// DescribeCollection type-asserts db to SchemaReader and delegates.
+// DescribeCollection resolves db to a SchemaReader (see dal.As) and delegates.
 func DescribeCollection(ctx context.Context, db dal.DB, ref *dal.CollectionRef) (*CollectionDef, error) {
-	r, ok := db.(SchemaReader)
+	r, ok := dal.As[SchemaReader](db)
 	if !ok {
 		return nil, notSupportedReader("DescribeCollection", db)
 	}
 	return r.DescribeCollection(ctx, ref)
 }
 
-// ListIndexes type-asserts db to SchemaReader and delegates.
+// ListIndexes resolves db to a SchemaReader (see dal.As) and delegates.
 func ListIndexes(ctx context.Context, db dal.DB, ref *dal.CollectionRef) ([]IndexDef, error) {
-	r, ok := db.(SchemaReader)
+	r, ok := dal.As[SchemaReader](db)
 	if !ok {
 		return nil, notSupportedReader("ListIndexes", db)
 	}
 	return r.ListIndexes(ctx, ref)
 }
 
-// ListConstraints type-asserts db to SchemaReader and delegates.
+// ListConstraints resolves db to a SchemaReader (see dal.As) and delegates.
 func ListConstraints(ctx context.Context, db dal.DB, ref *dal.CollectionRef) ([]ConstraintDef, error) {
-	r, ok := db.(SchemaReader)
+	r, ok := dal.As[SchemaReader](db)
 	if !ok {
 		return nil, notSupportedReader("ListConstraints", db)
 	}
 	return r.ListConstraints(ctx, ref)
 }
 
-// ListReferrers type-asserts db to SchemaReader and delegates.
+// ListReferrers resolves db to a SchemaReader (see dal.As) and delegates.
 func ListReferrers(ctx context.Context, db dal.DB, ref *dal.CollectionRef) ([]Referrer, error) {
-	r, ok := db.(SchemaReader)
+	r, ok := dal.As[SchemaReader](db)
 	if !ok {
 		return nil, notSupportedReader("ListReferrers", db)
 	}

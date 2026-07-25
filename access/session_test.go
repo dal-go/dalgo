@@ -248,18 +248,18 @@ func TestSecureDBAndTransactions(t *testing.T) {
 	if _, err := SecureDB(nil); err == nil {
 		t.Fatal()
 	}
-	if _, err := SecureDB(raw, nil); err == nil {
+	if _, err := SecureDB(dal.NewDB(raw), nil); err == nil {
 		t.Fatal()
 	}
-	if _, err := SecureDB(raw, WithDatabasePolicies(nil)); err == nil {
+	if _, err := SecureDB(dal.NewDB(raw), WithDatabasePolicies(nil)); err == nil {
 		t.Fatal()
 	}
 	bad := func(*secureDBOptions) error { return errors.New("bad") }
-	if _, err := SecureDB(raw, bad); err == nil {
+	if _, err := SecureDB(dal.NewDB(raw), bad); err == nil {
 		t.Fatal()
 	}
 	allow := MustPolicy("all", Root(Allow(ReadWrite, "all")))
-	db, err := SecureDB(raw, WithDatabasePolicies(allow), RequireContextPolicy())
+	db, err := SecureDB(dal.NewDB(raw), WithDatabasePolicies(allow), RequireContextPolicy())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,13 +271,13 @@ func TestSecureDBAndTransactions(t *testing.T) {
 		}()
 		MustSecureDB(nil)
 	}()
-	db2 := MustSecureDB(raw, WithDatabasePolicies(allow))
+	db2 := MustSecureDB(dal.NewDB(raw), WithDatabasePolicies(allow))
 	if db2 == nil {
 		t.Fatal()
 	}
 	ctx := WithPolicy(context.Background(), allow)
 	bound := BindDB(db, ctx)
-	_ = BindDB(raw, ctx)
+	_ = BindDB(dal.NewDB(raw), ctx)
 	if bound.ID() != "db" || bound.Adapter().Name() != "a" || bound.Schema() == nil || !bound.SupportsConcurrentConnections() {
 		t.Fatal("metadata")
 	}

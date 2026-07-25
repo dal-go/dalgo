@@ -13,7 +13,7 @@ import (
 // aggregation. Category A has three rows (10, 20, null); category B has one (5).
 func seedSales(t *testing.T) (*database, context.Context) {
 	t.Helper()
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": 10})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": 20})))
@@ -68,7 +68,7 @@ func TestGroupBy_SingleSourceAggregates(t *testing.T) {
 // AC all-null-group-aggregates-null: a group whose values are all null yields
 // nil SUM/MAX while COUNT(*) still counts the rows.
 func TestGroupBy_AllNullGroup(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": nil})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": nil})))
@@ -162,7 +162,7 @@ func TestGroupBy_HavingOnUnselectedAggregate(t *testing.T) {
 // AC grouped-order-and-limit: order by COUNT(*) descending with LIMIT 2 returns
 // the two highest-count groups in order.
 func TestGroupBy_OrderAndLimit(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	// 5 rows in A, 3 in B, 1 in C.
 	add := func(id, cat string) {
@@ -208,7 +208,7 @@ func TestGroupBy_EmptyUnchanged(t *testing.T) {
 // AC join-grouping-qualified: GROUP BY u.country over a join, COUNT(*) of joined
 // rows per country.
 func TestGroupBy_JoinQualified(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "country": "US"})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "country": "US"})))

@@ -258,7 +258,11 @@ The main package is [`dal`](./dal). It defines the interfaces application code
 usually depends on:
 
 - `dal.DB` for database-level reads, transactions, schema metadata, and adapter
-  identity.
+  identity. It is produced by `dal.NewDB` from an adapter's `dal.Backend` and
+  owns the write pipeline, so record validation and before-save hooks run before
+  any adapter is entered.
+- `dal.Backend` for what a storage adapter implements — the same shape as
+  `dal.DB`, without the seal.
 - `dal.ReadSession` and `dal.ReadwriteSession` for read and write operations.
 - `dal.Record` and `dal.Key` for database records and hierarchical keys.
 - `dal.Query` for structured and text queries.

@@ -26,7 +26,7 @@ func TestBackendName_NilDB(t *testing.T) {
 
 // TestBackendName_NilAdapter covers the branch where db.Adapter() is nil.
 func TestBackendName_NilAdapter(t *testing.T) {
-	got := backendName(&stubDB{adapter: nil})
+	got := backendName(dal.NewDB(&stubDB{adapter: nil}))
 	assert.Equal(t, "", got)
 }
 
@@ -50,7 +50,7 @@ func TestDefaultCurrentTimestamp_DefaultExpr(t *testing.T) {
 func TestListCollections_Dispatches(t *testing.T) {
 	db := newReaderStubDB("stub-driver")
 	parent := &record.Key{}
-	_, err := ListCollections(context.Background(), db, parent)
+	_, err := ListCollections(context.Background(), dal.NewDB(db), parent)
 	assert.NoError(t, err)
 	assert.Equal(t, "ListCollections", db.lastOp)
 	assert.Equal(t, parent, db.lastArg)
@@ -58,7 +58,7 @@ func TestListCollections_Dispatches(t *testing.T) {
 
 func TestListCollections_NotImplementer(t *testing.T) {
 	db := &stubDB{adapter: stubAdapter{name: "no-reader"}}
-	_, err := ListCollections(context.Background(), db, nil)
+	_, err := ListCollections(context.Background(), dal.NewDB(db), nil)
 	assert.Error(t, err)
 	assert.True(t, errors.Is(err, dal.ErrNotSupported))
 	var ue *NotSupportedError
@@ -70,7 +70,7 @@ func TestListCollections_NotImplementer(t *testing.T) {
 func TestListIndexes_Dispatches(t *testing.T) {
 	db := newReaderStubDB("stub-driver")
 	ref := &dal.CollectionRef{}
-	_, err := ListIndexes(context.Background(), db, ref)
+	_, err := ListIndexes(context.Background(), dal.NewDB(db), ref)
 	assert.NoError(t, err)
 	assert.Equal(t, "ListIndexes", db.lastOp)
 	assert.Equal(t, ref, db.lastArg)
@@ -78,7 +78,7 @@ func TestListIndexes_Dispatches(t *testing.T) {
 
 func TestListIndexes_NotImplementer(t *testing.T) {
 	db := &stubDB{adapter: stubAdapter{name: "no-reader"}}
-	_, err := ListIndexes(context.Background(), db, &dal.CollectionRef{})
+	_, err := ListIndexes(context.Background(), dal.NewDB(db), &dal.CollectionRef{})
 	assert.Error(t, err)
 	var ue *NotSupportedError
 	assert.True(t, errors.As(err, &ue))
@@ -88,7 +88,7 @@ func TestListIndexes_NotImplementer(t *testing.T) {
 func TestListConstraints_Dispatches(t *testing.T) {
 	db := newReaderStubDB("stub-driver")
 	ref := &dal.CollectionRef{}
-	_, err := ListConstraints(context.Background(), db, ref)
+	_, err := ListConstraints(context.Background(), dal.NewDB(db), ref)
 	assert.NoError(t, err)
 	assert.Equal(t, "ListConstraints", db.lastOp)
 	assert.Equal(t, ref, db.lastArg)
@@ -96,7 +96,7 @@ func TestListConstraints_Dispatches(t *testing.T) {
 
 func TestListConstraints_NotImplementer(t *testing.T) {
 	db := &stubDB{adapter: stubAdapter{name: "no-reader"}}
-	_, err := ListConstraints(context.Background(), db, &dal.CollectionRef{})
+	_, err := ListConstraints(context.Background(), dal.NewDB(db), &dal.CollectionRef{})
 	assert.Error(t, err)
 	var ue *NotSupportedError
 	assert.True(t, errors.As(err, &ue))
@@ -106,7 +106,7 @@ func TestListConstraints_NotImplementer(t *testing.T) {
 func TestListReferrers_Dispatches(t *testing.T) {
 	db := newReaderStubDB("stub-driver")
 	ref := &dal.CollectionRef{}
-	_, err := ListReferrers(context.Background(), db, ref)
+	_, err := ListReferrers(context.Background(), dal.NewDB(db), ref)
 	assert.NoError(t, err)
 	assert.Equal(t, "ListReferrers", db.lastOp)
 	assert.Equal(t, ref, db.lastArg)
@@ -114,7 +114,7 @@ func TestListReferrers_Dispatches(t *testing.T) {
 
 func TestListReferrers_NotImplementer(t *testing.T) {
 	db := &stubDB{adapter: stubAdapter{name: "no-reader"}}
-	_, err := ListReferrers(context.Background(), db, &dal.CollectionRef{})
+	_, err := ListReferrers(context.Background(), dal.NewDB(db), &dal.CollectionRef{})
 	assert.Error(t, err)
 	var ue *NotSupportedError
 	assert.True(t, errors.As(err, &ue))

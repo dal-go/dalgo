@@ -14,7 +14,7 @@ import (
 func TestFieldPathUpdate_SetsNestedValue(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("docs", "d1")
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
@@ -37,7 +37,7 @@ func TestFieldPathUpdate_SetsNestedValue(t *testing.T) {
 func TestFieldPathUpdate_DeleteFieldByFieldName(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("docs", "d1")
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
@@ -63,7 +63,7 @@ func TestFieldPathUpdate_DeleteFieldByFieldName(t *testing.T) {
 func TestFieldPathUpdate_DeleteFieldByFieldPath(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("docs", "d1")
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
@@ -92,7 +92,7 @@ func TestFieldPathUpdate_DeleteFieldByFieldPath(t *testing.T) {
 func TestFieldPathUpdate_NonMapIntermediateReturnsError(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("docs", "d1")
 
 	// "meta" is a string, not a map — navigating through it must fail gracefully.
@@ -112,7 +112,7 @@ func TestFieldPathUpdate_NonMapIntermediateReturnsError(t *testing.T) {
 func TestFieldPathUpdate_PlainFieldNameStillWorks(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("docs", "d1")
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{
@@ -135,7 +135,7 @@ func TestFieldPathUpdate_PlainFieldNameStillWorks(t *testing.T) {
 func TestFieldPathUpdate_CreatesMissingIntermediates(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("docs", "d5")
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, map[string]any{"title": "x"})))
