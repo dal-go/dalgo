@@ -136,7 +136,10 @@ func TestSecuredSessionsAllMethods(t *testing.T) {
 	allow := MustPolicy("all", Root(Allow(ReadWrite, "all")), OpaqueQueryScope(Allow(Query, "opaque")), CollectionGroupScope("items", Allow(Query, "group")))
 	rw := SecureReadwriteSession(f, allow)
 	key := record.NewKeyWithID("items", "1")
-	r := record.NewRecord(key)
+	// A data-carrying record: these tests drive WRITE methods, and the write
+	// pipeline validates record data. A bare NewRecord is an envelope awaiting a
+	// load, whose Data() deliberately panics — see dal-go/record v0.1.1.
+	r := record.NewRecordWithData(key, &struct{ Name string }{Name: "policy-test"})
 	rs := []record.Record{r}
 	keys := []*record.Key{key}
 	if ok, err := rw.Exists(ctx, key); !ok || err != nil {
@@ -281,7 +284,7 @@ func TestSecureDBAndTransactions(t *testing.T) {
 	if bound.ID() != "db" || bound.Adapter().Name() != "a" || bound.Schema() == nil || !bound.SupportsConcurrentConnections() {
 		t.Fatal("metadata")
 	}
-	r := record.NewRecord(record.NewKeyWithID("x", "1"))
+	r := record.NewRecordWithData(record.NewKeyWithID("x", "1"), &struct{ Name string }{Name: "policy-test"})
 	if _, err := bound.Exists(context.Background(), r.Key()); err != nil {
 		t.Fatal(err)
 	}
