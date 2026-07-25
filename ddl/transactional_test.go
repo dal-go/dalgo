@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dal-go/dalgo/dal"
 )
 
 // transactionalStub implements TransactionalDDL with a configurable answer.
@@ -33,11 +35,11 @@ func TestTransactionalDDL_StableAnswer(t *testing.T) {
 func TestSupportsTransactionalDDL_TrueOnImplementer(t *testing.T) {
 	// Per REQ:helper-function AC-1.
 	s := &transactionalStub{minStubDB: newMinStubDB("x"), supports: true}
-	assert.True(t, SupportsTransactionalDDL(s))
+	assert.True(t, SupportsTransactionalDDL(dal.NewDB(s)))
 }
 
 func TestSupportsTransactionalDDL_FalseOnNonImplementer(t *testing.T) {
 	// Per REQ:helper-function AC-2.
 	s := newMinStubDB("x")
-	assert.False(t, SupportsTransactionalDDL(s))
+	assert.False(t, SupportsTransactionalDDL(dal.NewDB(s)))
 }

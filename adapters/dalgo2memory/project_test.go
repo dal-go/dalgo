@@ -15,7 +15,7 @@ import (
 // projection (selecting fewer columns than the row has).
 func seedPeople(t *testing.T) (*database, context.Context) {
 	t.Helper()
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("people", "1"), &map[string]any{"id": 1, "name": "alice", "status": "active"})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("people", "2"), &map[string]any{"id": 2, "name": "bob", "status": "active"})))

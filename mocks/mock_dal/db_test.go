@@ -11,11 +11,11 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestNewMockDB(t *testing.T) {
+func TestNewMockBackend(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	assert.NotNil(t, mockDB)
 	assert.NotNil(t, mockDB.EXPECT())
 }
@@ -24,7 +24,7 @@ func TestMockDB_Adapter(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 
 	mockDB.EXPECT().Adapter().Return(nil)
 
@@ -36,7 +36,7 @@ func TestMockDB_ID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	expectedID := "test-db-id"
 
 	mockDB.EXPECT().ID().Return(expectedID)
@@ -49,7 +49,7 @@ func TestMockDB_Exists(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	ctx := context.Background()
 	key := &record.Key{}
 
@@ -84,7 +84,7 @@ func TestMockDB_Get(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	ctx := context.Background()
 
 	t.Run("get success", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestMockDB_GetMulti(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	ctx := context.Background()
 	records := []record.Record{NewMockRecord(ctrl), NewMockRecord(ctrl)}
 
@@ -133,7 +133,7 @@ func TestMockDB_QueryReader(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	ctx := context.Background()
 
 	t.Run("query reader success", func(t *testing.T) {
@@ -159,7 +159,7 @@ func TestMockDB_RunReadonlyTransaction(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	ctx := context.Background()
 	txFunc := func(context.Context, dal.ReadTransaction) error { return nil }
 
@@ -199,7 +199,7 @@ func TestMockDB_RunReadwriteTransaction(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	ctx := context.Background()
 	txFunc := func(context.Context, dal.ReadwriteTransaction) error { return nil }
 
@@ -238,7 +238,7 @@ func TestMockDB_RunReadwriteTransaction(t *testing.T) {
 func TestMockDB_SupportsConcurrentConnections(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockDB := NewMockDB(ctrl)
+	mockDB := NewMockBackend(ctrl)
 	mockDB.EXPECT().SupportsConcurrentConnections().Return(true)
 	assert.True(t, mockDB.SupportsConcurrentConnections())
 }

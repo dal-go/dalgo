@@ -16,7 +16,18 @@ import (
 )
 
 // NewDB creates an in-memory DALgo database.
+//
+// The backend is wrapped by dal.NewDB, so writes through the returned DB run
+// the framework write pipeline — record validation and before-save hooks —
+// before reaching the in-memory store.
 func NewDB(options ...Option) dal.DB {
+	return dal.NewDB(newDatabase(options...))
+}
+
+// newDatabase builds the raw backend. Tests that need the concrete type (to
+// inspect engines or the schema) use it directly; everything else goes through
+// NewDB.
+func newDatabase(options ...Option) *database {
 	db := &database{
 		collections:       make(map[string]storageEngine),
 		schemaRefBreaking: true,
@@ -160,7 +171,7 @@ func (db *database) UpdateMulti(ctx context.Context, keys []*record.Key, updates
 	return session{db: db}.UpdateMulti(ctx, keys, updates, preconditions...)
 }
 
-var _ dal.DB = (*database)(nil)
+var _ dal.Backend = (*database)(nil)
 
 type session struct {
 	db      *database

@@ -19,8 +19,9 @@ func TestErrorReturnBranches(t *testing.T) {
 
 	t.Run("update_not_supported", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		db := mock_dal.NewMockDB(ctrl)
-		db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(dal.ErrNotSupported)
+		backend := mock_dal.NewMockBackend(ctrl)
+		db := dal.NewDB(backend)
+		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(dal.ErrNotSupported)
 		update2records(t, db,
 			record.NewKeyWithID(E2ETestKind1, "k1"),
 			record.NewKeyWithID(E2ETestKind1, "k2"),
@@ -30,8 +31,9 @@ func TestErrorReturnBranches(t *testing.T) {
 
 	t.Run("delete_all_cities_query_error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		db := mock_dal.NewMockDB(ctrl)
-		db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		backend := mock_dal.NewMockBackend(ctrl)
+		db := dal.NewDB(backend)
+		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadwriteTransaction(ctrl)
 				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(nil, boom)
@@ -43,8 +45,9 @@ func TestErrorReturnBranches(t *testing.T) {
 
 	t.Run("delete_all_cities_reader_error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		db := mock_dal.NewMockDB(ctrl)
-		db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		backend := mock_dal.NewMockBackend(ctrl)
+		db := dal.NewDB(backend)
+		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadwriteTransaction(ctrl)
 				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(dal.NewRecordsReader(nil), nil)
@@ -56,8 +59,9 @@ func TestErrorReturnBranches(t *testing.T) {
 
 	t.Run("delete_all_cities_delete_error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		db := mock_dal.NewMockDB(ctrl)
-		db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		backend := mock_dal.NewMockBackend(ctrl)
+		db := dal.NewDB(backend)
+		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadwriteTransaction(ctrl)
 				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(dal.NewRecordsReader([]record.Record{
@@ -72,22 +76,25 @@ func TestErrorReturnBranches(t *testing.T) {
 
 	t.Run("delete_all_cities_transaction_error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		db := mock_dal.NewMockDB(ctrl)
-		db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(boom)
+		backend := mock_dal.NewMockBackend(ctrl)
+		db := dal.NewDB(backend)
+		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(boom)
 		require.ErrorContains(t, deleteAllCities(ctx, db), "failed to delete all cities")
 	})
 
 	t.Run("setup_data_propagates_delete_error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		db := mock_dal.NewMockDB(ctrl)
-		db.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(boom)
+		backend := mock_dal.NewMockBackend(ctrl)
+		db := dal.NewDB(backend)
+		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(boom)
 		require.Error(t, setupDataForQueryTests(ctx, db))
 	})
 
 	t.Run("select_all_cities_query_error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		db := mock_dal.NewMockDB(ctrl)
-		db.EXPECT().RunReadonlyTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		backend := mock_dal.NewMockBackend(ctrl)
+		db := dal.NewDB(backend)
+		backend.EXPECT().RunReadonlyTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.ROTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadTransaction(ctrl)
 				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(nil, boom)

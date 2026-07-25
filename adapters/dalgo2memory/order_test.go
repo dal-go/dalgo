@@ -17,7 +17,7 @@ type orderThing struct {
 
 func seedThings(t *testing.T) (*database, context.Context) {
 	t.Helper()
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("things", "1"), &orderThing{Name: "b"})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("things", "2"), &orderThing{Name: "a"})))

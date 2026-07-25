@@ -47,7 +47,7 @@ func TestMockDB_Schema(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	db := NewMockDB(ctrl)
+	db := NewMockBackend(ctrl)
 	schema := NewMockSchema(ctrl)
 
 	db.EXPECT().Schema().Return(schema)

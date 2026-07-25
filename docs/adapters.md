@@ -283,12 +283,72 @@ func main() {
 
 ## Implementing an Adapter
 
-To implement a custom adapter, implement the core interfaces.
+An adapter implements **`dal.Backend`** — the storage contract — and hands it to
+**`dal.NewDB`** from its public constructor. `dal.NewDB` returns the
+caller-facing `dal.DB`, which owns the write pipeline: record validation (see
+[Hooks and Validation](./hooks.md)) and registered before-save hooks run before
+your adapter's code is entered.
+
+```go
+// The public constructor is the only line that differs from a pre-Backend
+// adapter: it wraps the backend instead of returning it.
+func NewDB(client MyDBClient) dal.DB {
+	return dal.NewDB(&MyDatabase{client: client})
+}
+
+var _ dal.Backend = (*MyDatabase)(nil)
+```
+
+`dal.DB` is **sealed** with an unexported method, so `dal.NewDB` is the only way
+to produce one. That is what guarantees a caller can never be handed a database
+that skips the declared invariants — a guarantee worth having, given that
+`dalgo2datastore` exports package-level `Put`/`PutMulti` function variables that
+write straight past `dal.Record` and `dal.DB` entirely.
+
+Adapter internals that need their own concrete type back (the `dalgo2memory`
+branching provider, for one) use `dal.BackendOf`. Consumers that probe for an
+optional capability (`dbschema.SchemaReader`, `ddl.SchemaModifier`,
+`ddl.TransactionalDDL`) must use `dal.As[T]` rather than a plain type assertion,
+because the assertion would otherwise be made against the wrapper.
+
+### Decorating a DB — embed, never name
+
+A caching, tracing or access-policy layer decorates a `dal.DB`. Because `dal.DB`
+is sealed, a decorator must **embed** it. Naming it in a field and forwarding
+every method by hand no longer compiles, however complete the forwarding is:
+
+```go
+// ✅ Correct: embedding promotes the seal along with everything you do not
+// override.
+type cachingDB struct {
+	dal.DB
+	cache Cache
+}
+
+func (db *cachingDB) Get(ctx context.Context, r record.Record) error {
+	// … consult the cache, then fall through …
+	return db.DB.Get(ctx, r)
+}
+
+var _ dal.DB = (*cachingDB)(nil)
+
+// ❌ Will not compile: a named field promotes nothing.
+//
+//	type cachingDB struct {
+//		db    dal.DB   // ← must be an embedded `dal.DB`
+//		cache Cache
+//	}
+//
+// cachingDB does not implement dal.DB (missing method dalgoDB)
+```
+
+The change is mechanical — delete the field name and rewrite `v.db.X()` as
+`v.DB.X()` — but it is a change to the struct, not a one-line constructor edit.
 
 ### Minimum Interface Requirements
 
 ```go
-// 1. Implement DB interface
+// 1. Implement the dal.Backend interface
 type MyDatabase struct {
     client MyDBClient
     adapter dal.Adapter
@@ -596,6 +656,40 @@ func (db *MyDatabase) Get(ctx context.Context, record record.Record) error {
 ---
 
 ## Testing Adapters
+
+### Conformance Suite
+
+`dalgotest.RunConformance` asserts the record invariants DALgo enforces: an
+invalid record is rejected on `Insert`, `Set`, `UpdateRecord` and every `Multi*`
+variant; a valid one is accepted; the error a caller sees is the validation
+error rather than a storage error; a batch whose last record is invalid writes
+none of them; and `dal.WithoutValidation` is the only thing that bypasses it.
+
+```go
+package mydb_test
+
+import (
+	"testing"
+
+	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/dalgotest"
+)
+
+func TestConformance(t *testing.T) {
+	dalgotest.RunConformance(t, func(t *testing.T) (dal.DB, func()) {
+		db, cleanup := setupTestDatabase(t) // may t.Skip if the store is absent
+		return db, cleanup
+	})
+}
+```
+
+An adapter that cannot perform a write at all still conforms: the suite accepts
+`dal.ErrNotSupported` and `dal.ErrNotImplementedYet` where it expects a write to
+succeed. What it never accepts is a storage error where a validation error was
+due — which is exactly what a non-validating adapter produces.
+
+Use `dalgotest.WithCollection` when the adapter's schema restricts collection
+names.
 
 ### End-to-End Test Suite
 

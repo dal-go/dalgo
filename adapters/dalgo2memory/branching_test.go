@@ -109,14 +109,14 @@ func branchingNestedKey(spaceID, listID, itemID string) *record.Key {
 
 func TestBranchingPreservesNestedKeyChains(t *testing.T) {
 	ctx := context.Background()
-	source := NewDB().(*database)
+	source := newDatabase()
 	sourceKey := branchingNestedKey("family", "groceries", "apples")
 	wantPath := sourceKey.String()
 	if err := source.Set(ctx, record.NewRecordWithData(sourceKey, &branchingRecord{Title: "apples"})); err != nil {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := NewBranchingProvider().Capture(ctx, source)
+	checkpoint, err := NewBranchingProvider().Capture(ctx, dal.NewDB(source))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,12 +167,12 @@ func onlyQueriedItemKey(t testing.TB, db dal.DB) *record.Key {
 
 func TestBranchingDeepCopiesSerializedBytes(t *testing.T) {
 	ctx := context.Background()
-	source := NewDB().(*database)
+	source := newDatabase()
 	key := branchingRootKey("milk")
 	if err := source.Set(ctx, record.NewRecordWithData(key, &branchingRecord{Title: "milk"})); err != nil {
 		t.Fatal(err)
 	}
-	checkpoint, err := NewBranchingProvider().Capture(ctx, source)
+	checkpoint, err := NewBranchingProvider().Capture(ctx, dal.NewDB(source))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestBranchingDeepCopiesSerializedBytes(t *testing.T) {
 	assertBranchingTitle(t, mustBranch(t, checkpoint), key, "milk")
 
 	first := mustBranch(t, checkpoint)
-	firstDB := first.DB().(*database)
+	firstDB := dal.BackendOf(first.DB()).(*database)
 	firstDB.collections["items"].(*serializedEngine).records[storedID][0] = '['
 	closeTestBranch(t, first)
 	assertBranchingTitle(t, mustBranch(t, checkpoint), key, "milk")
@@ -217,15 +217,15 @@ func TestBranchingRejectsColumnarEngine(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			db := NewDB(WithSchema(false,
+			db := newDatabase(WithSchema(false,
 				WithCollection[branchingRecord]("items", nil, tc.collection),
-			)).(*database)
+			))
 			if tc.initialize {
 				if err := db.Set(context.Background(), record.NewRecordWithData(branchingRootKey("milk"), &branchingRecord{Title: "milk"})); err != nil {
 					t.Fatal(err)
 				}
 			}
-			checkpoint, err := NewBranchingProvider().Capture(context.Background(), db)
+			checkpoint, err := NewBranchingProvider().Capture(context.Background(), dal.NewDB(db))
 			if checkpoint != nil {
 				t.Fatal("unsupported engine published a checkpoint")
 			}
@@ -255,7 +255,7 @@ func TestBranchingRejectsConfiguredFactoryWithoutInvokingIt(t *testing.T) {
 		WithCollection[branchingRecord]("items", nil, panicStorage),
 	))
 
-	checkpoint, err := NewBranchingProvider().Capture(context.Background(), db)
+	checkpoint, err := NewBranchingProvider().Capture(context.Background(), dal.NewDB(db))
 	if checkpoint != nil {
 		t.Fatal("unsupported configured factory published a checkpoint")
 	}
@@ -548,7 +548,7 @@ type branchFailingProvider struct {
 
 func (p branchFailingProvider) Capability() branching.Capability { return p.inner.Capability() }
 func (p branchFailingProvider) Capture(ctx context.Context, db dal.DB) (branching.Checkpoint, error) {
-	checkpoint, err := p.inner.Capture(ctx, db)
+	checkpoint, err := p.inner.Capture(ctx, dal.NewDB(db))
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +571,7 @@ type trackingProvider struct {
 
 func (p *trackingProvider) Capability() branching.Capability { return p.inner.Capability() }
 func (p *trackingProvider) Capture(ctx context.Context, db dal.DB) (branching.Checkpoint, error) {
-	checkpoint, err := p.inner.Capture(ctx, db)
+	checkpoint, err := p.inner.Capture(ctx, dal.NewDB(db))
 	if err != nil {
 		return nil, err
 	}

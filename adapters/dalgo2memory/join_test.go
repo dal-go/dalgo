@@ -16,7 +16,7 @@ import (
 // resolution under a name collision.
 func seedUsersOrders(t *testing.T) (*database, context.Context) {
 	t.Helper()
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "status": "active"})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "status": "active"})))
@@ -223,7 +223,7 @@ func TestExecuteJoin_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("malformed base row errors", func(t *testing.T) {
-		db := NewDB().(*database)
+		db := newDatabase()
 		ctx := context.Background()
 		db.collections["users"] = &serializedEngine{records: map[string][]byte{"1": []byte("{")}}
 		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1})))
@@ -235,7 +235,7 @@ func TestExecuteJoin_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("malformed join row errors", func(t *testing.T) {
-		db := NewDB().(*database)
+		db := newDatabase()
 		ctx := context.Background()
 		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1})))
 		db.collections["orders"] = &serializedEngine{records: map[string][]byte{"a": []byte("{")}}
@@ -251,7 +251,7 @@ func TestExecuteJoin_EdgeCases(t *testing.T) {
 // carry a colliding "status" field ("zuser") to exercise qualified resolution.
 func seedForOrdering(t *testing.T) (*database, context.Context) {
 	t.Helper()
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1, "status": "zuser"})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "2"), &map[string]any{"id": 2, "status": "zuser"})))

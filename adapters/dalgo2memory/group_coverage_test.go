@@ -215,7 +215,7 @@ func TestGroupBy_MinBadSourceInProjection(t *testing.T) {
 
 // Two groups tie on the ORDER BY aggregate; the stable comparator keeps both.
 func TestGroupBy_OrderByTie(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "1"), &map[string]any{"category": "A"})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "2"), &map[string]any{"category": "B"})))
@@ -256,7 +256,7 @@ func TestGroupBy_OrderByBadSource(t *testing.T) {
 
 // SUM skips a non-numeric (non-null) value in the group.
 func TestGroupBy_SumSkipsNonNumeric(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	ctx := context.Background()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "1"), &map[string]any{"category": "A", "amount": 10})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", "2"), &map[string]any{"category": "A", "amount": "oops"})))

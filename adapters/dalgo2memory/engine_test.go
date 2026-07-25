@@ -53,9 +53,9 @@ func TestSerializedStorageMatchesDefault(t *testing.T) {
 	ctx := context.Background()
 
 	run := func(opts ...CollectionOption) *user {
-		db := NewDB(WithSchema(false,
+		db := newDatabase(WithSchema(false,
 			WithCollection[user]("users", nil, opts...),
-		)).(*database)
+		))
 		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u1"), &user{Name: "Alice", Role: "admin"})))
 		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "u2"), &user{Name: "Bob", Role: "member"})))
 
@@ -81,10 +81,10 @@ func TestSerializedStorageMatchesDefault(t *testing.T) {
 func TestMixedEnginesInOneDB(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[user]("a", nil, WithSerializedStorage()),
 		WithCollection[user]("b", nil, withCountingStorage()),
-	)).(*database)
+	))
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("a", "a1"), &user{Name: "Alice"})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("b", "b1"), &user{Name: "Bob"})))
@@ -118,7 +118,7 @@ func TestMixedEnginesInOneDB(t *testing.T) {
 func TestUnregisteredCollectionUsesSerialized(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("ad-hoc", "x1"), &user{Name: "Alice"})))
 	_, isSerialized := db.collections["ad-hoc"].(*serializedEngine)
 	require.True(t, isSerialized)
@@ -132,7 +132,7 @@ func TestUnregisteredCollectionUsesSerialized(t *testing.T) {
 // instance on repeated access for a collection.
 func TestEngineCachesInstance(t *testing.T) {
 	t.Parallel()
-	db := NewDB().(*database)
+	db := newDatabase()
 	first := db.engine("things")
 	second := db.engine("things")
 	require.Same(t, first, second)

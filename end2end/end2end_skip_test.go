@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/mocks/mock_dal"
 	"go.uber.org/mock/gomock"
 )
@@ -14,7 +15,8 @@ func TestQueryUnsupportedIsSkipped(t *testing.T) {
 	defer ctrl.Finish()
 
 	// No expectations are needed because we will skip single/multi
-	db := mock_dal.NewMockDB(ctrl)
+	backend := mock_dal.NewMockBackend(ctrl)
+	db := dal.NewDB(backend)
 
 	// Disable single/multi to reach the query branch only
 	runSingleAndMulti = false

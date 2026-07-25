@@ -20,7 +20,7 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func TestDatabaseMetadata(t *testing.T) {
-	db := NewDB().(*database)
+	db := newDatabase()
 	require.Equal(t, "dalgo2memory", db.ID())
 	require.Equal(t, "memory", db.Adapter().Name())
 	require.True(t, db.SupportsConcurrentConnections())
@@ -43,7 +43,7 @@ func TestUnsupportedRecordsetReader(t *testing.T) {
 
 func TestTopLevelWriteMethods(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := dalrecord.NewKeyWithID("Things", "one")
 	rec := dalrecord.NewRecordWithData(key, &thing{Name: "first", Count: 1})
 
@@ -66,7 +66,7 @@ func TestTopLevelWriteMethods(t *testing.T) {
 
 func TestTopLevelMultiMethods(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	keys := []*dalrecord.Key{
 		dalrecord.NewKeyWithID("Things", "one"),
 		dalrecord.NewKeyWithID("Things", "two"),
@@ -106,7 +106,7 @@ func TestTransactionMetadata(t *testing.T) {
 
 func TestInsertDuplicateAndMissingUpdate(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := dalrecord.NewKeyWithID("Things", "one")
 	rec := dalrecord.NewRecordWithData(key, &thing{Name: "first"})
 
@@ -122,7 +122,7 @@ func TestInsertDuplicateAndMissingUpdate(t *testing.T) {
 
 func TestMultiMethodsStopOnError(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	badRecord := dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Bad", "json"), func() {})
 
 	require.Error(t, db.SetMulti(ctx, []dalrecord.Record{badRecord}))
@@ -131,7 +131,7 @@ func TestMultiMethodsStopOnError(t *testing.T) {
 
 func TestInsertMultiStopsOnError(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := dalrecord.NewKeyWithID("Things", "one")
 	records := []dalrecord.Record{
 		dalrecord.NewRecordWithData(key, &thing{Name: "first"}),
@@ -143,7 +143,7 @@ func TestInsertMultiStopsOnError(t *testing.T) {
 
 func TestInsertMultiSuccess(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		return tx.InsertMulti(ctx, []dalrecord.Record{
 			dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Things", "one"), &thing{Name: "first"}),
@@ -154,7 +154,7 @@ func TestInsertMultiSuccess(t *testing.T) {
 
 func TestBadRecordDataAndUnsupportedQuery(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	err := db.Set(ctx, dalrecord.NewRecordWithData(dalrecord.NewKeyWithID("Bad", "json"), func() {}))
 	require.Error(t, err)
 
@@ -165,7 +165,7 @@ func TestBadRecordDataAndUnsupportedQuery(t *testing.T) {
 
 func TestMalformedStoredData(t *testing.T) {
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := dalrecord.NewKeyWithID("Bad", "json")
 	db.collections[key.Collection()] = &serializedEngine{records: map[string][]byte{keyID(key): []byte("{")}}
 
@@ -204,7 +204,7 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 	key := dalrecord.NewKeyWithID("Things", "existing")
 
 	newDB := func() *database {
-		db := NewDB(WithNoReadsAfterWritesInTransaction()).(*database)
+		db := newDatabase(WithNoReadsAfterWritesInTransaction())
 		require.NoError(t, db.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "before", Count: 1})))
 		return db
 	}
@@ -280,7 +280,7 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 	})
 
 	t.Run("default remains permissive", func(t *testing.T) {
-		db := NewDB().(*database)
+		db := newDatabase()
 		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 			if err := tx.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "stored"})); err != nil {
 				return err
@@ -297,7 +297,7 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 func TestConcurrentReadonlyQueriesInitializeEnginesSafely(t *testing.T) {
 	const workers = 32
 
-	db := NewDB().(*database)
+	db := newDatabase()
 	ready := make(chan struct{}, workers)
 	start := make(chan struct{})
 	errs := make(chan error, workers)

@@ -34,7 +34,7 @@ type TransactionalDDL interface {
 // implement = treat as non-transactional." Consumers SHOULD use this
 // rather than performing the assertion themselves.
 func SupportsTransactionalDDL(db dal.DB) bool {
-	a, ok := db.(TransactionalDDL)
+	a, ok := dal.As[TransactionalDDL](db)
 	if !ok {
 		return false
 	}

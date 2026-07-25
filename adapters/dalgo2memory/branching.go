@@ -51,7 +51,7 @@ func (serializedBranchingProvider) Capture(ctx context.Context, source dal.DB) (
 	if source == nil {
 		return nil, branching.ErrNilSourceDB
 	}
-	db, ok := source.(*database)
+	db, ok := dal.BackendOf(source).(*database)
 	if !ok {
 		return nil, &branching.UnsupportedError{
 			Provider: branchingProviderName,
@@ -273,6 +273,10 @@ func (c *serializedCheckpoint) Release(context.Context) error {
 }
 
 func (s databaseSnapshot) newDatabase() dal.DB {
+	return dal.NewDB(s.newBackend())
+}
+
+func (s databaseSnapshot) newBackend() *database {
 	db := &database{
 		collections:                     make(map[string]storageEngine, len(s.collections)),
 		schema:                          cloneMemorySchema(s.schema),

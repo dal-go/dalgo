@@ -32,7 +32,7 @@ type address struct {
 func TestSerialized_StoredAsDecodableBytes(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("users", "u1")
 	written := &user{Name: "Alice", Role: "admin"}
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, written)))
@@ -65,9 +65,9 @@ func TestSerialized_DefaultAndSchemalessCapable(t *testing.T) {
 	var _ storageEngine = (*serializedEngine)(nil)
 
 	ctx := context.Background()
-	db := NewDB(WithSchema(true,
+	db := newDatabase(WithSchema(true,
 		WithCollection[user]("users", nil, WithSerializedStorage()),
-	)).(*database)
+	))
 
 	// Schema-typed collection selected via WithSerializedStorage().
 	typedKey := record.NewKeyWithID("users", "u1")
@@ -96,7 +96,7 @@ func TestSerialized_DefaultAndSchemalessCapable(t *testing.T) {
 func TestSerialized_MutationAfterWriteIsolated(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("profiles", "p1")
 
 	written := &profile{Name: "Alice", Tags: []string{"a", "b"}, Address: address{City: "Paris"}}
@@ -118,7 +118,7 @@ func TestSerialized_MutationAfterWriteIsolated(t *testing.T) {
 func TestSerialized_TwoReadsIndependent(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("profiles", "p1")
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key,
 		&profile{Name: "Alice", Tags: []string{"a", "b"}, Address: address{City: "Paris"}})))
@@ -141,7 +141,7 @@ func TestSerialized_TwoReadsIndependent(t *testing.T) {
 func TestSerialized_NonSerializableWriteErrors(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("bad", "ch")
 	record := record.NewRecordWithData(key, map[string]any{"ch": make(chan int)})
 
@@ -165,7 +165,7 @@ func TestSerialized_UnknownFieldRejectedWhenTyped(t *testing.T) {
 	data := map[string]any{"Name": "Alice", "Undefined": 1}
 
 	// Schema-typed collection rejects the unknown field, naming the collection.
-	typedDB := NewDB(WithSchema(false, WithCollection[user]("users", nil))).(*database)
+	typedDB := newDatabase(WithSchema(false, WithCollection[user]("users", nil)))
 	typedKey := record.NewKeyWithID("users", "u1")
 	err := typedDB.Set(ctx, record.NewRecordWithData(typedKey, data))
 	require.Error(t, err)
@@ -173,7 +173,7 @@ func TestSerialized_UnknownFieldRejectedWhenTyped(t *testing.T) {
 	require.Empty(t, typedDB.collections["users"].(*serializedEngine).records)
 
 	// Schemaless collection accepts the same data.
-	schemalessDB := NewDB().(*database)
+	schemalessDB := newDatabase()
 	schemalessKey := record.NewKeyWithID("users", "u1")
 	require.NoError(t, schemalessDB.Set(ctx, record.NewRecordWithData(schemalessKey, data)))
 	var got map[string]any
@@ -188,7 +188,7 @@ func TestSerialized_UnknownFieldRejectedWhenTyped(t *testing.T) {
 func TestSerialized_InsertDuplicateErrors(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("users", "u1")
 	require.NoError(t, db.Insert(ctx, record.NewRecordWithData(key, &user{Name: "Alice", Role: "admin"})))
 
@@ -214,7 +214,7 @@ func TestSerialized_InsertDuplicateErrors(t *testing.T) {
 func TestSerialized_GetAbsentNotFound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB().(*database)
+	db := newDatabase()
 	key := record.NewKeyWithID("users", "absent")
 
 	rec := record.NewRecordWithData(key, &user{})
@@ -237,9 +237,9 @@ func TestSerialized_GetAbsentNotFound(t *testing.T) {
 func TestSerialized_QueryDecodesRows(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[profile]("profiles", nil),
-	)).(*database)
+	))
 
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("profiles", "p1"),
 		&profile{Name: "shared", Tags: []string{"x"}, Address: address{City: "Paris"}})))
@@ -282,9 +282,9 @@ func TestSerialized_QueryDecodesRows(t *testing.T) {
 func TestSerialized_UpdateAppliesAndRevalidates(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[user]("users", nil),
-	)).(*database)
+	))
 	key := record.NewKeyWithID("users", "u1")
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &user{Name: "Alice", Role: "admin"})))
 

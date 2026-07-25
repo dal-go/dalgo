@@ -34,9 +34,9 @@ type doc struct {
 
 func columnarItemDB(t *testing.T, colOpts ...ColumnOption) *database {
 	t.Helper()
-	db := NewDB(WithSchema(false,
+	db := newDatabase(WithSchema(false,
 		WithCollection[item]("items", nil, WithColumnarStorage(colOpts...)),
-	)).(*database)
+	))
 	return db
 }
 
@@ -55,9 +55,9 @@ func TestColumnar_RequiresTypedCollection(t *testing.T) {
 
 	// Selecting columnar storage for a non-struct, non-map collection (here a
 	// scalar element type) fails with the typed-collection error on use.
-	scalarDB := NewDB(WithSchema(false,
+	scalarDB := newDatabase(WithSchema(false,
 		WithCollection[int]("nums", nil, WithColumnarStorage()),
-	)).(*database)
+	))
 	scalarErr := scalarDB.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("nums", "n1"), 1))
 	require.Error(t, scalarErr)
 	require.ErrorContains(t, scalarErr, "nums")
@@ -65,9 +65,9 @@ func TestColumnar_RequiresTypedCollection(t *testing.T) {
 
 	// Selecting columnar storage for a schemaless (map[string]any) collection
 	// with no declared column fails with a descriptive error on use.
-	schemalessDB := NewDB(WithSchema(false,
+	schemalessDB := newDatabase(WithSchema(false,
 		WithCollection[map[string]any]("blobs", nil, WithColumnarStorage()),
-	)).(*database)
+	))
 	err := schemalessDB.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("blobs", "b1"), map[string]any{"x": 1}))
 	require.Error(t, err)
 	require.ErrorContains(t, err, "blobs")
@@ -129,7 +129,7 @@ func TestColumnar_SlotStableAcrossColumns(t *testing.T) {
 func TestColumnar_WriteBreaksRefsByDefault(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB(WithSchema(false, WithCollection[doc]("docs", nil, WithColumnarStorage()))).(*database)
+	db := newDatabase(WithSchema(false, WithCollection[doc]("docs", nil, WithColumnarStorage())))
 	key := record.NewKeyWithID("docs", "d1")
 	written := &doc{Title: "t", Tags: []string{"a", "b"}, Meta: address{City: "Paris"}}
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, written)))
@@ -162,27 +162,27 @@ func TestColumnar_FidelityOptOutMatrix(t *testing.T) {
 	}
 
 	// (a) default faithful collection: mutation does not show through.
-	faithfulDB := NewDB(WithSchema(false,
+	faithfulDB := newDatabase(WithSchema(false,
 		WithCollection[doc]("a", nil, WithColumnarStorage()),
-	)).(*database)
+	))
 	require.Equal(t, []string{"a", "b"}, mutateThenRead(faithfulDB, "a"))
 
 	// (b) per-collection opt-out: mutation shows through.
-	optOutDB := NewDB(WithSchema(false,
+	optOutDB := newDatabase(WithSchema(false,
 		WithCollection[doc]("b", nil, WithColumnarStorage(WithColumnarRefBreaking(false))),
-	)).(*database)
+	))
 	require.Equal(t, []string{"MUTATED", "b"}, mutateThenRead(optOutDB, "b"))
 
 	// (c) schema-wide opt-out, but one collection re-enables fidelity. The
 	// re-enabled collection is faithful; the inheriting collection reflects the
 	// mutation, proving per-collection overrides schema-wide.
-	schemaWideDB := NewDB(
+	schemaWideDB := newDatabase(
 		WithoutSchemaRefBreaking(),
 		WithSchema(false,
 			WithCollection[doc]("reenabled", nil, WithColumnarStorage(WithColumnarRefBreaking(true))),
 			WithCollection[doc]("inherits", nil, WithColumnarStorage()),
 		),
-	).(*database)
+	)
 	require.Equal(t, []string{"a", "b"}, mutateThenRead(schemaWideDB, "reenabled"))
 	require.Equal(t, []string{"MUTATED", "b"}, mutateThenRead(schemaWideDB, "inherits"))
 }
@@ -196,7 +196,7 @@ func TestColumnar_ParityWithSerializedOps(t *testing.T) {
 	ctx := context.Background()
 
 	run := func(t *testing.T, opts ...CollectionOption) {
-		db := NewDB(WithSchema(false, WithCollection[user]("users", nil, opts...))).(*database)
+		db := newDatabase(WithSchema(false, WithCollection[user]("users", nil, opts...)))
 		key := record.NewKeyWithID("users", "u1")
 
 		// Set overwrites.
@@ -315,7 +315,7 @@ func TestColumnar_CompactionPreservesLiveRecords(t *testing.T) {
 func TestColumnar_GetAndQueryReassemble(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB(WithSchema(false, WithCollection[doc]("docs", nil, WithColumnarStorage()))).(*database)
+	db := newDatabase(WithSchema(false, WithCollection[doc]("docs", nil, WithColumnarStorage())))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("docs", "d1"),
 		&doc{Title: "shared", Tags: []string{"x"}, Meta: address{City: "Paris"}})))
 	require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("docs", "d2"),
@@ -376,8 +376,8 @@ func TestColumnar_QueryMatchesSerialized(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	colDB := NewDB(WithSchema(false, WithCollection[queryRow]("q", nil, WithColumnarStorage()))).(*database)
-	serDB := NewDB(WithSchema(false, WithCollection[queryRow]("q", nil, WithSerializedStorage()))).(*database)
+	colDB := newDatabase(WithSchema(false, WithCollection[queryRow]("q", nil, WithColumnarStorage())))
+	serDB := newDatabase(WithSchema(false, WithCollection[queryRow]("q", nil, WithSerializedStorage())))
 	seedQueryRows(t, colDB, "q")
 	seedQueryRows(t, serDB, "q")
 
@@ -414,7 +414,7 @@ func TestColumnar_QueryMatchesSerialized(t *testing.T) {
 func TestColumnar_DefaultStrategyScansColumn(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := NewDB(WithSchema(false, WithCollection[queryRow]("q", nil, WithColumnarStorage()))).(*database)
+	db := newDatabase(WithSchema(false, WithCollection[queryRow]("q", nil, WithColumnarStorage())))
 	seedQueryRows(t, db, "q")
 	eng := db.collections["q"].(*columnarEngine)
 
@@ -489,9 +489,9 @@ func TestColumnar_WhereUsesStrategy(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	colDB := NewDB(WithSchema(false,
+	colDB := newDatabase(WithSchema(false,
 		WithCollection[queryRow]("q", nil, WithColumnarStorage()),
-	)).(*database)
+	))
 	// Install a recording strategy whose live-check is bound to the engine, so
 	// the engine's write side populates it as rows are seeded.
 	eng := colDB.engine("q").(*columnarEngine)
@@ -499,7 +499,7 @@ func TestColumnar_WhereUsesStrategy(t *testing.T) {
 	eng.byName["Group"].strategy = stgy
 	eng.byName["Group"].defaultStgy = nil
 
-	serDB := NewDB(WithSchema(false, WithCollection[queryRow]("q", nil, WithSerializedStorage()))).(*database)
+	serDB := newDatabase(WithSchema(false, WithCollection[queryRow]("q", nil, WithSerializedStorage())))
 	seedQueryRows(t, colDB, "q")
 	seedQueryRows(t, serDB, "q")
 
@@ -529,12 +529,12 @@ func TestColumnar_WhereFallsBackOnNoOpinion(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	colDB := NewDB(WithSchema(false, WithCollection[queryRow]("q", nil, WithColumnarStorage()))).(*database)
+	colDB := newDatabase(WithSchema(false, WithCollection[queryRow]("q", nil, WithColumnarStorage())))
 	eng := colDB.engine("q").(*columnarEngine)
 	stgy := newRecordingStrategy(false, func(slot int) bool { return eng.live[slot] })
 	eng.byName["Group"].strategy = stgy
 
-	serDB := NewDB(WithSchema(false, WithCollection[queryRow]("q", nil, WithSerializedStorage()))).(*database)
+	serDB := newDatabase(WithSchema(false, WithCollection[queryRow]("q", nil, WithSerializedStorage())))
 	seedQueryRows(t, colDB, "q")
 	seedQueryRows(t, serDB, "q")
 

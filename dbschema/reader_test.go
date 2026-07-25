@@ -125,7 +125,7 @@ func TestDescribeCollection_Dispatches(t *testing.T) {
 	// Per REQ:helper-functions AC-2.
 	db := newReaderStubDB("stub-driver")
 	ref := &dal.CollectionRef{}
-	result, err := DescribeCollection(context.Background(), db, ref)
+	result, err := DescribeCollection(context.Background(), dal.NewDB(db), ref)
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, "DescribeCollection", db.lastOp)
@@ -135,7 +135,7 @@ func TestDescribeCollection_Dispatches(t *testing.T) {
 func TestDescribeCollection_NotImplementer(t *testing.T) {
 	// Per REQ:helper-functions AC-3.
 	db := &stubDB{adapter: stubAdapter{name: "no-reader"}}
-	_, err := DescribeCollection(context.Background(), db, &dal.CollectionRef{})
+	_, err := DescribeCollection(context.Background(), dal.NewDB(db), &dal.CollectionRef{})
 	assert.Error(t, err)
 	assert.True(t, errors.Is(err, dal.ErrNotSupported))
 	var ue *NotSupportedError

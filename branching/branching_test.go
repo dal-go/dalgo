@@ -9,11 +9,15 @@ import (
 	"github.com/dal-go/dalgo/dal"
 )
 
+// TestDBInterfaceIsNotWidened guards that the branching capability stays
+// additive: it must not add methods to the interface storage adapters
+// implement. That interface is dal.Backend — dal.DB is the same shape plus the
+// unexported seal, asserted separately below.
 func TestDBInterfaceIsNotWidened(t *testing.T) {
-	dbType := reflect.TypeOf((*dal.DB)(nil)).Elem()
-	got := make([]string, dbType.NumMethod())
-	for i := range dbType.NumMethod() {
-		got[i] = dbType.Method(i).Name
+	backendType := reflect.TypeOf((*dal.Backend)(nil)).Elem()
+	got := make([]string, backendType.NumMethod())
+	for i := range backendType.NumMethod() {
+		got[i] = backendType.Method(i).Name
 	}
 	want := []string{
 		"Adapter",
@@ -29,7 +33,15 @@ func TestDBInterfaceIsNotWidened(t *testing.T) {
 		"SupportsConcurrentConnections",
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("dal.DB methods changed; branching must remain additive\ngot:  %v\nwant: %v", got, want)
+		t.Fatalf("dal.Backend methods changed; branching must remain additive\ngot:  %v\nwant: %v", got, want)
+	}
+
+	// dal.DB is dal.Backend plus exactly one unexported seal method. Anything
+	// else means the caller-facing surface drifted from the adapter contract.
+	dbType := reflect.TypeOf((*dal.DB)(nil)).Elem()
+	if dbType.NumMethod() != backendType.NumMethod()+1 {
+		t.Fatalf("dal.DB has %d methods, want dal.Backend's %d plus the seal",
+			dbType.NumMethod(), backendType.NumMethod())
 	}
 }
 

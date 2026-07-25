@@ -14,8 +14,8 @@ func TestMocks(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("MockDB", func(t *testing.T) {
-		m := NewMockDB(ctrl)
+	t.Run("MockBackend", func(t *testing.T) {
+		m := NewMockBackend(ctrl)
 		m.EXPECT().Adapter().Return(dal.NewAdapter("test", "v1")).AnyTimes()
 		m.EXPECT().Exists(ctx, gomock.Any()).Return(false, nil).AnyTimes()
 		m.EXPECT().Get(ctx, gomock.Any()).Return(nil).AnyTimes()
