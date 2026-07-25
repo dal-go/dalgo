@@ -163,7 +163,7 @@ func TestRemainingCoreBranches(t *testing.T) {
 func TestAllSessionFailureBranches(t *testing.T) {
 	ctx := context.Background()
 	key := record.NewKeyWithID("x", "1")
-	r := record.NewRecord(key)
+	r := record.NewRecordWithData(key, &struct{ Name string }{Name: "policy-test"})
 	rs := []record.Record{r}
 	ks := []*record.Key{key}
 	q := opaqueQ{}

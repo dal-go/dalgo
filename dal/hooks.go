@@ -104,21 +104,21 @@ func beforeSave(_ context.Context, _ DB, r record.Record) error {
 
 // recordDataToValidate returns the data carried by r.
 //
-// record.Record.Data() panics when the record's retrieval state has never been
-// set — which is the normal state of a record about to be written, and the
-// reason this validation path could not have worked even if something had
-// called it. There is no non-panicking way to ask a record.Record whether its
-// state is set, so the pipeline recovers, marks the record error-free (exactly
-// what every storage adapter does before persisting) and reads the data again.
-func recordDataToValidate(r record.Record) (data any) {
+// This used to recover from a panic. record.Record.Data() panics when the
+// record's error has never been set — a deliberate guard against reading data
+// before anyone has checked how the load went — and a record about to be
+// written was landing in that state, so the pipeline caught the panic and
+// cleared the error itself. That was working around the guard rather than
+// respecting it.
+//
+// Fixed properly upstream in github.com/dal-go/record v0.1.1: a record built
+// with caller-supplied data (NewRecordWithData, NewRecordWithoutKey) now sets
+// ErrNoError at construction, because the caller supplied the data and there is
+// no retrieval to wait for. NewRecord — an empty envelope awaiting a load —
+// still guards its data, which is the half of the invariant worth keeping.
+func recordDataToValidate(r record.Record) any {
 	if r == nil {
 		return nil
 	}
-	defer func() {
-		if recover() != nil {
-			r.SetError(nil)
-			data = r.Data()
-		}
-	}()
 	return r.Data()
 }
