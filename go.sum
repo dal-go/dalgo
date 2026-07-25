@@ -1,5 +1,7 @@
 github.com/RoaringBitmap/roaring/v2 v2.21.0 h1:RKVgkD+c9ouyCydF2PW/mztDyZTsb7ksas/IofnguDg=
 github.com/RoaringBitmap/roaring/v2 v2.21.0/go.mod h1:SfT3of9nYh3vis1dIbCj4Yw6KQGujTN+f345nrN/0JA=
+github.com/RoaringBitmap/roaring/v2 v2.24.0 h1:zQkkBZtG3WRP4j+P3A5DO221SvL1Br88TJkhyqEQRZo=
+github.com/RoaringBitmap/roaring/v2 v2.24.0/go.mod h1:SfT3of9nYh3vis1dIbCj4Yw6KQGujTN+f345nrN/0JA=
 github.com/bits-and-blooms/bitset v1.24.4 h1:95H15Og1clikBrKr/DuzMXkQzECs1M6hhoGXLwLQOZE=
 github.com/bits-and-blooms/bitset v1.24.4/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/dal-go/record v0.1.0 h1:hA4143oZwIgtBH/1BRTUEZMCpDfXQr3ONlVXX8USCNg=
