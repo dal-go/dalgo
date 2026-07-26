@@ -137,7 +137,7 @@ func TestMockReadTransaction_QueryMethods(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("QueryReader success", func(t *testing.T) {
-		mockTx.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, nil)
+		mockTx.EXPECT().ExecuteQueryToRecordsReader(ctx, gomock.Any()).Return(nil, nil)
 		reader, err := mockTx.ExecuteQueryToRecordsReader(ctx, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, reader)
@@ -145,7 +145,7 @@ func TestMockReadTransaction_QueryMethods(t *testing.T) {
 
 	t.Run("QueryReader error", func(t *testing.T) {
 		expectedErr := errors.New("query reader error")
-		mockTx.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, expectedErr)
+		mockTx.EXPECT().ExecuteQueryToRecordsReader(ctx, gomock.Any()).Return(nil, expectedErr)
 		reader, err := mockTx.ExecuteQueryToRecordsReader(ctx, nil)
 		assert.Error(t, err)
 		assert.Nil(t, reader)
@@ -340,7 +340,7 @@ func TestMockReadwriteTransaction_QueryMethods(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("QueryReader success", func(t *testing.T) {
-		mockTx.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, nil)
+		mockTx.EXPECT().ExecuteQueryToRecordsReader(ctx, gomock.Any()).Return(nil, nil)
 		reader, err := mockTx.ExecuteQueryToRecordsReader(ctx, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, reader)
@@ -348,7 +348,7 @@ func TestMockReadwriteTransaction_QueryMethods(t *testing.T) {
 
 	t.Run("QueryReader error", func(t *testing.T) {
 		expectedErr := errors.New("query reader error")
-		mockTx.EXPECT().GetRecordsReader(ctx, gomock.Any()).Return(nil, expectedErr)
+		mockTx.EXPECT().ExecuteQueryToRecordsReader(ctx, gomock.Any()).Return(nil, expectedErr)
 		reader, err := mockTx.ExecuteQueryToRecordsReader(ctx, nil)
 		assert.Error(t, err)
 		assert.Nil(t, reader)
