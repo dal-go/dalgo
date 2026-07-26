@@ -129,7 +129,7 @@ func TestEndToEnd(t *testing.T) {
 		//t.Log("RW tx:", txName)
 		switch txName {
 		case "SELECT * FROM Cities: no_limit":
-			tx.EXPECT().GetRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, query dal.Query) (reader dal.RecordsReader, err error) {
+			tx.EXPECT().ExecuteQueryToRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, query dal.Query) (reader dal.RecordsReader, err error) {
 				records := make([]record.Record, len(models.Cities))
 				for i, city := range models.Cities {
 					key := record.NewKeyWithID("c1", city)
@@ -138,7 +138,7 @@ func TestEndToEnd(t *testing.T) {
 				return dal.NewRecordsReader(records), nil
 			})
 		case "SELECT * FROM Cities: limit=3":
-			tx.EXPECT().GetRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, query dal.Query) (reader dal.RecordsReader, err error) {
+			tx.EXPECT().ExecuteQueryToRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, query dal.Query) (reader dal.RecordsReader, err error) {
 				records := make([]record.Record, 3)
 				for i, cityID := range models.SortedCityIDs[:3] {
 					key := record.NewKeyWithID("c1", cityID)
@@ -157,7 +157,7 @@ func TestEndToEnd(t *testing.T) {
 			tx.EXPECT().DeleteMulti(ctx, gomock.Any()).Return(nil).Times(1)
 		case "deleteAllCities":
 			tx.EXPECT().DeleteMulti(ctx, gomock.Any()).Return(nil).Times(1)
-			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.SortedCityIDs))
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.SortedCityIDs))
 		case "singleCreateWithPredefinedIDTest":
 			tx.EXPECT().Insert(ctx, gomock.Any()).Return(nil).Times(1)
 		case "setMulti":
@@ -186,21 +186,21 @@ func TestEndToEnd(t *testing.T) {
 		//t.Log("RO tx:", txName)
 		switch txName {
 		case "SELECT ID FROM Cities; limit=0":
-			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.SortedCityIDs))
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.SortedCityIDs))
 		case "SELECT ID FROM Cities ORDER BY Population; limit=3":
-			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.CityIDsSortedByPopulation))
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.CityIDsSortedByPopulation))
 		case "SELECT ID FROM Cities ORDER BY Population DESCENDING; limit=3":
-			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.CityIDsSortedByPopulation))
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.CityIDsSortedByPopulation))
 		case "SELECT ID FROM Cities WHERE Country = 'IN'":
-			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs([]string{"Delhi_Delhi", "Maharashtra_Mumbai"}))
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs([]string{"Delhi_Delhi", "Maharashtra_Mumbai"}))
 		case "SELECT Name AS city, Country FROM Cities",
 			"SELECT Country, COUNT(*), SUM(Population) GROUP BY Country",
 			"SELECT Country, COUNT(*) GROUP BY Country HAVING COUNT(*) > 1":
 			// This mock DB does not implement column projection / GROUP BY, so
 			// both read paths report the capability as unsupported and the
 			// shared end2end subtests skip.
-			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
-			tx.EXPECT().GetRecordsetReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+			tx.EXPECT().ExecuteQueryToRecordsetReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 		case "verify_cleanupDelete":
 			tx.EXPECT().GetMulti(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, records []record.Record) error {
 				for _, rec := range records {
@@ -266,7 +266,7 @@ func TestEndToEnd(t *testing.T) {
 				return nil
 			}).Times(1)
 		case "selectAllCities":
-			tx.EXPECT().GetRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, _ dal.Query) (dal.RecordsReader, error) {
+			tx.EXPECT().ExecuteQueryToRecordsReader(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, _ dal.Query) (dal.RecordsReader, error) {
 				records := make([]record.Record, len(models.Cities))
 				for i, city := range models.Cities {
 					key := record.NewKeyWithID("c1", city)
@@ -275,7 +275,7 @@ func TestEndToEnd(t *testing.T) {
 				return dal.NewRecordsReader(records), nil
 			}).Times(1)
 		case "SELECT ID FROM Cities; limit=3":
-			tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.SortedCityIDs))
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.SortedCityIDs))
 		case "":
 			panic("no RO tx name")
 		default:

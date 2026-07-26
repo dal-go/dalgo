@@ -36,7 +36,7 @@ func TestErrorReturnBranches(t *testing.T) {
 		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadwriteTransaction(ctrl)
-				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(nil, boom)
+				tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, boom)
 				return f(ctx, tx)
 			},
 		)
@@ -50,7 +50,7 @@ func TestErrorReturnBranches(t *testing.T) {
 		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadwriteTransaction(ctrl)
-				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(dal.NewRecordsReader(nil), nil)
+				tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(dal.NewRecordsReader(nil), nil)
 				return f(ctx, tx)
 			},
 		)
@@ -64,7 +64,7 @@ func TestErrorReturnBranches(t *testing.T) {
 		backend.EXPECT().RunReadwriteTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadwriteTransaction(ctrl)
-				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(dal.NewRecordsReader([]record.Record{
+				tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(dal.NewRecordsReader([]record.Record{
 					record.NewRecord(record.NewKeyWithID("Cities", "one")).SetError(nil),
 				}), nil)
 				tx.EXPECT().DeleteMulti(gomock.Any(), gomock.Any()).Return(boom)
@@ -97,7 +97,7 @@ func TestErrorReturnBranches(t *testing.T) {
 		backend.EXPECT().RunReadonlyTransaction(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, f dal.ROTxWorker, _ ...dal.TransactionOption) error {
 				tx := mock_dal.NewMockReadTransaction(ctrl)
-				tx.EXPECT().GetRecordsReader(gomock.Any(), gomock.Any()).Return(nil, boom)
+				tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, boom)
 				return f(ctx, tx)
 			},
 		)
