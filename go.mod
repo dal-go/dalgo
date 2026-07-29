@@ -2,7 +2,7 @@ module github.com/dal-go/dalgo
 
 go 1.24.0
 
-require github.com/dal-go/record v0.1.1
+require github.com/dal-go/record v0.1.2
 
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.24.0
