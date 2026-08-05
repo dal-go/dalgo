@@ -69,11 +69,13 @@ func (s *QueryBuilder) Clone() IQueryBuilder {
 
 func (s *QueryBuilder) StartFrom(cursor Cursor) IQueryBuilder {
 	s.q.startCursor = cursor
+	s.q.startAfter = ""
 	return s
 }
 
 func (s *QueryBuilder) StartAfter(cursor Cursor) IQueryBuilder {
 	s.q.startAfter = cursor
+	s.q.startCursor = ""
 	return s
 }
 

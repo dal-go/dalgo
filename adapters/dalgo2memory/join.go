@@ -163,7 +163,12 @@ func orderBySources[T any](rows []T, orderBy []dal.OrderExpression, sourcesOf fu
 			if !ok {
 				continue
 			}
-			c := compare(si[f.Source()][f.Name()], sj[f.Source()][f.Name()])
+			var c int
+			if f.IsID() {
+				c = compare(idOf(rows[i]), idOf(rows[j]))
+			} else {
+				c = compare(si[f.Source()][f.Name()], sj[f.Source()][f.Name()])
+			}
 			if oe.Descending() {
 				c = -c
 			}
