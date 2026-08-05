@@ -30,6 +30,7 @@ type IQueryBuilder interface {
 	SelectKeysOnly(idKind reflect.Kind) StructuredQuery
 	SelectColumns(columns ...Column) StructuredQuery
 	StartFrom(cursor Cursor) IQueryBuilder
+	StartAfter(cursor Cursor) IQueryBuilder
 }
 
 var _ IQueryBuilder = (*QueryBuilder)(nil)
@@ -68,6 +69,11 @@ func (s *QueryBuilder) Clone() IQueryBuilder {
 
 func (s *QueryBuilder) StartFrom(cursor Cursor) IQueryBuilder {
 	s.q.startCursor = cursor
+	return s
+}
+
+func (s *QueryBuilder) StartAfter(cursor Cursor) IQueryBuilder {
+	s.q.startAfter = cursor
 	return s
 }
 
