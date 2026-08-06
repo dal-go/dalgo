@@ -47,6 +47,7 @@ type structuredQuery struct {
 
 	// StartCursor specifies the startCursor/point to start from
 	startCursor Cursor
+	startAfter  Cursor
 }
 
 func (q structuredQuery) GetRecordsReader(ctx context.Context, qe QueryExecutor) (reader RecordsReader, err error) {
@@ -99,6 +100,8 @@ func (q structuredQuery) IDKind() reflect.Kind {
 func (q structuredQuery) StartFrom() Cursor {
 	return q.startCursor
 }
+
+func (q structuredQuery) StartAfter() Cursor { return q.startAfter }
 
 func (q structuredQuery) Offset() int {
 	return q.offset

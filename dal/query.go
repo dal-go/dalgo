@@ -57,4 +57,5 @@ type StructuredQuery interface {
 
 	// StartFrom specifies the startCursor/point to start from
 	StartFrom() Cursor
+	StartAfter() Cursor
 }

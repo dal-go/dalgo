@@ -414,6 +414,17 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 			return baseSources(base, r.data)
 		},
 		func(r memoryRow) string { return r.id })
+	rows, err = applySingleSourceCursor(rows, q)
+	if err != nil {
+		return nil, err
+	}
+	if offset := q.Offset(); offset > 0 {
+		if offset >= len(rows) {
+			rows = rows[:0]
+		} else {
+			rows = rows[offset:]
+		}
+	}
 	if limit := q.Limit(); limit > 0 && limit < len(rows) {
 		rows = rows[:limit]
 	}
@@ -445,6 +456,52 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		records[i] = record.NewRecordWithData(key, data).SetError(nil)
 	}
 	return dal.NewRecordsReader(records), nil
+}
+
+// applySingleSourceCursor implements the cursor shape that DALgo can prove
+// without an adapter-specific encoded tuple: one typed DocumentID order. A
+// deleted cursor document still advances lexically, matching a Firestore
+// DocumentID value cursor instead of requiring the row to remain present.
+func applySingleSourceCursor(rows []memoryRow, q dal.StructuredQuery) ([]memoryRow, error) {
+	startFrom, startAfter := q.StartFrom(), q.StartAfter()
+	if startFrom == "" && startAfter == "" {
+		return rows, nil
+	}
+	if startFrom != "" && startAfter != "" {
+		return nil, fmt.Errorf("%w: StartFrom and StartAfter are mutually exclusive", dal.ErrNotSupported)
+	}
+	orderBy := q.OrderBy()
+	if len(orderBy) != 1 {
+		return nil, fmt.Errorf("%w: cursors require exactly one typed DocumentID order", dal.ErrNotSupported)
+	}
+	field, ok := orderBy[0].Expression().(dal.FieldRef)
+	if !ok || !field.IsID() || field.Source() != "" {
+		return nil, fmt.Errorf("%w: cursors require a typed DocumentID order", dal.ErrNotSupported)
+	}
+	cursor, exclusive := string(startFrom), false
+	if startAfter != "" {
+		cursor, exclusive = string(startAfter), true
+	}
+	descending := orderBy[0].Descending()
+	first := len(rows)
+	for i, row := range rows {
+		id := row.id
+		if row.key != nil {
+			id = fmt.Sprint(row.key.ID)
+		}
+		include := id >= cursor
+		if descending {
+			include = id <= cursor
+		}
+		if exclusive && id == cursor {
+			include = false
+		}
+		if include {
+			first = i
+			break
+		}
+	}
+	return rows[first:], nil
 }
 
 var _ dal.ReadwriteTransaction = (*session)(nil)
