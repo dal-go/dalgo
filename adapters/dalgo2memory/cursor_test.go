@@ -32,14 +32,45 @@ func TestSingleSourceDocumentIDCursorsAreOrderedAndExclusive(t *testing.T) {
 	require.Equal(t, []string{"c"}, runSingleSource(t, db, ctx, query(false, "", "2", 0, 0)))
 	require.Equal(t, []string{"b"}, runSingleSource(t, db, ctx, query(true, "", "2", 0, 0)))
 	require.Equal(t, []string{"a"}, runSingleSource(t, db, ctx, query(false, "", "", 1, 1)))
+	require.Empty(t, runSingleSource(t, db, ctx, query(false, "", "", 3, 1)))
 }
 
 func TestSingleSourceCursorRejectsUntypedDocumentNameField(t *testing.T) {
 	db, ctx := seedThings(t)
 	q := dal.From(dal.NewRootCollectionRef("things", "")).NewQuery().
 		OrderBy(dal.Ascending(dal.Field("__name__"))).StartAfter("1").
-		SelectIntoRecord(func() record.Record { return record.NewRecordWithIncompleteKey("things", reflect.String, &orderThing{}) })
+		SelectIntoRecord(func() record.Record {
+			return record.NewRecordWithIncompleteKey("things", reflect.String, &orderThing{})
+		})
 	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
 	require.Nil(t, reader)
+	require.ErrorIs(t, err, dal.ErrNotSupported)
+}
+
+func TestSingleSourceCursorRejectsMissingOrder(t *testing.T) {
+	db, ctx := seedThings(t)
+	q := dal.From(dal.NewRootCollectionRef("things", "")).NewQuery().
+		StartAfter("1").
+		SelectIntoRecord(func() record.Record {
+			return record.NewRecordWithIncompleteKey("things", reflect.String, &orderThing{})
+		})
+	reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+	require.Nil(t, reader)
+	require.ErrorIs(t, err, dal.ErrNotSupported)
+}
+
+type conflictingCursorQuery struct {
+	dal.StructuredQuery
+}
+
+func (conflictingCursorQuery) StartFrom() dal.Cursor  { return "1" }
+func (conflictingCursorQuery) StartAfter() dal.Cursor { return "2" }
+
+func TestSingleSourceCursorRejectsConflictingCursorKinds(t *testing.T) {
+	q := dal.From(dal.NewRootCollectionRef("things", "")).NewQuery().
+		OrderBy(dal.Ascending(dal.DocumentID())).
+		SelectKeysOnly(reflect.String)
+	rows, err := applySingleSourceCursor(nil, conflictingCursorQuery{StructuredQuery: q})
+	require.Nil(t, rows)
 	require.ErrorIs(t, err, dal.ErrNotSupported)
 }
