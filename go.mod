@@ -6,7 +6,7 @@ require github.com/dal-go/record v0.1.2
 
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.24.0
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/stretchr/testify v1.11.1
 	github.com/strongo/random v0.0.1
 	github.com/strongo/validation v0.0.10
