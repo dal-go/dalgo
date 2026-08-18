@@ -5,9 +5,9 @@ go 1.24.0
 require github.com/dal-go/record v0.1.2
 
 require (
-	github.com/RoaringBitmap/roaring/v2 v2.24.0
+	github.com/RoaringBitmap/roaring/v2 v2.25.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	github.com/strongo/random v0.0.1
 	github.com/strongo/validation v0.0.10
 	go.uber.org/mock v0.6.0
