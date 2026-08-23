@@ -1,0 +1,556 @@
+package dalgo2memory
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
+)
+
+// ErrTransactionConflict is returned by RunReadwriteTransaction, for a
+// database created with WithOptimisticConcurrency, when another transaction
+// committed a write to a key this transaction read or wrote before this
+// transaction reached its own commit. A caller that wants to retry should
+// test for it with IsTransactionConflict rather than a direct comparison,
+// since the error returned always wraps additional diagnostic context.
+//
+// Before adding this, both the dal and record packages (dalgo's own error
+// vocabulary) were searched for an existing conflict / retryable / aborted
+// error type or predicate to reuse instead — dalgo2mysql, dalgo2sql,
+// dalgo2postgres and dalgo2sqlite were checked too, in case a convention
+// already existed for a backend that has real serialization failures. None of
+// them define one. This sentinel-plus-predicate pair follows the same idiom
+// this package already uses for ErrReadAfterWriteInTransaction (a checked
+// sentinel) and that the record package uses for
+// ErrRecordNotFound/IsNotFound (a predicate function) — see IsTransactionConflict.
+var ErrTransactionConflict = errors.New("dalgo2memory: transaction conflict: another transaction committed a write to a key this transaction read or wrote")
+
+// IsTransactionConflict reports whether err is, or wraps, ErrTransactionConflict.
+// A caller of a WithOptimisticConcurrency database's RunReadwriteTransaction
+// should use this to decide whether a failed transaction is safe to retry.
+func IsTransactionConflict(err error) bool {
+	return err != nil && errors.Is(err, ErrTransactionConflict)
+}
+
+// optimisticState buffers one read-write transaction's reads and writes when
+// the owning database runs with WithOptimisticConcurrency, instead of the
+// whole-database lock RunReadwriteTransaction otherwise holds for the
+// callback's entire duration.
+//
+// Nothing here touches a storage engine until commit (see the commit method),
+// and that is not merely an optimization: it is what makes the failure mode
+// correct. Consider two transactions racing to claim the same slug with
+// Get-then-Insert. If Insert instead wrote through to the engine immediately
+// (as the default mode's session.save does), the loser would either get
+// whatever "duplicate" error the engine happens to raise — which depends on
+// write ordering, not on what either transaction actually observed — or, if
+// it happened to write first and got overtaken afterwards, its write would be
+// visible to any other reader for real before anyone had detected the
+// conflict, and undoing it would need its own undo log that the storage
+// engines don't have. Deferring every write to a single, lock-guarded commit
+// step sidesteps both problems: nothing is visible until it is valid, and the
+// side that loses the race always gets ErrTransactionConflict specifically,
+// which is the error a caller can actually retry on.
+//
+// The trade-off this buys: within one transaction, the immediate return value
+// of Get/Exists/Set/Insert/Update/Delete only ever reflects what that same
+// transaction has itself observed or written (see touch) — never a
+// concurrent transaction's uncommitted work, and, for a key this transaction
+// has not yet touched, never storage-fidelity validation a write's data would
+// eventually fail (see validateForCommit's doc comment for the narrow gap
+// that remains there). Existence-driven outcomes (Insert's duplicate check,
+// Update's not-found check) are still resolved eagerly and correctly against
+// this transaction's own view, exactly as they are in the default mode — the
+// only thing that moves to commit time is telling this transaction whether
+// its view was still valid when it finished.
+type optimisticState struct {
+	db *database
+
+	// reads is this transaction's read set: the commit version observed the
+	// first time each key was touched — by a read OR a write, see touch.
+	// commit fails the transaction if any of these versions has advanced by
+	// the time it runs.
+	reads map[string]uint64
+
+	// pending is this transaction's local, mutable view of every key it has
+	// touched so far, keyed by conflictKey. See pendingEntry and touch.
+	pending map[string]*pendingEntry
+}
+
+// pendingEntry is one key's transaction-local view: the outcome of every
+// Get/Exists/Set/Insert/Update/Delete this transaction has issued for the
+// key, kept current so a later operation on the same key in the same
+// transaction sees this transaction's own uncommitted writes (Firestore
+// transactions behave the same way: a read after a write in the same
+// transaction sees the write).
+type pendingEntry struct {
+	// key is the full key (with its parent chain) this entry was first
+	// touched through.
+	key *record.Key
+	// present and data together are this transaction's current view of the
+	// key's value: present is false for a key this transaction has observed
+	// as absent (never stored, or deleted within this transaction); when
+	// present, data is the fully decoded row, JSON-normalized the same way
+	// normalizeData produces it.
+	present bool
+	data    map[string]any
+	// commit describes how to apply this entry to the real storage engine at
+	// commit time, reflecting only the LAST write this transaction made to
+	// the key — an Update layered on an earlier Set in the same transaction
+	// collapses to just the net resolved value, since only the final state is
+	// ever visible to anyone once this transaction commits. It is nil for a
+	// key this transaction has only read.
+	commit *pendingWrite
+}
+
+// pendingWriteKind distinguishes the two things commit can do to a key.
+type pendingWriteKind int
+
+const (
+	pendingWriteStore pendingWriteKind = iota
+	pendingWriteDelete
+)
+
+// pendingWrite is how commit replays one key's net write against the real
+// storage engine. rec/overwrite are only meaningful for pendingWriteStore.
+type pendingWrite struct {
+	kind      pendingWriteKind
+	rec       record.Record
+	overwrite bool
+}
+
+// conflictKey identifies a stored record for optimistic-concurrency version
+// tracking. It is collection-prefixed because keyID's own doc comment already
+// notes that a root-level id is not namespaced by collection on its own (two
+// different collections can share a leaf id); a nested record's keyID already
+// carries its full collection/id chain, so the prefix is redundant there but
+// harmless.
+func conflictKey(collection, id string) string {
+	return collection + "\x00" + id
+}
+
+// runOptimisticReadwriteTransaction is RunReadwriteTransaction's
+// WithOptimisticConcurrency path — see optimisticState's doc comment for the
+// design. It never holds db.mu for the callback's duration, only briefly, once
+// per read/write operation, and once more (also briefly) for the final
+// commit, so unrelated transactions' callbacks run fully concurrently: a
+// transaction can even pause indefinitely between operations (as a test
+// driving a specific interleaving does) without blocking anyone else, since
+// it is not holding any lock while paused.
+func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal.RWTxWorker) error {
+	tx := &optimisticState{
+		db:      db,
+		reads:   make(map[string]uint64),
+		pending: make(map[string]*pendingEntry),
+	}
+	s := session{db: db, txState: &transactionState{
+		noReadsAfterWrites: db.noReadsAfterWritesInTransaction,
+		optimistic:         tx,
+	}}
+	if err := f(ctx, s); err != nil {
+		return err
+	}
+	return tx.commit()
+}
+
+// bumpConflictVersion advances the commit-version counter for one key when
+// this database runs with WithOptimisticConcurrency, so an in-flight
+// optimistic transaction correctly treats a write made outside any
+// transaction as a conflicting external commit (a default-mode transaction
+// never reaches this: RunReadwriteTransaction routes every transaction
+// through runOptimisticReadwriteTransaction instead, once optimisticConcurrency
+// is set, so the only caller left here is a top-level, non-transactional
+// write). It is a no-op — adding no locking or bookkeeping cost — for a
+// database created without WithOptimisticConcurrency, keeping the default
+// path exactly as it was before this mode existed.
+//
+// Callers must already hold db.mu: every call site (session.save, the
+// non-optimistic session.Delete and session.UpdateRecord) does, since all
+// three only ever run inside a top-level method or a default-mode
+// transaction, both of which hold it for the call's duration.
+func (db *database) bumpConflictVersion(collection, id string) {
+	if !db.optimisticConcurrency {
+		return
+	}
+	db.versions[conflictKey(collection, id)]++
+}
+
+// firstTouchEntry returns key's pendingEntry, creating it — and recording its
+// commit-version baseline in reads — on first contact. isNew reports whether
+// this call created it, which touch uses to decide whether the entry still
+// needs to be populated from the live engine. The caller must already hold
+// db.mu, so that creating the entry and snapshotting the live commit version
+// happen atomically with respect to any other transaction's commit.
+//
+// A key's first contact establishes this transaction's baseline for it
+// whether that contact is a read or a write, matching the rule that a
+// transaction conflicts on a key it wrote just as much as one it only read.
+func (tx *optimisticState) firstTouchEntry(collection, id string, key *record.Key) (entry *pendingEntry, isNew bool) {
+	ck := conflictKey(collection, id)
+	if existing, ok := tx.pending[ck]; ok {
+		return existing, false
+	}
+	if _, ok := tx.reads[ck]; !ok {
+		tx.reads[ck] = tx.db.versions[ck] // implicit 0 for a key with no committed write yet
+	}
+	entry = &pendingEntry{key: key}
+	tx.pending[ck] = entry
+	return entry, true
+}
+
+// touch is the read-side entry point into a key's transaction-local view: it
+// returns the pendingEntry, loading it from the live engine on first contact
+// so this and later reads in the same transaction see a stable,
+// JSON-normalized value without going back to the engine again. Get, Exists
+// (via read), Insert's duplicate check, and Update's merge all go through it.
+// A later call for the same key, from any operation, always reuses the
+// existing entry instead — that is what gives read-your-own-writes within one
+// transaction even though nothing has actually reached the shared store yet.
+// A write that does not need the prior value (Set, Delete) uses
+// firstTouchEntry directly instead, since it can never fail. The caller must
+// already hold db.mu.
+func (tx *optimisticState) touch(collection, id string, key *record.Key) (*pendingEntry, error) {
+	entry, isNew := tx.firstTouchEntry(collection, id, key)
+	if !isNew {
+		return entry, nil
+	}
+	eng := tx.db.engine(collection)
+	var data map[string]any
+	target := record.NewRecordWithData(key, &data)
+	switch err := eng.load(id, target); {
+	case err == nil:
+		entry.present = true
+		entry.data = data
+	case record.IsNotFound(err):
+		// leave entry.present at its zero value (false)
+	default:
+		return nil, err
+	}
+	return entry, nil
+}
+
+// read performs one read-side touch: it takes db.mu, resolves the key's
+// pendingEntry, and releases db.mu again before returning. Both session.Get
+// and session.Exists go through it.
+func (tx *optimisticState) read(collection, id string, key *record.Key) (*pendingEntry, error) {
+	tx.db.mu.Lock()
+	defer tx.db.mu.Unlock()
+	return tx.touch(collection, id, key)
+}
+
+// get implements session.Get for an optimistic-mode transaction.
+func (tx *optimisticState) get(rec record.Record) error {
+	key := rec.Key()
+	collection := key.Collection()
+	if err := tx.db.guardCollection(collection); err != nil {
+		rec.SetError(err)
+		return err
+	}
+	entry, err := tx.read(collection, keyID(key), key)
+	if err != nil {
+		rec.SetError(err)
+		return err
+	}
+	if !entry.present {
+		notFoundErr := dal.NewErrNotFoundByKey(key, nil)
+		rec.SetError(notFoundErr)
+		return notFoundErr
+	}
+	rec.SetError(nil)
+	if err := materializeInto(entry.data, rec.Data()); err != nil {
+		rec.SetError(err)
+		return err
+	}
+	return nil
+}
+
+// exists implements session.Exists for an optimistic-mode transaction. Like
+// the default mode's session.Exists, it performs no schema-guard check.
+func (tx *optimisticState) exists(key *record.Key) (bool, error) {
+	entry, err := tx.read(key.Collection(), keyID(key), key)
+	if err != nil {
+		return false, err
+	}
+	return entry.present, nil
+}
+
+// stage implements session.Set for an optimistic-mode transaction: rec's data
+// becomes this transaction's resolved value for its key, replacing whatever
+// this transaction observed there before (an earlier read, or an earlier
+// write of its own). Nothing reaches the shared storage engine until commit —
+// see optimisticState's doc comment. Unlike insert, staging a Set can never
+// fail once its data has validated, since Set has no duplicate check to
+// consult the key's prior value for.
+func (tx *optimisticState) stage(rec record.Record) error {
+	key := rec.Key()
+	collection := key.Collection()
+	factory, err := tx.db.recordFactory(collection)
+	if err != nil {
+		rec.SetError(err)
+		return err
+	}
+	data, err := normalizeData(rec.Data())
+	if err != nil {
+		rec.SetError(err)
+		return err
+	}
+	if err := validateForCommit(collection, factory, data); err != nil {
+		rec.SetError(err)
+		return err
+	}
+
+	tx.db.mu.Lock()
+	entry, _ := tx.firstTouchEntry(collection, keyID(key), key)
+	entry.present = true
+	entry.data = data
+	entry.commit = &pendingWrite{kind: pendingWriteStore, rec: rec, overwrite: true}
+	tx.db.mu.Unlock()
+
+	rec.SetError(nil)
+	return nil
+}
+
+// insert implements session.Insert for an optimistic-mode transaction.
+// Unlike stage, it first consults this transaction's own view of the key
+// (via touch, which loads from the live engine only on the key's first
+// contact) and fails immediately, with the same "record already exists"
+// shape the engines themselves use, if this transaction has already observed
+// the key as present. That keeps a same-transaction duplicate (e.g. Insert
+// after a Get that found the key) an immediate, ordinary error exactly as in
+// the default mode (see TestInsertDuplicateAndMissingUpdate); a race with a
+// *different*, concurrently-committing transaction is instead only caught
+// later, at commit, as ErrTransactionConflict — see optimisticState's doc
+// comment for why the two cases need different errors.
+func (tx *optimisticState) insert(rec record.Record) error {
+	key := rec.Key()
+	collection := key.Collection()
+	factory, err := tx.db.recordFactory(collection)
+	if err != nil {
+		rec.SetError(err)
+		return err
+	}
+	data, err := normalizeData(rec.Data())
+	if err != nil {
+		rec.SetError(err)
+		return err
+	}
+	if err := validateForCommit(collection, factory, data); err != nil {
+		rec.SetError(err)
+		return err
+	}
+
+	tx.db.mu.Lock()
+	entry, touchErr := tx.touch(collection, keyID(key), key)
+	var resultErr error
+	switch {
+	case touchErr != nil:
+		resultErr = touchErr
+	case entry.present:
+		resultErr = fmt.Errorf("record already exists: %s", key)
+	default:
+		entry.present = true
+		entry.data = data
+		entry.commit = &pendingWrite{kind: pendingWriteStore, rec: rec, overwrite: false}
+	}
+	tx.db.mu.Unlock()
+
+	if resultErr != nil {
+		rec.SetError(resultErr)
+		return resultErr
+	}
+	rec.SetError(nil)
+	return nil
+}
+
+// delete implements session.Delete for an optimistic-mode transaction. Like
+// the default mode's session.Delete, deleting an already-absent key is a
+// no-op (never an error), and no schema-guard check is performed.
+func (tx *optimisticState) delete(key *record.Key) {
+	collection := key.Collection()
+	tx.db.mu.Lock()
+	defer tx.db.mu.Unlock()
+	// A delete never needs the prior value, so firstTouchEntry (which never
+	// fails) is enough — no need for touch's live-engine load.
+	entry, _ := tx.firstTouchEntry(collection, keyID(key), key)
+	entry.present = false
+	entry.data = nil
+	entry.commit = &pendingWrite{kind: pendingWriteDelete}
+}
+
+// updateRecord implements session.UpdateRecord for an optimistic-mode
+// transaction. Like the live engines' update, it requires the key to already
+// exist — checked eagerly against this transaction's own view, matching the
+// default mode's immediate not-found behavior — then applies updates to a
+// copy of this transaction's local snapshot via the same applyUpdatesToMap
+// the live engines use, so a second Update of the same key later in the same
+// transaction compounds on top of the first rather than the value the
+// transaction started with.
+func (tx *optimisticState) updateRecord(rec record.Record, updates []update.Update) error {
+	key := rec.Key()
+	collection := key.Collection()
+	factory, err := tx.db.recordFactory(collection)
+	if err != nil {
+		return err
+	}
+
+	tx.db.mu.Lock()
+	defer tx.db.mu.Unlock()
+	entry, err := tx.touch(collection, keyID(key), key)
+	if err != nil {
+		return err
+	}
+	if !entry.present {
+		return dal.NewErrNotFoundByKey(key, nil)
+	}
+	// Work on a defensive copy so a failure below (an unknown field, say)
+	// cannot leave entry.data half-updated for a later read in this same
+	// transaction to observe. cloneEntryData, unlike normalizeData, cannot
+	// itself fail: entry.data is already valid, previously round-tripped JSON
+	// data (see cloneEntryData's doc comment).
+	merged := cloneEntryData(entry.data)
+	if err := applyUpdatesToMap(merged, updates); err != nil {
+		return err
+	}
+	if err := validateForCommit(collection, factory, merged); err != nil {
+		return err
+	}
+	entry.data = merged
+	entry.commit = &pendingWrite{
+		kind:      pendingWriteStore,
+		rec:       record.NewRecordWithData(key, merged),
+		overwrite: true,
+	}
+	return nil
+}
+
+// commit is called once, synchronously, when the transaction's callback
+// returns nil (see runOptimisticReadwriteTransaction). It validates this
+// transaction's full read set — every key it touched, by a read or a write,
+// see touch — against the live commit-version table and, only if nothing has
+// changed since this transaction first touched it, applies its buffered
+// writes for real and advances their versions. Both steps run inside one
+// critical section so that validating and applying are atomic with respect to
+// every other transaction's own commit: that atomicity is the entire point,
+// since two separate steps here is exactly what a concurrent commit could
+// interleave between.
+//
+// A deferred validation failure — a buffered write whose data passed the
+// eager validateForCommit check at the point of the call, but still somehow
+// fails the target storage engine's own validation (a declared columnar
+// column's type mismatch discovered only during the real engine.store, for
+// instance) — can leave a multi-key commit partially applied: an earlier
+// key's write in the same commit may already have been applied to the engine
+// before a later key's write fails. This is a narrow, documented gap, not a
+// silent one: it cannot happen for the Serialized engine, nor for any of the
+// failure modes validateForCommit already screens for (unknown fields,
+// non-marshalable data) — see WithOptimisticConcurrency's doc comment and
+// this adapter's Feature report for the trade-off this accepts rather than
+// building a full two-phase commit across the storageEngine interface.
+func (tx *optimisticState) commit() error {
+	tx.db.mu.Lock()
+	defer tx.db.mu.Unlock()
+
+	for ck, baseline := range tx.reads {
+		if tx.db.versions[ck] != baseline {
+			return fmt.Errorf("%w: key %q changed after this transaction observed it", ErrTransactionConflict, ck)
+		}
+	}
+
+	for ck, entry := range tx.pending {
+		w := entry.commit
+		if w == nil {
+			continue // touched only by a read; nothing to apply
+		}
+		collection := entry.key.Collection()
+		id := keyID(entry.key)
+		switch w.kind {
+		case pendingWriteDelete:
+			tx.db.engine(collection).delete(id)
+		case pendingWriteStore:
+			if err := tx.db.engine(collection).store(id, w.rec, w.overwrite); err != nil {
+				return err
+			}
+		}
+		tx.db.versions[ck]++
+	}
+	return nil
+}
+
+// validateForCommit runs the same generic checks the real storage engines
+// perform before persisting — the data marshals to JSON, and, when factory is
+// non-nil (the collection has a schema), contains no field the schema does
+// not declare — so a malformed write fails immediately at the point of the
+// Set/Insert/Update call instead of being silently accepted into the buffer
+// and only discovered at commit. It mirrors serializedEngine.store's own
+// validation exactly (that engine performs no other checks); a storage
+// engine with additional validation of its own — the columnar engine's
+// per-column typed decode, for instance — can still fail at commit for a
+// reason this eager check does not catch. See commit's doc comment for the
+// resulting trade-off.
+//
+// factory is resolved once by the caller (stage/insert/updateRecord, via
+// recordFactory) rather than re-resolved here, since re-resolving it would
+// only ever repeat a check the caller already made successfully — by the
+// time any of them calls this, recordFactory has already been asked about
+// this exact collection and returned no error.
+func validateForCommit(collection string, factory func() any, data any) error {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if factory != nil {
+		return checkUnknownFields(collection, factory, b)
+	}
+	return nil
+}
+
+// normalizeData JSON-round-trips a record's data into a generic
+// map[string]any, matching the shape the Serialized engine actually persists
+// (and the shape the columnar engine's own rowData/materializeSlot produce)
+// so every later same-transaction operation on the key — materializeInto,
+// Update's merge, a later Insert's duplicate check — has a stable,
+// engine-independent snapshot to work from, isolated from the original data
+// the caller passed in.
+func normalizeData(data any) (map[string]any, error) {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]any
+	if err := json.Unmarshal(b, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// cloneEntryData deep-copies a pendingEntry's data via the same JSON round
+// trip normalizeData uses, but — unlike normalizeData — cannot itself fail:
+// its input is always already-valid, previously round-tripped JSON data (it
+// came from normalizeData or from an engine's own generic decode in touch),
+// and a generic map[string]any decoded from JSON contains only
+// JSON-representable values, which always re-marshal, and re-marshaled JSON
+// always re-decodes.
+func cloneEntryData(data map[string]any) map[string]any {
+	b, _ := json.Marshal(data)
+	var out map[string]any
+	_ = json.Unmarshal(b, &out)
+	return out
+}
+
+// materializeInto decodes data into target via a JSON round-trip, so the
+// result shares no references with the transaction's own snapshot or any
+// other read — the same isolation columnarEngine.materializeSlot already
+// gives query results. Only the decode into target can fail here (target is
+// a caller-supplied Get destination, which may not match what was stored):
+// the marshal side cannot, because every write path validates
+// marshalability before a value ever reaches a pendingEntry (see
+// normalizeData and cloneEntryData's doc comments), and get is
+// materializeInto's only caller, always with a pendingEntry's data.
+func materializeInto(data map[string]any, target any) error {
+	b, _ := json.Marshal(data)
+	return json.Unmarshal(b, target)
+}
