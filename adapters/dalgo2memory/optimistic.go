@@ -350,7 +350,7 @@ func (tx *optimisticState) insert(rec record.Record) error {
 	case touchErr != nil:
 		resultErr = touchErr
 	case entry.present:
-		resultErr = fmt.Errorf("record already exists: %s", key)
+		resultErr = fmt.Errorf("%w: %s", record.ErrRecordExists, key)
 	default:
 		entry.present = true
 		entry.data = data

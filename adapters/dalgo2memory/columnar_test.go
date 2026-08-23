@@ -210,6 +210,7 @@ func TestColumnar_ParityWithSerializedOps(t *testing.T) {
 		err := db.Insert(ctx, record.NewRecordWithData(key, &user{Name: "Bob"}))
 		require.Error(t, err)
 		require.ErrorContains(t, err, "already exists")
+		require.True(t, record.IsAlreadyExists(err), "a duplicate Insert should satisfy IsAlreadyExists: %v", err)
 		require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &got)))
 		require.Equal(t, "Alice2", got.Name)
 

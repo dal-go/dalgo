@@ -101,7 +101,11 @@ err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.Readwrit
     return tx.Insert(ctx, record)
 })
 if err != nil {
-    // Will fail if record already exists
+    // Will fail if record already exists. An adapter that can reliably tell a
+    // duplicate key apart from any other insert failure wraps
+    // record.ErrRecordExists, so callers can test for it with
+    // record.IsAlreadyExists(err) instead of treating every insert failure as
+    // a duplicate key.
 }
 ```
 

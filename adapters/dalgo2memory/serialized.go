@@ -43,13 +43,13 @@ func (e *serializedEngine) exists(id string) bool {
 	return ok
 }
 
-func (e *serializedEngine) store(id string, record record.Record, overwrite bool) error {
+func (e *serializedEngine) store(id string, rec record.Record, overwrite bool) error {
 	if !overwrite {
 		if _, ok := e.records[id]; ok {
-			return fmt.Errorf("record already exists: %s", record.Key())
+			return fmt.Errorf("%w: %s", record.ErrRecordExists, rec.Key())
 		}
 	}
-	b, err := json.Marshal(record.Data())
+	b, err := json.Marshal(rec.Data())
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (e *serializedEngine) store(id string, record record.Record, overwrite bool
 		}
 	}
 	e.records[id] = b
-	e.keys[id] = record.Key()
+	e.keys[id] = rec.Key()
 	return nil
 }
 

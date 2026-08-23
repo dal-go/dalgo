@@ -860,7 +860,3 @@ func number(v any) (float64, bool) {
 		return 0, false
 	}
 }
-
-func isDuplicate(err error) bool {
-	return err != nil && !errors.Is(err, record.ErrRecordNotFound)
-}
