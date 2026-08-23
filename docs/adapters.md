@@ -475,18 +475,23 @@ func (tx *myReadwriteTransaction) Set(ctx context.Context, record record.Record)
     return tx.client.Set(ctx, key, bytes, tx.tx)
 }
 
-func (tx *myReadwriteTransaction) Insert(ctx context.Context, record record.Record, opts ...dal.InsertOption) error {
+// Note: the parameter is named rec, not record, so the record package (and
+// its ErrRecordExists sentinel) stays reachable in the body below.
+func (tx *myReadwriteTransaction) Insert(ctx context.Context, rec record.Record, opts ...dal.InsertOption) error {
     // Check if exists
-    exists, err := tx.Exists(ctx, record.Key())
+    exists, err := tx.Exists(ctx, rec.Key())
     if err != nil {
         return err
     }
     if exists {
-        return errors.New("record already exists")
+        // Wrap record.ErrRecordExists rather than returning a plain error, so
+        // callers can distinguish "this key is taken" from any other insert
+        // failure with record.IsAlreadyExists (or errors.Is).
+        return fmt.Errorf("%w: %s", record.ErrRecordExists, rec.Key())
     }
     
     // Insert
-    return tx.Set(ctx, record)
+    return tx.Set(ctx, rec)
 }
 
 func (tx *myReadwriteTransaction) Update(ctx context.Context, key *record.Key, updates []update.Update, preconds ...dal.Precondition) error {
@@ -625,7 +630,7 @@ func translateError(err error) error {
     case isNotFoundError(err):
         return record.ErrRecordNotFound
     case isDuplicateKeyError(err):
-        return errors.New("duplicate key")
+        return fmt.Errorf("%w: %v", record.ErrRecordExists, err)
     case isDeadlockError(err):
         return errors.New("transaction deadlock")
     default:

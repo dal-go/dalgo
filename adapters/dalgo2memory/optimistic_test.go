@@ -608,7 +608,10 @@ func TestOptimisticConcurrencyInsertDuplicateWithinTransaction(t *testing.T) {
 		if IsTransactionConflict(dupErr) {
 			return fmt.Errorf("a same-transaction duplicate must not be reported as ErrTransactionConflict: %w", dupErr)
 		}
-		return nil // the duplicate was correctly rejected with an ordinary error
+		if !dalrecord.IsAlreadyExists(dupErr) {
+			return fmt.Errorf("a same-transaction duplicate must satisfy record.IsAlreadyExists: %w", dupErr)
+		}
+		return nil // the duplicate was correctly rejected with record.ErrRecordExists
 	})
 	require.NoError(t, err)
 }

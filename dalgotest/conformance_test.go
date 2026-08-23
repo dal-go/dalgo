@@ -2,6 +2,7 @@ package dalgotest_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -121,6 +122,86 @@ func TestSuiteFailsAnAdapterThatValidatesOnlyInsert(t *testing.T) {
 		if !contains(failed, want) {
 			t.Errorf("check %q passed against an adapter that validates only Insert", want)
 		}
+	}
+}
+
+// duplicateAcceptingDB is a deliberately non-conforming adapter: its Insert
+// never rejects a duplicate key at all — it silently behaves like Set. This is
+// the most basic way an adapter can fail the new "rejects an Insert over an
+// existing key" invariant.
+type duplicateAcceptingDB struct {
+	dal.DB
+}
+
+func (db duplicateAcceptingDB) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
+	return dal.BackendOf(db.DB).RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return f(ctx, duplicateAcceptingTx{ReadwriteTransaction: tx})
+	}, options...)
+}
+
+type duplicateAcceptingTx struct {
+	dal.ReadwriteTransaction
+}
+
+func (tx duplicateAcceptingTx) Insert(ctx context.Context, r record.Record, opts ...dal.InsertOption) error {
+	return tx.Set(ctx, r)
+}
+
+// TestSuiteFailsAnAdapterThatAcceptsDuplicateInserts is the non-vacuity proof
+// for the "record already exists" invariant's most basic violation: an Insert
+// that never rejects a duplicate key at all.
+func TestSuiteFailsAnAdapterThatAcceptsDuplicateInserts(t *testing.T) {
+	failed := runChecks(t, duplicateAcceptingDB{DB: dalgo2memory.NewDB()})
+	if !contains(failed, "rejects an Insert over an existing key with record.IsAlreadyExists") {
+		t.Fatal("the conformance suite passed an adapter whose Insert never rejects a duplicate key")
+	}
+}
+
+// errUnclassifiedDuplicate is what unclassifiedDuplicateTx.Insert reports for
+// a duplicate key — an ordinary error that does not wrap record.ErrRecordExists,
+// exactly what an adapter looks like before it adopts the sentinel.
+var errUnclassifiedDuplicate = errors.New("dalgotest: duplicate key (unclassified)")
+
+// unclassifiedDuplicateDB is a deliberately non-conforming adapter: it DOES
+// reject a duplicate Insert, but with a plain error that does not satisfy
+// record.IsAlreadyExists. This is the subtler violation the check exists to
+// catch — the exact "isDuplicate treats everything as a duplicate, or nothing
+// is classified at all" gap that motivated ErrRecordExists/IsAlreadyExists in
+// the first place.
+type unclassifiedDuplicateDB struct {
+	dal.DB
+}
+
+func (db unclassifiedDuplicateDB) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
+	return dal.BackendOf(db.DB).RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return f(ctx, unclassifiedDuplicateTx{ReadwriteTransaction: tx})
+	}, options...)
+}
+
+type unclassifiedDuplicateTx struct {
+	dal.ReadwriteTransaction
+}
+
+func (tx unclassifiedDuplicateTx) Insert(ctx context.Context, r record.Record, opts ...dal.InsertOption) error {
+	exists, err := tx.Exists(ctx, r.Key())
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errUnclassifiedDuplicate
+	}
+	return tx.ReadwriteTransaction.Insert(ctx, r, opts...)
+}
+
+// TestSuiteFailsAnAdapterWithAnUnclassifiedDuplicateError is the second
+// non-vacuity proof: an adapter that does reject a duplicate key, but with an
+// error the caller cannot tell apart from any other insert failure, must still
+// fail the check — anything less would let dalgo2memory's old isDuplicate
+// heuristic (any error that isn't ErrRecordNotFound) pass by accident.
+func TestSuiteFailsAnAdapterWithAnUnclassifiedDuplicateError(t *testing.T) {
+	failed := runChecks(t, unclassifiedDuplicateDB{DB: dalgo2memory.NewDB()})
+	if !contains(failed, "rejects an Insert over an existing key with record.IsAlreadyExists") {
+		t.Fatal("the conformance suite passed an adapter whose duplicate-key error does not satisfy record.IsAlreadyExists")
 	}
 }
 

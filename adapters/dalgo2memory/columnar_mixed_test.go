@@ -339,6 +339,7 @@ func TestMixed_ParityAndFidelity(t *testing.T) {
 		dup := target.Insert(ctx, record.NewRecordWithData(k, map[string]any{"tags": []string{"z"}}))
 		require.Error(t, dup)
 		require.ErrorContains(t, dup, "already exists")
+		require.True(t, record.IsAlreadyExists(dup), "a duplicate Insert should satisfy IsAlreadyExists: %v", dup)
 		absent := target.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("m", "absent"), &map[string]any{}))
 		require.True(t, record.IsNotFound(absent))
 	}

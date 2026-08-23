@@ -305,21 +305,21 @@ func (e *columnarEngine) exists(id string) bool {
 	return ok && e.live[slot]
 }
 
-func (e *columnarEngine) store(id string, record record.Record, overwrite bool) error {
+func (e *columnarEngine) store(id string, rec record.Record, overwrite bool) error {
 	if e.initErr != nil {
 		return e.initErr
 	}
 	if !overwrite {
 		if slot, ok := e.idToSlot[id]; ok && e.live[slot] {
-			return fmt.Errorf("record already exists: %s", record.Key())
+			return fmt.Errorf("%w: %s", record.ErrRecordExists, rec.Key())
 		}
 	}
-	values, leftover, err := e.prepareWrite(record.Data())
+	values, leftover, err := e.prepareWrite(rec.Data())
 	if err != nil {
 		return err
 	}
 	slot := e.allocSlot(id)
-	e.setSlotKey(slot, record.Key())
+	e.setSlotKey(slot, rec.Key())
 	e.writeSlot(slot, values, leftover)
 	return nil
 }

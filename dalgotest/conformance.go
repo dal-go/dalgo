@@ -146,6 +146,7 @@ func Checks(opts ...Option) []Check {
 		{"writes nothing when a record is rejected", s.rejectedRecordIsNotPersisted},
 		{"lets WithoutValidation bypass validation", s.withoutValidationBypasses},
 		{"validates database-level writes too", s.databaseLevelWritesAreValidated},
+		{"rejects an Insert over an existing key with record.IsAlreadyExists", s.rejectsDuplicateInsert},
 	}
 	return checks
 }
@@ -347,4 +348,43 @@ func (s suite) databaseLevelWritesAreValidated(ctx context.Context, db dal.DB) e
 		return fmt.Errorf("a database-level Insert of an invalid record failed with %v, want the validation error", err)
 	}
 	return nil
+}
+
+// rejectsDuplicateInsert asserts the invariant Insert exists to provide: it
+// fails when a record with the same key already exists, and — this is the
+// part left implicit until dal-go/record grew ErrRecordExists/IsAlreadyExists
+// — the failure must be identifiable as that specific case rather than lumped
+// in with every other reason Insert can fail. A caller (see
+// sneat-co/slugs claiming a unique slug via tx.Insert) needs that distinction
+// to avoid mistaking a transient backend error for "the key is taken".
+//
+// An adapter that does not implement Insert at all (unsupported on the seed)
+// still conforms, matching every other check in this suite. An adapter that
+// DOES implement Insert has no such exemption on the second call: Insert
+// unconditionally promises to fail on a duplicate key, so a plain nil or an
+// unclassified error both fail this check.
+func (s suite) rejectsDuplicateInsert(ctx context.Context, db dal.DB) error {
+	id := "insert-duplicate"
+
+	seedErr := inTx(ctx, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return tx.Insert(ctx, s.valid(id))
+	})
+	if unsupported(seedErr) {
+		return nil // adapter does not implement Insert at all; still conforms
+	}
+	if seedErr != nil {
+		return fmt.Errorf("seeding the record to insert over: %w", seedErr)
+	}
+
+	err := inTx(ctx, db, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return tx.Insert(ctx, s.valid(id))
+	})
+	switch {
+	case err == nil:
+		return errors.New("a second Insert at an existing key was accepted, want a duplicate-key error")
+	case record.IsAlreadyExists(err):
+		return nil
+	default:
+		return fmt.Errorf("a duplicate Insert failed with %v, want an error satisfying record.IsAlreadyExists", err)
+	}
 }

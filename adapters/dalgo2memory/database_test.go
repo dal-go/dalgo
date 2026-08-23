@@ -104,6 +104,10 @@ func TestTransactionMetadata(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestInsertDuplicateAndMissingUpdate proves record.IsAlreadyExists correctly
+// classifies a duplicate Insert (true) and does not misfire on an unrelated
+// write failure (false) — the two directions the predicate exists to tell
+// apart, per dal-go/record's ErrRecordExists/IsAlreadyExists contract.
 func TestInsertDuplicateAndMissingUpdate(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase()
@@ -113,11 +117,13 @@ func TestInsertDuplicateAndMissingUpdate(t *testing.T) {
 	require.NoError(t, db.Insert(ctx, rec))
 	err := db.Insert(ctx, rec)
 	require.Error(t, err)
-	require.True(t, isDuplicate(err))
+	require.True(t, dalrecord.IsAlreadyExists(err), "a duplicate Insert should satisfy IsAlreadyExists: %v", err)
+	require.False(t, dalrecord.IsNotFound(err), "a duplicate Insert should not satisfy IsNotFound: %v", err)
 
 	err = db.Update(ctx, dalrecord.NewKeyWithID("Things", "missing"), []update.Update{update.ByFieldName("Name", "x")})
 	require.Error(t, err)
 	require.True(t, dalrecord.IsNotFound(err))
+	require.False(t, dalrecord.IsAlreadyExists(err), "a not-found Update should not satisfy IsAlreadyExists: %v", err)
 }
 
 func TestMultiMethodsStopOnError(t *testing.T) {
