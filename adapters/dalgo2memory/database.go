@@ -31,6 +31,7 @@ func newDatabase(options ...Option) *database {
 	db := &database{
 		collections:       make(map[string]storageEngine),
 		schemaRefBreaking: true,
+		versions:          make(map[string]uint64),
 	}
 	for _, option := range options {
 		if option != nil {
@@ -59,6 +60,23 @@ type database struct {
 	// schemaRefBreaking is the schema-wide columnar fidelity default (faithful
 	// unless WithoutSchemaRefBreaking was used). NewDB initializes it to true.
 	schemaRefBreaking bool
+
+	// optimisticConcurrency selects the opt-in optimistic-concurrency
+	// read-write transaction mode (see WithOptimisticConcurrency) in place of
+	// the default whole-database lock RunReadwriteTransaction otherwise holds
+	// for a transaction's entire duration. Default false: nothing below
+	// changes behavior until it is set.
+	optimisticConcurrency bool
+	// versions is the commit-version table optimistic-mode transactions
+	// validate their reads against at commit (see optimisticState.commit): it
+	// maps a conflictKey to the number of times a committed write has touched
+	// it. A key absent from the map has an implicit version of 0, which
+	// doubles as "does not exist yet", so a transaction that observed a key as
+	// absent still conflicts correctly if another transaction inserts it
+	// first. It is guarded by mu exactly like the storage engines are — see
+	// optimisticState's doc comment for why one short-lived critical section
+	// covers both.
+	versions map[string]uint64
 }
 
 func (db *database) ID() string {
@@ -80,6 +98,9 @@ func (db *database) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker
 }
 
 func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
+	if db.optimisticConcurrency {
+		return db.runOptimisticReadwriteTransaction(ctx, f)
+	}
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return f(ctx, session{db: db, txState: &transactionState{
@@ -181,6 +202,13 @@ type session struct {
 type transactionState struct {
 	noReadsAfterWrites bool
 	hasWritten         bool
+	// optimistic is non-nil exactly when this transaction belongs to a
+	// database created with WithOptimisticConcurrency. Every session
+	// read/write method checks it first (via session.optimistic()) to route
+	// through the buffered, commit-validated path in optimistic.go instead of
+	// the immediate engine access below, which only ever runs for a top-level
+	// (non-transactional) call or a default-mode transaction.
+	optimistic *optimisticState
 }
 
 // ErrReadAfterWriteInTransaction matches the ordering error returned by
@@ -200,6 +228,19 @@ func (s session) markWrite() {
 	}
 }
 
+// optimistic returns this session's optimisticState, or nil for a top-level
+// (non-transactional) call, a readonly transaction, or a read-write
+// transaction on a database created without WithOptimisticConcurrency. It is
+// the single branch point every read/write method below uses to choose
+// between the buffered path (optimistic.go) and the immediate engine access
+// that was this package's only behavior before that mode existed.
+func (s session) optimistic() *optimisticState {
+	if s.txState == nil {
+		return nil
+	}
+	return s.txState.optimistic
+}
+
 func (s session) ID() string {
 	return ""
 }
@@ -212,6 +253,9 @@ func (s session) Exists(_ context.Context, key *record.Key) (bool, error) {
 	if err := s.allowRead(); err != nil {
 		return false, err
 	}
+	if opt := s.optimistic(); opt != nil {
+		return opt.exists(key)
+	}
 	return s.db.engine(key.Collection()).exists(keyID(key)), nil
 }
 
@@ -219,6 +263,9 @@ func (s session) Get(_ context.Context, rec record.Record) error {
 	if err := s.allowRead(); err != nil {
 		rec.SetError(err)
 		return err
+	}
+	if opt := s.optimistic(); opt != nil {
+		return opt.get(rec)
 	}
 	if err := s.db.guardCollection(rec.Key().Collection()); err != nil {
 		rec.SetError(err)
@@ -245,6 +292,13 @@ func (s session) GetMulti(ctx context.Context, records []record.Record) error {
 }
 
 func (s session) Set(_ context.Context, rec record.Record) error {
+	if opt := s.optimistic(); opt != nil {
+		if err := opt.stage(rec); err != nil {
+			return err
+		}
+		s.markWrite()
+		return nil
+	}
 	if err := s.save(rec, true); err != nil {
 		return err
 	}
@@ -276,6 +330,34 @@ func (s session) Insert(ctx context.Context, rec record.Record, opts ...dal.Inse
 		// dal.WithAdapterGeneratedID contract fall back to the default random-string generator.
 		gen = dal.NewInsertOptions(dal.WithRandomStringKey(dal.DefaultRandomStringIDLength, 5)).IDGenerator()
 	}
+
+	if opt := s.optimistic(); opt != nil {
+		if gen != nil {
+			err := dal.InsertWithIdGenerator(ctx, rec, gen, insertWithGeneratorMaxAttempts,
+				func(key *record.Key) error {
+					present, err := opt.exists(key)
+					if err != nil {
+						return err
+					}
+					if present {
+						return nil // id is taken: signal "exists" so generation retries
+					}
+					return record.ErrRecordNotFound // id is free: signal "not found" so it is inserted
+				},
+				opt.insert,
+			)
+			if err == nil {
+				s.markWrite()
+			}
+			return err
+		}
+		if err := opt.insert(rec); err != nil {
+			return err
+		}
+		s.markWrite()
+		return nil
+	}
+
 	if gen != nil {
 		err := dal.InsertWithIdGenerator(ctx, rec, gen, insertWithGeneratorMaxAttempts,
 			func(key *record.Key) error {
@@ -310,7 +392,14 @@ func (s session) InsertMulti(ctx context.Context, records []record.Record, opts 
 }
 
 func (s session) Delete(_ context.Context, key *record.Key) error {
-	s.db.engine(key.Collection()).delete(keyID(key))
+	if opt := s.optimistic(); opt != nil {
+		opt.delete(key)
+		s.markWrite()
+		return nil
+	}
+	id := keyID(key)
+	s.db.engine(key.Collection()).delete(id)
+	s.db.bumpConflictVersion(key.Collection(), id)
 	s.markWrite()
 	return nil
 }
@@ -328,13 +417,22 @@ func (s session) Update(ctx context.Context, key *record.Key, updates []update.U
 }
 
 func (s session) UpdateRecord(_ context.Context, record record.Record, updates []update.Update, _ ...dal.Precondition) error {
+	if opt := s.optimistic(); opt != nil {
+		if err := opt.updateRecord(record, updates); err != nil {
+			return err
+		}
+		s.markWrite()
+		return nil
+	}
 	collectionName := record.Key().Collection()
 	if err := s.db.guardCollection(collectionName); err != nil {
 		return err
 	}
-	if err := s.db.engine(collectionName).update(keyID(record.Key()), updates); err != nil {
+	id := keyID(record.Key())
+	if err := s.db.engine(collectionName).update(id, updates); err != nil {
 		return err
 	}
+	s.db.bumpConflictVersion(collectionName, id)
 	s.markWrite()
 	return nil
 }
@@ -351,6 +449,15 @@ func (s session) UpdateMulti(ctx context.Context, keys []*record.Key, updates []
 func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query) (dal.RecordsReader, error) {
 	if err := s.allowRead(); err != nil {
 		return nil, err
+	}
+	if s.optimistic() != nil {
+		// A query scans committed storage directly (see loadCandidateRows), so
+		// inside an optimistic-mode transaction it would see neither this
+		// transaction's own buffered writes nor participate in its conflict
+		// detection — a correctness trap, not a convenience. Point reads/writes
+		// by key (Get, Exists, Set, Insert, Update, Delete) are fully supported;
+		// see WithOptimisticConcurrency's doc comment.
+		return nil, fmt.Errorf("%w: queries are not supported inside a WithOptimisticConcurrency read-write transaction; read by key, or run the query outside the transaction", dal.ErrNotSupported)
 	}
 	q, ok := query.(dal.StructuredQuery)
 	if !ok {
@@ -520,10 +627,12 @@ func (s session) save(record record.Record, overwrite bool) error {
 		return err
 	}
 	record.SetError(nil)
-	if err := s.db.engine(collectionName).store(keyID(record.Key()), record, overwrite); err != nil {
+	id := keyID(record.Key())
+	if err := s.db.engine(collectionName).store(id, record, overwrite); err != nil {
 		record.SetError(err)
 		return err
 	}
+	s.db.bumpConflictVersion(collectionName, id)
 	record.SetError(nil)
 	return nil
 }

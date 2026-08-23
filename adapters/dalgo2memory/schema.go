@@ -21,6 +21,58 @@ func WithNoReadsAfterWritesInTransaction() Option {
 	}
 }
 
+// WithOptimisticConcurrency selects optimistic-concurrency read-write
+// transactions for this in-memory database instead of the default: without
+// it, RunReadwriteTransaction takes a whole-database lock for the callback's
+// entire duration, so read-write transactions are fully serialized and can
+// never actually contend with one another.
+//
+// That default is exactly right for most tests, but it makes one specific
+// class of test lie: a test that claims to prove a real concurrency
+// guarantee — "two concurrent claims of a unique slug, exactly one wins", or
+// "two concurrent bookings for the last remaining place, one is refused" —
+// passes trivially against the default lock, because the two transactions it
+// spawns can never actually run at the same time. It proves nothing about a
+// database, like Firestore, whose transactions really do contend. Production
+// code in this ecosystem relies on exactly this guarantee (see
+// sneat-co/bookius's facade4bookius/booking.go, which does a Get-then-Insert
+// inside RunReadwriteTransaction for slug uniqueness and for capacity), so a
+// test standing in for Firestore needs a mode where the contention is real.
+//
+// With this option, transactions may run concurrently: each buffers the keys
+// it reads and the writes it makes locally, touching no shared storage until
+// it commits (when its callback returns nil). At that point it fails with
+// ErrTransactionConflict (test with IsTransactionConflict) if another
+// transaction has committed a write to any key this one read or wrote since
+// it first touched that key — whether this one only read the key or wrote it
+// too. Buffering writes rather than applying them immediately is what makes
+// the LOSING side of a race get the conflict error specifically, rather than
+// some other error that happens to depend on write ordering: see
+// optimisticState's doc comment in optimistic.go for the full reasoning.
+//
+// A query (ExecuteQueryToRecordsReader / ExecuteQueryToRecordsetReader)
+// inside such a transaction returns dal.ErrNotSupported: a scan reads
+// committed storage directly, so it would see neither this transaction's own
+// buffered writes nor participate in its conflict detection. Point reads and
+// writes by key (Get, Exists, Set, Insert, Update, Delete and their -Multi
+// forms) are fully supported.
+//
+// This is deliberately adapter-local rather than part of dalgotest's shared
+// conformance suite: the suite proves record-validation invariants every
+// dal.DB adapter can be held to uniformly, but optimistic-concurrency
+// contention is not such a capability — a real backend like Firestore or a
+// SQL database already has its own genuine transactional contention, and
+// forcing every adapter to grow an equivalent option and test hook just to
+// stay in the suite would be scope the other adapters never asked for.
+//
+// The default remains the whole-database lock; nothing changes unless this
+// option is passed to NewDB.
+func WithOptimisticConcurrency() Option {
+	return func(db *database) {
+		db.optimisticConcurrency = true
+	}
+}
+
 // collectionDef describes a single collection in an in-memory schema.
 // It is produced by WithCollection and consumed by WithSchema.
 type collectionDef struct {
