@@ -2,7 +2,7 @@ module github.com/dal-go/dalgo
 
 go 1.24.0
 
-require github.com/dal-go/record v0.1.3-0.20260823104806-1a4a63df1fc5
+require github.com/dal-go/record v0.1.3
 
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.25.0
@@ -16,9 +16,7 @@ require (
 
 require (
 	github.com/bits-and-blooms/bitset v1.24.4 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/text v0.22.0 // indirect
 )
