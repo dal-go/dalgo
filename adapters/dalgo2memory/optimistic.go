@@ -317,7 +317,13 @@ func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal
 		optimistic:         tx,
 	}
 	s := session{db: db, txState: txState}
-	if err := f(ctx, s); err != nil {
+	// Stamp transactionInProgressKey on the ctx handed to f — not the ctx this
+	// function received, which RunReadwriteTransaction already checked for that
+	// key before dispatching here — so a nested RunReadonlyTransaction or
+	// RunReadwriteTransaction call made from inside this callback is rejected by
+	// ErrNestedTransaction instead of silently running as an independent,
+	// concurrently-committing transaction (see that error's doc comment).
+	if err := f(context.WithValue(ctx, transactionInProgressKey{}, true), s); err != nil {
 		return err
 	}
 	if txState.readAfterWriteRejected {
@@ -374,7 +380,13 @@ func (db *database) runLockedReadwriteTransaction(ctx context.Context, f dal.RWT
 		optimistic:         tx,
 	}
 	s := session{db: db, txState: txState}
-	if err := f(ctx, s); err != nil {
+	// See the identical comment in runOptimisticReadwriteTransaction: this
+	// stamps the ctx handed to f, not the ctx RunReadwriteTransaction already
+	// checked, so a nested transaction call from inside this callback is
+	// rejected by ErrNestedTransaction instead of deadlocking on db.mu, which
+	// this function holds for the callback's entire duration (sync.RWMutex is
+	// not reentrant).
+	if err := f(context.WithValue(ctx, transactionInProgressKey{}, true), s); err != nil {
 		return err // buffered writes are discarded: this IS the rollback
 	}
 	if txState.readAfterWriteRejected {

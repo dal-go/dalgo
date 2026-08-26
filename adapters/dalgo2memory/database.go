@@ -126,13 +126,91 @@ func (db *database) Schema() dal.Schema {
 	return nil
 }
 
+// transactionInProgressKey is the context key dalgo2memory stamps onto the
+// context it hands a transaction callback, so a nested attempt to start
+// another transaction from inside that callback can be detected. It is an
+// unexported struct type used only as a context key (never as a value), the
+// same idiom the real Firestore Go client uses for the identical purpose (see
+// ErrNestedTransaction's doc comment) — and, like that key, it has no
+// exported accessor: RunReadonlyTransaction and RunReadwriteTransaction below
+// are the only places that set or check it.
+type transactionInProgressKey struct{}
+
+// ErrNestedTransaction is returned by RunReadonlyTransaction and
+// RunReadwriteTransaction when either is called with a context that is
+// already running inside another transaction's callback, in any combination
+// of read-only and read-write.
+//
+// This is Firestore parity, not an invented restriction. The real client
+// (cloud.google.com/go/firestore, transaction.go) keeps one
+// transactionInProgressKey and one RunTransaction method underneath both
+// Client.RunTransaction (read-write) and the ReadOnly() option (read-only):
+//
+//	if ctx.Value(transactionInProgressKey{}) != nil {
+//		return errNestedTransaction
+//	}
+//
+// That check runs before RunTransaction even looks at whether either side is
+// read-only, so all four nestings — read-write-in-read-write,
+// read-only-in-read-write, read-write-in-read-only, read-only-in-read-only —
+// are rejected identically. dalgo2memory mirrors that scope exactly, rather
+// than only guarding the read-write-in-read-write case, so code that runs
+// against this adapter cannot rely on a nesting shape that would fail against
+// real Firestore.
+//
+// Independently of parity, dalgo2memory has its own reason to refuse
+// read-write-in-read-write specifically: the default whole-database-lock
+// RunReadwriteTransaction (runLockedReadwriteTransaction) holds db.mu for its
+// callback's entire duration, so a nested RunReadwriteTransaction call would
+// deadlock trying to re-acquire it (sync.RWMutex is not reentrant). The
+// opt-in WithOptimisticConcurrency path (runOptimisticReadwriteTransaction)
+// holds no such lock, so the same nested call would instead silently succeed
+// as an independent, concurrently-committing transaction — legalizing
+// exactly the pattern real Firestore rejects outright. This guard closes
+// both wrong outcomes — a hang and a silent behavior change — before either
+// can happen, for every mode combination.
+//
+// A rejected nested attempt does not poison the outer transaction: this
+// error is returned directly by the nested RunReadonlyTransaction /
+// RunReadwriteTransaction call, before any transaction state for the nested
+// attempt is created, exactly like errNestedTransaction is returned by the
+// real client's RunTransaction with no effect on the outer *Transaction's
+// fields. A callback that treats the error as fatal and returns it aborts
+// the outer transaction (its writes are discarded, same as any other
+// callback error); a callback that swallows it and returns nil lets the
+// outer transaction commit its own work normally.
+//
+// To intentionally start a genuinely independent transaction from inside a
+// callback — rather than nesting one inside it — begin it with
+// dal.GetNonTransactionalContext(ctx) in place of ctx: dal core's sanctioned
+// escape for exactly this. It works here because it returns a context from
+// before dalgo2memory (or whatever wraps it) ever set this key, so the guard
+// sees no marker. It is only available when something upstream wrapped the
+// context with dal.NewContextWithTransaction before handing it to this
+// backend (e.g. an access.NewDB-style decorator) — dalgo2memory itself
+// performs no such wrapping, so with nothing upstream doing it,
+// GetNonTransactionalContext has nothing to return. Note that the escape
+// only sidesteps THIS guard: started against the default whole-database-lock
+// mode while the outer callback's db.mu is still held, an "independent"
+// transaction on the same *database still deadlocks on that pre-existing,
+// unrelated lock — the escape is only deadlock-free run against a
+// WithOptimisticConcurrency database, or once the outer transaction has
+// returned.
+var ErrNestedTransaction = errors.New("dalgo2memory: nested transactions are not supported: Firestore rejects a transaction started inside another transaction's callback")
+
 func (db *database) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker, _ ...dal.TransactionOption) error {
+	if ctx.Value(transactionInProgressKey{}) != nil {
+		return ErrNestedTransaction
+	}
 	db.mu.RLock()
 	defer db.mu.RUnlock()
-	return f(ctx, session{db: db})
+	return f(context.WithValue(ctx, transactionInProgressKey{}, true), session{db: db})
 }
 
 func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
+	if ctx.Value(transactionInProgressKey{}) != nil {
+		return ErrNestedTransaction
+	}
 	if db.optimisticConcurrency {
 		return db.runOptimisticReadwriteTransaction(ctx, f)
 	}
