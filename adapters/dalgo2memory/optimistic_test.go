@@ -14,12 +14,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestOptimisticConcurrencyOption checks WithOptimisticConcurrency's own
-// bookkeeping: off by default, on when requested. Everything else in this
-// file exercises the behavior that flag switches on.
-func TestOptimisticConcurrencyOption(t *testing.T) {
-	require.False(t, newDatabase().optimisticConcurrency)
+// TestTransactionModeOptions checks the mode options' bookkeeping around the
+// contention-by-default flip: a plain NewDB() runs optimistic (the Firestore
+// profile), WithSingleWriterTransactions restores the whole-database lock,
+// the deprecated WithOptimisticConcurrency and the profile-naming
+// WithFirestoreProfile both affirm the default, and — because options apply
+// in order — the last one wins in either direction. Everything else in this
+// file exercises the behavior the flag switches between.
+func TestTransactionModeOptions(t *testing.T) {
+	require.True(t, newDatabase().optimisticConcurrency, "contention is the default")
+	require.False(t, newDatabase(WithSingleWriterTransactions()).optimisticConcurrency)
 	require.True(t, newDatabase(WithOptimisticConcurrency()).optimisticConcurrency)
+	require.True(t, newDatabase(WithFirestoreProfile()).optimisticConcurrency)
+	require.True(t, newDatabase(WithFirestoreProfile()).noReadsAfterWritesInTransaction)
+	require.True(t,
+		newDatabase(WithSingleWriterTransactions(), WithFirestoreProfile()).optimisticConcurrency,
+		"options apply in order: the profile re-asserts contention")
+	require.False(t,
+		newDatabase(WithOptimisticConcurrency(), WithSingleWriterTransactions()).optimisticConcurrency,
+		"options apply in order: the single-writer opt-out wins when last")
 }
 
 // TestIsTransactionConflict is the direct unit test for the predicate the
@@ -33,18 +46,18 @@ func TestIsTransactionConflict(t *testing.T) {
 	require.True(t, IsTransactionConflict(fmt.Errorf("wrapped: %w", ErrTransactionConflict)))
 }
 
-// TestDefaultTransactionsRemainSerialized is the regression guard for the
-// behavior this whole feature must not touch: without
-// WithOptimisticConcurrency, RunReadwriteTransaction still takes a
-// whole-database lock for a transaction's entire duration, so a second
-// read-write transaction cannot even START running until the first one's
-// callback returns. This is exactly what makes a "two concurrent claims,
-// exactly one wins" test meaningless against the default mode (see
-// WithOptimisticConcurrency's doc comment) — proving it still holds is what
-// justifies every other test in this file bothering to exist.
-func TestDefaultTransactionsRemainSerialized(t *testing.T) {
+// TestSingleWriterTransactionsSerialize is the regression guard for the
+// intent-named opt-out: under WithSingleWriterTransactions,
+// RunReadwriteTransaction takes a whole-database lock for a transaction's
+// entire duration, so a second read-write transaction cannot even START
+// running until the first one's callback returns. This was NewDB's default
+// before contention was (the flip that made a plain NewDB() the Firestore
+// profile); the mode survives as an explicit choice for backends that
+// genuinely serialize writers and for step-choreographed tests, and this
+// test is what proves the choice still delivers exactly that.
+func TestSingleWriterTransactionsSerialize(t *testing.T) {
 	ctx := context.Background()
-	db := newDatabase() // no WithOptimisticConcurrency: the pre-existing default
+	db := newDatabase(WithSingleWriterTransactions())
 
 	firstEntered := make(chan struct{})
 	release := make(chan struct{})

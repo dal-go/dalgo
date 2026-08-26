@@ -52,24 +52,32 @@ func WithInterleavedReadsAndWritesInTransaction() Option {
 }
 
 // WithOptimisticConcurrency selects optimistic-concurrency read-write
-// transactions for this in-memory database instead of the default: without
-// it, RunReadwriteTransaction takes a whole-database lock for the callback's
-// entire duration, so read-write transactions are fully serialized and can
-// never actually contend with one another.
+// transactions for this in-memory database.
 //
-// That default is exactly right for most tests, but it makes one specific
-// class of test lie: a test that claims to prove a real concurrency
-// guarantee — "two concurrent claims of a unique slug, exactly one wins", or
-// "two concurrent bookings for the last remaining place, one is refused" —
-// passes trivially against the default lock, because the two transactions it
-// spawns can never actually run at the same time. It proves nothing about a
-// database, like Firestore, whose transactions really do contend. Production
-// code in this ecosystem relies on exactly this guarantee (see
-// sneat-co/bookius's facade4bookius/booking.go, which does a Get-then-Insert
-// inside RunReadwriteTransaction for slug uniqueness and for capacity), so a
-// test standing in for Firestore needs a mode where the contention is real.
+// Deprecated: this is now NewDB's default behavior, so calling this option is
+// redundant on a plain NewDB(). It still works — it re-asserts optimistic
+// concurrency, which only matters when combined with an earlier
+// WithSingleWriterTransactions() in the same option list, since options apply
+// in order and the last one wins. New code should omit it and rely on the
+// default (or name it via WithFirestoreProfile); existing callers
+// (sneat-co/chessraiders among them) are unaffected and may drop the call at
+// their own pace. This follows the exact deprecation precedent of
+// WithNoReadsAfterWritesInTransaction when strict ordering became the
+// default.
 //
-// With this option, transactions may run concurrently: each buffers the keys
+// The paragraphs below describe the machinery, which is now simply how a
+// plain NewDB() behaves. Before this was the default, a test that claimed to
+// prove a real concurrency guarantee — "two concurrent claims of a unique
+// slug, exactly one wins", or "two concurrent bookings for the last remaining
+// place, one is refused" — passed trivially against the old whole-database
+// lock, because the two transactions it spawned could never actually run at
+// the same time. It proved nothing about a database, like Firestore, whose
+// transactions really do contend. Production code in this ecosystem relies on
+// exactly this guarantee (see sneat-co/bookius's facade4bookius/booking.go,
+// which does a Get-then-Insert inside RunReadwriteTransaction for slug
+// uniqueness and for capacity), which is why contention is now the default.
+//
+// In this mode, transactions may run concurrently: each buffers the keys
 // it reads and the writes it makes locally, touching no shared storage until
 // it commits (when its callback returns nil). At that point it fails with
 // ErrTransactionConflict (test with IsTransactionConflict) if another
@@ -100,16 +108,59 @@ func WithInterleavedReadsAndWritesInTransaction() Option {
 // forcing every adapter to grow an equivalent option and test hook just to
 // stay in the suite would be scope the other adapters never asked for.
 //
-// The default remains the whole-database lock, so transactions still cannot
-// contend unless this option is passed. What the default no longer differs on
-// is ATOMICITY: both modes buffer a transaction's writes and apply them only
-// once its callback returns nil, so a failed transaction discards its writes
-// exactly as Firestore does (see runLockedReadwriteTransaction). Contention is
-// therefore the one remaining transactional difference between the two modes,
-// alongside queries — which the default mode supports inside a read-write
-// transaction and this mode does not.
+// Both modes buffer a transaction's writes and apply them only once its
+// callback returns nil, so a failed transaction discards its writes exactly
+// as Firestore does regardless of this choice (see
+// runLockedReadwriteTransaction).
 func WithOptimisticConcurrency() Option {
 	return func(db *database) {
+		db.optimisticConcurrency = true
+	}
+}
+
+// WithSingleWriterTransactions opts a database out of the default
+// contention-capable transaction machinery: RunReadwriteTransaction takes a
+// whole-database lock for the callback's entire duration, so read-write
+// transactions are fully serialized — a single writer at a time, the way
+// SQLite's database-level write lock behaves. This was NewDB's default before
+// contention was; atomicity is unaffected (writes are buffered and discarded
+// on a failed callback in both modes), and transaction options like
+// dal.TxWithAttempts are silently ignored, since a conflict can never occur.
+//
+// Use this when the in-memory database stands in for a backend that
+// genuinely serializes writers, or for a test that deliberately choreographs
+// step-by-step transaction ordering and needs transactions never to abort.
+// Do NOT reach for it just to make a failing concurrent test pass: if the
+// code under test also runs against Firestore, a test failing with
+// ErrTransactionConflict under the default is exercising real contention
+// that production sees too — silencing it here hides the signal, the same
+// trap WithInterleavedReadsAndWritesInTransaction's doc comment warns about
+// for ordering.
+func WithSingleWriterTransactions() Option {
+	return func(db *database) {
+		db.optimisticConcurrency = false
+	}
+}
+
+// WithFirestoreProfile names the backend a plain NewDB() emulates: Firestore.
+// It re-asserts the full Firestore-faithful transaction bundle — strict
+// read-before-write ordering, snapshot reads with genuine contention, atomic
+// buffered commits, and bounded auto-retry of conflicts — and is therefore an
+// affirming no-op on a plain NewDB(), useful in two ways: as documentation in
+// a test that wants to SAY what it emulates rather than rely on defaults, and
+// as a last-wins reset after earlier options in the same list.
+//
+// Profiles name real backends rather than exposing isolation levels as free
+// dials, because a test double configured into a combination no real backend
+// has emulates nothing — see this package's option naming throughout. A SQL
+// profile family (per-transaction isolation levels, read-your-writes,
+// interleaved ordering) is planned to join it once the interleaved mode
+// gains query overlay support; until then
+// WithInterleavedReadsAndWritesInTransaction and WithSingleWriterTransactions
+// are the SQL-flavoured building blocks.
+func WithFirestoreProfile() Option {
+	return func(db *database) {
+		db.noReadsAfterWritesInTransaction = true
 		db.optimisticConcurrency = true
 	}
 }

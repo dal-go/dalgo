@@ -19,7 +19,8 @@ var bothTransactionModes = []struct {
 	name string
 	opts []Option
 }{
-	{"default locked mode", nil},
+	{"default (contending) mode", nil},
+	{"single-writer mode", []Option{WithSingleWriterTransactions()}},
 	{"WithOptimisticConcurrency", []Option{WithOptimisticConcurrency()}},
 }
 

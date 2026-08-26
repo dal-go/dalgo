@@ -37,7 +37,8 @@ func TestTransactionRollback_DiscardsWrites(t *testing.T) {
 		name string
 		opts []Option
 	}{
-		{"default locked mode", nil},
+		{"default (contending) mode", nil},
+		{"single-writer mode", []Option{WithSingleWriterTransactions()}},
 		{"WithOptimisticConcurrency", []Option{WithOptimisticConcurrency()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
@@ -73,7 +74,8 @@ func TestTransactionRollback_DiscardsDeletes(t *testing.T) {
 		name string
 		opts []Option
 	}{
-		{"default locked mode", nil},
+		{"default (contending) mode", nil},
+		{"single-writer mode", []Option{WithSingleWriterTransactions()}},
 		{"WithOptimisticConcurrency", []Option{WithOptimisticConcurrency()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
@@ -105,7 +107,8 @@ func TestTransactionCommit_AppliesAllWrites(t *testing.T) {
 		name string
 		opts []Option
 	}{
-		{"default locked mode", nil},
+		{"default (contending) mode", nil},
+		{"single-writer mode", []Option{WithSingleWriterTransactions()}},
 		{"WithOptimisticConcurrency", []Option{WithOptimisticConcurrency()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
@@ -323,7 +326,8 @@ func TestReadAfterWriteRejection_PoisonsCommitEvenIfSwallowed(t *testing.T) {
 		name string
 		opts []Option
 	}{
-		{"default locked mode", nil},
+		{"default (contending) mode", nil},
+		{"single-writer mode", []Option{WithSingleWriterTransactions()}},
 		{"WithOptimisticConcurrency", []Option{WithOptimisticConcurrency()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {

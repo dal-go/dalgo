@@ -381,12 +381,69 @@ func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal
 		if attempt > 0 {
 			runtime.Gosched()
 		}
+		if attempt == attempts-1 && attempts > 1 {
+			// FINAL-ATTEMPT ESCALATION: a transaction that lost every
+			// optimistic attempt runs its last one holding db.mu for the
+			// callback's entire duration, which cannot conflict - nothing can
+			// interleave. This is the progress guarantee real Firestore gives
+			// through server-side locking: contended writers there QUEUE on
+			// document locks and eventually all complete, they do not abort
+			// each other forever. Pure OCC without a queue can starve a
+			// transaction on a hot key indefinitely (measured: 8 workers
+			// incrementing one document exhausted 5 optimistic attempts and
+			// surfaced a raw conflict production would never see); escalation
+			// bounds that at "worst case degrades to the single-writer mode
+			// for one attempt", exactly the semantics of waiting on the lock.
+			//
+			// TxWithAttempts(1) deliberately never escalates - it means "one
+			// optimistic shot", which is what conflict-observation tests use.
+			return db.runEscalatedReadwriteTransaction(ctx, f)
+		}
 		err = db.runOptimisticReadwriteTransactionOnce(ctx, f)
 		if err == nil || !IsTransactionConflict(err) {
 			return err
 		}
 	}
 	return err
+}
+
+// runEscalatedReadwriteTransaction is the final-attempt form of an
+// optimistic-mode transaction (see the escalation comment in
+// runOptimisticReadwriteTransaction): it holds db.mu for the callback's whole
+// duration like the single-writer mode does, but keeps validateVersions true
+// so its commit STAMPS db.versions and db.collectionSeq - concurrent
+// optimistic transactions must see this commit as a conflicting write exactly
+// like any other. Validation itself passes trivially: holding the lock means
+// no other commit can interleave between this transaction's reads and its
+// commit. The snapshot machinery is likewise inert here for the same reason -
+// commitSeq cannot advance mid-transaction.
+func (db *database) runEscalatedReadwriteTransaction(ctx context.Context, f dal.RWTxWorker) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	tx := &optimisticState{
+		db:               db,
+		reads:            make(map[string]uint64),
+		pending:          make(map[string]*pendingEntry),
+		ownerHoldsLock:   true,
+		validateVersions: true,
+	}
+	txState := &transactionState{
+		noReadsAfterWrites: db.noReadsAfterWritesInTransaction,
+		optimistic:         tx,
+	}
+	s := session{db: db, txState: txState}
+	// Nested-transaction stamping: see the identical comment in
+	// runLockedReadwriteTransaction - a nested call must be rejected, not
+	// deadlock on the db.mu this function holds.
+	if err := f(context.WithValue(ctx, transactionInProgressKey{}, true), s); err != nil {
+		return err // buffered writes are discarded: this IS the rollback
+	}
+	if txState.readAfterWriteRejected {
+		// Same poisoning as both other runners: a swallowed ordering
+		// rejection must not commit.
+		return fmt.Errorf("%w: commit refused because a read-after-write was rejected earlier in this transaction", ErrReadAfterWriteInTransaction)
+	}
+	return tx.commit()
 }
 
 // runOptimisticReadwriteTransactionOnce is a single attempt of an
