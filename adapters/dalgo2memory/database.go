@@ -79,14 +79,24 @@ type database struct {
 	optimisticConcurrency bool
 	// versions is the commit-version table optimistic-mode transactions
 	// validate their reads against at commit (see optimisticState.commit): it
-	// maps a conflictKey to the number of times a committed write has touched
-	// it. A key absent from the map has an implicit version of 0, which
-	// doubles as "does not exist yet", so a transaction that observed a key as
-	// absent still conflicts correctly if another transaction inserts it
-	// first. It is guarded by mu exactly like the storage engines are — see
+	// maps a conflictKey to the value commitSeq held when the key was last
+	// touched by a committed write. A key absent from the map has an implicit
+	// version of 0 — older than every possible snapshot — which doubles as
+	// "does not exist yet", so a transaction that observed a key as absent
+	// still conflicts correctly if another transaction inserts it first. It is
+	// guarded by mu exactly like the storage engines are — see
 	// optimisticState's doc comment for why one short-lived critical section
 	// covers both.
 	versions map[string]uint64
+	// commitSeq is the database's global commit sequence: it advances once per
+	// committed write batch — an optimistic transaction's successful commit, or
+	// a single top-level write — and the keys that batch touched are stamped
+	// with the new value in versions. Together they let a transaction ask the
+	// one question snapshot reads need: "was this key committed after the
+	// moment my snapshot was pinned?" (see optimisticState.observeAtSnapshot).
+	// Guarded by mu; only meaningful when optimisticConcurrency is set, since
+	// the default whole-database-lock mode leaves versions empty.
+	commitSeq uint64
 }
 
 func (db *database) ID() string {

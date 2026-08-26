@@ -67,6 +67,18 @@ func IsTransactionConflict(err error) bool {
 // this transaction's own view, exactly as they are in the default mode — the
 // only thing that moves to commit time is telling this transaction whether
 // its view was still valid when it finished.
+//
+// Reads are SNAPSHOT reads, matching Firestore: every value a transaction
+// observes belongs to the single committed database state that existed at the
+// transaction's first observation (startSeq). A key committed after that
+// moment cannot be served without fracturing the view — handing the callback
+// values from two different committed states, a mix that never existed and
+// that Firestore never shows — so touching such a key fails with
+// ErrTransactionConflict from the read itself, and poisons the commit in case
+// the callback swallows the error (see observeAtSnapshot). No data is ever
+// cloned to achieve this: as long as nothing observed has been overwritten,
+// the live store IS the snapshot, and the moment that stops being true the
+// transaction aborts and is retried instead of being served history.
 type optimisticState struct {
 	db *database
 
@@ -92,12 +104,67 @@ type optimisticState struct {
 
 	// validateVersions is true only in optimistic mode, where commit checks
 	// this transaction's read set against the live commit-version table and
-	// advances the versions of the keys it writes. The default locked mode
-	// leaves it false: it holds db.mu for the callback's entire duration, so no
-	// other transaction can interleave and there is nothing to validate — and
-	// skipping the bookkeeping keeps db.versions empty rather than growing it
-	// with entries nothing ever reads.
+	// stamps the keys it writes with a fresh commit sequence. The default
+	// locked mode leaves it false: it holds db.mu for the callback's entire
+	// duration, so no other transaction can interleave and there is nothing to
+	// validate — and skipping the bookkeeping keeps db.versions empty rather
+	// than growing it with entries nothing ever reads.
 	validateVersions bool
+
+	// startSeq is the database commit sequence this transaction reads at:
+	// every value it observes belongs to the committed state that existed at
+	// startSeq. It is pinned LAZILY, at the transaction's first observing
+	// touch (a Get, Exists, Insert's duplicate check, or Update's merge —
+	// never a blind Set/Delete, which observes nothing), rather than when the
+	// transaction starts: Firestore's effective read time is likewise its
+	// first read's, and pinning earlier would abort transactions that merely
+	// began before an unrelated commit. Zero and meaningless until
+	// startSeqPinned; guarded by db.mu like everything else here.
+	startSeq       uint64
+	startSeqPinned bool
+
+	// conflict records the first snapshot violation an observing touch
+	// detected (see observeAtSnapshot). Once set, the transaction is
+	// poisoned: every later touch returns it and commit refuses, so a
+	// callback that swallows the read error cannot commit work derived from a
+	// fractured view. The real Firestore client gives the same protection by
+	// failing the commit of a transaction whose read came back ABORTED.
+	conflict error
+}
+
+// observeAtSnapshot enforces this transaction's read snapshot for one key
+// about to be observed for the first time. On the transaction's very first
+// observation it pins startSeq to the database's current commit sequence —
+// the moment that defines which committed state this transaction reads. On
+// every later first observation it checks whether the key was committed
+// AFTER startSeq: if so, no value can be served without fracturing the view
+// (mixing values from two different committed states — the read-committed
+// anomaly this mechanism exists to kill), so it poisons the transaction and
+// returns ErrTransactionConflict from the read itself. The real Firestore
+// client behaves the same way: a read inside a transaction can come back
+// ABORTED, and the SDK's retry loop re-runs the whole callback.
+//
+// Blind writes (Set, Delete) never come through here: they observe nothing,
+// and Firestore's blind writes likewise do not conflict on the written key's
+// prior state. Their write-write races are still caught by commit's
+// validation against the baseline firstTouchEntry records at touch time.
+//
+// The caller must already hold db.mu (it is touch's own precondition), so
+// reading db.commitSeq and db.versions here is synchronized with every
+// commit's stamping.
+func (tx *optimisticState) observeAtSnapshot(ck string) error {
+	if !tx.startSeqPinned {
+		tx.startSeqPinned = true
+		tx.startSeq = tx.db.commitSeq
+		return nil
+	}
+	if seq := tx.db.versions[ck]; seq > tx.startSeq {
+		tx.conflict = fmt.Errorf(
+			"%w: key %q was committed at sequence %d, after this transaction's read snapshot (sequence %d)",
+			ErrTransactionConflict, ck, seq, tx.startSeq)
+		return tx.conflict
+	}
+	return nil
 }
 
 // lock acquires db.mu unless the owning transaction already holds it for its
@@ -257,16 +324,19 @@ func (db *database) runLockedReadwriteTransaction(ctx context.Context, f dal.RWT
 	return tx.commit()
 }
 
-// bumpConflictVersion advances the commit-version counter for one key when
-// this database runs with WithOptimisticConcurrency, so an in-flight
-// optimistic transaction correctly treats a write made outside any
-// transaction as a conflicting external commit (a default-mode transaction
-// never reaches this: RunReadwriteTransaction routes every transaction
-// through runOptimisticReadwriteTransaction instead, once optimisticConcurrency
-// is set, so the only caller left here is a top-level, non-transactional
-// write). It is a no-op — adding no locking or bookkeeping cost — for a
-// database created without WithOptimisticConcurrency, keeping the default
-// path exactly as it was before this mode existed.
+// bumpConflictVersion stamps one key with a fresh commit sequence when this
+// database runs with WithOptimisticConcurrency, so an in-flight optimistic
+// transaction correctly treats a write made outside any transaction as a
+// conflicting external commit — both at its own commit (baseline validation)
+// and at read time (observeAtSnapshot sees the key committed after its
+// snapshot). Each top-level write is its own single-key commit, so it
+// advances db.commitSeq by one and stamps the key with the new value. (A
+// default-mode transaction never reaches this: RunReadwriteTransaction routes
+// every transaction through runOptimisticReadwriteTransaction instead, once
+// optimisticConcurrency is set, so the only caller left here is a top-level,
+// non-transactional write.) It is a no-op — adding no locking or bookkeeping
+// cost — for a database created without WithOptimisticConcurrency, keeping
+// the default path exactly as it was before this mode existed.
 //
 // Callers must already hold db.mu: every call site (session.save, the
 // non-optimistic session.Delete and session.UpdateRecord) does, since all
@@ -276,7 +346,8 @@ func (db *database) bumpConflictVersion(collection, id string) {
 	if !db.optimisticConcurrency {
 		return
 	}
-	db.versions[conflictKey(collection, id)]++
+	db.commitSeq++
+	db.versions[conflictKey(collection, id)] = db.commitSeq
 }
 
 // firstTouchEntry returns key's pendingEntry, creating it — and recording its
@@ -308,16 +379,33 @@ func (tx *optimisticState) firstTouchEntry(collection, id string, key *record.Ke
 // JSON-normalized value without going back to the engine again. Get, Exists
 // (via read), Insert's duplicate check, and Update's merge all go through it.
 // A later call for the same key, from any operation, always reuses the
-// existing entry instead — that is what gives read-your-own-writes within one
-// transaction even though nothing has actually reached the shared store yet.
-// A write that does not need the prior value (Set, Delete) uses
-// firstTouchEntry directly instead, since it can never fail. The caller must
-// already hold db.mu.
+// existing entry instead — that is both what gives read-your-own-writes
+// within one transaction even though nothing has reached the shared store,
+// and what keeps a re-read of the same key snapshot-stable after another
+// transaction commits over it (commit's baseline validation then reports the
+// conflict). A write that does not need the prior value (Set, Delete) uses
+// firstTouchEntry directly instead, since it can never fail.
+//
+// A key touched for the first time is checked against the transaction's read
+// snapshot BEFORE any entry is created (see observeAtSnapshot): a key
+// committed after startSeq fails right here, leaving no half-initialized
+// entry behind for a later same-transaction read to mistake for "absent".
+// The caller must already hold db.mu.
 func (tx *optimisticState) touch(collection, id string, key *record.Key) (*pendingEntry, error) {
-	entry, isNew := tx.firstTouchEntry(collection, id, key)
-	if !isNew {
-		return entry, nil
+	if tx.conflict != nil {
+		// The transaction is already poisoned by an earlier snapshot
+		// violation; no further observation can produce a usable result, and
+		// commit will refuse regardless.
+		return nil, tx.conflict
 	}
+	ck := conflictKey(collection, id)
+	if existing, ok := tx.pending[ck]; ok {
+		return existing, nil
+	}
+	if err := tx.observeAtSnapshot(ck); err != nil {
+		return nil, err
+	}
+	entry, _ := tx.firstTouchEntry(collection, id, key)
 	eng := tx.db.engine(collection)
 	var data map[string]any
 	target := record.NewRecordWithData(key, &data)
@@ -554,6 +642,16 @@ func (tx *optimisticState) commit() error {
 	tx.lock()
 	defer tx.unlock()
 
+	if tx.conflict != nil {
+		// A read in this transaction already observed a snapshot violation;
+		// the callback swallowed that error and returned nil, but its work is
+		// derived from a fractured view and must not become visible. Refusing
+		// here mirrors the real Firestore client, which fails the commit of a
+		// transaction whose read came back ABORTED regardless of what the
+		// callback returned.
+		return fmt.Errorf("commit refused: an earlier read in this transaction observed a snapshot conflict: %w", tx.conflict)
+	}
+
 	if tx.validateVersions {
 		for ck, baseline := range tx.reads {
 			if tx.db.versions[ck] != baseline {
@@ -562,6 +660,14 @@ func (tx *optimisticState) commit() error {
 		}
 	}
 
+	// appliedSeq is this commit's entry in the global commit sequence,
+	// allocated lazily at the first applied write so a read-only commit does
+	// not advance the sequence (it changed nothing, so no snapshot needs to
+	// know it happened). Every key this commit touches is stamped with the
+	// same value: the batch is one atomic commit, and stamping its keys with
+	// one sequence is what lets observeAtSnapshot ask "was this key committed
+	// after my snapshot?" with a single comparison.
+	var appliedSeq uint64
 	for ck, entry := range tx.pending {
 		w := entry.commit
 		if w == nil {
@@ -578,7 +684,11 @@ func (tx *optimisticState) commit() error {
 			}
 		}
 		if tx.validateVersions {
-			tx.db.versions[ck]++
+			if appliedSeq == 0 {
+				tx.db.commitSeq++
+				appliedSeq = tx.db.commitSeq
+			}
+			tx.db.versions[ck] = appliedSeq
 		}
 	}
 	return nil
