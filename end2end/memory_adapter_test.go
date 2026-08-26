@@ -8,5 +8,5 @@ import (
 )
 
 func TestDalgo2Memory(t *testing.T) {
-	end2end.TestDalgoDB(t, dalgo2memory.NewDB(), nil, false)
+	end2end.TestDalgoDB(t, dalgo2memory.New(dalgo2memory.FirestoreProfile()), nil, false)
 }

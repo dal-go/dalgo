@@ -16,7 +16,7 @@ import (
 // shared suite without a line of validation code of its own.
 func TestConformance(t *testing.T) {
 	dalgotest.RunConformance(t, func(*testing.T) (dal.DB, func()) {
-		return dalgo2memory.NewDB(), nil
+		return dalgo2memory.New(dalgo2memory.FirestoreProfile()), nil
 	})
 }
 
@@ -41,7 +41,7 @@ func (t validatedThing) Validate() error {
 // only in production.
 func TestInvalidRecordIsRejectedAndNotStored(t *testing.T) {
 	ctx := context.Background()
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 	key := record.NewKeyWithID("things", "t1")
 
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -64,7 +64,7 @@ func TestInvalidRecordIsRejectedAndNotStored(t *testing.T) {
 // ordinary path.
 func TestValidRecordIsStored(t *testing.T) {
 	ctx := context.Background()
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 	key := record.NewKeyWithID("things", "t1")
 
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {

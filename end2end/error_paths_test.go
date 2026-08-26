@@ -107,7 +107,7 @@ func TestErrorReturnBranches(t *testing.T) {
 	})
 
 	t.Run("select_all_cities_into_record", func(t *testing.T) {
-		db := dalgo2memory.NewDB()
+		db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 		require.NoError(t, setupDataForQueryTests(ctx, db))
 		records, err := selectAllCities(ctx, db)
 		require.NoError(t, err)

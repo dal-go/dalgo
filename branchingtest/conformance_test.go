@@ -47,7 +47,7 @@ func (c *conformanceCheckpoint) Branch(ctx context.Context) (branching.Branch, e
 	if c.released {
 		return nil, branching.ErrReleased
 	}
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 	if c.exists {
 		if err := setConformanceItem(ctx, db, c.item.Count); err != nil {
 			return nil, err
@@ -76,7 +76,7 @@ func (b *conformanceBranch) Close(context.Context) error {
 func TestRunConformance(t *testing.T) {
 	RunConformance(t, Callbacks{
 		New: func(testing.TB) (dal.DB, branching.Provider) {
-			return dalgo2memory.NewDB(), conformanceProvider{}
+			return dalgo2memory.New(dalgo2memory.FirestoreProfile()), conformanceProvider{}
 		},
 		Seed: func(ctx context.Context, db dal.DB) error {
 			return setConformanceItem(ctx, db, 1)
@@ -154,7 +154,7 @@ func TestConformanceFailureHelper(t *testing.T) {
 	if failureCase == "" {
 		t.Skip("only run as a subprocess by TestFailurePathCoverage")
 	}
-	source := dalgo2memory.NewDB()
+	source := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 	switch failureCase {
 	case "validate":
 		validate(t, Callbacks{})
@@ -259,7 +259,7 @@ func scriptedFailureCallbacks(failureCase string) Callbacks {
 	}
 	return Callbacks{
 		New: func(testing.TB) (dal.DB, branching.Provider) {
-			script.source = dalgo2memory.NewDB()
+			script.source = dalgo2memory.New(dalgo2memory.FirestoreProfile())
 			return script.source, &scriptedProvider{script: script}
 		},
 		Seed: func(_ context.Context, db dal.DB) error {
@@ -316,7 +316,7 @@ func (c *scriptedCheckpoint) Branch(context.Context) (branching.Branch, error) {
 		return nil, branching.ErrReleased
 	}
 	c.branchCalls++
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 	if c.script.failureCase == "siblings same handle" {
 		if c.sharedDB == nil {
 			c.sharedDB = db

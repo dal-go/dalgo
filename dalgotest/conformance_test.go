@@ -30,7 +30,7 @@ func runChecks(t *testing.T, db dal.DB) []string {
 // TestSuitePassesAConformingAdapter guards against the opposite failure: a suite
 // so strict that no real adapter can pass it is also useless.
 func TestSuitePassesAConformingAdapter(t *testing.T) {
-	if failed := runChecks(t, dalgo2memory.NewDB()); len(failed) != 0 {
+	if failed := runChecks(t, dalgo2memory.New(dalgo2memory.FirestoreProfile())); len(failed) != 0 {
 		t.Fatalf("a conforming adapter failed %d checks: %v", len(failed), failed)
 	}
 }
@@ -50,7 +50,7 @@ func (db skippingDB) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWork
 // goes red, the conformance suite is decorative and a non-validating adapter
 // would ship green.
 func TestSuiteFailsAnAdapterThatSkipsValidation(t *testing.T) {
-	failed := runChecks(t, skippingDB{DB: dalgo2memory.NewDB()})
+	failed := runChecks(t, skippingDB{DB: dalgo2memory.New(dalgo2memory.FirestoreProfile())})
 	if len(failed) == 0 {
 		t.Fatal("the conformance suite passed an adapter that performs no validation at all")
 	}
@@ -109,7 +109,7 @@ func validateInline(r record.Record) error {
 // proof, aimed at the failure mode a naive suite misses: partial coverage
 // inside one adapter.
 func TestSuiteFailsAnAdapterThatValidatesOnlyInsert(t *testing.T) {
-	failed := runChecks(t, insertOnlyValidatingDB{DB: dalgo2memory.NewDB()})
+	failed := runChecks(t, insertOnlyValidatingDB{DB: dalgo2memory.New(dalgo2memory.FirestoreProfile())})
 
 	if contains(failed, "rejects an invalid record on Insert") {
 		t.Error("the Insert check failed against an adapter that does validate Insert")
@@ -151,7 +151,7 @@ func (tx duplicateAcceptingTx) Insert(ctx context.Context, r record.Record, opts
 // for the "record already exists" invariant's most basic violation: an Insert
 // that never rejects a duplicate key at all.
 func TestSuiteFailsAnAdapterThatAcceptsDuplicateInserts(t *testing.T) {
-	failed := runChecks(t, duplicateAcceptingDB{DB: dalgo2memory.NewDB()})
+	failed := runChecks(t, duplicateAcceptingDB{DB: dalgo2memory.New(dalgo2memory.FirestoreProfile())})
 	if !contains(failed, "rejects an Insert over an existing key with record.IsAlreadyExists") {
 		t.Fatal("the conformance suite passed an adapter whose Insert never rejects a duplicate key")
 	}
@@ -199,7 +199,7 @@ func (tx unclassifiedDuplicateTx) Insert(ctx context.Context, r record.Record, o
 // fail the check — anything less would let dalgo2memory's old isDuplicate
 // heuristic (any error that isn't ErrRecordNotFound) pass by accident.
 func TestSuiteFailsAnAdapterWithAnUnclassifiedDuplicateError(t *testing.T) {
-	failed := runChecks(t, unclassifiedDuplicateDB{DB: dalgo2memory.NewDB()})
+	failed := runChecks(t, unclassifiedDuplicateDB{DB: dalgo2memory.New(dalgo2memory.FirestoreProfile())})
 	if !contains(failed, "rejects an Insert over an existing key with record.IsAlreadyExists") {
 		t.Fatal("the conformance suite passed an adapter whose duplicate-key error does not satisfy record.IsAlreadyExists")
 	}

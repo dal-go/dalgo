@@ -29,7 +29,7 @@ type brokenDB struct {
 }
 
 func newBrokenDB(writeErr, existsErr error, exists bool) brokenDB {
-	return brokenDB{DB: dalgo2memory.NewDB(), writeErr: writeErr, existsErr: existsErr, exists: exists}
+	return brokenDB{DB: dalgo2memory.New(dalgo2memory.FirestoreProfile()), writeErr: writeErr, existsErr: existsErr, exists: exists}
 }
 
 func (db brokenDB) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
@@ -253,7 +253,7 @@ func TestSuitePassesAReadOnlyAdapter(t *testing.T) {
 // collection names run the suite at all.
 func TestWithCollectionRedirectsWrites(t *testing.T) {
 	const collection = "custom_conformance"
-	db := dalgo2memory.NewDB(dalgo2memory.WithSchema(false,
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile(), dalgo2memory.WithSchema(false,
 		dalgo2memory.WithCollection[dalgotest.Record](collection, nil),
 	))
 	for _, check := range dalgotest.Checks(dalgotest.WithCollection(collection)) {
@@ -280,7 +280,7 @@ func TestRunConformanceDrivesTheChecks(t *testing.T) {
 	t.Run("with cleanup", func(t *testing.T) {
 		var cleaned int
 		dalgotest.RunConformance(t, func(*testing.T) (dal.DB, func()) {
-			return dalgo2memory.NewDB(), func() { cleaned++ }
+			return dalgo2memory.New(dalgo2memory.FirestoreProfile()), func() { cleaned++ }
 		})
 		if cleaned != len(dalgotest.Checks()) {
 			t.Fatalf("cleanup ran %d times, want once per check (%d)", cleaned, len(dalgotest.Checks()))
@@ -288,7 +288,7 @@ func TestRunConformanceDrivesTheChecks(t *testing.T) {
 	})
 	t.Run("without cleanup", func(t *testing.T) {
 		dalgotest.RunConformance(t, func(*testing.T) (dal.DB, func()) {
-			return dalgo2memory.NewDB(), nil
+			return dalgo2memory.New(dalgo2memory.FirestoreProfile()), nil
 		})
 	})
 }
