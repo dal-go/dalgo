@@ -79,6 +79,57 @@ type optimisticState struct {
 	// pending is this transaction's local, mutable view of every key it has
 	// touched so far, keyed by conflictKey. See pendingEntry and touch.
 	pending map[string]*pendingEntry
+
+	// ownerHoldsLock is true when the transaction owning this state already
+	// holds db.mu for its whole duration — the default (whole-database lock)
+	// mode, see runLockedReadwriteTransaction. Every method below reaches the
+	// shared store through lock/unlock rather than db.mu directly, because
+	// sync.Mutex is not reentrant: taking db.mu again from inside a
+	// default-mode transaction would deadlock instantly. In optimistic mode
+	// this stays false and lock/unlock take the mutex for real, one short
+	// critical section per operation, exactly as before this field existed.
+	ownerHoldsLock bool
+
+	// validateVersions is true only in optimistic mode, where commit checks
+	// this transaction's read set against the live commit-version table and
+	// advances the versions of the keys it writes. The default locked mode
+	// leaves it false: it holds db.mu for the callback's entire duration, so no
+	// other transaction can interleave and there is nothing to validate — and
+	// skipping the bookkeeping keeps db.versions empty rather than growing it
+	// with entries nothing ever reads.
+	validateVersions bool
+}
+
+// lock acquires db.mu unless the owning transaction already holds it for its
+// whole duration (the default locked mode). See ownerHoldsLock.
+func (tx *optimisticState) lock() {
+	if !tx.ownerHoldsLock {
+		tx.db.mu.Lock()
+	}
+}
+
+// unlock releases db.mu unless the owning transaction holds it for its whole
+// duration (the default locked mode). See ownerHoldsLock.
+func (tx *optimisticState) unlock() {
+	if !tx.ownerHoldsLock {
+		tx.db.mu.Unlock()
+	}
+}
+
+// hasBufferedWrites reports whether this transaction has staged a write that
+// has not yet reached the shared store. A query scans committed storage
+// directly, so it cannot see such writes; ExecuteQueryToRecordsReader consults
+// this to refuse the query rather than silently return a stale result.
+//
+// The caller must already hold db.mu (every caller runs inside a transaction
+// method that does), so this reads tx.pending directly rather than locking.
+func (tx *optimisticState) hasBufferedWrites() bool {
+	for _, entry := range tx.pending {
+		if entry.commit != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // pendingEntry is one key's transaction-local view: the outcome of every
@@ -143,9 +194,10 @@ func conflictKey(collection, id string) string {
 // it is not holding any lock while paused.
 func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal.RWTxWorker) error {
 	tx := &optimisticState{
-		db:      db,
-		reads:   make(map[string]uint64),
-		pending: make(map[string]*pendingEntry),
+		db:               db,
+		reads:            make(map[string]uint64),
+		pending:          make(map[string]*pendingEntry),
+		validateVersions: true,
 	}
 	s := session{db: db, txState: &transactionState{
 		noReadsAfterWrites: db.noReadsAfterWritesInTransaction,
@@ -153,6 +205,54 @@ func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal
 	}}
 	if err := f(ctx, s); err != nil {
 		return err
+	}
+	return tx.commit()
+}
+
+// runLockedReadwriteTransaction is RunReadwriteTransaction's default path: it
+// holds db.mu for the callback's entire duration, so read-write transactions
+// are fully serialized and cannot contend (see WithOptimisticConcurrency for
+// the mode where they can).
+//
+// Writes are nonetheless buffered through the same optimisticState machinery
+// rather than applied to the storage engines as they are made, because that is
+// what makes a transaction ATOMIC: Firestore discards every write of a
+// transaction whose callback returns an error, and before this the in-memory
+// adapter left them behind, so a failed transaction committed its partial work
+// for real. Returning early below — without calling commit — is the whole
+// rollback mechanism: nothing was ever written, so there is nothing to undo.
+//
+// No read-overlay logic is needed to make the buffer invisible, because the
+// default noReadsAfterWritesInTransaction rule already rejects any read that
+// follows a write in the same transaction: a read can only happen while the
+// buffer is still empty. The one configuration that can observe the buffer is
+// WithInterleavedReadsAndWritesInTransaction, and there reads DO consult it —
+// every read goes through optimisticState.touch, which returns this
+// transaction's own pending view of a key it has written. The single case
+// buffering cannot serve is a QUERY issued after a write, since a query scans
+// committed storage rather than resolving keys through touch; that is refused
+// explicitly rather than answered with a stale result (see
+// session.ExecuteQueryToRecordsReader).
+func (db *database) runLockedReadwriteTransaction(ctx context.Context, f dal.RWTxWorker) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	tx := &optimisticState{
+		db:      db,
+		reads:   make(map[string]uint64),
+		pending: make(map[string]*pendingEntry),
+		// The callback runs with db.mu held for its whole duration, so the
+		// per-operation locking inside optimisticState must be suppressed
+		// (sync.Mutex is not reentrant), and there is no concurrent commit to
+		// validate a read set against.
+		ownerHoldsLock:   true,
+		validateVersions: false,
+	}
+	s := session{db: db, txState: &transactionState{
+		noReadsAfterWrites: db.noReadsAfterWritesInTransaction,
+		optimistic:         tx,
+	}}
+	if err := f(ctx, s); err != nil {
+		return err // buffered writes are discarded: this IS the rollback
 	}
 	return tx.commit()
 }
@@ -237,8 +337,8 @@ func (tx *optimisticState) touch(collection, id string, key *record.Key) (*pendi
 // pendingEntry, and releases db.mu again before returning. Both session.Get
 // and session.Exists go through it.
 func (tx *optimisticState) read(collection, id string, key *record.Key) (*pendingEntry, error) {
-	tx.db.mu.Lock()
-	defer tx.db.mu.Unlock()
+	tx.lock()
+	defer tx.unlock()
 	return tx.touch(collection, id, key)
 }
 
@@ -303,12 +403,12 @@ func (tx *optimisticState) stage(rec record.Record) error {
 		return err
 	}
 
-	tx.db.mu.Lock()
+	tx.lock()
 	entry, _ := tx.firstTouchEntry(collection, keyID(key), key)
 	entry.present = true
 	entry.data = data
 	entry.commit = &pendingWrite{kind: pendingWriteStore, rec: rec, overwrite: true}
-	tx.db.mu.Unlock()
+	tx.unlock()
 
 	rec.SetError(nil)
 	return nil
@@ -343,7 +443,7 @@ func (tx *optimisticState) insert(rec record.Record) error {
 		return err
 	}
 
-	tx.db.mu.Lock()
+	tx.lock()
 	entry, touchErr := tx.touch(collection, keyID(key), key)
 	var resultErr error
 	switch {
@@ -356,7 +456,7 @@ func (tx *optimisticState) insert(rec record.Record) error {
 		entry.data = data
 		entry.commit = &pendingWrite{kind: pendingWriteStore, rec: rec, overwrite: false}
 	}
-	tx.db.mu.Unlock()
+	tx.unlock()
 
 	if resultErr != nil {
 		rec.SetError(resultErr)
@@ -371,8 +471,8 @@ func (tx *optimisticState) insert(rec record.Record) error {
 // no-op (never an error), and no schema-guard check is performed.
 func (tx *optimisticState) delete(key *record.Key) {
 	collection := key.Collection()
-	tx.db.mu.Lock()
-	defer tx.db.mu.Unlock()
+	tx.lock()
+	defer tx.unlock()
 	// A delete never needs the prior value, so firstTouchEntry (which never
 	// fails) is enough — no need for touch's live-engine load.
 	entry, _ := tx.firstTouchEntry(collection, keyID(key), key)
@@ -397,8 +497,8 @@ func (tx *optimisticState) updateRecord(rec record.Record, updates []update.Upda
 		return err
 	}
 
-	tx.db.mu.Lock()
-	defer tx.db.mu.Unlock()
+	tx.lock()
+	defer tx.unlock()
 	entry, err := tx.touch(collection, keyID(key), key)
 	if err != nil {
 		return err
@@ -451,12 +551,14 @@ func (tx *optimisticState) updateRecord(rec record.Record, updates []update.Upda
 // this adapter's Feature report for the trade-off this accepts rather than
 // building a full two-phase commit across the storageEngine interface.
 func (tx *optimisticState) commit() error {
-	tx.db.mu.Lock()
-	defer tx.db.mu.Unlock()
+	tx.lock()
+	defer tx.unlock()
 
-	for ck, baseline := range tx.reads {
-		if tx.db.versions[ck] != baseline {
-			return fmt.Errorf("%w: key %q changed after this transaction observed it", ErrTransactionConflict, ck)
+	if tx.validateVersions {
+		for ck, baseline := range tx.reads {
+			if tx.db.versions[ck] != baseline {
+				return fmt.Errorf("%w: key %q changed after this transaction observed it", ErrTransactionConflict, ck)
+			}
 		}
 	}
 
@@ -475,7 +577,9 @@ func (tx *optimisticState) commit() error {
 				return err
 			}
 		}
-		tx.db.versions[ck]++
+		if tx.validateVersions {
+			tx.db.versions[ck]++
+		}
 	}
 	return nil
 }

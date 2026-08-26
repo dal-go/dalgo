@@ -95,8 +95,14 @@ func WithInterleavedReadsAndWritesInTransaction() Option {
 // forcing every adapter to grow an equivalent option and test hook just to
 // stay in the suite would be scope the other adapters never asked for.
 //
-// The default remains the whole-database lock; nothing changes unless this
-// option is passed to NewDB.
+// The default remains the whole-database lock, so transactions still cannot
+// contend unless this option is passed. What the default no longer differs on
+// is ATOMICITY: both modes buffer a transaction's writes and apply them only
+// once its callback returns nil, so a failed transaction discards its writes
+// exactly as Firestore does (see runLockedReadwriteTransaction). Contention is
+// therefore the one remaining transactional difference between the two modes,
+// alongside queries — which the default mode supports inside a read-write
+// transaction and this mode does not.
 func WithOptimisticConcurrency() Option {
 	return func(db *database) {
 		db.optimisticConcurrency = true

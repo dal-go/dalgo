@@ -111,11 +111,7 @@ func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorke
 	if db.optimisticConcurrency {
 		return db.runOptimisticReadwriteTransaction(ctx, f)
 	}
-	db.mu.Lock()
-	defer db.mu.Unlock()
-	return f(ctx, session{db: db, txState: &transactionState{
-		noReadsAfterWrites: db.noReadsAfterWritesInTransaction,
-	}})
+	return db.runLockedReadwriteTransaction(ctx, f)
 }
 
 func (db *database) Exists(ctx context.Context, key *record.Key) (bool, error) {
@@ -460,14 +456,30 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err := s.allowRead(); err != nil {
 		return nil, err
 	}
-	if s.optimistic() != nil {
-		// A query scans committed storage directly (see loadCandidateRows), so
-		// inside an optimistic-mode transaction it would see neither this
-		// transaction's own buffered writes nor participate in its conflict
-		// detection — a correctness trap, not a convenience. Point reads/writes
-		// by key (Get, Exists, Set, Insert, Update, Delete) are fully supported;
-		// see WithOptimisticConcurrency's doc comment.
-		return nil, fmt.Errorf("%w: queries are not supported inside a WithOptimisticConcurrency read-write transaction; read by key, or run the query outside the transaction", dal.ErrNotSupported)
+	if opt := s.optimistic(); opt != nil {
+		// A query scans committed storage directly (see loadCandidateRows)
+		// rather than resolving keys through the transaction's pending view, so
+		// it cannot see writes this transaction has buffered but not committed.
+		// Answering it anyway would silently return a stale result — a
+		// correctness trap, not a convenience.
+		//
+		// In the default locked mode this is normally unreachable: the default
+		// noReadsAfterWritesInTransaction rule already rejects any read after a
+		// write, so a query can only run while the buffer is empty, and reading
+		// committed storage is then exactly correct. It becomes reachable only
+		// under WithInterleavedReadsAndWritesInTransaction, where a query may
+		// legitimately follow a write.
+		if opt.hasBufferedWrites() {
+			return nil, fmt.Errorf("%w: a query inside a read-write transaction cannot see that transaction's own uncommitted writes; issue the query before the first write, or read by key", dal.ErrNotSupported)
+		}
+		// In optimistic mode a query additionally takes no part in conflict
+		// detection: the rows it scans never enter the read set, so a
+		// concurrent commit that changes them will not be caught. Point
+		// reads/writes by key are fully supported — see
+		// WithOptimisticConcurrency's doc comment.
+		if s.db.optimisticConcurrency {
+			return nil, fmt.Errorf("%w: queries are not supported inside a WithOptimisticConcurrency read-write transaction; read by key, or run the query outside the transaction", dal.ErrNotSupported)
+		}
 	}
 	q, ok := query.(dal.StructuredQuery)
 	if !ok {
