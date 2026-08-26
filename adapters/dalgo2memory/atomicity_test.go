@@ -304,3 +304,48 @@ func TestReadAfterWriteStillRejectedByDefault(t *testing.T) {
 	})
 	require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
 }
+
+// TestReadAfterWriteRejection_PoisonsCommitEvenIfSwallowed is the regression
+// test for the fidelity gap this covers: the real Firestore Go client
+// (cloud.google.com/go/firestore, transaction.go's readAfterWrite field)
+// records a rejected read-after-write and fails the transaction's commit
+// even when the callback swallows the read's error and returns nil. Before
+// this fix, dalgo2memory only surfaced the violation through the read call's
+// own return value — a callback that ignored it and returned nil got its
+// buffered writes committed anyway, which a real Firestore-backed caller
+// could never observe.
+//
+// It runs against BOTH transaction modes: the flag lives on transactionState,
+// which both runLockedReadwriteTransaction and runOptimisticReadwriteTransaction
+// share, and each has its own commit-refusal check to cover.
+func TestReadAfterWriteRejection_PoisonsCommitEvenIfSwallowed(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []Option
+	}{
+		{"default locked mode", nil},
+		{"WithOptimisticConcurrency", []Option{WithOptimisticConcurrency()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			ctx := context.Background()
+			db := newDatabase(mode.opts...)
+
+			err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+				if err := tx.Set(ctx, thingRecord("t1", 1)); err != nil {
+					return err
+				}
+				// Deliberately swallow the read-after-write error and return nil, as
+				// a careless caller might.
+				_, _ = tx.Exists(ctx, thingKey("t1"))
+				return nil
+			})
+			require.Error(t, err, "a swallowed read-after-write rejection must still fail the commit")
+			assert.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+
+			exists, existsErr := db.Exists(ctx, thingKey("t1"))
+			require.NoError(t, existsErr)
+			assert.False(t, exists,
+				"a write buffered before a swallowed read-after-write rejection must not be committed")
+		})
+	}
+}

@@ -208,6 +208,17 @@ type session struct {
 type transactionState struct {
 	noReadsAfterWrites bool
 	hasWritten         bool
+	// readAfterWriteRejected is set by allowRead the first time it rejects a
+	// read for following a write in this transaction. It exists so the
+	// ordering violation still poisons the transaction's eventual commit even
+	// when the callback swallows the returned error and returns nil: the real
+	// Firestore Go client (cloud.google.com/go/firestore, transaction.go's
+	// readAfterWrite field) records the same fact and fails the commit
+	// regardless of what the callback returns — it does not rely on the
+	// callback propagating the read's own error. Both
+	// runLockedReadwriteTransaction and runOptimisticReadwriteTransaction check
+	// this flag after a nil callback return and refuse to commit if it is set.
+	readAfterWriteRejected bool
 	// optimistic is non-nil exactly when this transaction belongs to a
 	// database created with WithOptimisticConcurrency. Every session
 	// read/write method checks it first (via session.optimistic()) to route
@@ -223,6 +234,10 @@ var ErrReadAfterWriteInTransaction = errors.New("firestore: read after write in 
 
 func (s session) allowRead() error {
 	if s.txState != nil && s.txState.noReadsAfterWrites && s.txState.hasWritten {
+		// Record the violation on the transaction itself, not just in this call's
+		// return value: see readAfterWriteRejected's doc comment for why a
+		// swallowed error must still fail the eventual commit.
+		s.txState.readAfterWriteRejected = true
 		return ErrReadAfterWriteInTransaction
 	}
 	return nil
