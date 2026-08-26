@@ -282,9 +282,20 @@ func TestOptimisticConcurrencyDisjointKeysDoNotConflict(t *testing.T) {
 // Get after a Set/Insert/Update/Delete of the same key must see that
 // transaction's own pending write, even though nothing has reached the
 // shared engine yet.
+//
+// This deliberately combines WithOptimisticConcurrency with
+// WithInterleavedReadsAndWritesInTransaction: the Set-then-Get-then-Exists
+// sequence below is exactly the ordering a real Firestore transaction
+// forbids (Firestore requires every read before any write), so under the
+// package's Firestore-compatible default this would correctly fail with
+// ErrReadAfterWriteInTransaction. The point of this test is a different,
+// orthogonal property — that the optimistic engine's local write buffer
+// itself is internally consistent — so it opts into the permissive ordering
+// a SQL-like backend would allow rather than asserting a Firestore ordering
+// rule it isn't testing.
 func TestOptimisticConcurrencyReadYourOwnWrites(t *testing.T) {
 	ctx := context.Background()
-	db := newDatabase(WithOptimisticConcurrency())
+	db := newDatabase(WithOptimisticConcurrency(), WithInterleavedReadsAndWritesInTransaction())
 	key := dalrecord.NewKeyWithID("Things", "rmw")
 
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -314,6 +325,32 @@ func TestOptimisticConcurrencyReadYourOwnWrites(t *testing.T) {
 	exists, err := db.Exists(ctx, key)
 	require.NoError(t, err)
 	require.False(t, exists)
+}
+
+// TestOptimisticConcurrencyInheritsDefaultOrdering proves the inverted
+// NewDB default (strict, Firestore-compatible read-after-write rejection)
+// propagates into WithOptimisticConcurrency transactions exactly like it does
+// for the default whole-database-lock mode: optimisticState routes
+// noReadsAfterWrites through from db.noReadsAfterWritesInTransaction (see
+// runOptimisticReadwriteTransaction), so a database built with
+// WithOptimisticConcurrency alone — no interleave opt-out — still rejects a
+// session-level read that follows a session-level write in the same
+// transaction. This combination (optimistic concurrency + strict ordering)
+// is in fact the more faithful emulation of real Firestore, which is both
+// optimistically concurrent and ordering-restricted at once.
+func TestOptimisticConcurrencyInheritsDefaultOrdering(t *testing.T) {
+	ctx := context.Background()
+	db := newDatabase(WithOptimisticConcurrency())
+	key := dalrecord.NewKeyWithID("Things", "ordering")
+	require.NoError(t, db.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "before"})))
+
+	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		if err := tx.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "after"})); err != nil {
+			return err
+		}
+		return tx.Get(ctx, dalrecord.NewRecordWithData(key, &thing{}))
+	})
+	require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
 }
 
 // TestOptimisticConcurrencyUpdateCompoundsAndCommits checks that Update

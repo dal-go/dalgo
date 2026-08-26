@@ -29,9 +29,14 @@ func NewDB(options ...Option) dal.DB {
 // NewDB.
 func newDatabase(options ...Option) *database {
 	db := &database{
-		collections:       make(map[string]storageEngine),
-		schemaRefBreaking: true,
-		versions:          make(map[string]uint64),
+		collections: make(map[string]storageEngine),
+		// noReadsAfterWritesInTransaction defaults to true: a plain NewDB()
+		// rejects a read after a write in a read-write transaction, matching
+		// Firestore's real ordering rule. See
+		// WithInterleavedReadsAndWritesInTransaction for the opt-out.
+		noReadsAfterWritesInTransaction: true,
+		schemaRefBreaking:               true,
+		versions:                        make(map[string]uint64),
 	}
 	for _, option := range options {
 		if option != nil {
@@ -55,7 +60,12 @@ type database struct {
 	enginesMu sync.Mutex
 	schema    *memorySchema
 	// noReadsAfterWritesInTransaction emulates Firestore's transaction ordering
-	// rule for databases created with WithNoReadsAfterWritesInTransaction.
+	// rule: a read-write transaction fails a read that follows a write. NewDB
+	// initializes it to true (see newDatabase); pass
+	// WithInterleavedReadsAndWritesInTransaction to turn it off for a backend
+	// that legitimately interleaves reads and writes, or
+	// WithNoReadsAfterWritesInTransaction to re-assert it explicitly
+	// (deprecated — redundant against the default on its own).
 	noReadsAfterWritesInTransaction bool
 	// schemaRefBreaking is the schema-wide columnar fidelity default (faithful
 	// unless WithoutSchemaRefBreaking was used). NewDB initializes it to true.

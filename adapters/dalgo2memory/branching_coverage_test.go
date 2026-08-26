@@ -124,6 +124,51 @@ func assertSerializedSchemaClone(t testing.TB, db *database) {
 	}
 }
 
+// TestBranchingPropagatesDefaultStrictOrdering proves the inverted NewDB
+// default carries through Capture/Branch even when no ordering option was
+// passed at all: snapshotDatabase and databaseSnapshot.newBackend both copy
+// db.noReadsAfterWritesInTransaction verbatim (branching.go), so a source
+// database built with zero options is already strict, and a branch taken
+// from it stays strict too — this is a regression guard specifically for the
+// no-options case, complementing
+// TestBranchingPreservesSerializedSchemaConfiguration's explicit-option case.
+func TestBranchingPropagatesDefaultStrictOrdering(t *testing.T) {
+	ctx := context.Background()
+	source := newDatabase() // no options: strict ordering is the default
+	if !source.noReadsAfterWritesInTransaction {
+		t.Fatal("newDatabase() with no options must default to strict ordering")
+	}
+	key := branchingRootKey("milk")
+	if err := source.Set(ctx, record.NewRecordWithData(key, &branchingRecord{Title: "milk"})); err != nil {
+		t.Fatal(err)
+	}
+
+	checkpoint, err := NewBranchingProvider().Capture(ctx, dal.NewDB(source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = checkpoint.Release(ctx) }()
+
+	branch := mustBranch(t, checkpoint)
+	defer closeTestBranch(t, branch)
+	branchDB := dal.BackendOf(branch.DB()).(*database)
+	if !branchDB.noReadsAfterWritesInTransaction {
+		t.Fatal("branch lost the default strict-ordering setting")
+	}
+
+	// Behavioral check, not just the field: a read-write transaction on the
+	// branch must actually reject a read that follows a write.
+	err = branch.DB().RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		if err := tx.Set(ctx, record.NewRecordWithData(key, &branchingRecord{Title: "eggs"})); err != nil {
+			return err
+		}
+		return tx.Get(ctx, record.NewRecordWithData(key, &branchingRecord{}))
+	})
+	if !errors.Is(err, ErrReadAfterWriteInTransaction) {
+		t.Fatalf("branch transaction err = %v, want ErrReadAfterWriteInTransaction", err)
+	}
+}
+
 func TestCloneRecordKeyHandlesIncompleteAndCompositeIDs(t *testing.T) {
 	t.Run("incomplete parent chain", func(t *testing.T) {
 		parent := record.NewIncompleteKey("spaces", reflect.String, nil)
