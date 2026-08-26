@@ -51,7 +51,11 @@ var _ InsertOptions = (*insertOptions)(nil)
 func NewInsertOptions(opts ...InsertOption) InsertOptions {
 	var options insertOptions
 	for _, o := range opts {
-		o(&options)
+		// Skip nil options rather than panic - same guard, and reason, as
+		// NewTransactionOptions.
+		if o != nil {
+			o(&options)
+		}
 	}
 	return options
 }
