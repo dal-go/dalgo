@@ -15,13 +15,79 @@ import (
 	"github.com/dal-go/record/update"
 )
 
-// NewDB creates an in-memory DALgo database.
+// Profile names the real backend this in-memory database stands in for, and
+// selects that backend's transaction-semantics bundle wholesale. It is a
+// distinct type rather than an Option so the compiler enforces that every
+// call to New names its backend: dalgo is platform-independent — it has
+// adapters for Firestore, Datastore, MySQL, Postgres, SQLite and more — so no
+// single vendor's transaction semantics is a neutral default for the test
+// double, and a database configured into a combination no real backend has
+// emulates nothing. Construct one with FirestoreProfile or
+// SingleWriterProfile; a SQL profile family (per-transaction isolation
+// levels, read-your-writes) will join them once the interleaved mode's query
+// support exists — profile names are never published before their semantics.
+//
+// Options passed to New apply AFTER the profile, in order, last-wins — so the
+// intent-named options remain available as narrow, explicit modifiers on top
+// of a named backend's bundle.
+type Profile func(*database)
+
+// FirestoreProfile emulates Google Cloud Firestore's transaction semantics:
+// serializable isolation with snapshot reads (a fractured view aborts at the
+// read), genuine contention between concurrent read-write transactions,
+// atomic buffered commits, strict read-before-write ordering (a rejected read
+// also poisons the commit), transactional queries with phantom protection,
+// nested transactions rejected, and bounded auto-retry of conflicts with
+// final-attempt lock escalation — matching the Firestore Go client's own
+// silent retry of aborted transactions.
+func FirestoreProfile() Profile {
+	return func(db *database) {
+		db.noReadsAfterWritesInTransaction = true
+		db.optimisticConcurrency = true
+	}
+}
+
+// SingleWriterProfile emulates a backend that serializes writers behind a
+// database-level write lock, the way SQLite behaves: RunReadwriteTransaction
+// holds a whole-database lock for the callback's entire duration, so
+// read-write transactions can never contend and never abort. Atomicity and
+// strict read-before-write ordering are retained; transaction options such as
+// dal.TxWithAttempts are silently ignored, since a conflict cannot occur.
+// Choose it for backends that genuinely serialize writers, or for tests that
+// deliberately choreograph step-by-step transaction ordering — never to
+// silence contention failures in code that also runs against Firestore.
+func SingleWriterProfile() Profile {
+	return func(db *database) {
+		db.noReadsAfterWritesInTransaction = true
+		db.optimisticConcurrency = false
+	}
+}
+
+// New creates an in-memory DALgo database emulating the named backend.
+//
+// The profile is required and nil panics: an in-memory test double is always
+// standing in for something, and which something changes what the tests
+// prove — see Profile's doc comment for why there is deliberately no default.
 //
 // The backend is wrapped by dal.NewDB, so writes through the returned DB run
 // the framework write pipeline — record validation and before-save hooks —
 // before reaching the in-memory store.
+func New(profile Profile, options ...Option) dal.DB {
+	if profile == nil {
+		panic("dalgo2memory.New: profile must not be nil — name the backend this database emulates (e.g. FirestoreProfile())")
+	}
+	return dal.NewDB(newDatabase(append([]Option{Option(profile)}, options...)...))
+}
+
+// NewDB creates an in-memory DALgo database emulating Firestore.
+//
+// Deprecated: use New with an explicit Profile instead. NewDB keeps the
+// FirestoreProfile default for compatibility with existing callers, but a
+// platform-independent library should not imply any vendor's transaction
+// semantics without the call site naming it; NewDB will be removed once
+// known consumers have migrated.
 func NewDB(options ...Option) dal.DB {
-	return dal.NewDB(newDatabase(options...))
+	return New(FirestoreProfile(), options...)
 }
 
 // newDatabase builds the raw backend. Tests that need the concrete type (to

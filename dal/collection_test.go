@@ -38,7 +38,7 @@ func (Contact) CollectionName() string { return "contacts" }
 
 func newMemoryDB(t *testing.T) dal.DB {
 	t.Helper()
-	return dalgo2memory.NewDB()
+	return dalgo2memory.New(dalgo2memory.FirestoreProfile())
 }
 
 // write runs f inside a read-write transaction against db.

@@ -23,7 +23,7 @@ type genUser struct {
 // from the shared gomock-driven TestDalgoDB suite (which stays green).
 func TestCollection_Insert_EndToEnd(t *testing.T) {
 	ctx := context.Background()
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 	users := dal.CollectionAt[string, genUser]("e2eusers")
 
 	// Default generator (no options).
@@ -62,7 +62,7 @@ func TestCollection_Insert_EndToEnd(t *testing.T) {
 // persists the record under a generated non-empty id, retrievable by that id.
 func TestSession_Insert_GeneratesViaInsertOption(t *testing.T) {
 	ctx := context.Background()
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 
 	var rec record.Record
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -88,7 +88,7 @@ func TestSession_Insert_GeneratesViaInsertOption(t *testing.T) {
 // generated id.
 func TestSession_Insert_WithAdapterGeneratedID(t *testing.T) {
 	ctx := context.Background()
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 
 	var rec record.Record
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -112,7 +112,7 @@ func TestSession_Insert_WithAdapterGeneratedID(t *testing.T) {
 // option, the explicit generator wins (a 24-char id, not the 16-char default).
 func TestSession_Insert_WithAdapterGeneratedID_ExplicitGeneratorWins(t *testing.T) {
 	ctx := context.Background()
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 
 	var rec record.Record
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
@@ -134,7 +134,7 @@ func TestSession_Insert_WithAdapterGeneratedID_ExplicitGeneratorWins(t *testing.
 // "<nil>" id.
 func TestSession_Insert_GenerationPrecedesStorage_NoNilID(t *testing.T) {
 	ctx := context.Background()
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		rec := record.NewRecordWithIncompleteKey("users", reflect.String, &genUser{Name: "Alice"})
@@ -153,7 +153,7 @@ func TestSession_Insert_GenerationPrecedesStorage_NoNilID(t *testing.T) {
 // timestamp generator deterministically produces the same id within a run.
 func TestSession_Insert_GeneratorExhaustion(t *testing.T) {
 	ctx := context.Background()
-	db := dalgo2memory.NewDB()
+	db := dalgo2memory.New(dalgo2memory.FirestoreProfile())
 
 	gen := dal.WithTimeStampStringID(dal.TimeStampAccuracyDay, 10, 5)
 
