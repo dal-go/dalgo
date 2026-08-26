@@ -204,7 +204,16 @@ func (v txOptions) Password() string {
 func NewTransactionOptions(opts ...TransactionOption) TransactionOptions {
 	options := txOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		// A nil option is skipped rather than invoked: callers commonly pass a
+		// literal nil or an unset option variable through a variadic chain
+		// (RunReadwriteTransaction(ctx, f, nil) exists in the wild), and
+		// invoking it panics. Adapters apply the same guard to their own
+		// options (see dalgo2memory's newDatabase); the constructor is the one
+		// place that protects every adapter at once - including
+		// dalgo2firestore, which reads these options in production.
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	return &options
 }
