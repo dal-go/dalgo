@@ -384,21 +384,27 @@ func TestOptimisticConcurrencyUpdateCompoundsAndCommits(t *testing.T) {
 	require.Equal(t, thing{Name: "updated", Count: 2}, got)
 }
 
-// TestOptimisticConcurrencyQueryUnsupported documents and locks in the one
-// deliberate gap in this mode: a query inside an optimistic transaction reads
-// committed storage directly, so it would see neither the transaction's own
-// buffered writes nor participate in its conflict detection. Rather than
-// silently returning a semantically inconsistent result, it fails clearly.
-func TestOptimisticConcurrencyQueryUnsupported(t *testing.T) {
+// TestOptimisticConcurrencyJoinQueryUnsupported locks in the one query shape
+// still refused inside an optimistic transaction: joins. Plain queries are
+// now supported with collection-grained snapshot/conflict participation (see
+// txquery_test.go); a join would scan several collections in one result, and
+// Firestore — the backend a transactional query must stay faithful to — has
+// no joins at all. This test previously asserted that ALL queries were
+// refused; that refusal was the gap blocking optimistic mode from ever
+// becoming the default, and removing it is the point of the transactional
+// query support.
+func TestOptimisticConcurrencyJoinQueryUnsupported(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
 
 	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
-		q := dal.From(dal.NewRootCollectionRef("Things", "")).NewQuery().SelectKeysOnly(reflect.String)
+		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+		q := dal.From(usersAlias()).Join(join).NewQuery().SelectIntoRecord(intoMapRecord())
 		_, err := tx.ExecuteQueryToRecordsReader(ctx, q)
 		return err
 	})
 	require.ErrorIs(t, err, dal.ErrNotSupported)
+	require.Contains(t, err.Error(), "joins")
 }
 
 // TestOptimisticConcurrencyInsertWithGenerator checks that Insert's

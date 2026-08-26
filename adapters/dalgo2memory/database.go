@@ -37,6 +37,7 @@ func newDatabase(options ...Option) *database {
 		noReadsAfterWritesInTransaction: true,
 		schemaRefBreaking:               true,
 		versions:                        make(map[string]uint64),
+		collectionSeq:                   make(map[string]uint64),
 	}
 	for _, option := range options {
 		if option != nil {
@@ -97,6 +98,20 @@ type database struct {
 	// Guarded by mu; only meaningful when optimisticConcurrency is set, since
 	// the default whole-database-lock mode leaves versions empty.
 	commitSeq uint64
+	// collectionSeq maps a leaf collection name to the value commitSeq held
+	// when ANY record in that collection was last touched by a committed
+	// write. It is versions' coarse, collection-grained sibling, and exists
+	// for queries: a query's result depends on every record in the collection
+	// — including ones that do not exist yet, which per-key versions cannot
+	// name — so a transaction that queried a collection registers this value
+	// instead (see optimisticState.observeCollectionAtSnapshot). Any later
+	// committed write to the collection then conflicts the querying
+	// transaction. That is deliberately coarser than Firestore's own
+	// index-range locking (an unrelated write to the same collection
+	// conflicts too), but it can only err toward a spurious, retryable abort
+	// — never toward silently missing a phantom insert. Guarded by mu;
+	// populated only when optimisticConcurrency is set, like versions.
+	collectionSeq map[string]uint64
 }
 
 func (db *database) ID() string {
@@ -497,18 +512,34 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		if opt.hasBufferedWrites() {
 			return nil, fmt.Errorf("%w: a query inside a read-write transaction cannot see that transaction's own uncommitted writes; issue the query before the first write, or read by key", dal.ErrNotSupported)
 		}
-		// In optimistic mode a query additionally takes no part in conflict
-		// detection: the rows it scans never enter the read set, so a
-		// concurrent commit that changes them will not be caught. Point
-		// reads/writes by key are fully supported — see
-		// WithOptimisticConcurrency's doc comment.
-		if s.db.optimisticConcurrency {
-			return nil, fmt.Errorf("%w: queries are not supported inside a WithOptimisticConcurrency read-write transaction; read by key, or run the query outside the transaction", dal.ErrNotSupported)
-		}
 	}
 	q, ok := query.(dal.StructuredQuery)
 	if !ok {
 		return nil, dal.ErrNotSupported
+	}
+	if opt := s.optimistic(); opt != nil && s.db.optimisticConcurrency {
+		// A query inside an optimistic-mode transaction participates in the
+		// transaction's snapshot and conflict detection at COLLECTION
+		// granularity: its result depends on every record in the collection,
+		// including ones that do not exist yet, which the per-key read set
+		// cannot name — so registering the collection is what makes phantom
+		// inserts conflict instead of slipping past commit validation. The
+		// registration (and the abort when the collection was already written
+		// after this transaction's snapshot) happens in
+		// observeCollectionAtSnapshot; db.mu is then held for the remainder of
+		// this call so the scan below reads exactly the registered state.
+		if len(q.From().Joins()) > 0 {
+			// Firestore — the backend a transactional query must stay
+			// faithful to — has no joins at all, and a join here would scan
+			// several collections in one result. Refuse rather than invent
+			// multi-collection transactional semantics no real backend has.
+			return nil, fmt.Errorf("%w: joins are not supported inside a read-write transaction; run the join outside the transaction", dal.ErrNotSupported)
+		}
+		opt.lock()
+		defer opt.unlock()
+		if err := opt.observeCollectionAtSnapshot(q.From().Base().Name()); err != nil {
+			return nil, err
+		}
 	}
 	if len(q.From().Joins()) > 0 {
 		return s.executeJoinQuery(q)

@@ -130,6 +130,52 @@ type optimisticState struct {
 	// fractured view. The real Firestore client gives the same protection by
 	// failing the commit of a transaction whose read came back ABORTED.
 	conflict error
+
+	// collectionReads is the query-side sibling of reads: the collections
+	// this transaction has queried, each with the db.collectionSeq value
+	// observed at query time. commit fails the transaction if any of them has
+	// advanced — which is what catches PHANTOMS: an insert into a queried
+	// collection changes the query's result without touching any key the
+	// per-key read set could have named. Registered lazily by
+	// observeCollectionAtSnapshot; nil until the first transactional query.
+	collectionReads map[string]uint64
+}
+
+// observeCollectionAtSnapshot is observeAtSnapshot's collection-grained
+// counterpart, called once per transactional query (see
+// session.ExecuteQueryToRecordsReader). It pins the snapshot if this query is
+// the transaction's first observation; aborts — poisoning the transaction,
+// exactly like a point read — if the collection was committed to after the
+// snapshot was pinned, since the scan could then return rows from a state
+// newer than everything else this transaction has seen; and otherwise
+// registers the collection's current sequence in collectionReads for commit
+// to revalidate. Registering at collection granularity is deliberately
+// coarser than Firestore's index-range locking: an unrelated write to the
+// same collection conflicts too, but the error is a spurious retryable abort,
+// never a silently missed phantom — see database.collectionSeq's doc comment.
+//
+// The caller must already hold db.mu.
+func (tx *optimisticState) observeCollectionAtSnapshot(collection string) error {
+	if tx.conflict != nil {
+		// Poisoned by an earlier snapshot violation; see touch.
+		return tx.conflict
+	}
+	if !tx.startSeqPinned {
+		tx.startSeqPinned = true
+		tx.startSeq = tx.db.commitSeq
+	} else if seq := tx.db.collectionSeq[collection]; seq > tx.startSeq {
+		tx.conflict = fmt.Errorf(
+			"%w: collection %q was written at sequence %d, after this transaction's read snapshot (sequence %d)",
+			ErrTransactionConflict, collection, seq, tx.startSeq)
+		return tx.conflict
+	}
+	if tx.collectionReads == nil {
+		tx.collectionReads = make(map[string]uint64)
+	}
+	if _, ok := tx.collectionReads[collection]; !ok {
+		tx.collectionReads[collection] = tx.db.collectionSeq[collection]
+	}
+	return nil
 }
 
 // observeAtSnapshot enforces this transaction's read snapshot for one key
@@ -366,6 +412,10 @@ func (db *database) bumpConflictVersion(collection, id string) {
 	}
 	db.commitSeq++
 	db.versions[conflictKey(collection, id)] = db.commitSeq
+	// The collection-grained table advances in lockstep so a transaction that
+	// QUERIED this collection conflicts too — a top-level write can be the
+	// phantom insert its query would have missed. See database.collectionSeq.
+	db.collectionSeq[collection] = db.commitSeq
 }
 
 // firstTouchEntry returns key's pendingEntry, creating it — and recording its
@@ -676,6 +726,15 @@ func (tx *optimisticState) commit() error {
 				return fmt.Errorf("%w: key %q changed after this transaction observed it", ErrTransactionConflict, ck)
 			}
 		}
+		// The collection-grained read set is validated the same way: a queried
+		// collection whose sequence advanced means a commit — possibly a
+		// phantom insert the query could not have named as a key — changed
+		// what this transaction's query would return. See collectionReads.
+		for collection, baseline := range tx.collectionReads {
+			if tx.db.collectionSeq[collection] != baseline {
+				return fmt.Errorf("%w: collection %q was written after this transaction queried it", ErrTransactionConflict, collection)
+			}
+		}
 	}
 
 	// appliedSeq is this commit's entry in the global commit sequence,
@@ -707,6 +766,10 @@ func (tx *optimisticState) commit() error {
 				appliedSeq = tx.db.commitSeq
 			}
 			tx.db.versions[ck] = appliedSeq
+			// Keep the collection-grained table in lockstep, so transactions
+			// that QUERIED this collection conflict on this commit too — this
+			// write may be the phantom their query could not have named.
+			tx.db.collectionSeq[collection] = appliedSeq
 		}
 	}
 	return nil
