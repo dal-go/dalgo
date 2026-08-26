@@ -54,13 +54,20 @@ func TestOptimisticConcurrencyRetry_ConflictThenSucceeds(t *testing.T) {
 	assert.EqualValues(t, 100, got["n"], "attempt 2 must have read the winning external value (99) and added 1 to it")
 }
 
-// TestOptimisticConcurrencyRetry_PersistentConflictExhaustsDefaultAttempts
-// checks the other side of the bound: a conflict that recurs on every single
-// attempt (the external commit here races EVERY attempt's read, not just the
-// first) must not retry forever — it exhausts defaultTransactionMaxAttempts
-// and returns a final error that still satisfies IsTransactionConflict, so a
-// caller that gives up can still tell why.
-func TestOptimisticConcurrencyRetry_PersistentConflictExhaustsDefaultAttempts(t *testing.T) {
+// TestOptimisticConcurrencyRetry_PersistentConflictEscalatesAndCompletes
+// checks the other side of the bound, whose contract changed when
+// final-attempt escalation landed: a conflict recurring on every optimistic
+// attempt no longer exhausts into a raw error — the LAST attempt runs under
+// the whole-database lock and cannot conflict, so the transaction completes,
+// matching real Firestore's lock queue where contended writers finish rather
+// than abort each other forever. The callback runs exactly once per attempt.
+//
+// The external fracture-commit is guarded to the optimistic attempts only:
+// on the escalated attempt this callback must not perform a top-level write
+// on the same database, since the escalated attempt holds db.mu for the
+// callback's whole duration — the identical (and pre-existing) hazard of the
+// single-writer mode, documented at runEscalatedReadwriteTransaction.
+func TestOptimisticConcurrencyRetry_PersistentConflictEscalatesAndCompletes(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
 	require.NoError(t, db.Set(ctx, thingRecord("A", 1)))
@@ -71,17 +78,22 @@ func TestOptimisticConcurrencyRetry_PersistentConflictExhaustsDefaultAttempts(t 
 		if _, err := readThingN(ctx, tx, "A"); err != nil {
 			return err
 		}
-		// Unlike the test above, this external commit runs on EVERY
-		// attempt, after that attempt's own read: no attempt can ever
-		// succeed.
-		require.NoError(t, db.Set(ctx, thingRecord("A", callbackRuns+100)))
-		return nil
+		if callbackRuns < defaultTransactionMaxAttempts {
+			// Fracture every OPTIMISTIC attempt's snapshot after its read: no
+			// optimistic attempt can ever commit.
+			require.NoError(t, db.Set(ctx, thingRecord("A", callbackRuns+100)))
+		}
+		return tx.Set(ctx, thingRecord("A", 999))
 	})
 
+	require.NoError(t, err,
+		"the escalated final attempt cannot conflict, so a persistently contended transaction completes")
 	require.Equal(t, defaultTransactionMaxAttempts, callbackRuns,
-		"the callback must run exactly once per attempt, up to the default budget, no more")
-	require.Error(t, err)
-	assert.True(t, IsTransactionConflict(err), "the exhausted retry must still report a classifiable conflict: %v", err)
+		"the callback must run exactly once per attempt: every optimistic attempt, then the escalated one")
+
+	var got map[string]any
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(thingKey("A"), &got)))
+	assert.EqualValues(t, 999, got["n"], "the escalated attempt's write must be the one that landed")
 }
 
 // TestOptimisticConcurrencyRetry_TxWithAttempts1DisablesRetry checks that
@@ -123,13 +135,18 @@ func TestOptimisticConcurrencyRetry_TxWithAttemptsHonorsExplicitCount(t *testing
 		if _, err := readThingN(ctx, tx, "A"); err != nil {
 			return err
 		}
-		require.NoError(t, db.Set(ctx, thingRecord("A", callbackRuns+100)))
+		if callbackRuns < 3 {
+			// Fracture only the optimistic attempts (1 and 2); the escalated
+			// third attempt holds db.mu, where a top-level write would
+			// deadlock — see runEscalatedReadwriteTransaction.
+			require.NoError(t, db.Set(ctx, thingRecord("A", callbackRuns+100)))
+		}
 		return nil
 	}, dal.TxWithAttempts(3))
 
-	require.Equal(t, 3, callbackRuns, "TxWithAttempts(3) must run exactly 3 attempts, not the default 5 or a single attempt")
-	require.Error(t, err)
-	assert.True(t, IsTransactionConflict(err))
+	require.Equal(t, 3, callbackRuns,
+		"TxWithAttempts(3) must run exactly 3 attempts: 2 optimistic, then the escalated final one — not the default 5, not a single attempt")
+	require.NoError(t, err, "the escalated final attempt completes the transaction")
 }
 
 // TestOptimisticConcurrencyRetry_ReadAfterWriteNotRetried is the required
@@ -177,4 +194,70 @@ func TestLockedModeIgnoresAttemptsOptionSilently(t *testing.T) {
 
 	require.ErrorIs(t, err, errBoom)
 	require.Equal(t, 1, callbackRuns, "the locked mode must not retry regardless of the requested attempt count")
+}
+
+// TestEscalatedAttempt_FailureModes covers the escalated final attempt's two
+// non-commit exits, which are otherwise shadowed by escalation's cannot-
+// conflict guarantee: a callback error still rolls the attempt back, and a
+// swallowed read-after-write rejection still poisons the commit — the same
+// contracts the optimistic and single-writer runners honor.
+func TestEscalatedAttempt_FailureModes(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("callback error discards writes", func(t *testing.T) {
+		db := newDatabase(WithOptimisticConcurrency())
+		require.NoError(t, db.Set(ctx, thingRecord("A", 1)))
+		var runs int
+		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			runs++
+			if _, err := readThingN(ctx, tx, "A"); err != nil {
+				return err
+			}
+			if runs == 1 {
+				require.NoError(t, db.Set(ctx, thingRecord("A", 2))) // fracture attempt 1
+			}
+			if err := tx.Set(ctx, thingRecord("C", 1)); err != nil {
+				return err
+			}
+			if runs == 2 {
+				return errBoom // fail the ESCALATED attempt itself
+			}
+			return nil
+		}, dal.TxWithAttempts(2))
+		require.ErrorIs(t, err, errBoom)
+		require.Equal(t, 2, runs)
+		exists, existsErr := db.Exists(ctx, thingKey("C"))
+		require.NoError(t, existsErr)
+		assert.False(t, exists, "the escalated attempt's writes must be discarded on callback error")
+	})
+
+	t.Run("swallowed read-after-write poisons the escalated commit", func(t *testing.T) {
+		db := newDatabase(WithOptimisticConcurrency())
+		require.NoError(t, db.Set(ctx, thingRecord("A", 1)))
+		var runs int
+		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			runs++
+			if _, err := readThingN(ctx, tx, "A"); err != nil {
+				return err
+			}
+			if runs == 1 {
+				require.NoError(t, db.Set(ctx, thingRecord("A", 2))) // fracture attempt 1
+			}
+			if err := tx.Set(ctx, thingRecord("C", 1)); err != nil {
+				return err
+			}
+			if runs == 2 {
+				_, rawErr := readThingN(ctx, tx, "A") // read after write: rejected
+				require.ErrorIs(t, rawErr, ErrReadAfterWriteInTransaction)
+				// Swallow it, as buggy caller code might.
+			}
+			return nil
+		}, dal.TxWithAttempts(2))
+		require.ErrorIs(t, err, ErrReadAfterWriteInTransaction,
+			"the escalated attempt must refuse to commit after a swallowed ordering rejection")
+		require.Equal(t, 2, runs, "a read-after-write rejection is a code bug, never retried")
+		exists, existsErr := db.Exists(ctx, thingKey("C"))
+		require.NoError(t, existsErr)
+		assert.False(t, exists)
+	})
 }
