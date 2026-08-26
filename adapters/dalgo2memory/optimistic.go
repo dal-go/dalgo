@@ -266,12 +266,21 @@ func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal
 		pending:          make(map[string]*pendingEntry),
 		validateVersions: true,
 	}
-	s := session{db: db, txState: &transactionState{
+	txState := &transactionState{
 		noReadsAfterWrites: db.noReadsAfterWritesInTransaction,
 		optimistic:         tx,
-	}}
+	}
+	s := session{db: db, txState: txState}
 	if err := f(ctx, s); err != nil {
 		return err
+	}
+	if txState.readAfterWriteRejected {
+		// The callback swallowed the read's ErrReadAfterWriteInTransaction and
+		// returned nil, but the violation still poisons the transaction — see
+		// transactionState.readAfterWriteRejected's doc comment for the
+		// Firestore-client parity this matches. Refusing the commit here, rather
+		// than calling tx.commit(), is what discards the buffered writes.
+		return fmt.Errorf("%w: commit refused because a read-after-write was rejected earlier in this transaction", ErrReadAfterWriteInTransaction)
 	}
 	return tx.commit()
 }
@@ -314,12 +323,21 @@ func (db *database) runLockedReadwriteTransaction(ctx context.Context, f dal.RWT
 		ownerHoldsLock:   true,
 		validateVersions: false,
 	}
-	s := session{db: db, txState: &transactionState{
+	txState := &transactionState{
 		noReadsAfterWrites: db.noReadsAfterWritesInTransaction,
 		optimistic:         tx,
-	}}
+	}
+	s := session{db: db, txState: txState}
 	if err := f(ctx, s); err != nil {
 		return err // buffered writes are discarded: this IS the rollback
+	}
+	if txState.readAfterWriteRejected {
+		// The callback swallowed the read's ErrReadAfterWriteInTransaction and
+		// returned nil, but the violation still poisons the transaction — see
+		// transactionState.readAfterWriteRejected's doc comment for the
+		// Firestore-client parity this matches. Refusing the commit here, rather
+		// than calling tx.commit(), is what discards the buffered writes.
+		return fmt.Errorf("%w: commit refused because a read-after-write was rejected earlier in this transaction", ErrReadAfterWriteInTransaction)
 	}
 	return tx.commit()
 }

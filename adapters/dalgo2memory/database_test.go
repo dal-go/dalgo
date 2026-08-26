@@ -237,9 +237,19 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
 			_, err = tx.ExecuteQueryToRecordsetReader(ctx, q)
 			require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+			// Swallow every rejection above and return nil anyway: the commit must
+			// still be poisoned (see transactionState.readAfterWriteRejected) —
+			// this matches the real Firestore Go client's transaction.go, which
+			// fails the commit for a recorded read-after-write regardless of what
+			// the callback returns.
 			return nil
 		})
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrReadAfterWriteInTransaction,
+			"a swallowed read-after-write rejection must still fail the commit")
+
+		exists, existsErr := db.Exists(ctx, dalrecord.NewKeyWithID("Things", "new"))
+		require.NoError(t, existsErr)
+		require.False(t, exists, "the write buffered before the rejected reads must not be committed")
 	})
 
 	t.Run("each write operation blocks subsequent reads", func(t *testing.T) {
@@ -278,9 +288,13 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 					}
 					_, err := tx.Exists(ctx, key)
 					require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+					// Swallow it and return nil anyway: the commit must still be
+					// poisoned — see the "read then write then reads fail" subtest
+					// above and transactionState.readAfterWriteRejected's doc comment.
 					return nil
 				})
-				require.NoError(t, err)
+				require.ErrorIs(t, err, ErrReadAfterWriteInTransaction,
+					"a swallowed read-after-write rejection must still fail the commit")
 			})
 		}
 	})
