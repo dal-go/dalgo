@@ -5,11 +5,29 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
 	"github.com/dal-go/record/update"
 )
+
+// defaultTransactionMaxAttempts is how many times an optimistic-mode
+// read-write transaction retries the whole callback after
+// ErrTransactionConflict when the caller does not request a specific count
+// via dal.TxWithAttempts. It matches
+// cloud.google.com/go/firestore.DefaultTransactionMaxAttempts (see that
+// module's transaction.go): the real Firestore Go client's RunTransaction
+// retries the whole callback on an ABORTED status up to that many times, so
+// production code running against real Firestore essentially never observes
+// a first-attempt abort. dalgo2firestore.RunReadwriteTransaction passes
+// dal.TransactionOptions.Attempts() straight through to firestore.MaxAttempts
+// when it is set (see dalgo2firestore/transaction.go's
+// createFirestoreTransactionOptions), and otherwise leaves the SDK's own
+// default in force — this constant is dalgo2memory's copy of that same
+// default, so a database created with WithOptimisticConcurrency fails tests
+// in ways production code never does if it surfaces a conflict un-retried.
+const defaultTransactionMaxAttempts = 5
 
 // ErrTransactionConflict is returned by RunReadwriteTransaction, for a
 // database created with WithOptimisticConcurrency, when another transaction
@@ -298,14 +316,89 @@ func conflictKey(collection, id string) string {
 }
 
 // runOptimisticReadwriteTransaction is RunReadwriteTransaction's
-// WithOptimisticConcurrency path — see optimisticState's doc comment for the
-// design. It never holds db.mu for the callback's duration, only briefly, once
-// per read/write operation, and once more (also briefly) for the final
-// commit, so unrelated transactions' callbacks run fully concurrently: a
-// transaction can even pause indefinitely between operations (as a test
-// driving a specific interleaving does) without blocking anyone else, since
-// it is not holding any lock while paused.
-func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal.RWTxWorker) error {
+// WithOptimisticConcurrency path: it retries the ENTIRE callback, up to
+// attempts times, whenever an attempt fails with ErrTransactionConflict —
+// matching the real Firestore Go client, whose RunTransaction retries the
+// whole callback on an ABORTED status up to DefaultTransactionMaxAttempts
+// (see defaultTransactionMaxAttempts's doc comment for the exact mapping).
+// Every attempt runs through runOptimisticReadwriteTransactionOnce with a
+// completely FRESH optimisticState — fresh reads, fresh pending writes, a
+// fresh snapshot pin — exactly as a real Firestore retry gets a fresh
+// server-side transaction.
+//
+// Because of that, THE CALLBACK MUST BE SAFE TO RUN MORE THAN ONCE: dalgo
+// core's own RWTxWorker doc and the real Firestore client both impose the
+// same requirement ("f may be called more than once, f should usually be
+// idempotent", cloud.google.com/go/firestore's transaction.go), and it is not
+// new here — WithOptimisticConcurrency already re-runs nothing itself, but a
+// caller-supplied callback that mutates state it captured from outside tx
+// (an in-memory counter, an external side effect) will observe a retry's
+// repeat invocation in both systems identically. A callback that is not
+// idempotent needs dal.TxWithAttempts(1) to disable retrying altogether.
+//
+// A conflict is retried whether it was detected by the callback itself (a
+// snapshot-abort read via observeAtSnapshot/observeCollectionAtSnapshot, or
+// the poisoned-commit refusal after a swallowed read error) or only later, at
+// commit's own baseline validation: both cases are ErrTransactionConflict,
+// and both mean the same thing — this attempt's view was invalidated by
+// someone else's commit before it finished, so a fresh attempt might not be.
+//
+// ErrReadAfterWriteInTransaction is deliberately NEVER retried, even though
+// runOptimisticReadwriteTransactionOnce can return it wrapped in the same way
+// commit wraps a conflict: it signals a code bug in the callback (a read that
+// follows the callback's own write, which this adapter's ordering rule
+// rejects), not contention with another transaction, and running the exact
+// same buggy callback again cannot fix that. The real Firestore client draws
+// the identical line: it detects the equivalent violation client-side and
+// sets err to errReadAfterWrite BEFORE the retry loop's isAborted(err) check,
+// so that error is never classified as retryable there either (see
+// cloud.google.com/go/firestore's transaction.go, RunTransaction). Checking
+// only IsTransactionConflict below is what implements this: neither
+// ErrReadAfterWriteInTransaction nor any ordinary callback error (a
+// not-found, a validation failure, ErrNestedTransaction, ...) ever wraps
+// ErrTransactionConflict, so none of them are retried.
+//
+// attempts is dal.TransactionOptions.Attempts() from the options
+// RunReadwriteTransaction's caller passed in. Zero or negative — unset, or an
+// odd caller-supplied value — is treated as defaultTransactionMaxAttempts,
+// the same default the real client applies when Attempts() is left at zero
+// (dalgo2firestore's createFirestoreTransactionOptions only calls
+// firestore.MaxAttempts when attempts > 0, otherwise leaving the SDK's own
+// DefaultTransactionMaxAttempts in force).
+//
+// There is no backoff between attempts beyond a runtime.Gosched(): the real
+// client backs off with gax.Backoff (transaction.go) to avoid hammering a
+// remote server while real contention clears, but this is an in-memory
+// adapter with no I/O latency, network contention, or rate limit to wait
+// out — the only thing worth yielding for is giving another goroutine racing
+// this one on the same *database a chance to finish its own commit.
+func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, attempts int) error {
+	if attempts <= 0 {
+		attempts = defaultTransactionMaxAttempts
+	}
+	var err error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if attempt > 0 {
+			runtime.Gosched()
+		}
+		err = db.runOptimisticReadwriteTransactionOnce(ctx, f)
+		if err == nil || !IsTransactionConflict(err) {
+			return err
+		}
+	}
+	return err
+}
+
+// runOptimisticReadwriteTransactionOnce is a single attempt of an
+// optimistic-mode read-write transaction — see optimisticState's doc comment
+// for the design, and runOptimisticReadwriteTransaction's doc comment for how
+// attempts are retried around this. It never holds db.mu for the callback's
+// duration, only briefly, once per read/write operation, and once more (also
+// briefly) for the final commit, so unrelated transactions' callbacks run
+// fully concurrently: a transaction can even pause indefinitely between
+// operations (as a test driving a specific interleaving does) without
+// blocking anyone else, since it is not holding any lock while paused.
+func (db *database) runOptimisticReadwriteTransactionOnce(ctx context.Context, f dal.RWTxWorker) error {
 	tx := &optimisticState{
 		db:               db,
 		reads:            make(map[string]uint64),
@@ -340,7 +433,13 @@ func (db *database) runOptimisticReadwriteTransaction(ctx context.Context, f dal
 // runLockedReadwriteTransaction is RunReadwriteTransaction's default path: it
 // holds db.mu for the callback's entire duration, so read-write transactions
 // are fully serialized and cannot contend (see WithOptimisticConcurrency for
-// the mode where they can).
+// the mode where they can). It never retries, and RunReadwriteTransaction
+// does not even pass it dal.TransactionOptions.Attempts(): validateVersions
+// stays false below, so db.versions and db.collectionSeq are never consulted
+// or grown for this mode's own transactions, and ErrTransactionConflict can
+// only ever originate from validateVersions' checks — a locked-mode
+// transaction's callback and commit therefore never produce it, and there is
+// nothing for a retry loop to catch here.
 //
 // Writes are nonetheless buffered through the same optimisticState machinery
 // rather than applied to the storage engines as they are made, because that is

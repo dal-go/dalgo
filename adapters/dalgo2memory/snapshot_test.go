@@ -39,6 +39,12 @@ func readThingN(ctx context.Context, tx dal.ReadTransaction, id string) (float64
 // B's new value, which would fracture the view (A=1 and B=2 never coexisted).
 // A read of an UNCHANGED key between the two stays fine: the live store is
 // still the snapshot for everything the external commit did not touch.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry: the callback's
+// external commits and require.EqualValues assertions run again on every
+// retry attempt, and a is 2 (not 1) once a retry's own first read observes
+// the previous attempt's external Set — asserting a single attempt's
+// observation is the entire point of this test.
 func TestSnapshotReads_FracturedViewAbortsAtRead(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -62,7 +68,7 @@ func TestSnapshotReads_FracturedViewAbortsAtRead(t *testing.T) {
 
 		_, readErr = readThingN(ctx, tx, "B")
 		return readErr
-	})
+	}, dal.TxWithAttempts(1))
 
 	require.Error(t, readErr, "reading B after A's snapshot was overwritten must fail at the read")
 	assert.True(t, IsTransactionConflict(readErr), "the read error must be retryable: %v", readErr)
@@ -75,6 +81,11 @@ func TestSnapshotReads_FracturedViewAbortsAtRead(t *testing.T) {
 // Firestore client, which fails the commit of a transaction whose read came
 // back ABORTED regardless of what the callback returned. A later read in the
 // same transaction (of any key) also keeps failing: the transaction is dead.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry, which the callback
+// swallowing its own conflict would otherwise trigger: a retry's fresh
+// attempt is not guaranteed to reproduce the same poisoned-read/poisoned-write
+// sequence this test asserts about a single attempt.
 func TestSnapshotReads_SwallowedConflictPoisonsCommit(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -101,7 +112,7 @@ func TestSnapshotReads_SwallowedConflictPoisonsCommit(t *testing.T) {
 			return err
 		}
 		return nil
-	})
+	}, dal.TxWithAttempts(1))
 
 	require.Error(t, err, "a transaction that observed a snapshot conflict must not commit")
 	assert.True(t, IsTransactionConflict(err))
@@ -118,6 +129,11 @@ func TestSnapshotReads_SwallowedConflictPoisonsCommit(t *testing.T) {
 // Firestore's fixed read time — trading a spurious abort (absorbed by the
 // caller's retry) for an O(1) check and semantics that need one sentence to
 // state.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry: the callback's own
+// external commit of B always lands after each attempt's snapshot is pinned,
+// so a retry would just reproduce the same abort every time — this test is
+// about that single-attempt behavior, not about how many times it repeats.
 func TestSnapshotReads_UnrelatedNewerKeyAlsoAborts(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -131,7 +147,7 @@ func TestSnapshotReads_UnrelatedNewerKeyAlsoAborts(t *testing.T) {
 		require.NoError(t, db.Set(ctx, thingRecord("B", 2)))
 		_, readErr := readThingN(ctx, tx, "B")
 		return readErr
-	})
+	}, dal.TxWithAttempts(1))
 	assert.True(t, IsTransactionConflict(err))
 }
 
@@ -164,6 +180,11 @@ func TestSnapshotReads_BlindWriteToNewerKeyCommits(t *testing.T) {
 // above must not weaken write-write conflict detection. A key this
 // transaction blind-wrote and another transaction then committed over is
 // still caught at commit by the baseline validation.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry: the callback's
+// external commit always lands after the blind write it races, in every
+// attempt, so this is a single-attempt observation, not a claim about what
+// happens after N retries.
 func TestSnapshotReads_WriteWriteRaceStillConflicts(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -175,7 +196,7 @@ func TestSnapshotReads_WriteWriteRaceStillConflicts(t *testing.T) {
 		}
 		require.NoError(t, db.Set(ctx, thingRecord("A", 2))) // external commit wins the race
 		return nil
-	})
+	}, dal.TxWithAttempts(1))
 	assert.True(t, IsTransactionConflict(err),
 		"an external commit between a blind write and its commit must still conflict")
 }
@@ -206,6 +227,12 @@ func TestSnapshotReads_PinsAtFirstReadNotAtStart(t *testing.T) {
 // it after an external commit returns the SNAPSHOT value (the cached entry),
 // never the newer one — and the transaction then fails at commit via baseline
 // validation rather than ever showing the torn value.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry: without it, a
+// retry's first read would pin its NEW snapshot after the previous attempt's
+// external Set already landed, so the re-read's assert.EqualValues(t, 1, a)
+// below would see 2 instead — failing an assertion this test's whole point is
+// to make about a single attempt's snapshot.
 func TestSnapshotReads_RereadStaysOnSnapshot(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -222,7 +249,7 @@ func TestSnapshotReads_RereadStaysOnSnapshot(t *testing.T) {
 		}
 		assert.EqualValues(t, 1, a, "a re-read must stay on the transaction's snapshot")
 		return nil
-	})
+	}, dal.TxWithAttempts(1))
 	assert.True(t, IsTransactionConflict(err),
 		"the transaction read a key another commit overwrote, so its commit must conflict")
 }

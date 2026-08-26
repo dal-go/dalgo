@@ -207,12 +207,18 @@ func (db *database) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker
 	return f(context.WithValue(ctx, transactionInProgressKey{}, true), session{db: db})
 }
 
-func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, _ ...dal.TransactionOption) error {
+func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
 	if ctx.Value(transactionInProgressKey{}) != nil {
 		return ErrNestedTransaction
 	}
 	if db.optimisticConcurrency {
-		return db.runOptimisticReadwriteTransaction(ctx, f)
+		// Attempts() is the only option this backend honors here: bounded
+		// auto-retry of ErrTransactionConflict, matching real Firestore's
+		// RunTransaction (see runOptimisticReadwriteTransaction's doc
+		// comment). It is meaningless for the locked mode below, which never
+		// produces that error in the first place.
+		attempts := dal.NewTransactionOptions(options...).Attempts()
+		return db.runOptimisticReadwriteTransaction(ctx, f, attempts)
 	}
 	return db.runLockedReadwriteTransaction(ctx, f)
 }
