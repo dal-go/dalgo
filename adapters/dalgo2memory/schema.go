@@ -13,11 +13,41 @@ type Option func(*database)
 // WithNoReadsAfterWritesInTransaction enables Firestore-compatible transaction
 // ordering for this in-memory database. In a read-write transaction, every
 // read after the first successful write returns ErrReadAfterWriteInTransaction.
-// It is intended for tests that need to catch Firestore-only ordering errors;
-// the default in-memory behavior remains permissive.
+//
+// Deprecated: this is now NewDB's default behavior, so calling this option is
+// redundant on a plain NewDB(). It still works — it re-asserts strict
+// ordering, which only matters when combined with an earlier
+// WithInterleavedReadsAndWritesInTransaction() in the same option list, since
+// options apply in order and the last one wins. New code should omit it and
+// rely on the default; existing callers (sneat-co/chessraiders among them)
+// are unaffected and may drop the call at their own pace.
 func WithNoReadsAfterWritesInTransaction() Option {
 	return func(db *database) {
 		db.noReadsAfterWritesInTransaction = true
+	}
+}
+
+// WithInterleavedReadsAndWritesInTransaction opts a database out of the
+// default Firestore-compatible transaction-ordering check: with it, a
+// read-write transaction may freely read a key after the transaction has
+// written (to that key or any other), the same way a SQL database's
+// session-local transaction behaves.
+//
+// Use this when the in-memory database stands in for a backend whose
+// transactions genuinely permit interleaving reads and writes — a SQL-style
+// adapter such as dalgo2mysql, dalgo2postgres, or dalgo2sqlite, or a test
+// double standing in for one of them. Do NOT reach for this just to make a
+// failing test pass: if the code under test also runs against Firestore
+// (dalgo2firestore) or another backend with the same read-after-write
+// restriction, a test failing with ErrReadAfterWriteInTransaction is
+// reporting a real ordering bug in the code under test — the same class of
+// bug that shipped a production 500 in sneat-core-modules's
+// set_user_country, undetected because its unit tests ran against the old
+// permissive default. Silencing that signal with this option would hide the
+// bug again, not fix it.
+func WithInterleavedReadsAndWritesInTransaction() Option {
+	return func(db *database) {
+		db.noReadsAfterWritesInTransaction = false
 	}
 }
 

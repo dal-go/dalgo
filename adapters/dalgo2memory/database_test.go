@@ -285,16 +285,43 @@ func TestNoReadsAfterWritesInTransaction(t *testing.T) {
 		}
 	})
 
-	t.Run("default remains permissive", func(t *testing.T) {
-		db := newDatabase()
+	t.Run("default now rejects reads after writes", func(t *testing.T) {
+		db := newDatabase() // no options: strict ordering is the default
+		require.NoError(t, db.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "before", Count: 1})))
 		err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 			if err := tx.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "stored"})); err != nil {
 				return err
 			}
 			return tx.Get(ctx, dalrecord.NewRecordWithData(key, &thing{}))
 		})
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
 	})
+}
+
+// TestInterleavedReadsAndWritesInTransaction proves
+// WithInterleavedReadsAndWritesInTransaction opts a database back out of the
+// default strict ordering, restoring the old permissive behavior for a
+// backend (SQL-like) that genuinely allows a transaction to read after it has
+// written.
+func TestInterleavedReadsAndWritesInTransaction(t *testing.T) {
+	ctx := context.Background()
+	key := dalrecord.NewKeyWithID("Things", "existing")
+
+	db := newDatabase(WithInterleavedReadsAndWritesInTransaction())
+	require.NoError(t, db.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "before", Count: 1})))
+
+	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		if err := tx.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "stored"})); err != nil {
+			return err
+		}
+		got := &thing{}
+		if err := tx.Get(ctx, dalrecord.NewRecordWithData(key, got)); err != nil {
+			return err
+		}
+		require.Equal(t, "stored", got.Name)
+		return nil
+	})
+	require.NoError(t, err)
 }
 
 // TestConcurrentReadonlyQueriesInitializeEnginesSafely verifies that queries
