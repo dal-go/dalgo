@@ -35,9 +35,19 @@ func newDatabase(options ...Option) *database {
 		// Firestore's real ordering rule. See
 		// WithInterleavedReadsAndWritesInTransaction for the opt-out.
 		noReadsAfterWritesInTransaction: true,
-		schemaRefBreaking:               true,
-		versions:                        make(map[string]uint64),
-		collectionSeq:                   make(map[string]uint64),
+		// optimisticConcurrency defaults to true: a plain NewDB() runs
+		// read-write transactions on the optimistic machinery — genuine
+		// contention, snapshot reads, and bounded auto-retry of conflicts —
+		// completing the Firestore-faithful default profile. Real Firestore
+		// transactions really do contend, so a concurrency test passing
+		// against a serialized double proves nothing about production; that
+		// gap is why this defaults on. See WithSingleWriterTransactions for
+		// the intent-named opt-out that restores the whole-database-lock
+		// single-writer mode.
+		optimisticConcurrency: true,
+		schemaRefBreaking:     true,
+		versions:              make(map[string]uint64),
+		collectionSeq:         make(map[string]uint64),
 	}
 	for _, option := range options {
 		if option != nil {
@@ -72,11 +82,12 @@ type database struct {
 	// unless WithoutSchemaRefBreaking was used). NewDB initializes it to true.
 	schemaRefBreaking bool
 
-	// optimisticConcurrency selects the opt-in optimistic-concurrency
-	// read-write transaction mode (see WithOptimisticConcurrency) in place of
-	// the default whole-database lock RunReadwriteTransaction otherwise holds
-	// for a transaction's entire duration. Default false: nothing below
-	// changes behavior until it is set.
+	// optimisticConcurrency selects the optimistic-concurrency read-write
+	// transaction mode — genuine contention, snapshot reads, auto-retry.
+	// Default TRUE (see newDatabase): a plain NewDB() is the Firestore
+	// profile. WithSingleWriterTransactions sets it false, restoring the
+	// whole-database lock RunReadwriteTransaction otherwise holds for a
+	// transaction's entire duration.
 	optimisticConcurrency bool
 	// versions is the commit-version table optimistic-mode transactions
 	// validate their reads against at commit (see optimisticState.commit): it

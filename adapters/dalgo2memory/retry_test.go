@@ -167,7 +167,7 @@ func TestOptimisticConcurrencyRetry_ReadAfterWriteNotRetried(t *testing.T) {
 // callback having run exactly once.
 func TestLockedModeIgnoresAttemptsOptionSilently(t *testing.T) {
 	ctx := context.Background()
-	db := newDatabase() // default locked mode: no WithOptimisticConcurrency
+	db := newDatabase(WithSingleWriterTransactions()) // single-writer mode: conflicts cannot occur
 
 	var callbackRuns int
 	err := db.RunReadwriteTransaction(ctx, func(context.Context, dal.ReadwriteTransaction) error {
