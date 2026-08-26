@@ -81,11 +81,16 @@ func WithInterleavedReadsAndWritesInTransaction() Option {
 // optimisticState's doc comment in optimistic.go for the full reasoning.
 //
 // A query (ExecuteQueryToRecordsReader / ExecuteQueryToRecordsetReader)
-// inside such a transaction returns dal.ErrNotSupported: a scan reads
-// committed storage directly, so it would see neither this transaction's own
-// buffered writes nor participate in its conflict detection. Point reads and
-// writes by key (Get, Exists, Set, Insert, Update, Delete and their -Multi
-// forms) are fully supported.
+// inside such a transaction is supported and participates in the
+// transaction's snapshot and conflict detection at COLLECTION granularity:
+// the query registers its collection, aborts with ErrTransactionConflict if
+// the collection was committed to after this transaction's snapshot, and the
+// commit revalidates it — which is what makes phantom inserts conflict
+// instead of slipping past the per-key read set (see
+// optimisticState.observeCollectionAtSnapshot). Joins are the one refused
+// shape (Firestore has none to stay faithful to). Point reads and writes by
+// key (Get, Exists, Set, Insert, Update, Delete and their -Multi forms) are
+// fully supported.
 //
 // This is deliberately adapter-local rather than part of dalgotest's shared
 // conformance suite: the suite proves record-validation invariants every
