@@ -231,6 +231,64 @@ func TestInterleavedReadsSeeOwnWrites(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// genThing is the record type the top-level generated-insert tests below store.
+type genThing struct {
+	Name string `json:"name"`
+}
+
+// TestTopLevelInsert_WithGenerator covers session.Insert's NON-transactional
+// generated-id path.
+//
+// It exists because of the buffering change: an Insert issued inside a
+// read-write transaction now routes through the pending buffer
+// (optimisticState.insert), so the transaction-based generator tests in
+// generated_insert_test.go no longer reach the immediate engine path at all.
+// That path is still live for a top-level call on the backend, so it keeps its
+// own coverage here rather than being deleted as newly-unreachable — it is not
+// unreachable, only reached from somewhere else now.
+func TestTopLevelInsert_WithGenerator(t *testing.T) {
+	ctx := context.Background()
+	db := newDatabase()
+
+	rec := record.NewRecordWithIncompleteKey("things", reflect.String, &genThing{Name: "generated"})
+	require.NoError(t, db.Insert(ctx, rec, dal.WithRandomStringKey(16, 5)))
+
+	id, ok := rec.Key().ID.(string)
+	require.True(t, ok, "generator must assign a string id")
+	require.NotEmpty(t, id, "generated id must not be empty")
+
+	out := &genThing{}
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("things", id), out)))
+	assert.Equal(t, "generated", out.Name)
+}
+
+// TestTopLevelInsert_GeneratorCollision covers the same non-transactional path's
+// collision branch: a deterministic generator that keeps producing an id which
+// is already taken must exhaust its attempts rather than overwrite the record
+// sitting there.
+func TestTopLevelInsert_GeneratorCollision(t *testing.T) {
+	ctx := context.Background()
+	db := newDatabase()
+
+	// A day-accuracy timestamp generator deterministically yields the same id
+	// throughout a single test run, so the second insert collides every attempt.
+	gen := dal.WithTimeStampStringID(dal.TimeStampAccuracyDay, 10, 5)
+
+	first := record.NewRecordWithIncompleteKey("days", reflect.String, &genThing{Name: "first"})
+	require.NoError(t, db.Insert(ctx, first, gen))
+	firstID, ok := first.Key().ID.(string)
+	require.True(t, ok)
+
+	second := record.NewRecordWithIncompleteKey("days", reflect.String, &genThing{Name: "second"})
+	err := db.Insert(ctx, second, gen)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, dal.ErrExceedsMaxNumberOfAttempts)
+
+	out := &genThing{}
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("days", firstID), out)))
+	assert.Equal(t, "first", out.Name, "the colliding insert must not overwrite the record already there")
+}
+
 // TestReadAfterWriteStillRejectedByDefault re-asserts that buffering did not
 // weaken the v0.67.0 ordering rule.
 func TestReadAfterWriteStillRejectedByDefault(t *testing.T) {
