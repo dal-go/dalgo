@@ -1,6 +1,8 @@
 module github.com/dal-go/dalgo
 
-go 1.27.0
+go 1.26.0
+
+toolchain go1.27.0
 
 require github.com/dal-go/record v0.1.3
 
