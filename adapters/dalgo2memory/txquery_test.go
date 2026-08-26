@@ -63,6 +63,12 @@ func TestTxQuery_WorksAndCommits(t *testing.T) {
 // commit INSERTS a new record there. No key in the per-key read set names the
 // new record — it did not exist — yet the query's result is now stale, so the
 // commit must conflict.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry: the callback's
+// external Set of the phantom record always lands after each attempt's own
+// query, so a retry would just repeat the same conflict every time — this
+// test is about that single-attempt behavior, not about how many times it
+// repeats.
 func TestTxQuery_PhantomInsertConflictsAtCommit(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -75,7 +81,7 @@ func TestTxQuery_PhantomInsertConflictsAtCommit(t *testing.T) {
 		// The phantom: a record the query could not have named as a key.
 		require.NoError(t, db.Set(ctx, thingRecord("B", 1)))
 		return nil
-	})
+	}, dal.TxWithAttempts(1))
 	assert.True(t, IsTransactionConflict(err),
 		"an insert into a queried collection must conflict the querying transaction: %v", err)
 }
@@ -105,6 +111,12 @@ func TestTxQuery_UnrelatedCollectionWriteDoesNotConflict(t *testing.T) {
 // transaction already observed, so the query itself aborts — and a second
 // query attempt hits the poisoned fast-path, and the swallowed conflict still
 // refuses the commit.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry: the callback's
+// external Set into "things" always lands after each attempt's own snapshot
+// pin, so a retry would just repeat the same abort sequence every time — this
+// test is about that single-attempt behavior, not about how many times it
+// repeats.
 func TestTxQuery_QueryAfterSnapshotFractureAborts(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -127,13 +139,19 @@ func TestTxQuery_QueryAfterSnapshotFractureAborts(t *testing.T) {
 		_, again := queryThingIDs(ctx, tx)
 		require.True(t, IsTransactionConflict(again), "the poisoned transaction fails every later query too")
 		return nil // swallow, as buggy caller code might
-	})
+	}, dal.TxWithAttempts(1))
 	assert.True(t, IsTransactionConflict(err), "the swallowed query conflict must still refuse the commit")
 }
 
 // TestTxQuery_QueryPinsSnapshot: a query can be the transaction's FIRST
 // observation, pinning the snapshot exactly as a point read would — proven by
 // the point read AFTER a later external commit aborting.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry: the callback's
+// external Set of A always lands after each attempt's own query pins the
+// snapshot, so a retry would just repeat the same abort every time — this
+// test is about that single-attempt behavior, not about how many times it
+// repeats.
 func TestTxQuery_QueryPinsSnapshot(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -150,7 +168,7 @@ func TestTxQuery_QueryPinsSnapshot(t *testing.T) {
 		require.True(t, IsTransactionConflict(readErr),
 			"a point read of a key committed after the query's snapshot must abort: %v", readErr)
 		return readErr
-	})
+	}, dal.TxWithAttempts(1))
 	assert.True(t, IsTransactionConflict(err))
 }
 

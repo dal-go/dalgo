@@ -107,6 +107,14 @@ type slugThing struct {
 // TestOptimisticConcurrencyReadWriteConflict's doc comment for why ordinary
 // channels are enough to force this deterministically, with no dedicated
 // test hook needed.
+//
+// dal.TxWithAttempts(1) disables the default auto-retry: without it, the
+// loser's transaction would be re-run after its first-attempt conflict. Its
+// retry's fresh Get would find the slug already claimed (the winner has since
+// committed), so it would return the "test setup" error below instead of
+// ever reaching bothRead/proceed again — turning the single conflict this
+// test looks for into an unrelated setup failure, not the ErrTransactionConflict
+// the assertions below require.
 func TestOptimisticConcurrencyGetThenInsertSameKeyExactlyOneWins(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -129,7 +137,7 @@ func TestOptimisticConcurrencyGetThenInsertSameKeyExactlyOneWins(t *testing.T) {
 			bothRead <- struct{}{}
 			<-proceed
 			return tx.Insert(ctx, dalrecord.NewRecordWithData(key, &slugThing{Owner: owner}))
-		})
+		}, dal.TxWithAttempts(1))
 	}
 
 	go claim("alice")
@@ -183,6 +191,11 @@ func TestOptimisticConcurrencyGetThenInsertSameKeyExactlyOneWins(t *testing.T) {
 // resumption, which is all the determinism this test needs; a bespoke
 // test-only hook would buy nothing beyond what the callback itself already
 // provides as a synchronization point.
+//
+// A's transaction passes dal.TxWithAttempts(1): its callback closes
+// aReached, and the default auto-retry would re-run that same callback after
+// the first-attempt conflict this test is looking for, panicking on
+// aReached's second close.
 func TestOptimisticConcurrencyReadWriteConflict(t *testing.T) {
 	ctx := context.Background()
 	db := newDatabase(WithOptimisticConcurrency())
@@ -202,7 +215,7 @@ func TestOptimisticConcurrencyReadWriteConflict(t *testing.T) {
 			close(aReached)
 			<-releaseA
 			return tx.Set(ctx, dalrecord.NewRecordWithData(key, &thing{Name: "from-a", Count: got.Count + 1}))
-		})
+		}, dal.TxWithAttempts(1))
 	}()
 
 	<-aReached // A has read K; it is now paused, holding no lock
