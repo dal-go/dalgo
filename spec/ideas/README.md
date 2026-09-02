@@ -27,7 +27,9 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [query-group-by-aggregation](query-group-by-aggregation.md) | Implemented | 2026-06-05 | alex | query-group-by-aggregation |
 | [recordops](recordops.md) | Approved | 2026-05-15 | alex | — |
 | [recordset-computed-columns](recordset-computed-columns.md) | Specified | 2026-06-02 | alex | recordset-computed-columns |
+| [row-level-access-conditions](row-level-access-conditions.md) | Specifying | 2026-09-02 | alex | access-policies/row-level-conditions, access-policies/principal-bindings, access-policies/field-patterns |
 | [transaction-message](transaction-message.md) | Approved | 2026-06-02 | alex | — |
+| [triggers-and-webhooks](triggers-and-webhooks.md) | Draft | 2026-09-02 | alex | — |
 
 ## Open Questions
 
