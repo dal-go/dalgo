@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/plan-specification
+status: Implemented
+---
+
 # Plan: Serialized storage engine (dalgo2memory default)
 
 **Status:** Implemented

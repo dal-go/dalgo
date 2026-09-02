@@ -1,0 +1,32 @@
+name: SpecScore lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: specscore-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install specscore CLI
+        # Pinned deliberately: an unpinned `latest` install lets a CLI release
+        # change what the lint rules expect and redden main with no repo-side
+        # change (see sneat-co/backstage's specscore.yml for the incident).
+        # Bump in the same commit that updates the spec tree to match.
+        env:
+          SPECSCORE_VERSION: v0.38.4
+        run: |
+          curl -fsSL https://specscore.md/install/get-cli | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Lint spec tree
+        run: specscore spec lint --caller ci

@@ -1,6 +1,6 @@
 ---
 format: https://specscore.md/plan-specification
-status: Draft
+status: Implemented
 ---
 # Plan: Typed Collection
 
