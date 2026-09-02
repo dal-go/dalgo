@@ -17,6 +17,14 @@ Add portable, adapter-independent access policies to DALgo. A secured `dal.DB` e
 
 The product promise is: **define least privilege once and enforce it across every DALgo adapter.**
 
+## Contents
+
+| Child | Description |
+|---|---|
+| [row-level-conditions](row-level-conditions/README.md) | Optional `where`/`check` conditions on allow rules, expressed in the `dal.Condition` AST with runtime variables (`$currentUser`, named variables from context); post-read check for `Get`/`Exists`, AND-rewrite for `Query`, pre-/post-image checks for writes inside a transaction. |
+| [principal-bindings](principal-bindings/README.md) | Rule sets bound to `roles`/`groups`/`users`/`everyone`; principal on context; effective policy = union of the principal's bindings compiled as one policy, then intersected with database policies. |
+| [field-patterns](field-patterns/README.md) | `fields` allow-lists with `*` wildcards on rules: projection/redaction on reads, touched-field checks on writes (list `users` without `passwordHash`). |
+
 ## Problem
 
 DALgo currently provides a common API for records, queries, and transactions, but a component receiving a `dal.DB` or transaction receives all authority exposed by that handle. Applications with extensions, plug-ins, tenants, background jobs, analytics users, or support tooling must rely on convention to keep code inside an allowed subtree. A mistake can write a root collection, enumerate sensitive records, or query data outside the current tenant.
