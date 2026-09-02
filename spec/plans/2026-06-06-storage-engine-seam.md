@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/plan-specification
+status: Implemented
+---
+
 # Plan: Pluggable per-collection storage engine seam (dalgo2memory)
 
 **Status:** Implemented

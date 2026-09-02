@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/plan-specification
+status: Implemented
+---
+
 # Plan: Source-qualified, multi-key ORDER BY resolution in dalgo2memory
 
 **Status:** Implemented

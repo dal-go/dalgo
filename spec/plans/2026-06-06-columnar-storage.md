@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/plan-specification
+status: Implemented
+---
+
 # Plan: Columnar storage engine (dalgo2memory)
 
 **Status:** Implemented

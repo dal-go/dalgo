@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/plan-specification
+status: Implemented
+---
+
 # Plan: Computed Columns in recordset (neutral evaluator contract)
 
 **Status:** Implemented

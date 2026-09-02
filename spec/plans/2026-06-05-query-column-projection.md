@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/plan-specification
+status: Implemented
+---
+
 # Plan: Column selection in the query builder, projected by dalgo2memory
 
 **Status:** Implemented

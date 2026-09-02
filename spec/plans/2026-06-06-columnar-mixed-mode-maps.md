@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/plan-specification
+status: Implemented
+---
+
 # Plan: Mixed-mode columnar storage for map[string]any collections (dalgo2memory)
 
 **Status:** Implemented

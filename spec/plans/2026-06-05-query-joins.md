@@ -1,3 +1,8 @@
+---
+format: https://specscore.md/plan-specification
+status: Implemented
+---
+
 # Plan: First-class INNER/LEFT joins in dal's query model
 
 **Status:** Implemented
