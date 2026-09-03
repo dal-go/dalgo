@@ -48,6 +48,34 @@ type Decision struct {
 	// rewrite for Query. A nil entry means the resource is allowed outright.
 	// Residuals is nil for an unconditional decision.
 	Residuals []dal.Condition
+	// Writes holds, per request resource, the ordered alternatives that decide
+	// a write on that resource (see WriteResidual). A nil entry means the write
+	// is allowed outright, with no row or post-image constraint.
+	Writes []*WriteResidual
+}
+
+// WriteAlternative is one allow rule as it applies to a write. Where selects
+// the rows (by pre-image) the rule applies to; nil means every row. Check is
+// what the row must satisfy after the write; nil means no constraint. Both are
+// resolved conditions; the Text fields keep the source form with parameter
+// names for explanations.
+type WriteAlternative struct {
+	Rule      string
+	Where     dal.Condition
+	Check     dal.Condition
+	WhereText string
+	CheckText string
+}
+
+// WriteResidual is what the secured wrapper enforces on a write: the
+// conditional alternatives in precedence order, then Terminal — the first
+// unconditional rule when it is an allow (possibly with a Check) — or nil when
+// the walk ends in a deny or in no rule at all. The first alternative whose
+// Where holds on the pre-image decides the write; a new row (Insert, or Set of
+// a missing row) is admitted by the first alternative whose Check it satisfies.
+type WriteResidual struct {
+	Alternatives []WriteAlternative
+	Terminal     *WriteAlternative
 }
 
 // DeniedError is returned when a policy rejects an operation.
@@ -134,6 +162,7 @@ func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 	}
 	var last Decision
 	var residuals []dal.Condition
+	var writes []*WriteResidual
 	resolver := newVariableResolver(ctx)
 	for i, resource := range request.Resources {
 		last = p.decideResource(resolver, request.Operation, resource)
@@ -146,8 +175,15 @@ func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 			}
 			residuals[i] = last.Residuals[0]
 		}
+		if last.Writes != nil {
+			if writes == nil {
+				writes = make([]*WriteResidual, len(request.Resources))
+			}
+			writes[i] = last.Writes[0]
+		}
 	}
 	last.Residuals = residuals
+	last.Writes = writes
 	return last
 }
 
@@ -177,7 +213,7 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 		}
 		conditional = append(conditional, matching[i])
 	}
-	if terminal != nil && (len(conditional) == 0 || terminal.effect == effectAllow) {
+	if len(conditional) == 0 && (terminal.effect != effectAllow || terminal.check == nil) {
 		allowed := terminal.effect == effectAllow
 		return Decision{
 			Allowed:      allowed,
@@ -190,43 +226,101 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 			Explanation:  fmt.Sprintf("matched rule %q (%s)", terminal.name, terminal.effect),
 		}
 	}
-	parts := make([]dal.Condition, 0, len(conditional))
+	// Resolve every alternative once; an unresolved parameter denies.
+	write := &WriteResidual{}
+	for _, rule := range conditional {
+		alternative, err := p.resolveAlternative(resolver, rule)
+		if err != nil {
+			return p.denyUnresolved(operation, resource, rule, err)
+		}
+		write.Alternatives = append(write.Alternatives, alternative)
+	}
+	if terminal != nil && terminal.effect == effectAllow {
+		alternative, err := p.resolveAlternative(resolver, *terminal)
+		if err != nil {
+			return p.denyUnresolved(operation, resource, *terminal, err)
+		}
+		write.Terminal = &alternative
+	}
+	decision := Decision{
+		Allowed:      true,
+		Operation:    operation,
+		Resource:     resource,
+		Policy:       p.name,
+		PolicySource: p.source,
+		Effect:       effectAllow.String(),
+		Writes:       []*WriteResidual{write},
+	}
+	if len(conditional) == 0 {
+		// A terminal allow with only a post-image check: reads are unconditional.
+		decision.Rule = terminal.name
+		decision.Condition = terminal.check.String()
+		decision.Explanation = fmt.Sprintf("matched rule %q (allow; check: %s)", terminal.name, decision.Condition)
+		return decision
+	}
 	names := make([]string, 0, len(conditional))
 	texts := make([]string, 0, len(conditional))
-	for _, rule := range conditional {
-		resolved, err := condeval.Substitute(rule.where, resolver.resolve)
-		if err != nil {
-			return Decision{
-				Operation:    operation,
-				Resource:     resource,
-				Policy:       p.name,
-				PolicySource: p.source,
-				Rule:         rule.name,
-				Effect:       effectDeny.String(),
-				Condition:    rule.where.String(),
-				Explanation:  fmt.Sprintf("cannot evaluate rule %q: %v", rule.name, err),
-			}
-		}
-		parts = append(parts, resolved)
-		names = append(names, rule.name)
-		texts = append(texts, rule.where.String())
+	parts := make([]dal.Condition, 0, len(conditional))
+	for _, alternative := range write.Alternatives {
+		names = append(names, alternative.Rule)
+		texts = append(texts, alternative.WhereText)
+		parts = append(parts, alternative.Where)
+	}
+	if write.Terminal != nil {
+		// An unconditional allow makes the row conditions moot for reads.
+		decision.Rule = write.Terminal.Rule
+		decision.Explanation = fmt.Sprintf("matched rule %q (allow)", write.Terminal.Rule)
+		return decision
 	}
 	residual, text := parts[0], texts[0]
 	if len(parts) > 1 {
 		residual = dal.NewGroupCondition(dal.Or, parts...)
 		text = "(" + strings.Join(texts, " OR ") + ")"
 	}
+	decision.Rule = strings.Join(names, ", ")
+	decision.Condition = text
+	decision.Explanation = fmt.Sprintf("matched conditional rule(s) %s (where: %s)", quoteAll(names), text)
+	decision.Residuals = []dal.Condition{residual}
+	return decision
+}
+
+func (p *AccessPolicy) resolveAlternative(resolver variableResolver, rule compiledRule) (WriteAlternative, error) {
+	alternative := WriteAlternative{Rule: rule.name}
+	if rule.where != nil {
+		resolved, err := condeval.Substitute(rule.where, resolver.resolve)
+		if err != nil {
+			return WriteAlternative{}, err
+		}
+		alternative.Where = resolved
+		alternative.WhereText = rule.where.String()
+	}
+	if rule.check != nil {
+		resolved, err := condeval.Substitute(rule.check, resolver.resolve)
+		if err != nil {
+			return WriteAlternative{}, err
+		}
+		alternative.Check = resolved
+		alternative.CheckText = rule.check.String()
+	}
+	return alternative, nil
+}
+
+func (p *AccessPolicy) denyUnresolved(operation Operations, resource Resource, rule compiledRule, err error) Decision {
+	condition := ""
+	if rule.where != nil {
+		condition = rule.where.String()
+	} else if rule.check != nil {
+		condition = rule.check.String()
+	}
 	return Decision{
-		Allowed:      true,
 		Operation:    operation,
 		Resource:     resource,
 		Policy:       p.name,
 		PolicySource: p.source,
-		Rule:         strings.Join(names, ", "),
-		Effect:       effectAllow.String(),
-		Condition:    text,
-		Explanation:  fmt.Sprintf("matched conditional rule(s) %s (where: %s)", quoteAll(names), text),
-		Residuals:    []dal.Condition{residual},
+		Rule:         rule.name,
+		Effect:       effectDeny.String(),
+		Condition:    condition,
+		Explanation:  fmt.Sprintf("cannot evaluate rule %q: %v", rule.name, err),
 	}
 }
 

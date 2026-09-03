@@ -11,6 +11,7 @@ import (
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/end2end/models"
 	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -127,5 +128,27 @@ func accessConditionsTest(ctx context.Context, t *testing.T, db dal.DB) {
 		exists, err = secured.Exists(callerCtx, record.NewKeyWithID(models.CitiesCollection, otherCountryID))
 		assert.ErrorIs(t, err, access.ErrAccessDenied)
 		assert.False(t, exists)
+	})
+	t.Run("writes_follow_the_condition", func(t *testing.T) {
+		if !queriesRan {
+			t.Skip("adapter did not execute a narrowed query; writes are not exercised")
+		}
+		writer := access.MustSecureDB(db, access.WithDatabasePolicies(access.MustPolicy("cities-writes",
+			access.Scope(models.CitiesCollection, access.AnyID, access.Allow(access.Update|access.Delete, "edit-own-country").Where(countryOfCaller)),
+		)))
+		touch := func(id string) error {
+			return writer.RunReadwriteTransaction(callerCtx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+				return tx.Update(ctx, record.NewKeyWithID(models.CitiesCollection, id), []update.Update{update.ByFieldName("HasAirport", true)})
+			}, dal.TxWithMessage("access conditions write"))
+		}
+		require.NoError(t, touch(expected[0]), "update of an own-country city")
+		assert.ErrorIs(t, touch(otherCountryID), access.ErrAccessDenied, "update of another country's city")
+		err := writer.RunReadwriteTransaction(callerCtx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			return tx.Delete(ctx, record.NewKeyWithID(models.CitiesCollection, otherCountryID))
+		}, dal.TxWithMessage("access conditions write"))
+		assert.ErrorIs(t, err, access.ErrAccessDenied, "delete of another country's city")
+		other := &models.City{}
+		require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID(models.CitiesCollection, otherCountryID), other)))
+		assert.NotEqual(t, country, other.Country, "the other country's city must be untouched")
 	})
 }

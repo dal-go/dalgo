@@ -98,7 +98,9 @@ conditions.
 ### REQ: rule-condition-slots
 
 A rule MUST accept two optional conditions: `where` and `check`. `check` MUST
-default to `where` when absent. In this feature, conditions MUST be accepted on
+default to `where` when absent. A rule MAY declare `check` without `where`: it
+then applies to every row on read and constrains only what a write may
+produce. In this feature, conditions MUST be accepted on
 **allow** rules only; constructing a deny rule with a condition MUST fail. A
 condition MUST NOT be accepted on a collection-group resource rule or on an
 opaque-query rule. A conditional rule MUST NOT authorise `Truncate`: when its
@@ -243,8 +245,15 @@ evaluate `where` on it; evaluate `check` on the new data. `Update`: read the
 pre-image, evaluate `where` on it, compute the post-image by applying the update
 and evaluate `check` on it; if the wrapper cannot compute the post-image for the
 update's operations it MUST deny. `Delete`: read the pre-image and evaluate
-`where` on it. Multi-record writes MUST be evaluated in full before any record
-is written and denied whole if any record fails. On an adapter without
+`where` on it. Rule selection for a write follows the read-side precedence walk:
+the first conditional allow whose `where` holds on the pre-image decides the
+row and its `check` applies; a new row (`Insert`, or `Set` of a missing row) is
+admitted by the first conditional allow whose `check` it satisfies; when no
+conditional allow applies, the first unconditional allow admits the write,
+subject to its own `check` if it declares one. An `Update` or `Delete` of a
+missing row under only conditional rules MUST be denied; under an unconditional
+allow it MUST be left to the adapter. Multi-record writes MUST be evaluated in
+full before any record is written and denied whole if any record fails. On an adapter without
 transactions, a conditional write MUST be denied unless the policy sets an
 explicit best-effort option, in which case the pre-image read precedes the
 write without isolation and the decision explanation states so.
@@ -384,11 +393,29 @@ field value of the record.
 **When** the caller queries `orders` with `Limit 10` ordered by `createdAt`
 **Then** the adapter executes a query whose `Where` conjoins `tenantID == "t1"` with the caller's conditions, and the ten returned rows all belong to `t1`.
 
+### AC: check-defaults-to-where (verifies REQ:rule-condition-slots)
+
+**Given** an allow rule with only `where: ownerID == $currentUser`
+**When** an `Insert` is evaluated with data whose `ownerID` differs from the current user
+**Then** the insert is denied with the explanation naming the `check` slot.
+
 ### AC: cannot-take-ownership (verifies REQ:write-enforcement)
 
 **Given** an allow rule `Set where ownerID == $currentUser` and an existing record owned by another user
 **When** the caller sets that key with data whose `ownerID` is the caller
 **Then** the write is denied because `where` fails on the pre-image.
+
+### AC: update-post-image (verifies REQ:write-enforcement)
+
+**Given** an allow rule `Update where ownerID == $currentUser check ownerID == $currentUser`
+**When** the caller updates their own record by setting `ownerID` to someone else
+**Then** the update is denied because `check` fails on the computed post-image.
+
+### AC: batch-all-or-nothing (verifies REQ:write-enforcement)
+
+**Given** a conditional `Delete` rule and a multi-delete where one key's pre-image fails `where`
+**When** the batch is executed
+**Then** nothing is deleted.
 
 ### AC: unconditional-suite-unchanged (verifies REQ:precedence-with-conditions)
 

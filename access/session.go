@@ -16,7 +16,7 @@ type securedReadSession struct {
 }
 
 func (s securedReadSession) Exists(ctx context.Context, key *record.Key) (bool, error) {
-	residuals, err := s.guard.authorizeRequest(ctx, Request{Operation: Exists, Resources: []Resource{RecordResourceForKey(key)}})
+	residuals, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Exists, Resources: []Resource{RecordResourceForKey(key)}})
 	if err != nil {
 		return false, err
 	}
@@ -27,7 +27,7 @@ func (s securedReadSession) Exists(ctx context.Context, key *record.Key) (bool, 
 }
 
 func (s securedReadSession) Get(ctx context.Context, record record.Record) error {
-	residuals, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.Key())}})
+	residuals, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.Key())}})
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (s securedReadSession) Get(ctx context.Context, record record.Record) error
 
 func (s securedReadSession) GetMulti(ctx context.Context, records []record.Record) error {
 	resources := resourcesForRecords(records)
-	residuals, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: resources})
+	residuals, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: resources})
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, q
 // Where carries the residual row condition.
 func (s securedReadSession) authorizeQuery(ctx context.Context, query dal.Query) (dal.Query, error) {
 	resources := resourcesForQuery(query)
-	residuals, err := s.guard.authorizeRequest(ctx, Request{Operation: Query, Resources: resources, Query: query})
+	residuals, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Query, Resources: resources, Query: query})
 	if err != nil {
 		return nil, err
 	}
@@ -86,66 +86,97 @@ type securedWriteSession struct {
 }
 
 func (s securedWriteSession) Set(ctx context.Context, record record.Record) error {
-	if err := s.guard.authorize(ctx, Set, RecordResourceForKey(record.Key())); err != nil {
+	if err := s.authorizeAndEnforce(ctx, Set, []writeTarget{{key: record.Key(), data: record.Data()}}); err != nil {
 		return err
 	}
 	return s.session.Set(ctx, record)
 }
 
 func (s securedWriteSession) SetMulti(ctx context.Context, records []record.Record) error {
-	if err := s.guard.authorize(ctx, Set, resourcesForRecords(records)...); err != nil {
+	if err := s.authorizeAndEnforce(ctx, Set, targetsForRecords(records)); err != nil {
 		return err
 	}
 	return s.session.SetMulti(ctx, records)
 }
 
 func (s securedWriteSession) Insert(ctx context.Context, record record.Record, options ...dal.InsertOption) error {
-	if err := s.guard.authorize(ctx, Insert, RecordResourceForKey(record.Key())); err != nil {
+	if err := s.authorizeAndEnforce(ctx, Insert, []writeTarget{{key: record.Key(), data: record.Data()}}); err != nil {
 		return err
 	}
 	return s.session.Insert(ctx, record, options...)
 }
 
 func (s securedWriteSession) InsertMulti(ctx context.Context, records []record.Record, options ...dal.InsertOption) error {
-	if err := s.guard.authorize(ctx, Insert, resourcesForRecords(records)...); err != nil {
+	if err := s.authorizeAndEnforce(ctx, Insert, targetsForRecords(records)); err != nil {
 		return err
 	}
 	return s.session.InsertMulti(ctx, records, options...)
 }
 
 func (s securedWriteSession) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
-	if err := s.guard.authorize(ctx, Update, RecordResourceForKey(key)); err != nil {
+	if err := s.authorizeAndEnforce(ctx, Update, []writeTarget{{key: key, updates: updates}}); err != nil {
 		return err
 	}
 	return s.session.Update(ctx, key, updates, preconditions...)
 }
 
 func (s securedWriteSession) UpdateRecord(ctx context.Context, record record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
-	if err := s.guard.authorize(ctx, Update, RecordResourceForKey(record.Key())); err != nil {
+	if err := s.authorizeAndEnforce(ctx, Update, []writeTarget{{key: record.Key(), updates: updates}}); err != nil {
 		return err
 	}
 	return s.session.UpdateRecord(ctx, record, updates, preconditions...)
 }
 
 func (s securedWriteSession) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
-	if err := s.guard.authorize(ctx, Update, resourcesForKeys(keys)...); err != nil {
+	targets := make([]writeTarget, len(keys))
+	for i, key := range keys {
+		targets[i] = writeTarget{key: key, updates: updates}
+	}
+	if err := s.authorizeAndEnforce(ctx, Update, targets); err != nil {
 		return err
 	}
 	return s.session.UpdateMulti(ctx, keys, updates, preconditions...)
 }
 
 func (s securedWriteSession) Delete(ctx context.Context, key *record.Key) error {
-	if err := s.guard.authorize(ctx, Delete, RecordResourceForKey(key)); err != nil {
+	if err := s.authorizeAndEnforce(ctx, Delete, []writeTarget{{key: key}}); err != nil {
 		return err
 	}
 	return s.session.Delete(ctx, key)
 }
 
 func (s securedWriteSession) DeleteMulti(ctx context.Context, keys []*record.Key) error {
-	if err := s.guard.authorize(ctx, Delete, resourcesForKeys(keys)...); err != nil {
+	targets := make([]writeTarget, len(keys))
+	for i, key := range keys {
+		targets[i] = writeTarget{key: key}
+	}
+	if err := s.authorizeAndEnforce(ctx, Delete, targets); err != nil {
 		return err
 	}
 	return s.session.DeleteMulti(ctx, keys)
+}
+
+// authorizeAndEnforce authorizes a write on every target and then enforces
+// the write residuals — pre-image row conditions and post-image checks —
+// before anything reaches the adapter, so a batch is refused whole.
+func (s securedWriteSession) authorizeAndEnforce(ctx context.Context, operation Operations, targets []writeTarget) error {
+	resources := make([]Resource, len(targets))
+	for i, target := range targets {
+		resources[i] = RecordResourceForKey(target.key)
+	}
+	writes, err := s.guard.authorizeWrite(ctx, operation, resources...)
+	if err != nil {
+		return err
+	}
+	return s.enforceWrites(ctx, operation, writes, targets)
+}
+
+func targetsForRecords(records []record.Record) []writeTarget {
+	targets := make([]writeTarget, len(records))
+	for i, rec := range records {
+		targets[i] = writeTarget{key: rec.Key(), data: rec.Data()}
+	}
+	return targets
 }
 
 type securedReadwriteSession struct {

@@ -104,50 +104,40 @@ func (g guard) bind(ctx context.Context) guard {
 	return g
 }
 
-// authorize settles an operation that cannot carry a residual condition. In
-// this version that is every write: a conditional rule on a write operation is
-// refused rather than silently granted, until pre-image and post-image checks
-// exist.
+// authorize settles an operation by policy decision alone; residual row
+// conditions, if any, are ignored. Reads use authorizeRequest and writes use
+// authorizeWrite so residuals are enforced.
 func (g guard) authorize(ctx context.Context, operation Operations, resources ...Resource) error {
-	residuals, err := g.authorizeRequest(ctx, Request{Operation: operation, Resources: resources})
-	if err != nil {
-		return err
-	}
-	for _, perResource := range residuals {
-		for _, residual := range perResource {
-			return &DeniedError{Decision: Decision{
-				Operation:    operation,
-				Resource:     residual.resource,
-				Policy:       residual.policy,
-				PolicySource: residual.policySource,
-				Rule:         residual.rule,
-				Effect:       effectDeny.String(),
-				Condition:    residual.text,
-				Explanation:  fmt.Sprintf("conditional rule %q is not enforced for %s in this version (where: %s)", residual.rule, operation, residual.text),
-			}}
-		}
-	}
-	return nil
+	_, _, err := g.authorizeRequest(ctx, Request{Operation: operation, Resources: resources})
+	return err
+}
+
+// authorizeWrite returns, per resource, the write residuals every applicable
+// policy requires the caller to enforce before delegating the write.
+func (g guard) authorizeWrite(ctx context.Context, operation Operations, resources ...Resource) ([][]writeResidual, error) {
+	_, writes, err := g.authorizeRequest(ctx, Request{Operation: operation, Resources: resources})
+	return writes, err
 }
 
 // authorizeRequest evaluates every applicable policy and returns, per request
-// resource, the residual conditions the caller must still enforce. A denial by
-// any policy is returned immediately.
-func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]residual, error) {
+// resource, the read residuals and the write residuals the caller must still
+// enforce. A denial by any policy is returned immediately.
+func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]residual, [][]writeResidual, error) {
 	dynamicPolicies := policiesFromContext(ctx)
 	contextPolicyCount := len(g.boundPolicies) + len(dynamicPolicies)
 	if err := g.requireContextPolicy(request.Operation, contextPolicyCount); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	policies := make([]Policy, 0, len(g.databasePolicies)+contextPolicyCount)
 	policies = append(policies, g.databasePolicies...)
 	policies = append(policies, g.boundPolicies...)
 	policies = append(policies, dynamicPolicies...)
 	var residuals [][]residual
+	var writes [][]writeResidual
 	for _, policy := range policies {
 		decision := policy.Decide(ctx, request)
 		if !decision.Allowed {
-			return nil, &DeniedError{Decision: decision}
+			return nil, nil, &DeniedError{Decision: decision}
 		}
 		for i, condition := range decision.Residuals {
 			if condition == nil || i >= len(request.Resources) {
@@ -165,8 +155,22 @@ func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]resid
 				condition:    condition,
 			})
 		}
+		for i, write := range decision.Writes {
+			if write == nil || i >= len(request.Resources) {
+				continue
+			}
+			if writes == nil {
+				writes = make([][]writeResidual, len(request.Resources))
+			}
+			writes[i] = append(writes[i], writeResidual{
+				policy:       decision.Policy,
+				policySource: decision.PolicySource,
+				resource:     request.Resources[i],
+				residual:     write,
+			})
+		}
 	}
-	return residuals, nil
+	return residuals, writes, nil
 }
 
 func (g guard) checkContext(ctx context.Context) error {

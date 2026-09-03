@@ -50,6 +50,9 @@ type DocumentRule struct {
 	// Where is an optional row condition on an allow rule, written in the
 	// DTQL condition syntax with a `param` expression for runtime variables.
 	Where *DocumentCondition `json:"where,omitempty" yaml:"where,omitempty"`
+	// Check is an optional post-image condition on an allow rule: what a row
+	// written under the rule must satisfy afterwards. Defaults to Where.
+	Check *DocumentCondition `json:"check,omitempty" yaml:"check,omitempty"`
 }
 
 // Codec decouples policy loading from both its syntax and its storage. A
@@ -359,6 +362,13 @@ func ruleFromDocumentRule(documentRule DocumentRule, allowedEffects map[effect]b
 		}
 		rule = rule.Where(condition)
 	}
+	if documentRule.Check != nil {
+		condition, err := conditionFromDocument(*documentRule.Check)
+		if err != nil {
+			return Rule{}, fmt.Errorf("check: %w", err)
+		}
+		rule = rule.Check(condition)
+	}
 	return rule, nil
 }
 
@@ -482,6 +492,13 @@ func documentRuleFromRule(rule Rule) (DocumentRule, error) {
 			return DocumentRule{}, fmt.Errorf("%w: rule %q: %v", ErrNotSerializable, rule.name, err)
 		}
 		documentRule.Where = where
+	}
+	if rule.check != nil {
+		check, err := documentFromCondition(rule.check)
+		if err != nil {
+			return DocumentRule{}, fmt.Errorf("%w: rule %q: %v", ErrNotSerializable, rule.name, err)
+		}
+		documentRule.Check = check
 	}
 	return documentRule, nil
 }

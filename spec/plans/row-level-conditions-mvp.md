@@ -121,6 +121,12 @@ customers, get another user's record denied, exists upgraded; whole module at
   edit half needs the write side and is deferred with it.
 - access-policies/row-level-conditions#ac:capture-in-condition — path captures
   (`{name}` segments bound to `$path.<name>`) are the next plan.
+- access-policies/row-level-conditions#ac:check-defaults-to-where — write side,
+  verified by [`row-level-conditions-write-side`](row-level-conditions-write-side.md).
+- access-policies/row-level-conditions#ac:update-post-image — write side,
+  verified by [`row-level-conditions-write-side`](row-level-conditions-write-side.md).
+- access-policies/row-level-conditions#ac:batch-all-or-nothing — write side,
+  verified by [`row-level-conditions-write-side`](row-level-conditions-write-side.md).
 
 ## Open Questions
 
