@@ -1,13 +1,13 @@
 ---
 format: https://specscore.md/idea-specification
-status: Specifying
+status: Implementing
 ---
 # Idea: Declarative per-principal policies with row-level conditions, path captures and field patterns
 
-**Status:** Specifying
+**Status:** Implementing
 **Date:** 2026-09-02
 **Owner:** alex
-**Promotes To:** access-policies/row-level-conditions, access-policies/principal-bindings, access-policies/field-patterns
+**Promotes To:** access-policies/field-patterns, access-policies/principal-bindings, access-policies/row-level-conditions
 **Supersedes:** —
 **Related Ideas:** extends:access-policies
 

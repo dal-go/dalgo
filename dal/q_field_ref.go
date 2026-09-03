@@ -75,6 +75,8 @@ func WhereField(name string, operator Operator, v any) Condition {
 		val = v
 	case FieldRef:
 		val = v
+	case Param:
+		val = v
 	case Array:
 		if operator != In {
 			panic("arrays must use with `In` operator")

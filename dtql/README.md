@@ -38,11 +38,12 @@ by `Serialize` with a descriptive error rather than silently dropped.
 | `FieldRef` | `{ field: <name> }` |
 | `Constant` | `{ value: <scalar> }` (inline string, bool, int or float) |
 | `Array` | `{ values: [ <scalar>, ... ] }` (inline, for `In` membership) |
+| `Param` | `{ param: <name> }` — a runtime parameter (`$name` in query text), substituted with a constant or array before execution; names are dotted identifiers such as `currentUser` or `principal.roles` |
 | `Operator` | the `dal.Operator` string itself: `==`, `In`, `>`, `>=`, `<`, `<=` |
 | `Limit` / `Offset` | `limit: <int>` / `offset: <int>` (omitted when zero) |
 
-An expression node sets **exactly one** of `field`, `value` or `values`, which
-discriminates a `FieldRef`, a `Constant` or an `Array`.
+An expression node sets **exactly one** of `field`, `value`, `values` or
+`param`, which discriminates a `FieldRef`, a `Constant`, an `Array` or a `Param`.
 
 ## Document shape
 

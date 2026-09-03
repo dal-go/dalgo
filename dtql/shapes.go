@@ -18,12 +18,13 @@ type fromYAML struct {
 }
 
 // exprYAML is the YAML representation of an in-scope dal.Expression.
-// Exactly one of Field / Value / Values is set, which discriminates a
-// FieldRef, a Constant or an Array respectively.
+// Exactly one of Field / Value / Values / Param is set, which discriminates a
+// FieldRef, a Constant, an Array or a Param respectively.
 type exprYAML struct {
 	Field  string `yaml:"field,omitempty"`  // dal.FieldRef
 	Value  any    `yaml:"value,omitempty"`  // dal.Constant (inline scalar)
 	Values any    `yaml:"values,omitempty"` // dal.Array (inline sequence)
+	Param  string `yaml:"param,omitempty"`  // dal.Param (runtime parameter, "$name")
 }
 
 // columnYAML is the YAML representation of a dal.Column.

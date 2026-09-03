@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
+	"github.com/dal-go/dalgo/condeval"
 	"github.com/dal-go/dalgo/dal"
 )
 
@@ -37,6 +39,15 @@ type Decision struct {
 	Rule         string
 	Effect       string
 	Explanation  string
+	// Condition is the source text of the row condition behind a conditional
+	// decision, with parameter names rather than resolved values.
+	Condition string
+	// Residuals holds, per request resource (same index as Request.Resources),
+	// the resolved row condition the caller must still enforce before the
+	// operation is complete: after the read for point operations, by query
+	// rewrite for Query. A nil entry means the resource is allowed outright.
+	// Residuals is nil for an unconditional decision.
+	Residuals []dal.Condition
 }
 
 // DeniedError is returned when a policy rejects an operation.
@@ -102,7 +113,7 @@ func (p *AccessPolicy) Name() string { return p.name }
 // a policy document, such as an object key, URL, database key, or file path.
 func (p *AccessPolicy) Source() string { return p.source }
 
-func (p *AccessPolicy) Decide(_ context.Context, request Request) Decision {
+func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 	if !request.Operation.validLeaf() {
 		return Decision{
 			Operation:    request.Operation,
@@ -122,16 +133,25 @@ func (p *AccessPolicy) Decide(_ context.Context, request Request) Decision {
 		}
 	}
 	var last Decision
-	for _, resource := range request.Resources {
-		last = p.decideResource(request.Operation, resource)
+	var residuals []dal.Condition
+	resolver := newVariableResolver(ctx)
+	for i, resource := range request.Resources {
+		last = p.decideResource(resolver, request.Operation, resource)
 		if !last.Allowed {
 			return last
 		}
+		if last.Residuals != nil {
+			if residuals == nil {
+				residuals = make([]dal.Condition, len(request.Resources))
+			}
+			residuals[i] = last.Residuals[0]
+		}
 	}
+	last.Residuals = residuals
 	return last
 }
 
-func (p *AccessPolicy) decideResource(operation Operations, resource Resource) Decision {
+func (p *AccessPolicy) decideResource(resolver variableResolver, operation Operations, resource Resource) Decision {
 	matching := matchingRules(p.compiled, operation, resource)
 	if len(matching) == 0 {
 		return Decision{
@@ -143,19 +163,79 @@ func (p *AccessPolicy) decideResource(operation Operations, resource Resource) D
 			Explanation:  "no matching allow rule",
 		}
 	}
-	winner := matching[0]
-	allowed := winner.effect == effectAllow
-	explanation := fmt.Sprintf("matched rule %q (%s)", winner.name, winner.effect)
+	// Walk matches in precedence order: conditional allows met before the first
+	// unconditional rule apply to the rows their conditions select; the first
+	// unconditional rule settles everything else. An unconditional allow makes
+	// the collected conditions moot; a deny (or no unconditional rule at all)
+	// leaves their disjunction as the residual the caller must enforce.
+	var conditional []compiledRule
+	var terminal *compiledRule
+	for i := range matching {
+		if matching[i].where == nil {
+			terminal = &matching[i]
+			break
+		}
+		conditional = append(conditional, matching[i])
+	}
+	if terminal != nil && (len(conditional) == 0 || terminal.effect == effectAllow) {
+		allowed := terminal.effect == effectAllow
+		return Decision{
+			Allowed:      allowed,
+			Operation:    operation,
+			Resource:     resource,
+			Policy:       p.name,
+			PolicySource: p.source,
+			Rule:         terminal.name,
+			Effect:       terminal.effect.String(),
+			Explanation:  fmt.Sprintf("matched rule %q (%s)", terminal.name, terminal.effect),
+		}
+	}
+	parts := make([]dal.Condition, 0, len(conditional))
+	names := make([]string, 0, len(conditional))
+	texts := make([]string, 0, len(conditional))
+	for _, rule := range conditional {
+		resolved, err := condeval.Substitute(rule.where, resolver.resolve)
+		if err != nil {
+			return Decision{
+				Operation:    operation,
+				Resource:     resource,
+				Policy:       p.name,
+				PolicySource: p.source,
+				Rule:         rule.name,
+				Effect:       effectDeny.String(),
+				Condition:    rule.where.String(),
+				Explanation:  fmt.Sprintf("cannot evaluate rule %q: %v", rule.name, err),
+			}
+		}
+		parts = append(parts, resolved)
+		names = append(names, rule.name)
+		texts = append(texts, rule.where.String())
+	}
+	residual, text := parts[0], texts[0]
+	if len(parts) > 1 {
+		residual = dal.NewGroupCondition(dal.Or, parts...)
+		text = "(" + strings.Join(texts, " OR ") + ")"
+	}
 	return Decision{
-		Allowed:      allowed,
+		Allowed:      true,
 		Operation:    operation,
 		Resource:     resource,
 		Policy:       p.name,
 		PolicySource: p.source,
-		Rule:         winner.name,
-		Effect:       winner.effect.String(),
-		Explanation:  explanation,
+		Rule:         strings.Join(names, ", "),
+		Effect:       effectAllow.String(),
+		Condition:    text,
+		Explanation:  fmt.Sprintf("matched conditional rule(s) %s (where: %s)", quoteAll(names), text),
+		Residuals:    []dal.Condition{residual},
 	}
+}
+
+func quoteAll(names []string) string {
+	quoted := make([]string, len(names))
+	for i, name := range names {
+		quoted[i] = fmt.Sprintf("%q", name)
+	}
+	return strings.Join(quoted, ", ")
 }
 
 func (p *AccessPolicy) Authorize(ctx context.Context, request Request) error {

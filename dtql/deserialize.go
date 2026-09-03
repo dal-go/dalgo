@@ -101,17 +101,25 @@ func exprFromYAML(e exprYAML) (dal.Expression, error) {
 	if e.Values != nil {
 		set++
 	}
+	if e.Param != "" {
+		set++
+	}
 	if set == 0 {
-		return nil, fmt.Errorf("expression must set exactly one of field, value or values")
+		return nil, fmt.Errorf("expression must set exactly one of field, value, values or param")
 	}
 	if set > 1 {
-		return nil, fmt.Errorf("expression must set exactly one of field, value or values, but several are set")
+		return nil, fmt.Errorf("expression must set exactly one of field, value, values or param, but several are set")
 	}
 	switch {
 	case e.Field != "":
 		return dal.NewFieldRef("", e.Field), nil
 	case e.Value != nil:
 		return dal.Constant{Value: e.Value}, nil
+	case e.Param != "":
+		if !dal.ValidParamName(e.Param) {
+			return nil, fmt.Errorf("invalid parameter name %q", e.Param)
+		}
+		return dal.Param{Name: e.Param}, nil
 	default: // e.Values != nil
 		return dal.Array{Value: e.Values}, nil
 	}

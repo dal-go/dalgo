@@ -1,12 +1,12 @@
 ---
 format: https://specscore.md/feature-specification
-status: Draft
+status: Implementing
 ---
 
 # Feature: Row-level access conditions with runtime variables
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/access-policies/row-level-conditions?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/access-policies/row-level-conditions?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/access-policies/row-level-conditions?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/access-policies/row-level-conditions?op=request-change) |
-**Status:** Draft
+**Status:** Implementing
 **Date:** 2026-09-02
 **Owner:** alex
 **Source Ideas:** row-level-access-conditions
