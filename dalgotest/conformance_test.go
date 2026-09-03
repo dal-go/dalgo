@@ -3,6 +3,8 @@ package dalgotest_test
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -212,4 +214,51 @@ func contains(haystack []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// TestRunConformanceReportsFailures proves the testing.T wrapper turns a
+// failing check into a failed subtest. A failing subtest would fail this
+// package's own run, so the helper below executes in a subprocess whose
+// coverage directory is forwarded, exactly as branchingtest does.
+func TestRunConformanceReportsFailures(t *testing.T) {
+	cmd := exec.Command(os.Args[0], append([]string{
+		"-test.run=^TestRunConformanceFailureHelper$",
+		"-test.count=1",
+	}, coverageArguments()...)...)
+	cmd.Env = append(os.Environ(), "DALGO_DALGOTEST_FAILURE=1")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("failure helper unexpectedly passed:\n%s", output)
+	}
+	for _, want := range []string{
+		"--- FAIL: TestRunConformanceFailureHelper/rejects_an_invalid_record_on_Insert",
+		"--- FAIL: TestRunConformanceFailureHelper/rejects_an_invalid_record_on_Set",
+		"--- FAIL: TestRunConformanceFailureHelper/rejects_an_invalid_record_on_Update",
+	} {
+		if !strings.Contains(string(output), want) {
+			t.Errorf("failure helper output did not contain %q:\n%s", want, output)
+		}
+	}
+}
+
+// TestRunConformanceFailureHelper runs the suite against the validation-
+// skipping adapter and is expected to fail; it only runs as a subprocess of
+// TestRunConformanceReportsFailures.
+func TestRunConformanceFailureHelper(t *testing.T) {
+	if os.Getenv("DALGO_DALGOTEST_FAILURE") == "" {
+		t.Skip("only run as a subprocess by TestRunConformanceReportsFailures")
+	}
+	dalgotest.RunConformance(t, func(*testing.T) (dal.DB, func()) {
+		return skippingDB{DB: dalgo2memory.New(dalgo2memory.FirestoreProfile())}, nil
+	})
+}
+
+func coverageArguments() []string {
+	var args []string
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-test.gocoverdir=") {
+			args = append(args, arg)
+		}
+	}
+	return args
 }
