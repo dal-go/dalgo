@@ -146,9 +146,11 @@ release after the row-level-conditions feature lands.
 
 ## Open Questions
 
-- Where exactly should triggers live: a `triggers` package in this module, or
-  event model here and dispatcher elsewhere? Recommendation: model, outbox and
-  matching here; broker actions in separate modules.
+- Where exactly should triggers live? *Decided 2026-09-03 (founder):* the change-event
+  model, the transactional outbox and trigger matching live in this module (a
+  `triggers` package beside `dal`), because the outbox write must be atomic with
+  the data write inside the framework write pipeline; the webhook action uses the
+  standard library; broker and queue actions live in separate modules.
 - Package and collection naming: `triggers` vs `events` vs `cdc`; the default
   outbox path (`/_dalgo/outbox/*`?) and whether it is configurable per database.
 - Should the pre-image be captured by default for `Update` and `Delete`, or only

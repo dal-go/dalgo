@@ -176,10 +176,9 @@ these rows" before it needs field masks. Timebox: one `dalgo` release per part.
 
 ## Open Questions
 
-- Should a row-level denial on `Get` surface as a `DeniedError` (explainable,
-  consistent with path denials) or as `ErrRecordNotFound` (RLS-style, resists
-  enumeration)? Recommendation: `DeniedError` by default with a policy option to
-  hide denied records.
+- Should a row-level denial on `Get` surface as a `DeniedError` or as
+  `ErrRecordNotFound`? *Decided 2026-09-03 (founder):* `DeniedError` by default,
+  with a policy option to hide denied records as not found.
 - Where do role and group *memberships* come from — always the host via the
   context, or may a binding document also declare group membership? Recommendation:
   host only; DALgo stays identity-agnostic.

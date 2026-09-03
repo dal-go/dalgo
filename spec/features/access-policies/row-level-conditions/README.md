@@ -421,7 +421,7 @@ No adapter is modified.
 
 ## Open Questions
 
-- Default behaviour of a denied conditional point read: `DeniedError` (recommended, consistent and explainable) or `ErrRecordNotFound` (resists enumeration)? The hide option exists either way; the default is the decision.
+- Default behaviour of a denied conditional point read: *Decided 2026-09-03 (founder):* `DeniedError` by default (consistent and explainable); the policy option to hide denied records as `ErrRecordNotFound` remains available for enumeration-sensitive collections.
 - Should the parameter expression live in `dal` (usable by any query) or in `access` only? Recommended: `dal`, because DTQL and DataTug need it independently.
 - Should the `dtql` change (the `param` node) be filed as a change request on the `dtql` feature before this feature leaves Draft?
 - Which named variables, beyond `currentUser` and `now`, deserve a built-in convenience?
