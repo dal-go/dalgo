@@ -276,6 +276,10 @@ func TestEndToEnd(t *testing.T) {
 			}).Times(1)
 		case "SELECT ID FROM Cities; limit=3":
 			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(readCityIDs(models.SortedCityIDs))
+		case "access conditions":
+			// The replay adapter cannot execute a narrowed query; the access
+			// sub-tests must skip rather than fail.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 		case "":
 			panic("no RO tx name")
 		default:

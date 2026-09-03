@@ -60,7 +60,7 @@ func TestConditionalDocumentRoundTrip(t *testing.T) {
 	}
 	collection := CollectionResourceFor(nil, "customers")
 	decision = policy.Decide(ctx, Request{Operation: Query, Resources: []Resource{collection}})
-	if !decision.Allowed || decision.Residuals[0].String() != "(status = 'open' OR (region In (eu,uk) AND score >= 10))" {
+	if !decision.Allowed || decision.Residuals[0].String() != "(status = 'open' OR (region In ('eu','uk') AND score >= 10))" {
 		t.Fatalf("decoded group rule = %+v", decision)
 	}
 	for name, marshal := range map[string]func(*AccessPolicy) ([]byte, error){"yaml": MarshalAccessPolicyYAML, "json": MarshalAccessPolicyJSON} {

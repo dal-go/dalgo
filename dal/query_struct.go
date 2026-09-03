@@ -112,80 +112,129 @@ func (q structuredQuery) Limit() int {
 }
 
 func (q structuredQuery) String() string {
+	return QueryString(q)
+}
+
+// QueryString renders a structured query in the textual form String() uses,
+// reading every part through the StructuredQuery interface so a wrapper (see
+// WithWhere) renders exactly like a native query.
+func QueryString(q StructuredQuery) string {
 	writer := bytes.NewBuffer(make([]byte, 0, 1024))
 	_, _ = writer.WriteString("SELECT")
-	if q.limit > 0 {
-		_, _ = writer.WriteString(" TOP " + strconv.Itoa(q.limit))
+	limit := q.Limit()
+	if limit > 0 {
+		_, _ = writer.WriteString(" TOP " + strconv.Itoa(limit))
 	}
+	columns := q.Columns()
+	where := q.Where()
 
-	is1liner := len(q.columns) <= 1 &&
-		(q.where == nil || reflect.TypeOf(q.where) == reflect.TypeOf(Comparison{}))
+	is1liner := len(columns) <= 1 &&
+		(where == nil || reflect.TypeOf(where) == reflect.TypeOf(Comparison{}))
 
-	switch len(q.columns) {
+	switch len(columns) {
 	case 0:
 		_, _ = writer.WriteString(" *")
 	case 1:
-		_, _ = fmt.Fprint(writer, " ", q.columns[0].String())
+		_, _ = fmt.Fprint(writer, " ", columns[0].String())
 	default:
-		for i, col := range q.columns {
+		for i, col := range columns {
 			_, _ = fmt.Fprint(writer, "\n\t", col.String())
-			if i < len(q.columns)-1 {
+			if i < len(columns)-1 {
 				_, _ = writer.WriteString(",")
 			}
 		}
 	}
-	if q.from != nil {
+	if from := q.From(); from != nil {
 		if is1liner {
 			_, _ = writer.WriteString(" ")
 		} else {
 			_, _ = writer.WriteString("\n")
 		}
 		var fromStr string
-		switch from := q.from.Base().(type) {
+		switch base := from.Base().(type) {
 		case CollectionRef:
-			fromStr = from.Path()
+			fromStr = base.Path()
 		case *CollectionRef:
-			fromStr = from.Path()
+			fromStr = base.Path()
 		case CollectionGroupRef:
-			fromStr = from.Name()
+			fromStr = base.Name()
 		case *CollectionGroupRef:
-			fromStr = from.Name()
+			fromStr = base.Name()
 		}
 		_, _ = fmt.Fprintf(writer, "FROM [%v]", fromStr)
 	}
-	if q.where != nil {
+	if where != nil {
 		if is1liner {
 			_, _ = writer.WriteString(" ")
 		} else {
 			_, _ = writer.WriteString("\n")
 		}
-		_, _ = writer.WriteString("WHERE " + q.where.String())
+		_, _ = writer.WriteString("WHERE " + where.String())
 	}
-	if len(q.groupBy) > 0 {
+	if groupBy := q.GroupBy(); len(groupBy) > 0 {
 		_, _ = writer.WriteString("\nGROUP BY ")
-		for i, expr := range q.groupBy {
+		for i, expr := range groupBy {
 			if i > 0 {
 				_, _ = writer.WriteString(", ")
 			}
 			_, _ = writer.WriteString(expr.String())
 		}
 	}
-	if q.having != nil {
-		_, _ = writer.WriteString("\nHAVING " + q.having.String())
+	if having := q.Having(); having != nil {
+		_, _ = writer.WriteString("\nHAVING " + having.String())
 	}
-	if len(q.orderBy) > 0 {
+	if orderBy := q.OrderBy(); len(orderBy) > 0 {
 		_, _ = writer.WriteString("\nORDER BY ")
-		for i, expr := range q.orderBy {
+		for i, expr := range orderBy {
 			if i > 0 {
 				_, _ = writer.WriteString(", ")
 			}
 			_, _ = writer.WriteString(expr.String())
 		}
 	}
-	if q.offset > 0 {
-		_, _ = writer.WriteString("\nOFFSET " + strconv.Itoa(q.offset))
+	if offset := q.Offset(); offset > 0 {
+		_, _ = writer.WriteString("\nOFFSET " + strconv.Itoa(offset))
 	}
 	return writer.String()
+}
+
+// WithWhere returns a query identical to q except that its Where is
+// condition. A query built by QueryBuilder is copied, so adapters and String()
+// see an ordinary structured query; any other StructuredQuery implementation
+// is wrapped and rendered through QueryString. Callers that narrow a query —
+// an access policy conjoining a row condition, for example — use this rather
+// than rebuilding the query, so columns, ordering, limits and cursors survive.
+func WithWhere(q StructuredQuery, condition Condition) StructuredQuery {
+	switch native := q.(type) {
+	case structuredQuery:
+		native.where = condition
+		return native
+	case *structuredQuery:
+		clone := *native
+		clone.where = condition
+		return clone
+	default:
+		return whereOverride{StructuredQuery: q, where: condition}
+	}
+}
+
+// whereOverride wraps a foreign StructuredQuery implementation with a
+// replaced Where. It hands itself, not the wrapped query, to executors.
+type whereOverride struct {
+	StructuredQuery
+	where Condition
+}
+
+func (w whereOverride) Where() Condition { return w.where }
+
+func (w whereOverride) String() string { return QueryString(w) }
+
+func (w whereOverride) GetRecordsReader(ctx context.Context, qe QueryExecutor) (RecordsReader, error) {
+	return qe.ExecuteQueryToRecordsReader(ctx, w)
+}
+
+func (w whereOverride) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (RecordsetReader, error) {
+	return qe.ExecuteQueryToRecordsetReader(ctx, w)
 }
 
 var _ fmt.Stringer = (*structuredQuery)(nil)

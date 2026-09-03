@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -24,11 +25,18 @@ func (v Constant) String() string {
 	case int:
 		return strconv.Itoa(v.Value.(int))
 	case string:
-		return fmt.Sprintf("'%v'", v.Value)
+		return quoteString(v.Value.(string))
 	default:
 		s, _ := json.Marshal(v.Value)
 		return string(s)
 	}
+}
+
+// quoteString renders a string literal with single quotes, doubling any
+// embedded single quote so the text is a valid SQL string literal even when
+// the value came from a caller or a policy variable.
+func quoteString(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
 func NewConstant(v any) Constant {
