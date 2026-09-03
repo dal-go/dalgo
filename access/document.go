@@ -26,7 +26,21 @@ type Document struct {
 	Kind       string           `json:"kind" yaml:"kind"`
 	Metadata   DocumentMetadata `json:"metadata" yaml:"metadata"`
 	Default    string           `json:"default" yaml:"default"`
-	Scopes     []DocumentScope  `json:"scopes" yaml:"scopes"`
+	Scopes     []DocumentScope  `json:"scopes,omitempty" yaml:"scopes,omitempty"`
+	// RuleSets and Bindings describe a principal policy set: named rule sets
+	// (each a scope tree like Scopes) and the roles, groups, users and
+	// everyone they are bound to. A document has either Scopes or both
+	// RuleSets and Bindings.
+	RuleSets map[string][]DocumentScope `json:"ruleSets,omitempty" yaml:"ruleSets,omitempty"`
+	Bindings *DocumentBindings          `json:"bindings,omitempty" yaml:"bindings,omitempty"`
+}
+
+// DocumentBindings maps principals to rule-set names.
+type DocumentBindings struct {
+	Roles    map[string][]string `json:"roles,omitempty" yaml:"roles,omitempty"`
+	Groups   map[string][]string `json:"groups,omitempty" yaml:"groups,omitempty"`
+	Users    map[string][]string `json:"users,omitempty" yaml:"users,omitempty"`
+	Everyone []string            `json:"everyone,omitempty" yaml:"everyone,omitempty"`
 }
 
 type DocumentMetadata struct {
@@ -133,11 +147,18 @@ func DecodeAccessPolicy(reader io.Reader, codec Codec, options ...DecodeOption) 
 	if err != nil {
 		return nil, err
 	}
+	return accessPolicyFromDocument(document, settings)
+}
+
+func accessPolicyFromDocument(document Document, settings decodeOptions) (*AccessPolicy, error) {
 	if document.Kind != AccessPolicyKind {
 		return nil, fmt.Errorf("access: expected kind %s, got %q", AccessPolicyKind, document.Kind)
 	}
 	if document.Default != effectDeny.String() {
 		return nil, fmt.Errorf("access: AccessPolicy default must be %q", effectDeny)
+	}
+	if document.Bindings != nil || len(document.RuleSets) > 0 {
+		return nil, fmt.Errorf("access: the document declares rule sets and bindings; decode it as a principal policy set")
 	}
 	rules, err := rulesFromDocument(document, map[effect]bool{effectAllow: true, effectDeny: true})
 	if err != nil {
@@ -149,6 +170,125 @@ func DecodeAccessPolicy(reader io.Reader, codec Codec, options ...DecodeOption) 
 	}
 	policy.source = settings.source
 	return policy, nil
+}
+
+// DecodePrincipalPolicySet decodes and validates one AccessPolicy document
+// that binds named rule sets to roles, groups, users and everyone.
+func DecodePrincipalPolicySet(reader io.Reader, codec Codec, options ...DecodeOption) (*PrincipalPolicySet, error) {
+	document, settings, err := decodeDocument(reader, codec, options)
+	if err != nil {
+		return nil, err
+	}
+	return principalPolicySetFromDocument(document, settings)
+}
+
+func principalPolicySetFromDocument(document Document, settings decodeOptions) (*PrincipalPolicySet, error) {
+	if document.Kind != AccessPolicyKind {
+		return nil, fmt.Errorf("access: expected kind %s, got %q", AccessPolicyKind, document.Kind)
+	}
+	if document.Default != effectDeny.String() {
+		return nil, fmt.Errorf("access: AccessPolicy default must be %q", effectDeny)
+	}
+	if document.Bindings == nil || len(document.RuleSets) == 0 {
+		return nil, fmt.Errorf("access: a principal policy set requires ruleSets and bindings")
+	}
+	if len(document.Scopes) > 0 {
+		return nil, fmt.Errorf("access: a principal policy set must not declare top-level scopes; put them in a rule set")
+	}
+	allowed := map[effect]bool{effectAllow: true, effectDeny: true}
+	ruleSets := make(map[string][]Rule, len(document.RuleSets))
+	for setName, scopes := range document.RuleSets {
+		rules := make([]Rule, 0, len(scopes))
+		for i, scope := range scopes {
+			rule, err := ruleFromDocumentScope(scope, allowed)
+			if err != nil {
+				return nil, fmt.Errorf("access: ruleSets[%s][%d]: %w", setName, i, err)
+			}
+			rules = append(rules, rule)
+		}
+		ruleSets[setName] = rules
+	}
+	set, err := NewPrincipalPolicySet(document.Metadata.Name, ruleSets, Bindings{
+		Roles:    document.Bindings.Roles,
+		Groups:   document.Bindings.Groups,
+		Users:    document.Bindings.Users,
+		Everyone: document.Bindings.Everyone,
+	})
+	if err != nil {
+		return nil, err
+	}
+	set.source = settings.source
+	return set, nil
+}
+
+// DecodePolicy decodes one AccessPolicy document as either an AccessPolicy
+// or, when it declares rule sets and bindings, a PrincipalPolicySet.
+func DecodePolicy(reader io.Reader, codec Codec, options ...DecodeOption) (Policy, error) {
+	document, settings, err := decodeDocument(reader, codec, options)
+	if err != nil {
+		return nil, err
+	}
+	if document.Bindings != nil || len(document.RuleSets) > 0 {
+		return principalPolicySetFromDocument(document, settings)
+	}
+	return accessPolicyFromDocument(document, settings)
+}
+
+// EncodePrincipalPolicySet validates and writes one principal policy set
+// through codec.
+func EncodePrincipalPolicySet(writer io.Writer, codec Codec, set *PrincipalPolicySet) error {
+	if set == nil {
+		return fmt.Errorf("access: principal policy set is required")
+	}
+	document := Document{
+		APIVersion: DocumentAPIVersion,
+		Kind:       AccessPolicyKind,
+		Metadata:   DocumentMetadata{Name: set.name},
+		Default:    effectDeny.String(),
+		RuleSets:   make(map[string][]DocumentScope, len(set.ruleSets)),
+		Bindings: &DocumentBindings{
+			Roles:    set.bindings.Roles,
+			Groups:   set.bindings.Groups,
+			Users:    set.bindings.Users,
+			Everyone: set.bindings.Everyone,
+		},
+	}
+	for setName, rules := range set.ruleSets {
+		scopes := make([]DocumentScope, 0, len(rules))
+		for _, rule := range rules {
+			scope, err := documentScopeFromRule(rule)
+			if err != nil {
+				return fmt.Errorf("rule set %q: %w", setName, err)
+			}
+			scopes = append(scopes, scope)
+		}
+		document.RuleSets[setName] = scopes
+	}
+	return encodeDocument(writer, codec, document)
+}
+
+func MarshalPrincipalPolicySetYAML(set *PrincipalPolicySet) ([]byte, error) {
+	var data bytes.Buffer
+	if err := EncodePrincipalPolicySet(&data, YAMLCodec{}, set); err != nil {
+		return nil, err
+	}
+	return data.Bytes(), nil
+}
+
+func MarshalPrincipalPolicySetJSON(set *PrincipalPolicySet) ([]byte, error) {
+	var data bytes.Buffer
+	if err := EncodePrincipalPolicySet(&data, JSONCodec{}, set); err != nil {
+		return nil, err
+	}
+	return data.Bytes(), nil
+}
+
+func UnmarshalPrincipalPolicySetYAML(data []byte, options ...DecodeOption) (*PrincipalPolicySet, error) {
+	return DecodePrincipalPolicySet(bytes.NewReader(data), YAMLCodec{}, options...)
+}
+
+func UnmarshalPrincipalPolicySetJSON(data []byte, options ...DecodeOption) (*PrincipalPolicySet, error) {
+	return DecodePrincipalPolicySet(bytes.NewReader(data), JSONCodec{}, options...)
 }
 
 // DecodeAuditPolicy decodes and validates one AuditPolicy from any reader.
@@ -195,8 +335,8 @@ func decodeDocument(reader io.Reader, codec Codec, options []DecodeOption) (Docu
 	if strings.TrimSpace(document.Metadata.Name) == "" {
 		return Document{}, settings, fmt.Errorf("access: metadata.name is required")
 	}
-	if len(document.Scopes) == 0 {
-		return Document{}, settings, fmt.Errorf("access: at least one scope is required")
+	if len(document.Scopes) == 0 && len(document.RuleSets) == 0 && document.Bindings == nil {
+		return Document{}, settings, fmt.Errorf("access: at least one scope, or rule sets with bindings, is required")
 	}
 	return document, settings, nil
 }
