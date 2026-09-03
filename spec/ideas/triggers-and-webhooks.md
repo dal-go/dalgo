@@ -1,13 +1,13 @@
 ---
 format: https://specscore.md/idea-specification
-status: Draft
+status: Specifying
 ---
 # Idea: Triggers and webhooks for trigger-less stores
 
-**Status:** Draft
+**Status:** Specifying
 **Date:** 2026-09-02
 **Owner:** alex
-**Promotes To:** —
+**Promotes To:** triggers
 **Supersedes:** —
 **Related Ideas:** extends:transaction-message, depends_on:row-level-access-conditions
 

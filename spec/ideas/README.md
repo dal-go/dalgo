@@ -29,7 +29,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [recordset-computed-columns](recordset-computed-columns.md) | Specified | 2026-06-02 | alex | recordset-computed-columns |
 | [row-level-access-conditions](row-level-access-conditions.md) | Implementing | 2026-09-02 | alex | access-policies/field-patterns, access-policies/principal-bindings, access-policies/row-level-conditions |
 | [transaction-message](transaction-message.md) | Approved | 2026-06-02 | alex | — |
-| [triggers-and-webhooks](triggers-and-webhooks.md) | Draft | 2026-09-02 | alex | — |
+| [triggers-and-webhooks](triggers-and-webhooks.md) | Specifying | 2026-09-02 | alex | triggers |
 
 ## Open Questions
 
