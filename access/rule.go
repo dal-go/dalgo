@@ -3,6 +3,9 @@ package access
 import (
 	"fmt"
 	"strings"
+
+	"github.com/dal-go/dalgo/condeval"
+	"github.com/dal-go/dalgo/dal"
 )
 
 type effect uint8
@@ -48,6 +51,21 @@ type Rule struct {
 	effect     effect
 	resource   string
 	children   []Rule
+	where      dal.Condition
+}
+
+// Where attaches a row condition to an allow rule: the rule applies only to
+// records whose values satisfy condition. The condition is a dal.Condition over
+// the record's fields (comparisons, In, And/Or groups) whose right-hand values
+// may be parameters such as dal.NewParam("currentUser"), resolved from the
+// operation context (see WithVariables and WithCurrentUser).
+//
+// Conditions are valid on allow rules under path scopes only. A conditional
+// rule never authorises Truncate: naming it explicitly fails compilation, while
+// the write and readwrite groups simply drop it.
+func (r Rule) Where(condition dal.Condition) Rule {
+	r.where = condition
+	return r
 }
 
 // Allow permits operations at the containing scope. The optional name appears
@@ -120,6 +138,8 @@ type compiledRule struct {
 	effect     effect
 	depth      int
 	literals   int
+	where      dal.Condition
+	params     []string
 }
 
 func compileRules(rules []Rule, allowedEffects map[effect]bool) ([]compiledRule, error) {
@@ -147,6 +167,9 @@ func compileRule(
 	allowedEffects map[effect]bool,
 	compiled *[]compiledRule,
 ) error {
+	if rule.where != nil && rule.kind != directiveRule {
+		return fmt.Errorf("access: conditions are only valid on allow rules, not on scopes")
+	}
 	switch rule.kind {
 	case directiveRule:
 		if !allowedEffects[rule.effect] {
@@ -155,19 +178,45 @@ func compileRule(
 		if !rule.operations.validSet() {
 			return fmt.Errorf("access: rule %q has an invalid operation set", rule.name)
 		}
+		operations := rule.operations
+		var params []string
+		if rule.where != nil {
+			if rule.effect != effectAllow {
+				return fmt.Errorf("access: rule %q: conditional %s rules are not supported; conditions apply to allow rules only", rule.name, rule.effect)
+			}
+			if resourceKind != PathResource {
+				return fmt.Errorf("access: rule %q: conditions are not valid on %s rules", rule.name, resourceKind)
+			}
+			if operations&Truncate != 0 {
+				if operations != Write && operations != ReadWrite {
+					return fmt.Errorf("access: rule %q: a conditional rule cannot authorise truncate", rule.name)
+				}
+				operations &^= Truncate
+			}
+			info, err := condeval.Validate(rule.where)
+			if err != nil {
+				return fmt.Errorf("access: rule %q: invalid condition: %w", rule.name, err)
+			}
+			params = info.Params
+		}
 		name := rule.name
 		if name == "" {
-			name = fmt.Sprintf("%s %s at %s", rule.effect, rule.operations, resourceDescription(resourceKind, resourceName, prefix))
+			name = fmt.Sprintf("%s %s at %s", rule.effect, operations, resourceDescription(resourceKind, resourceName, prefix))
+			if rule.where != nil {
+				name += " where " + rule.where.String()
+			}
 		}
 		*compiled = append(*compiled, compiledRule{
 			kind:       resourceKind,
 			pattern:    prefix,
 			resource:   resourceName,
 			name:       name,
-			operations: rule.operations,
+			operations: operations,
 			effect:     rule.effect,
 			depth:      len(prefix.segments),
 			literals:   literalCount(prefix),
+			where:      rule.where,
+			params:     params,
 		})
 		return nil
 	case scopeRule:

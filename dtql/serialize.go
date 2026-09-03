@@ -111,8 +111,10 @@ func exprToYAML(expr dal.Expression) (exprYAML, error) {
 		return exprYAML{Value: e.Value}, nil
 	case dal.Array:
 		return exprYAML{Values: e.Value}, nil
+	case dal.Param:
+		return exprYAML{Param: e.Name}, nil
 	default:
-		return exprYAML{}, fmt.Errorf("unsupported expression %T (only field references, constants and arrays are supported)", expr)
+		return exprYAML{}, fmt.Errorf("unsupported expression %T (only field references, constants, arrays and parameters are supported)", expr)
 	}
 }
 

@@ -16,41 +16,68 @@ type securedReadSession struct {
 }
 
 func (s securedReadSession) Exists(ctx context.Context, key *record.Key) (bool, error) {
-	if err := s.guard.authorize(ctx, Exists, RecordResourceForKey(key)); err != nil {
+	residuals, err := s.guard.authorizeRequest(ctx, Request{Operation: Exists, Resources: []Resource{RecordResourceForKey(key)}})
+	if err != nil {
 		return false, err
 	}
-	return s.session.Exists(ctx, key)
+	if len(residuals) == 0 {
+		return s.session.Exists(ctx, key)
+	}
+	return existsThroughRead(ctx, s.session, key, residuals[0])
 }
 
 func (s securedReadSession) Get(ctx context.Context, record record.Record) error {
-	if err := s.guard.authorize(ctx, Get, RecordResourceForKey(record.Key())); err != nil {
+	residuals, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.Key())}})
+	if err != nil {
 		return err
 	}
-	return s.session.Get(ctx, record)
+	if err := s.session.Get(ctx, record); err != nil {
+		return err
+	}
+	if len(residuals) == 0 {
+		return nil
+	}
+	return checkRecord(Get, record, residuals[0])
 }
 
 func (s securedReadSession) GetMulti(ctx context.Context, records []record.Record) error {
 	resources := resourcesForRecords(records)
-	if err := s.guard.authorize(ctx, Get, resources...); err != nil {
+	residuals, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: resources})
+	if err != nil {
 		return err
 	}
-	return s.session.GetMulti(ctx, records)
+	if err := s.session.GetMulti(ctx, records); err != nil {
+		return err
+	}
+	return checkRecords(Get, records, residuals)
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
-	resources := resourcesForQuery(query)
-	if err := s.guard.authorizeRequest(ctx, Request{Operation: Query, Resources: resources, Query: query}); err != nil {
+	query, err := s.authorizeQuery(ctx, query)
+	if err != nil {
 		return nil, err
 	}
 	return s.session.ExecuteQueryToRecordsReader(ctx, query)
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
-	resources := resourcesForQuery(query)
-	if err := s.guard.authorizeRequest(ctx, Request{Operation: Query, Resources: resources, Query: query}); err != nil {
+	query, err := s.authorizeQuery(ctx, query)
+	if err != nil {
 		return nil, err
 	}
 	return s.session.ExecuteQueryToRecordsetReader(ctx, query, options...)
+}
+
+// authorizeQuery authorizes every source of a query and returns the query to
+// execute: the caller's own when no residual applies, otherwise a copy whose
+// Where carries the residual row condition.
+func (s securedReadSession) authorizeQuery(ctx context.Context, query dal.Query) (dal.Query, error) {
+	resources := resourcesForQuery(query)
+	residuals, err := s.guard.authorizeRequest(ctx, Request{Operation: Query, Resources: resources, Query: query})
+	if err != nil {
+		return nil, err
+	}
+	return rewriteQuery(query, residuals)
 }
 
 type securedWriteSession struct {

@@ -17,6 +17,11 @@
           "required": [
             "values"
           ]
+        },
+        {
+          "required": [
+            "param"
+          ]
         }
       ],
       "properties": {
@@ -24,6 +29,10 @@
           "type": "string"
         },
         "field": {
+          "type": "string"
+        },
+        "param": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
         },
         "value": {
@@ -100,10 +109,19 @@
           "required": [
             "values"
           ]
+        },
+        {
+          "required": [
+            "param"
+          ]
         }
       ],
       "properties": {
         "field": {
+          "type": "string"
+        },
+        "param": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
         },
         "value": {
@@ -189,6 +207,11 @@
           "required": [
             "values"
           ]
+        },
+        {
+          "required": [
+            "param"
+          ]
         }
       ],
       "properties": {
@@ -196,6 +219,10 @@
           "type": "boolean"
         },
         "field": {
+          "type": "string"
+        },
+        "param": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
         },
         "value": {

@@ -22,11 +22,13 @@ func schemaDocument() map[string]any {
 		"field":  map[string]any{"type": "string"},
 		"value":  scalar,
 		"values": map[string]any{"type": "array", "items": scalar},
+		"param":  map[string]any{"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"},
 	}
 	exprOneOf := []any{
 		map[string]any{"required": []any{"field"}},
 		map[string]any{"required": []any{"value"}},
 		map[string]any{"required": []any{"values"}},
+		map[string]any{"required": []any{"param"}},
 	}
 	// A column/order is an expression plus one extra key (as / desc).
 	columnProps := mergeProps(exprProps, map[string]any{"as": map[string]any{"type": "string"}})

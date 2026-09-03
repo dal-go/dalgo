@@ -75,7 +75,7 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 		{
 			name:    "expression with no field/value/values",
 			yaml:    "from:\n  name: users\ncolumns:\n  - as: x\n",
-			wantErr: "exactly one of field, value or values",
+			wantErr: "exactly one of field, value, values or param",
 		},
 	}
 	for _, tt := range tests {

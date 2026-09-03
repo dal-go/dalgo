@@ -47,6 +47,9 @@ type DocumentRule struct {
 	ID         string   `json:"id" yaml:"id"`
 	Effect     string   `json:"effect" yaml:"effect"`
 	Operations []string `json:"operations" yaml:"operations"`
+	// Where is an optional row condition on an allow rule, written in the
+	// DTQL condition syntax with a `param` expression for runtime variables.
+	Where *DocumentCondition `json:"where,omitempty" yaml:"where,omitempty"`
 }
 
 // Codec decouples policy loading from both its syntax and its storage. A
@@ -348,7 +351,15 @@ func ruleFromDocumentRule(documentRule DocumentRule, allowedEffects map[effect]b
 	if !allowedEffects[ruleEffect] {
 		return Rule{}, fmt.Errorf("effect %q is not valid for policy kind %s", ruleEffect, documentRule.Effect)
 	}
-	return directive(ruleEffect, operations, []string{id}), nil
+	rule := directive(ruleEffect, operations, []string{id})
+	if documentRule.Where != nil {
+		condition, err := conditionFromDocument(*documentRule.Where)
+		if err != nil {
+			return Rule{}, fmt.Errorf("where: %w", err)
+		}
+		rule = rule.Where(condition)
+	}
+	return rule, nil
 }
 
 func parseEffect(value string) (effect, error) {
@@ -464,7 +475,15 @@ func documentRuleFromRule(rule Rule) (DocumentRule, error) {
 	if err != nil {
 		return DocumentRule{}, fmt.Errorf("%w: %v", ErrNotSerializable, err)
 	}
-	return DocumentRule{ID: rule.name, Effect: rule.effect.String(), Operations: operations}, nil
+	documentRule := DocumentRule{ID: rule.name, Effect: rule.effect.String(), Operations: operations}
+	if rule.where != nil {
+		where, err := documentFromCondition(rule.where)
+		if err != nil {
+			return DocumentRule{}, fmt.Errorf("%w: rule %q: %v", ErrNotSerializable, rule.name, err)
+		}
+		documentRule.Where = where
+	}
+	return documentRule, nil
 }
 
 func documentPath(pattern PathPattern) (string, error) {

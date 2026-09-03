@@ -1,10 +1,10 @@
 ---
 format: https://specscore.md/plan-specification
-status: Approved
+status: Implemented
 ---
 # Plan: Implement row-level access conditions (read-side MVP)
 
-**Status:** Approved
+**Status:** Implemented
 **Source Feature:** access-policies/row-level-conditions
 **Date:** 2026-09-03
 **Owner:** alex
@@ -45,7 +45,7 @@ read and write levels differ by declaring two rules on one path.
 **Id:** task-1
 **Verifies:** access-policies/row-level-conditions#ac:comparison-and-groups
 **Depends-On:** —
-**Status:** planning
+**Status:** complete
 
 Add `dal.Param` (string form `$<name>`, validated name) as a `FieldRef`/`Constant`
 sibling, accepted by `WhereField`, so queries and policy conditions share one
@@ -56,7 +56,7 @@ parameter node.
 **Id:** task-2
 **Verifies:** access-policies/row-level-conditions#ac:comparison-and-groups
 **Depends-On:** 1
-**Status:** planning
+**Status:** complete
 
 New `condeval` package: `Match` over JSON-normalised record data (comparisons,
 `In` incl. array-field overlap, And/Or, dotted field paths, missing field is
@@ -68,7 +68,7 @@ false), `Validate` (structural rules, referenced fields and params),
 **Id:** task-3
 **Verifies:** access-policies/row-level-conditions#ac:conditional-deny-rejected, access-policies/row-level-conditions#ac:write-group-excludes-truncate, access-policies/row-level-conditions#ac:missing-variable-denies, access-policies/row-level-conditions#ac:unconditional-suite-unchanged, access-policies/row-level-conditions#ac:no-leak
 **Depends-On:** 2
-**Status:** planning
+**Status:** complete
 
 `Rule.Where(cond)`; compile validation (allow only, path rules only, explicit
 `Truncate` rejected, `write`/`readwrite` drop it); `WithVariables`,
@@ -81,7 +81,7 @@ without values.
 **Id:** task-4
 **Verifies:** access-policies/row-level-conditions#ac:get-other-users-record, access-policies/row-level-conditions#ac:tenant-slice, access-policies/row-level-conditions#ac:no-leak
 **Depends-On:** 3
-**Status:** planning
+**Status:** complete
 
 `Get`/`GetMulti` evaluate the residual after the read and zero the data on
 denial; `Exists` upgrades to a read; `Query` is wrapped with the residual ANDed
@@ -93,7 +93,7 @@ a conditional rule are denied in this slice.
 **Id:** task-5
 **Verifies:** access-policies/row-level-conditions#ac:yaml-roundtrip
 **Depends-On:** 3
-**Status:** planning
+**Status:** complete
 
 `where` on `DocumentRule` in DTQL condition syntax with `param`; encode and
 decode both directions in YAML and JSON; DTQL gains the `param` expression and
@@ -102,13 +102,25 @@ its generated schema is refreshed.
 ### Task 6: Integration against dalgo2memory and coverage gate
 
 **Id:** task-6
-**Verifies:** access-policies/row-level-conditions#ac:read-all-edit-assigned, access-policies/row-level-conditions#ac:tenant-slice
+**Verifies:** access-policies/row-level-conditions#ac:tenant-slice
 **Depends-On:** 4, 5
-**Status:** planning
+**Status:** complete
 
 Secured `dalgo2memory` round trips: tenant slice with limit and order, read all
 customers, get another user's record denied, exists upgraded; whole module at
 100% statement coverage; existing suites unchanged.
+
+## Deferred AC Coverage
+
+- access-policies/row-level-conditions#ac:cannot-take-ownership — write-side
+  enforcement (pre-image `where`, post-image `check`) is the next plan; in this
+  slice a conditional rule on a write operation denies fail-closed with an
+  explanation, so no write is ever granted by an unenforced condition.
+- access-policies/row-level-conditions#ac:read-all-edit-assigned — the read
+  half (query returns every customer, get succeeds) is exercised by task 6; the
+  edit half needs the write side and is deferred with it.
+- access-policies/row-level-conditions#ac:capture-in-condition — path captures
+  (`{name}` segments bound to `$path.<name>`) are the next plan.
 
 ## Open Questions
 
