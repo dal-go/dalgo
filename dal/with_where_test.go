@@ -58,7 +58,7 @@ func TestWithWhereForeignQuery(t *testing.T) {
 	inner := NewQueryBuilder(From(NewRootCollectionRef("orders", ""))).Limit(3).SelectKeysOnly(reflect.String)
 	foreign := &foreignQuery{StructuredQuery: inner}
 	wrapped := WithWhere(foreign, WhereField("tenantID", Equal, "t1"))
-	if _, ok := wrapped.(whereOverride); !ok {
+	if _, ok := wrapped.(queryOverride); !ok {
 		t.Fatalf("expected a wrapper, got %T", wrapped)
 	}
 	if wrapped.Where().String() != "tenantID = 't1'" || wrapped.Limit() != 3 {
@@ -75,7 +75,7 @@ func TestWithWhereForeignQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, q := range executor.seen {
-		if _, ok := q.(whereOverride); !ok {
+		if _, ok := q.(queryOverride); !ok {
 			t.Errorf("executor call %d received %T, want the wrapper", i, q)
 		}
 	}
@@ -90,5 +90,30 @@ func TestQuoteEscaping(t *testing.T) {
 	}
 	if got := (Array{Value: []any{"x'y", 2}}).String(); got != "('x''y',2)" {
 		t.Errorf("Array.String() []any = %q", got)
+	}
+}
+
+func TestWithColumns(t *testing.T) {
+	base := NewQueryBuilder(From(NewRootCollectionRef("users", ""))).WhereField("status", Equal, "active").SelectKeysOnly(reflect.String)
+	projected := WithColumns(base, []Column{{Expression: Field("id")}, {Expression: Field("name")}})
+	if len(projected.Columns()) != 2 || projected.Where().String() != "status = 'active'" || len(base.Columns()) != 0 {
+		t.Errorf("native projection: %+v", projected)
+	}
+	if !strings.Contains(projected.String(), "id") || !strings.Contains(projected.String(), "name") {
+		t.Errorf("String() = %q", projected.String())
+	}
+	pointer := base.(structuredQuery)
+	if got := WithColumns(&pointer, []Column{{Expression: Field("x")}}); len(got.Columns()) != 1 || len(pointer.columns) != 0 {
+		t.Errorf("pointer clone: %v / %v", got.Columns(), pointer.columns)
+	}
+	foreign := &foreignQuery{StructuredQuery: base}
+	wrapped := WithColumns(foreign, []Column{{Expression: Field("id")}})
+	if len(wrapped.Columns()) != 1 || wrapped.Where().String() != "status = 'active'" {
+		t.Errorf("foreign projection: columns=%v where=%q", wrapped.Columns(), wrapped.Where())
+	}
+	// A where override on a foreign query keeps the foreign columns.
+	narrowed := WithWhere(foreign, WhereField("a", Equal, 1))
+	if len(narrowed.Columns()) != 0 {
+		t.Errorf("where override must not touch columns: %v", narrowed.Columns())
 	}
 }

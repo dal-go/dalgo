@@ -43,9 +43,10 @@ type writeTarget struct {
 // writeImages holds what a write residual is evaluated against: whether the
 // row exists, its pre-image, and its post-image (nil for a Delete).
 type writeImages struct {
-	exists bool
-	pre    map[string]any
-	post   map[string]any
+	exists  bool
+	pre     map[string]any
+	post    map[string]any
+	updates []update.Update
 }
 
 // enforceWrites evaluates every policy's write residual for every target
@@ -91,6 +92,7 @@ func (s securedWriteSession) writeImages(ctx context.Context, operation Operatio
 			images.pre = *shadow.Data().(*map[string]any)
 		}
 	}
+	images.updates = target.updates
 	switch operation {
 	case Insert, Set:
 		post, err := condeval.ToMap(target.data)
@@ -125,7 +127,7 @@ func evaluateWrite(operation Operations, images writeImages, w writeResidual) er
 				return w.deny(operation, alternative.Rule, checkText, fmt.Sprintf("post-image check could not be evaluated for rule %q: %v", alternative.Rule, err))
 			}
 			if ok {
-				return nil
+				return checkFields(operation, images, w, alternative)
 			}
 		}
 		return terminalAdmits(operation, images, w, "no rule admits the new row")
@@ -148,6 +150,9 @@ func evaluateWrite(operation Operations, images writeImages, w writeResidual) er
 		}
 		if operation == Delete {
 			return nil
+		}
+		if err := checkFields(operation, images, w, alternative); err != nil {
+			return err
 		}
 		check, checkText := alternativeCheck(alternative)
 		ok, err = condeval.Match(images.post, check)
@@ -179,7 +184,13 @@ func terminalAdmits(operation Operations, images writeImages, w writeResidual, f
 	if terminal == nil {
 		return w.deny(operation, alternativeNames(w.residual), alternativeTexts(w.residual), failure)
 	}
-	if operation == Delete || terminal.Check == nil {
+	if operation == Delete {
+		return nil
+	}
+	if err := checkFields(operation, images, w, *terminal); err != nil {
+		return err
+	}
+	if terminal.Check == nil {
 		return nil
 	}
 	ok, err := condeval.Match(images.post, terminal.Check)
@@ -190,6 +201,25 @@ func terminalAdmits(operation Operations, images writeImages, w writeResidual, f
 		return w.deny(operation, terminal.Rule, terminal.CheckText, fmt.Sprintf("post-image check not satisfied for rule %q (check: %s)", terminal.Rule, terminal.CheckText))
 	}
 	return nil
+}
+
+// checkFields refuses a write that sets (Insert, Set) or touches (Update) a
+// field outside the deciding alternative's allow-list.
+func checkFields(operation Operations, images writeImages, w writeResidual, alternative WriteAlternative) error {
+	if alternative.fields == nil {
+		return nil
+	}
+	sets := fieldSets{alternative.fields}
+	var refused []string
+	if operation == Update {
+		refused = sets.disallowedUpdates(images.updates)
+	} else {
+		refused = sets.disallowedPaths(images.post)
+	}
+	if len(refused) == 0 {
+		return nil
+	}
+	return w.deny(operation, alternative.Rule, sets.sources(), fmt.Sprintf("field %q is outside the fields of rule %q (%s)", refused[0], alternative.Rule, sets.sources()))
 }
 
 func alternativeNames(r *WriteResidual) string {

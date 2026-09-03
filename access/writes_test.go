@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/adapters/dalgo2memory"
+	"github.com/dal-go/dalgo/condeval"
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
 	"github.com/dal-go/record/update"
@@ -31,9 +32,18 @@ func (s *stubReadwriteSession) Get(_ context.Context, rec record.Record) error {
 		return nil
 	}
 	if target, ok := rec.Data().(*map[string]any); ok {
-		*target = row
+		*target = condeval.CloneMap(row)
 	}
 	rec.SetError(nil)
+	return nil
+}
+
+func (s *stubReadwriteSession) GetMulti(ctx context.Context, records []record.Record) error {
+	for _, rec := range records {
+		if err := s.Get(ctx, rec); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
