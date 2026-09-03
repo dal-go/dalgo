@@ -493,7 +493,7 @@ type fakeCond struct{}
 
 func (fakeCond) String() string { return "fake" }
 
-func TestConditionalWritesFailClosed(t *testing.T) {
+func TestConditionalWriteNeedsReadCapability(t *testing.T) {
 	policy := customersPolicy(t)
 	ctx := WithCurrentUser(context.Background(), "u1")
 	key := record.NewKeyWithID("customers", "c1")
@@ -504,8 +504,7 @@ func TestConditionalWritesFailClosed(t *testing.T) {
 		"delete multi": func() error { return session.DeleteMulti(ctx, []*record.Key{key}) },
 	} {
 		err := op()
-		var denied *DeniedError
-		if !errors.As(err, &denied) || !strings.Contains(err.Error(), "not enforced") || denied.Decision.Condition != "assignedTo = $currentUser" {
+		if !errors.Is(err, ErrAccessDenied) || !strings.Contains(err.Error(), "pre-image") {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -520,9 +519,9 @@ func TestResidualsBoundedByResources(t *testing.T) {
 	// A custom policy returning more residuals than resources must not panic.
 	policy := oversizedPolicy{}
 	g := guard{databasePolicies: []Policy{policy}}
-	residuals, err := g.authorizeRequest(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("x", "1"))}})
-	if err != nil || len(residuals) != 1 || len(residuals[0]) != 1 {
-		t.Errorf("residuals = %v, %v", residuals, err)
+	residuals, writes, err := g.authorizeRequest(context.Background(), Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("x", "1"))}})
+	if err != nil || len(residuals) != 1 || len(residuals[0]) != 1 || len(writes) != 1 || len(writes[0]) != 1 {
+		t.Errorf("residuals = %v, writes = %v, %v", residuals, writes, err)
 	}
 }
 
@@ -531,7 +530,8 @@ type oversizedPolicy struct{}
 func (oversizedPolicy) Name() string { return "oversized" }
 func (oversizedPolicy) Decide(context.Context, Request) Decision {
 	condition := dal.WhereField("a", dal.Equal, dal.Constant{Value: 1})
-	return Decision{Allowed: true, Policy: "oversized", Residuals: []dal.Condition{condition, condition, condition}}
+	write := &WriteResidual{Terminal: &WriteAlternative{Rule: "t"}}
+	return Decision{Allowed: true, Policy: "oversized", Residuals: []dal.Condition{condition, condition, condition}, Writes: []*WriteResidual{write, write, write}}
 }
 func (p oversizedPolicy) Authorize(ctx context.Context, request Request) error {
 	if d := p.Decide(ctx, request); !d.Allowed {

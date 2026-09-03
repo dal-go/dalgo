@@ -2,6 +2,7 @@ package access
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/dal-go/dalgo/condeval"
@@ -52,6 +53,7 @@ type Rule struct {
 	resource   string
 	children   []Rule
 	where      dal.Condition
+	check      dal.Condition
 }
 
 // Where attaches a row condition to an allow rule: the rule applies only to
@@ -65,6 +67,17 @@ type Rule struct {
 // the write and readwrite groups simply drop it.
 func (r Rule) Where(condition dal.Condition) Rule {
 	r.where = condition
+	return r
+}
+
+// Check attaches a post-image condition to an allow rule: a row written under
+// the rule must satisfy condition after the write (the new data of an Insert
+// or Set, the updated row of an Update). A rule with Where but no Check uses
+// Where as its check, so "rows where ownerID == $currentUser" also means "and
+// they must still be mine afterwards". A rule with Check but no Where applies
+// to every row on read and constrains only what a write may produce.
+func (r Rule) Check(condition dal.Condition) Rule {
+	r.check = condition
 	return r
 }
 
@@ -139,6 +152,7 @@ type compiledRule struct {
 	depth      int
 	literals   int
 	where      dal.Condition
+	check      dal.Condition
 	params     []string
 }
 
@@ -167,7 +181,7 @@ func compileRule(
 	allowedEffects map[effect]bool,
 	compiled *[]compiledRule,
 ) error {
-	if rule.where != nil && rule.kind != directiveRule {
+	if (rule.where != nil || rule.check != nil) && rule.kind != directiveRule {
 		return fmt.Errorf("access: conditions are only valid on allow rules, not on scopes")
 	}
 	switch rule.kind {
@@ -180,7 +194,7 @@ func compileRule(
 		}
 		operations := rule.operations
 		var params []string
-		if rule.where != nil {
+		if rule.where != nil || rule.check != nil {
 			if rule.effect != effectAllow {
 				return fmt.Errorf("access: rule %q: conditional %s rules are not supported; conditions apply to allow rules only", rule.name, rule.effect)
 			}
@@ -193,17 +207,32 @@ func compileRule(
 				}
 				operations &^= Truncate
 			}
-			info, err := condeval.Validate(rule.where)
-			if err != nil {
-				return fmt.Errorf("access: rule %q: invalid condition: %w", rule.name, err)
+			seen := map[string]struct{}{}
+			for slot, condition := range map[string]dal.Condition{"where": rule.where, "check": rule.check} {
+				if condition == nil {
+					continue
+				}
+				info, err := condeval.Validate(condition)
+				if err != nil {
+					return fmt.Errorf("access: rule %q: invalid %s condition: %w", rule.name, slot, err)
+				}
+				for _, param := range info.Params {
+					if _, dup := seen[param]; !dup {
+						seen[param] = struct{}{}
+						params = append(params, param)
+					}
+				}
 			}
-			params = info.Params
+			sort.Strings(params)
 		}
 		name := rule.name
 		if name == "" {
 			name = fmt.Sprintf("%s %s at %s", rule.effect, operations, resourceDescription(resourceKind, resourceName, prefix))
 			if rule.where != nil {
 				name += " where " + rule.where.String()
+			}
+			if rule.check != nil {
+				name += " check " + rule.check.String()
 			}
 		}
 		*compiled = append(*compiled, compiledRule{
@@ -216,6 +245,7 @@ func compileRule(
 			depth:      len(prefix.segments),
 			literals:   literalCount(prefix),
 			where:      rule.where,
+			check:      rule.check,
 			params:     params,
 		})
 		return nil
