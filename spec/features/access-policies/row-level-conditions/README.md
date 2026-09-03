@@ -381,6 +381,12 @@ field value of the record.
 **When** a record under `/spaces/s1/ext/trackus/items/i1` whose `spaceID` is `s1` is read, and one whose `spaceID` is `s2`
 **Then** the first read is allowed and the second is denied.
 
+### AC: unknown-capture-rejected (verifies REQ:path-captures)
+
+**Given** a rule on `/spaces/*/ext/trackus/**` conditioned on `$path.spaceID`
+**When** the policy is constructed
+**Then** construction fails naming the missing capture.
+
 ### AC: get-other-users-record (verifies REQ:point-read-enforcement)
 
 **Given** an allow rule `Get where ownerID == $currentUser` and a record owned by someone else

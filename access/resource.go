@@ -3,6 +3,7 @@ package access
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -27,9 +28,10 @@ const (
 )
 
 type pathSegment struct {
-	kind  segmentKind
-	value any
-	anyID bool
+	kind    segmentKind
+	value   any
+	anyID   bool
+	capture string // name of a captured ID segment; empty when not captured
 }
 
 // Resource is a policy target. Construct resources through RecordResource,
@@ -57,6 +59,10 @@ func (r Resource) String() string {
 		}
 		parts := make([]string, len(r.path))
 		for i, segment := range r.path {
+			if segment.capture != "" {
+				parts[i] = "{" + segment.capture + "}"
+				continue
+			}
 			if segment.anyID {
 				parts[i] = "*"
 				continue
@@ -119,6 +125,16 @@ type anyIDValue struct{}
 // not assigned yet.
 var AnyID = anyIDValue{}
 
+type captureValue struct{ name string }
+
+// Capture matches any record ID like AnyID and binds the matched value to the
+// variable $path.<name> for the conditions of rules under this pattern, so a
+// rule on /spaces/{spaceID}/ext/trackus/** can say `spaceID == $path.spaceID`.
+// The name is a plain identifier; it must be unique within one pattern.
+func Capture(name string) any {
+	return captureValue{name: name}
+}
+
 // PathPattern is a structural path prefix. Arguments alternate between a
 // collection name and an ID matcher; a terminal collection name is valid.
 type PathPattern struct {
@@ -150,6 +166,18 @@ func NewPath(parts ...any) (PathPattern, error) {
 			segments[i] = pathSegment{kind: idSegment, anyID: true}
 			continue
 		}
+		if capture, ok := part.(captureValue); ok {
+			if !validCaptureName(capture.name) {
+				return PathPattern{}, fmt.Errorf("access: path part %d: invalid capture name %q", i, capture.name)
+			}
+			for _, previous := range segments[:i] {
+				if previous.capture == capture.name {
+					return PathPattern{}, fmt.Errorf("access: path part %d: duplicate capture name %q", i, capture.name)
+				}
+			}
+			segments[i] = pathSegment{kind: idSegment, anyID: true, capture: capture.name}
+			continue
+		}
 		if part == nil {
 			return PathPattern{}, fmt.Errorf("access: path ID part %d is nil; use AnyID for a wildcard", i)
 		}
@@ -168,6 +196,37 @@ func (p PathPattern) append(other PathPattern) PathPattern {
 	segments = append(segments, other.segments...)
 	return PathPattern{segments: segments}
 }
+
+// captures lists the capture names a pattern declares, in path order.
+func (p PathPattern) captures() []string {
+	var names []string
+	for _, segment := range p.segments {
+		if segment.capture != "" {
+			names = append(names, segment.capture)
+		}
+	}
+	return names
+}
+
+// captureValues returns the values a matched resource binds to the pattern's
+// captures, keyed "path.<name>". It assumes patternsMatch already held.
+func captureValues(pattern PathPattern, resource Resource) map[string]any {
+	var values map[string]any
+	for i, segment := range pattern.segments {
+		if segment.capture == "" || i >= len(resource.path) {
+			continue
+		}
+		if values == nil {
+			values = map[string]any{}
+		}
+		values["path."+segment.capture] = resource.path[i].value
+	}
+	return values
+}
+
+var reCaptureName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func validCaptureName(name string) bool { return reCaptureName.MatchString(name) }
 
 func patternsMatch(pattern PathPattern, resource Resource) bool {
 	if resource.kind != PathResource || len(pattern.segments) > len(resource.path) {

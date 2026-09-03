@@ -59,6 +59,23 @@ func newVariableResolver(ctx context.Context) variableResolver {
 	return variableResolver{variables: variablesFromContext(ctx), now: time.Now().UTC()}
 }
 
+// withCaptures returns a resolver that also knows the values a matched path
+// pattern bound to its captures; captures take precedence over variables of
+// the same name.
+func (r variableResolver) withCaptures(captures map[string]any) variableResolver {
+	if len(captures) == 0 {
+		return r
+	}
+	merged := make(map[string]any, len(r.variables)+len(captures))
+	for name, value := range r.variables {
+		merged[name] = value
+	}
+	for name, value := range captures {
+		merged[name] = value
+	}
+	return variableResolver{variables: merged, now: r.now}
+}
+
 func (r variableResolver) resolve(name string) (any, bool) {
 	if value, ok := r.variables[name]; ok {
 		return value, true

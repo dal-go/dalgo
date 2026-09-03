@@ -98,6 +98,8 @@ sub-tests for adapters; 100% statement coverage.
 
 - access-policies/row-level-conditions#ac:capture-in-condition — path captures
   are the next plan.
+- access-policies/row-level-conditions#ac:unknown-capture-rejected — path captures,
+  verified by [`row-level-conditions-path-captures`](row-level-conditions-path-captures.md).
 - access-policies/row-level-conditions#ac:comparison-and-groups — read-side criterion
   already verified by [`row-level-conditions-mvp`](row-level-conditions-mvp.md);
   behaviour unchanged here, suites re-run green.
