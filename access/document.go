@@ -410,6 +410,13 @@ func parseDocumentPath(value string) (PathPattern, error) {
 			patternParts[i] = AnyID
 			continue
 		}
+		if strings.HasPrefix(decoded, "{") && strings.HasSuffix(decoded, "}") {
+			if i%2 == 0 {
+				return PathPattern{}, fmt.Errorf("path %q uses a capture where a collection name is required", value)
+			}
+			patternParts[i] = Capture(strings.TrimSuffix(strings.TrimPrefix(decoded, "{"), "}"))
+			continue
+		}
 		if decoded == "*" {
 			return PathPattern{}, fmt.Errorf("path %q uses * where a collection name is required", value)
 		}
@@ -509,6 +516,10 @@ func documentPath(pattern PathPattern) (string, error) {
 	}
 	parts := make([]string, len(pattern.segments))
 	for i, segment := range pattern.segments {
+		if segment.capture != "" {
+			parts[i] = "{" + segment.capture + "}"
+			continue
+		}
 		if segment.anyID {
 			parts[i] = "*"
 			continue

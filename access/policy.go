@@ -229,14 +229,14 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 	// Resolve every alternative once; an unresolved parameter denies.
 	write := &WriteResidual{}
 	for _, rule := range conditional {
-		alternative, err := p.resolveAlternative(resolver, rule)
+		alternative, err := p.resolveAlternative(resolver.withCaptures(captureValues(rule.pattern, resource)), rule)
 		if err != nil {
 			return p.denyUnresolved(operation, resource, rule, err)
 		}
 		write.Alternatives = append(write.Alternatives, alternative)
 	}
 	if terminal != nil && terminal.effect == effectAllow {
-		alternative, err := p.resolveAlternative(resolver, *terminal)
+		alternative, err := p.resolveAlternative(resolver.withCaptures(captureValues(terminal.pattern, resource)), *terminal)
 		if err != nil {
 			return p.denyUnresolved(operation, resource, *terminal, err)
 		}

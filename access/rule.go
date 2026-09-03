@@ -2,6 +2,7 @@ package access
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -224,6 +225,15 @@ func compileRule(
 				}
 			}
 			sort.Strings(params)
+			declared := prefix.captures()
+			for _, param := range params {
+				if !strings.HasPrefix(param, "path.") {
+					continue
+				}
+				if !slices.Contains(declared, strings.TrimPrefix(param, "path.")) {
+					return fmt.Errorf("access: rule %q references $%s but its path %s captures no such segment", rule.name, param, prefix)
+				}
+			}
 		}
 		name := rule.name
 		if name == "" {
