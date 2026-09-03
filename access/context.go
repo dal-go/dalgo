@@ -45,6 +45,17 @@ func variablesFromContext(ctx context.Context) map[string]any {
 	for name, value := range variables {
 		combined[name] = value
 	}
+	if principal, ok := PrincipalFrom(ctx); ok {
+		if _, set := combined["currentUser"]; !set && principal.ID != nil {
+			combined["currentUser"] = principal.ID
+		}
+		if _, set := combined["principal.roles"]; !set {
+			combined["principal.roles"] = append([]string{}, principal.Roles...)
+		}
+		if _, set := combined["principal.groups"]; !set {
+			combined["principal.groups"] = append([]string{}, principal.Groups...)
+		}
+	}
 	return combined
 }
 
