@@ -34,6 +34,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [Collection[K, T] batch insert and Count/Exists/First terminals](typed-collection-extras/README.md) | Approved | — |
 | [dalgo2namecheap: NameCheap API Adapter](dalgo2namecheap-namecheap-api-adapter/README.md) | Approved | — |
 | [Hierarchical access and audit policies](access-policies/README.md) | Stable | — |
+| [Triggers and webhooks: change events, transactional outbox, dispatcher](triggers/README.md) | Draft | — |
 
 ## Open Questions
 
