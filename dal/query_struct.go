@@ -214,26 +214,58 @@ func WithWhere(q StructuredQuery, condition Condition) StructuredQuery {
 		clone.where = condition
 		return clone
 	default:
-		return whereOverride{StructuredQuery: q, where: condition}
+		return queryOverride{StructuredQuery: q, where: condition, hasWhere: true}
 	}
 }
 
-// whereOverride wraps a foreign StructuredQuery implementation with a
-// replaced Where. It hands itself, not the wrapped query, to executors.
-type whereOverride struct {
-	StructuredQuery
-	where Condition
+// WithColumns returns a query identical to q except that it selects columns.
+// Like WithWhere it copies a builder query and wraps any other implementation.
+func WithColumns(q StructuredQuery, columns []Column) StructuredQuery {
+	switch native := q.(type) {
+	case structuredQuery:
+		native.columns = columns
+		return native
+	case *structuredQuery:
+		clone := *native
+		clone.columns = columns
+		return clone
+	default:
+		return queryOverride{StructuredQuery: q, columns: columns, hasColumns: true}
+	}
 }
 
-func (w whereOverride) Where() Condition { return w.where }
+// queryOverride wraps a foreign StructuredQuery implementation with a
+// replaced Where and/or Columns. It hands itself, not the wrapped query, to
+// executors.
+type queryOverride struct {
+	StructuredQuery
+	where      Condition
+	hasWhere   bool
+	columns    []Column
+	hasColumns bool
+}
 
-func (w whereOverride) String() string { return QueryString(w) }
+func (w queryOverride) Where() Condition {
+	if w.hasWhere {
+		return w.where
+	}
+	return w.StructuredQuery.Where()
+}
 
-func (w whereOverride) GetRecordsReader(ctx context.Context, qe QueryExecutor) (RecordsReader, error) {
+func (w queryOverride) Columns() []Column {
+	if w.hasColumns {
+		return w.columns
+	}
+	return w.StructuredQuery.Columns()
+}
+
+func (w queryOverride) String() string { return QueryString(w) }
+
+func (w queryOverride) GetRecordsReader(ctx context.Context, qe QueryExecutor) (RecordsReader, error) {
 	return qe.ExecuteQueryToRecordsReader(ctx, w)
 }
 
-func (w whereOverride) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (RecordsetReader, error) {
+func (w queryOverride) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (RecordsetReader, error) {
 	return qe.ExecuteQueryToRecordsetReader(ctx, w)
 }
 

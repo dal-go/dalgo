@@ -55,6 +55,18 @@ type Rule struct {
 	children   []Rule
 	where      dal.Condition
 	check      dal.Condition
+	fields     []string
+}
+
+// Fields attaches an allow-list of field patterns to an allow rule: reads
+// return only matching fields (a query is projected and its records
+// redacted) and writes may only set or touch matching fields. Patterns are
+// dotted paths whose segments are literal names, `*`, `prefix*` or `*suffix`;
+// a trailing `.*` covers a whole subtree; an allowed parent covers its
+// children. A rule without Fields means every field.
+func (r Rule) Fields(patterns ...string) Rule {
+	r.fields = append([]string(nil), patterns...)
+	return r
 }
 
 // Where attaches a row condition to an allow rule: the rule applies only to
@@ -154,6 +166,7 @@ type compiledRule struct {
 	literals   int
 	where      dal.Condition
 	check      dal.Condition
+	fields     *fieldSet
 	params     []string
 }
 
@@ -182,8 +195,8 @@ func compileRule(
 	allowedEffects map[effect]bool,
 	compiled *[]compiledRule,
 ) error {
-	if (rule.where != nil || rule.check != nil) && rule.kind != directiveRule {
-		return fmt.Errorf("access: conditions are only valid on allow rules, not on scopes")
+	if (rule.where != nil || rule.check != nil || rule.fields != nil) && rule.kind != directiveRule {
+		return fmt.Errorf("access: conditions and fields are only valid on allow rules, not on scopes")
 	}
 	switch rule.kind {
 	case directiveRule:
@@ -195,6 +208,20 @@ func compileRule(
 		}
 		operations := rule.operations
 		var params []string
+		var fields *fieldSet
+		if rule.fields != nil {
+			if rule.effect != effectAllow {
+				return fmt.Errorf("access: rule %q: fields apply to allow rules only", rule.name)
+			}
+			if resourceKind != PathResource {
+				return fmt.Errorf("access: rule %q: fields are not valid on %s rules", rule.name, resourceKind)
+			}
+			parsed, err := parseFieldPatterns(rule.fields)
+			if err != nil {
+				return fmt.Errorf("access: rule %q: %w", rule.name, err)
+			}
+			fields = parsed
+		}
 		if rule.where != nil || rule.check != nil {
 			if rule.effect != effectAllow {
 				return fmt.Errorf("access: rule %q: conditional %s rules are not supported; conditions apply to allow rules only", rule.name, rule.effect)
@@ -244,6 +271,9 @@ func compileRule(
 			if rule.check != nil {
 				name += " check " + rule.check.String()
 			}
+			if fields != nil {
+				name += " fields [" + strings.Join(fields.sources, ", ") + "]"
+			}
 		}
 		*compiled = append(*compiled, compiledRule{
 			kind:       resourceKind,
@@ -256,6 +286,7 @@ func compileRule(
 			literals:   literalCount(prefix),
 			where:      rule.where,
 			check:      rule.check,
+			fields:     fields,
 			params:     params,
 		})
 		return nil

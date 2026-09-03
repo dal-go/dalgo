@@ -67,6 +67,8 @@ type DocumentRule struct {
 	// Check is an optional post-image condition on an allow rule: what a row
 	// written under the rule must satisfy afterwards. Defaults to Where.
 	Check *DocumentCondition `json:"check,omitempty" yaml:"check,omitempty"`
+	// Fields is an optional allow-list of field patterns on an allow rule.
+	Fields []string `json:"fields,omitempty" yaml:"fields,omitempty"`
 }
 
 // Codec decouples policy loading from both its syntax and its storage. A
@@ -509,6 +511,9 @@ func ruleFromDocumentRule(documentRule DocumentRule, allowedEffects map[effect]b
 		}
 		rule = rule.Check(condition)
 	}
+	if documentRule.Fields != nil {
+		rule = rule.Fields(documentRule.Fields...)
+	}
 	return rule, nil
 }
 
@@ -646,6 +651,9 @@ func documentRuleFromRule(rule Rule) (DocumentRule, error) {
 			return DocumentRule{}, fmt.Errorf("%w: rule %q: %v", ErrNotSerializable, rule.name, err)
 		}
 		documentRule.Check = check
+	}
+	if rule.fields != nil {
+		documentRule.Fields = append([]string(nil), rule.fields...)
 	}
 	return documentRule, nil
 }

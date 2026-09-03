@@ -1,12 +1,12 @@
 ---
 format: https://specscore.md/feature-specification
-status: Draft
+status: Implementing
 ---
 
 # Feature: Field patterns — wildcard field allow-lists on rules
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/access-policies/field-patterns?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/access-policies/field-patterns?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/access-policies/field-patterns?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/access-policies/field-patterns?op=request-change) |
-**Status:** Draft
+**Status:** Implementing
 **Date:** 2026-09-02
 **Owner:** alex
 **Source Ideas:** row-level-access-conditions
@@ -133,11 +133,23 @@ allowed set MUST be the intersection of every applicable rule's allowed fields.
 **When** the caller queries `users` selecting all columns
 **Then** the adapter observes a query selecting `id` and `name` only.
 
+### AC: get-redacted (verifies REQ:read-projection)
+
+**Given** the same rule
+**When** the caller gets `/users/u1`
+**Then** the returned data contains `id` and `name` and no other field.
+
 ### AC: update-outside-fields (verifies REQ:write-field-check)
 
 **Given** a rule allowing `Update` on `/contacts/*` with `fields: [name, phones.*]`
 **When** the caller updates `ownerID`
 **Then** the update is denied naming `ownerID`.
+
+### AC: condition-may-read-hidden-field (verifies REQ:write-field-check)
+
+**Given** a rule with `fields: [name]` and `where: ownerID == $currentUser`
+**When** the caller gets their own record
+**Then** the read is allowed and the returned data contains `name` only.
 
 ### AC: intersection-across-policies (verifies REQ:precedence-and-composition)
 
@@ -147,13 +159,16 @@ allowed set MUST be the intersection of every applicable rule's allowed fields.
 
 ## Architecture
 
-- `access.Rule` gains `Fields []FieldPattern`; compiled rules hold a matcher.
+- `access.Rule` gains the `Fields(patterns ...string)` builder (documents:
+  `fields:`); compiled rules hold a parsed matcher. `fields` is accepted on
+  allow rules only and applies to every operation the rule names.
 - The secured query executor rewrites `Columns` using the existing
   [column projection](../../query-column-projection/README.md) support; when an
   adapter reports it cannot project, the wrapper redacts in the reader.
-- Point-read redaction operates on map data directly and on struct data through
-  the same field access the query model uses, producing a map when a struct
-  cannot be partially populated.
+- Point-read redaction removes keys from map data in place; a struct target is
+  zeroed and re-populated with the allowed fields only, so hidden fields are at
+  their zero value (a struct cannot express absence). Callers that need to
+  tell "absent" from "zero" read into a map.
 - Write checks inspect record data (maps or structs via field access) and the
   `update` operations' field paths.
 - Codecs extend the versioned document model with `fields`.
@@ -184,5 +199,12 @@ No adapter is modified.
 
 ## Open Questions
 
-- Should redaction on struct data return a map, or a zeroed struct with a "redacted fields" side channel? Recommendation: map, so absence is unambiguous.
-- Should a rule be able to allow `fields` for reads and a different list for writes in one rule, or must that be two rules? Recommendation: two rules; simpler precedence.
+None at this time.
+
+Resolved during implementation:
+
+- Redaction on struct data keeps the caller's type: the struct is zeroed and
+  re-populated with the allowed fields (see Architecture). A map is not
+  substituted because the caller chose the target type.
+- One rule carries one `fields` list for every operation it names; different
+  read and write lists are two rules, so precedence stays per rule.

@@ -65,6 +65,9 @@ type WriteAlternative struct {
 	Check     dal.Condition
 	WhereText string
 	CheckText string
+	// Fields is the rule's allow-list of field patterns; nil means every field.
+	Fields []string
+	fields *fieldSet
 }
 
 // WriteResidual is what the secured wrapper enforces on a write: the
@@ -213,7 +216,7 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 		}
 		conditional = append(conditional, matching[i])
 	}
-	if len(conditional) == 0 && (terminal.effect != effectAllow || terminal.check == nil) {
+	if len(conditional) == 0 && (terminal.effect != effectAllow || (terminal.check == nil && terminal.fields == nil)) {
 		allowed := terminal.effect == effectAllow
 		return Decision{
 			Allowed:      allowed,
@@ -252,10 +255,14 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 		Writes:       []*WriteResidual{write},
 	}
 	if len(conditional) == 0 {
-		// A terminal allow with only a post-image check: reads are unconditional.
+		// A terminal allow with only a post-image check or a fields list:
+		// reads are unconditional on rows.
 		decision.Rule = terminal.name
-		decision.Condition = terminal.check.String()
-		decision.Explanation = fmt.Sprintf("matched rule %q (allow; check: %s)", terminal.name, decision.Condition)
+		decision.Explanation = fmt.Sprintf("matched rule %q (allow)", terminal.name)
+		if terminal.check != nil {
+			decision.Condition = terminal.check.String()
+			decision.Explanation = fmt.Sprintf("matched rule %q (allow; check: %s)", terminal.name, decision.Condition)
+		}
 		return decision
 	}
 	names := make([]string, 0, len(conditional))
@@ -285,7 +292,10 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 }
 
 func (p *AccessPolicy) resolveAlternative(resolver variableResolver, rule compiledRule) (WriteAlternative, error) {
-	alternative := WriteAlternative{Rule: rule.name}
+	alternative := WriteAlternative{Rule: rule.name, fields: rule.fields}
+	if rule.fields != nil {
+		alternative.Fields = append([]string(nil), rule.fields.sources...)
+	}
 	if rule.where != nil {
 		resolved, err := condeval.Substitute(rule.where, resolver.resolve)
 		if err != nil {

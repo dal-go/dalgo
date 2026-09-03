@@ -484,9 +484,6 @@ func TestCheckRecordEdges(t *testing.T) {
 	nilData := record.NewRecordWithData(key, (*customer)(nil))
 	nilData.SetError(nil)
 	clearRecord(nilData, errors.New("x"))
-	if err := checkRecords(Get, nil, nil); err != nil {
-		t.Errorf("no residuals = %v", err)
-	}
 }
 
 type fakeCond struct{}

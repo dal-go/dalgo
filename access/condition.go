@@ -51,14 +51,93 @@ func matchResiduals(operation Operations, data map[string]any, residuals []resid
 	return nil
 }
 
-// checkRecord enforces the residuals of a point read on a record the adapter
-// has just loaded. A record that does not exist needs no check. On denial the
-// record's data is cleared and its error set, so the caller receives nothing
-// but the denial.
-func checkRecord(operation Operations, rec record.Record, residuals []residual) error {
-	if len(residuals) == 0 || !rec.Exists() {
+// enforceRead applies row conditions and field redaction to a record the
+// adapter has just loaded: the residuals must hold, and the deciding
+// alternative's fields (per policy) bound what the caller receives.
+func enforceRead(operation Operations, rec record.Record, residuals []residual, writes []writeResidual) error {
+	if !rec.Exists() {
 		return nil
 	}
+	data, err := condeval.ToMap(rec.Data())
+	if err != nil {
+		if len(residuals) > 0 {
+			denied := residuals[0].deny(operation, fmt.Sprintf("row condition could not be evaluated: %v", err))
+			clearRecord(rec, denied)
+			return denied
+		}
+		if len(writes) > 0 {
+			denied := writes[0].deny(operation, "", "", fmt.Sprintf("record fields could not be evaluated: %v", err))
+			clearRecord(rec, denied)
+			return denied
+		}
+		return nil
+	}
+	if err := matchResiduals(operation, data, residuals); err != nil {
+		clearRecord(rec, err)
+		return err
+	}
+	sets, err := decidingFields(operation, data, writes)
+	if err != nil {
+		clearRecord(rec, err)
+		return err
+	}
+	if err := sets.redactRecord(rec); err != nil {
+		denied := writes[0].deny(operation, "", "", fmt.Sprintf("record could not be redacted: %v", err))
+		clearRecord(rec, denied)
+		return denied
+	}
+	return nil
+}
+
+// decidingFields returns, per policy, the allow-list of the alternative that
+// decides the loaded record: the first whose Where holds, else the terminal.
+func decidingFields(operation Operations, data map[string]any, writes []writeResidual) (fieldSets, error) {
+	var sets fieldSets
+	for _, w := range writes {
+		var deciding *WriteAlternative
+		for i := range w.residual.Alternatives {
+			alternative := &w.residual.Alternatives[i]
+			ok, err := condeval.Match(data, alternative.Where)
+			if err != nil {
+				return nil, w.deny(operation, alternative.Rule, alternative.WhereText, fmt.Sprintf("row condition could not be evaluated for rule %q: %v", alternative.Rule, err))
+			}
+			if ok {
+				deciding = alternative
+				break
+			}
+		}
+		if deciding == nil {
+			deciding = w.residual.Terminal
+		}
+		if deciding != nil && deciding.fields != nil {
+			sets = append(sets, deciding.fields)
+		}
+	}
+	return sets, nil
+}
+
+// queryFields collects every allow-list that could bound a row of a query:
+// all alternatives and the terminal of every policy. A row may come through
+// any of them, so the intersection is what is safe to return.
+func queryFields(writes []writeResidual) fieldSets {
+	var sets fieldSets
+	for _, w := range writes {
+		for i := range w.residual.Alternatives {
+			if fields := w.residual.Alternatives[i].fields; fields != nil {
+				sets = append(sets, fields)
+			}
+		}
+		if terminal := w.residual.Terminal; terminal != nil && terminal.fields != nil {
+			sets = append(sets, terminal.fields)
+		}
+	}
+	return sets
+}
+
+// checkRecord enforces the residuals of an existence check on the shadow
+// record just loaded for it. On denial the record's data is cleared and its
+// error set, so the caller receives nothing but the denial.
+func checkRecord(operation Operations, rec record.Record, residuals []residual) error {
 	data, err := condeval.ToMap(rec.Data())
 	if err != nil {
 		denied := residuals[0].deny(operation, fmt.Sprintf("row condition could not be evaluated: %v", err))
@@ -145,21 +224,4 @@ func existsThroughRead(ctx context.Context, session dal.ReadSession, key *record
 		return false, err
 	}
 	return true, nil
-}
-
-// checkRecords enforces residuals on a multi-record read. Any denial clears
-// every record, so a batch never returns a partial result.
-func checkRecords(operation Operations, records []record.Record, residuals [][]residual) error {
-	if len(residuals) == 0 {
-		return nil
-	}
-	for i, rec := range records {
-		if err := checkRecord(operation, rec, residuals[i]); err != nil {
-			for _, other := range records {
-				clearRecord(other, err)
-			}
-			return err
-		}
-	}
-	return nil
 }

@@ -27,57 +27,110 @@ func (s securedReadSession) Exists(ctx context.Context, key *record.Key) (bool, 
 }
 
 func (s securedReadSession) Get(ctx context.Context, record record.Record) error {
-	residuals, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.Key())}})
+	residuals, writes, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.Key())}})
 	if err != nil {
 		return err
 	}
 	if err := s.session.Get(ctx, record); err != nil {
 		return err
 	}
-	if len(residuals) == 0 {
+	if len(residuals) == 0 && len(writes) == 0 {
 		return nil
 	}
-	return checkRecord(Get, record, residuals[0])
+	return enforceRead(Get, record, first(residuals), first(writes))
+}
+
+func first[T any](perResource [][]T) []T {
+	if len(perResource) == 0 {
+		return nil
+	}
+	return perResource[0]
 }
 
 func (s securedReadSession) GetMulti(ctx context.Context, records []record.Record) error {
 	resources := resourcesForRecords(records)
-	residuals, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: resources})
+	residuals, writes, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: resources})
 	if err != nil {
 		return err
 	}
 	if err := s.session.GetMulti(ctx, records); err != nil {
 		return err
 	}
-	return checkRecords(Get, records, residuals)
+	if len(residuals) == 0 && len(writes) == 0 {
+		return nil
+	}
+	for i, rec := range records {
+		var perRecordResiduals []residual
+		if len(residuals) > 0 {
+			perRecordResiduals = residuals[i]
+		}
+		var perRecordWrites []writeResidual
+		if len(writes) > 0 {
+			perRecordWrites = writes[i]
+		}
+		if err := enforceRead(Get, rec, perRecordResiduals, perRecordWrites); err != nil {
+			for _, other := range records {
+				clearRecord(other, err)
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
-	query, err := s.authorizeQuery(ctx, query)
+	query, sets, err := s.authorizeQuery(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-	return s.session.ExecuteQueryToRecordsReader(ctx, query)
+	if structured, ok := query.(dal.StructuredQuery); ok && sets.restrictive() {
+		if projected, ok := projectQuery(structured, sets); ok {
+			query = projected
+		}
+	}
+	reader, err := s.session.ExecuteQueryToRecordsReader(ctx, query)
+	if err != nil || !sets.restrictive() {
+		return reader, err
+	}
+	return redactingReader{RecordsReader: reader, sets: sets}, nil
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
-	query, err := s.authorizeQuery(ctx, query)
+	query, sets, err := s.authorizeQuery(ctx, query)
 	if err != nil {
 		return nil, err
+	}
+	if sets.restrictive() {
+		structured, _ := query.(dal.StructuredQuery)
+		projected, ok := projectQuery(structured, sets)
+		if !ok {
+			return nil, &DeniedError{Decision: Decision{Operation: Query, Resource: resourcesForQuery(query)[0], Policy: "fields", Effect: effectDeny.String(), Explanation: fmt.Sprintf("the allowed fields (%s) cannot be projected onto a recordset; select explicit columns or read records", sets.sources())}}
+		}
+		query = projected
 	}
 	return s.session.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
 // authorizeQuery authorizes every source of a query and returns the query to
-// execute: the caller's own when no residual applies, otherwise a copy whose
-// Where carries the residual row condition.
-func (s securedReadSession) authorizeQuery(ctx context.Context, query dal.Query) (dal.Query, error) {
+// execute — the caller's own when no residual applies, otherwise a copy whose
+// Where carries the residual row condition — and the field allow-lists that
+// bound its rows.
+func (s securedReadSession) authorizeQuery(ctx context.Context, query dal.Query) (dal.Query, fieldSets, error) {
 	resources := resourcesForQuery(query)
-	residuals, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Query, Resources: resources, Query: query})
+	residuals, writes, err := s.guard.authorizeRequest(ctx, Request{Operation: Query, Resources: resources, Query: query})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return rewriteQuery(query, residuals)
+	rewritten, err := rewriteQuery(query, residuals)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := 1; i < len(writes); i++ {
+		for _, w := range writes[i] {
+			return nil, nil, w.deny(Query, "", "", "field rules on a joined source are not supported in this version")
+		}
+	}
+	return rewritten, queryFields(first(writes)), nil
 }
 
 type securedWriteSession struct {
