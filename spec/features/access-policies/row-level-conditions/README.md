@@ -22,7 +22,10 @@ named variables, and **path captures** such as `$path.spaceID` bound from a
 named wildcard segment) resolved from the operation's `context.Context`. Two slots follow the
 PostgreSQL row-level-security shape: `where` names the rows the rule applies to;
 `check` names the shape a written row must have afterwards and defaults to
-`where`.
+`where`. Because a condition attaches to a rule and a rule names its
+operations, **reads and writes on the same path carry different conditions by
+declaring two rules** — read every customer, edit only the customers assigned
+to you — with no new precedence rule.
 
 The secured wrapper enforces the condition in the way each operation needs:
 evaluated on the record after a point read; **AND-rewritten into the structured
@@ -97,8 +100,13 @@ conditions.
 A rule MUST accept two optional conditions: `where` and `check`. `check` MUST
 default to `where` when absent. In this feature, conditions MUST be accepted on
 **allow** rules only; constructing a deny rule with a condition MUST fail. A
-condition MUST NOT be accepted on a rule that grants `Truncate`, on a
-collection-group resource rule, or on an opaque-query rule.
+condition MUST NOT be accepted on a collection-group resource rule or on an
+opaque-query rule. A conditional rule MUST NOT authorise `Truncate`: when its
+operations name `Truncate` explicitly, construction MUST fail; when they name
+the `write` or `readwrite` group, `Truncate` MUST be excluded from the compiled
+rule. Two rules on the same path with disjoint operations MUST both apply, so
+an unconditional `read` allow and a conditional `update`/`delete` allow on the
+same path express "read all, edit own" without any precedence interaction.
 
 #### AC-1: check-defaults-to-where
 
@@ -111,6 +119,18 @@ collection-group resource rule, or on an opaque-query rule.
 **Given** a deny rule carrying a `where` condition
 **When** the policy is constructed
 **Then** construction fails and the error states that conditional deny rules are not supported.
+
+#### AC-3: read-all-edit-assigned
+
+**Given** on `/customers/*` an unconditional rule allowing `Read` and a rule allowing `Update` and `Delete` `where assignedTo == $currentUser`, and a context with current user `u1`
+**When** `u1` queries customers, gets a customer assigned to `u2`, updates a customer assigned to `u1`, and updates one assigned to `u2`
+**Then** the query returns every customer, the get succeeds, the first update succeeds, and the second update is denied naming the conditional rule.
+
+#### AC-4: write-group-excludes-truncate
+
+**Given** a conditional rule allowing the `write` group `where ownerID == $currentUser` on `/notes/*`
+**When** a truncate request for `notes` is evaluated
+**Then** it is denied, and the compiled rule reports `Insert`, `Set`, `Update` and `Delete` only.
 
 ### REQ: variable-resolution
 
@@ -279,6 +299,22 @@ valid unchanged. DTQL MUST gain the same `param` expression so a saved query and
 a policy condition are written identically; that DTQL change is specified as a
 change request on the [`dtql`](../../dtql/README.md) feature and referenced here.
 
+```yaml
+scopes:
+  - path: /customers/*
+    rules:
+      - id: read-all
+        effect: allow
+        operations: [read]
+      - id: edit-assigned
+        effect: allow
+        operations: [update, delete]
+        where:
+          op: "=="
+          left: { field: assignedTo }
+          right: { param: currentUser }
+```
+
 #### AC-1: yaml-roundtrip
 
 **Given** a YAML policy with a rule carrying `where: { op: "==", left: { field: ownerID }, right: { param: currentUser } }`
@@ -311,6 +347,18 @@ field value of the record.
 **Given** a deny rule carrying a `where` condition
 **When** the policy is constructed
 **Then** construction fails and the error states that conditional deny rules are not supported.
+
+### AC: read-all-edit-assigned (verifies REQ:rule-condition-slots)
+
+**Given** on `/customers/*` an unconditional rule allowing `Read` and a rule allowing `Update` and `Delete` `where assignedTo == $currentUser`, and a context with current user `u1`
+**When** `u1` queries customers, gets a customer assigned to `u2`, updates a customer assigned to `u1`, and updates one assigned to `u2`
+**Then** the query returns every customer, the get succeeds, the first update succeeds, and the second update is denied naming the conditional rule.
+
+### AC: write-group-excludes-truncate (verifies REQ:rule-condition-slots)
+
+**Given** a conditional rule allowing the `write` group `where ownerID == $currentUser` on `/notes/*`
+**When** a truncate request for `notes` is evaluated
+**Then** it is denied, and the compiled rule reports `Insert`, `Set`, `Update` and `Delete` only.
 
 ### AC: missing-variable-denies (verifies REQ:variable-resolution)
 
@@ -395,7 +443,7 @@ No adapter is modified.
 - Post-image not computable for an update: deny; explanation names the update operation.
 - Conditional write on a non-transactional adapter without the best-effort option: deny.
 - Condition references a field absent from the record: the comparison is false; the request is denied by that rule (fail closed), never treated as a match.
-- Condition on a deny rule, on `Truncate`, on a collection-group or opaque-query rule: constructor error; `Must…` panics.
+- Condition on a deny rule, on a rule naming `Truncate` explicitly, on a collection-group or opaque-query rule: constructor error; `Must…` panics. A conditional `write`/`readwrite` group silently drops `Truncate`.
 - Strict re-evaluation after a query finds a violating record: deny the whole result; explanation names the rule.
 - Denied conditional `Get`/`Exists`: `DeniedError` (default) or `ErrRecordNotFound` (hide option), never data.
 

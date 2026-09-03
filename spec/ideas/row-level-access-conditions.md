@@ -76,7 +76,10 @@ structured query so the engine filters and paging stays correct; `Insert`
 evaluates `check`; `Set`/`Update` evaluate `where` on the pre-image and `check`
 on the post-image inside the same transaction; `Delete` evaluates `where` on the
 pre-image. Conditions on allow rules only in the first slice (a conditional deny
-needs a `NOT`/`!=` the AST lacks). Precedence, composition and explanations are
+needs a `NOT`/`!=` the AST lacks). Read and write levels differ by declaring
+two rules on one path — a user reads every customer but edits only the
+customers assigned to them (founder example, 2026-09-03) — and a conditional
+rule never authorises `Truncate`. Precedence, composition and explanations are
 unchanged; denials never leak values.
 
 **2. Principal bindings (`access-policies/principal-bindings`).** A document
