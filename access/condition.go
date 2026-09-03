@@ -95,38 +95,6 @@ func clearRecord(rec record.Record, denied error) {
 	rec.SetError(denied)
 }
 
-// conditionalQuery is a structured query whose Where has the residual row
-// condition conjoined. It delegates everything else to the caller's query and
-// hands itself, not the original, to the executor.
-type conditionalQuery struct {
-	dal.StructuredQuery
-	where dal.Condition
-}
-
-func withResidual(query dal.StructuredQuery, condition dal.Condition) conditionalQuery {
-	where := condition
-	if existing := query.Where(); existing != nil {
-		where = dal.NewGroupCondition(dal.And, existing, condition)
-	}
-	return conditionalQuery{StructuredQuery: query, where: where}
-}
-
-func (q conditionalQuery) Where() dal.Condition { return q.where }
-
-func (q conditionalQuery) String() string {
-	return q.StructuredQuery.String() + " /* access: WHERE " + q.where.String() + " */"
-}
-
-func (q conditionalQuery) GetRecordsReader(ctx context.Context, qe dal.QueryExecutor) (dal.RecordsReader, error) {
-	return qe.ExecuteQueryToRecordsReader(ctx, q)
-}
-
-func (q conditionalQuery) GetRecordsetReader(ctx context.Context, qe dal.QueryExecutor) (dal.RecordsetReader, error) {
-	return qe.ExecuteQueryToRecordsetReader(ctx, q)
-}
-
-var _ dal.StructuredQuery = conditionalQuery{}
-
 // rewriteQuery applies the residuals of a Query request. Only the base source
 // (resource index 0) may carry a residual in this version; a residual on a
 // joined source is refused. A residual on a non-structured query cannot occur,
@@ -157,7 +125,10 @@ func rewriteQuery(query dal.Query, residuals [][]residual) (dal.Query, error) {
 	if len(conditions) > 1 {
 		condition = dal.NewGroupCondition(dal.And, conditions...)
 	}
-	return withResidual(structured, condition), nil
+	if existing := structured.Where(); existing != nil {
+		condition = dal.NewGroupCondition(dal.And, existing, condition)
+	}
+	return dal.WithWhere(structured, condition), nil
 }
 
 // existsThroughRead upgrades an existence check to a read so a residual can be

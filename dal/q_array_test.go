@@ -219,7 +219,7 @@ func TestArray_String(t *testing.T) {
 		{
 			name:      "any_slice",
 			array:     Array{Value: []any{"a", 1, true}},
-			want:      "(a,1,true)",
+			want:      "('a',1,true)",
 			wantPanic: false,
 		},
 		{

@@ -388,22 +388,23 @@ func TestConditionalQueriesThroughStub(t *testing.T) {
 		if strings.Contains(where, "$") {
 			t.Errorf("a parameter reached the adapter: %q", where)
 		}
-		if structured.Limit() != 10 || len(structured.OrderBy()) != 1 || !strings.Contains(delegated.String(), "access: WHERE") {
-			t.Errorf("wrapper lost query parts: limit=%d order=%d string=%q", structured.Limit(), len(structured.OrderBy()), delegated.String())
+		if structured.Limit() != 10 || len(structured.OrderBy()) != 1 || !strings.Contains(delegated.String(), "WHERE (status = 'open' AND tenantID = 't1')") {
+			t.Errorf("rewritten query lost parts: limit=%d order=%d string=%q", structured.Limit(), len(structured.OrderBy()), delegated.String())
 		}
 	}
-	// The wrapper hands itself to an executor.
-	wrapped := stub.queries[0]
+	// The rewritten query is an ordinary structured query that renders its
+	// residual in String(), which SQL-text adapters emit directly.
+	rewritten := stub.queries[0]
 	stub.queries = nil
-	if _, err := wrapped.GetRecordsReader(ctx, stub); err != nil {
+	if _, err := rewritten.GetRecordsReader(ctx, stub); err != nil {
 		t.Errorf("GetRecordsReader: %v", err)
 	}
-	if _, err := wrapped.GetRecordsetReader(ctx, stub); err != nil {
+	if _, err := rewritten.GetRecordsetReader(ctx, stub); err != nil {
 		t.Errorf("GetRecordsetReader: %v", err)
 	}
 	for i, delegated := range stub.queries {
-		if _, ok := delegated.(conditionalQuery); !ok {
-			t.Errorf("executor call %d received %T, want the wrapper", i, delegated)
+		if !strings.Contains(delegated.String(), "tenantID = 't1'") {
+			t.Errorf("executor call %d received a query without the residual: %s", i, delegated.String())
 		}
 	}
 	// Without a caller condition the residual stands alone.
@@ -447,10 +448,8 @@ func TestConditionalQueriesThroughStub(t *testing.T) {
 
 func TestRewriteQueryEdges(t *testing.T) {
 	bare := dal.NewQueryBuilder(dal.From(dal.NewRootCollectionRef("orders", ""))).SelectKeysOnly(reflect.String)
-	if q, err := rewriteQuery(bare, [][]residual{{}}); err != nil {
-		t.Errorf("empty base residuals: %v", err)
-	} else if _, wrapped := q.(conditionalQuery); wrapped {
-		t.Error("empty base residuals must return the caller's query unchanged")
+	if q, err := rewriteQuery(bare, [][]residual{{}}); err != nil || q.(dal.StructuredQuery).Where() != nil {
+		t.Errorf("empty base residuals must return the caller's query unchanged: %v, %v", q, err)
 	}
 	r := residual{rule: "r", text: "x = $y", condition: dal.WhereField("x", dal.Equal, dal.Constant{Value: 1})}
 	if _, err := rewriteQuery(opaqueQ{}, [][]residual{{r}}); !errors.Is(err, ErrAccessDenied) {

@@ -75,15 +75,25 @@ func (v Array) String() string {
 		if len(value) == 0 {
 			return "()"
 		}
-		return "('" + strings.Join(value, "','") + "')"
+		quoted := make([]string, len(value))
+		for i, s := range value {
+			quoted[i] = quoteString(s)
+		}
+		return "(" + strings.Join(quoted, ",") + ")"
 	default:
 		// Check if value is a slice
 		val := reflect.ValueOf(v.Value)
 		if val.Kind() == reflect.Slice {
-			// Convert slice elements to strings and join them
+			// Convert slice elements to strings and join them; string
+			// elements are quoted like constants so the text stays a valid
+			// SQL list whatever the slice's static type.
 			var elements []string
 			for i := 0; i < val.Len(); i++ {
 				elem := val.Index(i).Interface()
+				if s, ok := elem.(string); ok {
+					elements = append(elements, quoteString(s))
+					continue
+				}
 				elements = append(elements, fmt.Sprintf("%v", elem))
 			}
 			return "(" + strings.Join(elements, ",") + ")"
