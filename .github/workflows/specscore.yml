@@ -17,7 +17,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install specscore CLI
         # Pinned deliberately: an unpinned `latest` install lets a CLI release
         # change what the lint rules expect and redden main with no repo-side
