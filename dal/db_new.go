@@ -123,8 +123,8 @@ func (db *validatedWriteDB) dalgoWithoutValidation() WriteSession {
 // newValidatedTx decorates a storage adapter's read-write transaction with the
 // framework write pipeline. Reads and transaction metadata are forwarded
 // unchanged.
-func newValidatedTx(tx ReadwriteTransaction, db DB) validatedTx {
-	return validatedTx{
+func newValidatedTx(tx ReadwriteTransaction, db DB) *validatedTx {
+	return &validatedTx{
 		ReadTransaction: tx,
 		writePipeline:   writePipeline{ws: tx, db: db, validate: true},
 		rw:              tx,
@@ -140,11 +140,12 @@ type validatedTx struct {
 	rw ReadwriteTransaction
 }
 
-var _ ReadwriteTransaction = validatedTx{}
+var _ ReadwriteTransaction = (*validatedTx)(nil)
 
-func (tx validatedTx) ID() string { return tx.rw.ID() }
+func (tx *validatedTx) ID() string { return tx.rw.ID() }
 
-func (tx validatedTx) dalgoWithoutValidation() WriteSession {
-	tx.validate = false
-	return tx
+func (tx *validatedTx) dalgoWithoutValidation() WriteSession {
+	unvalidated := *tx
+	unvalidated.validate = false
+	return &unvalidated
 }
