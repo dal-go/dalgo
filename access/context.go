@@ -66,8 +66,25 @@ type variableResolver struct {
 	now       time.Time
 }
 
-func newVariableResolver(ctx context.Context) variableResolver {
-	return variableResolver{variables: variablesFromContext(ctx), now: time.Now().UTC()}
+func newVariableResolver(ctx context.Context, policyRealms ...string) variableResolver {
+	variables := variablesFromContext(ctx)
+	if principal, ok := PrincipalFrom(ctx); ok && principal.Subject != nil {
+		delete(variables, "currentUser")
+		variables["principal.roles"] = []string{}
+		variables["principal.groups"] = []string{}
+		realm := ""
+		if len(policyRealms) > 0 {
+			realm = policyRealms[0]
+		}
+		if realm != "" && principal.Subject.Realm == realm {
+			variables["principal.roles"] = append([]string(nil), principal.Roles...)
+			variables["principal.groups"] = append([]string(nil), principal.Groups...)
+			if principal.Subject.Kind == PrincipalKindUser {
+				variables["currentUser"] = principal.Subject.ID
+			}
+		}
+	}
+	return variableResolver{variables: variables, now: time.Now().UTC()}
 }
 
 // withCaptures returns a resolver that also knows the values a matched path

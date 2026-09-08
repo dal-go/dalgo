@@ -21,6 +21,7 @@ const (
 type FilePolicyConfig struct {
 	Enabled  bool     `json:"enabled" yaml:"enabled"`
 	Database string   `json:"database" yaml:"database"`
+	Realm    string   `json:"realm,omitempty" yaml:"realm,omitempty"`
 	Policies []string `json:"policies" yaml:"policies"`
 }
 
@@ -79,6 +80,9 @@ func LoadPolicyFiles(root string, config FilePolicyConfig) ([]Policy, error) {
 	if len(config.Policies) == 0 {
 		return nil, fmt.Errorf("access: enabled file policies require at least one policy file")
 	}
+	if config.Realm != "" && !validPrincipalPart(config.Realm) {
+		return nil, fmt.Errorf("access: policy realm must be a canonical string of at most 256 bytes")
+	}
 	rootFS, err := os.OpenRoot(root)
 	if err != nil {
 		return nil, fmt.Errorf("access: open policy root: %w", err)
@@ -92,6 +96,7 @@ func LoadPolicyFiles(root string, config FilePolicyConfig) ([]Policy, error) {
 		if err != nil {
 			return nil, err
 		}
+		setPolicyRealm(policy, config.Realm)
 		if previous, exists := names[policy.Name()]; exists {
 			return nil, fmt.Errorf("access: duplicate policy id %q in %q and %q", policy.Name(), previous, name)
 		}
@@ -99,6 +104,15 @@ func LoadPolicyFiles(root string, config FilePolicyConfig) ([]Policy, error) {
 		policies = append(policies, policy)
 	}
 	return policies, nil
+}
+
+func setPolicyRealm(policy Policy, realm string) {
+	switch policy := policy.(type) {
+	case *AccessPolicy:
+		policy.realm = realm
+	case *PrincipalPolicySet:
+		policy.realm = realm
+	}
 }
 
 func loadPolicyFile(root *os.Root, name, database string) (Policy, error) {

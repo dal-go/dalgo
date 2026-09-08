@@ -25,11 +25,16 @@ func TestLoadPolicyFiles(t *testing.T) {
         effect: allow
         operations: [get]
 `))
-	policies, err := LoadPolicyFiles(root, FilePolicyConfig{Enabled: true, Database: "db1", Policies: []string{"policy.yaml"}})
+	policies, err := LoadPolicyFiles(root, FilePolicyConfig{Enabled: true, Database: "db1", Realm: "people", Policies: []string{"policy.yaml"}})
 	require.NoError(t, err)
 	require.Len(t, policies, 1)
 	assert.Equal(t, "policy-one", policies[0].Name())
 	assert.Equal(t, "policy.yaml", policies[0].(*AccessPolicy).Source())
+	assert.Equal(t, "people", policies[0].(*AccessPolicy).realm)
+	for _, realm := range []string{" people", "people\x00", string([]byte{0xff})} {
+		_, err := LoadPolicyFiles(root, FilePolicyConfig{Enabled: true, Database: "db1", Realm: realm, Policies: []string{"policy.yaml"}})
+		require.ErrorContains(t, err, "policy realm")
+	}
 }
 
 func TestLoadPolicyFilesPrincipalBindings(t *testing.T) {

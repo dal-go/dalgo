@@ -116,6 +116,7 @@ type AccessPolicy struct {
 	name           string
 	source         string
 	visibility     string
+	realm          string
 	collectionMask *CompiledMask
 	execution      *compiledExecutionGate
 	rules          []Rule
@@ -150,6 +151,9 @@ func (p *AccessPolicy) Name() string { return p.name }
 func (p *AccessPolicy) Source() string { return p.source }
 
 func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
+	if !policyRealmAllows(ctx, p.realm) {
+		return principalRealmDenied(request, p.name, p.source)
+	}
 	if !p.execution.allows(request) {
 		return executionDenied(request, p.name, p.source)
 	}
@@ -174,7 +178,7 @@ func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 	var last Decision
 	var residuals []dal.Condition
 	var writes []*WriteResidual
-	resolver := newVariableResolver(ctx)
+	resolver := newVariableResolver(ctx, p.realm)
 	for i, resource := range request.Resources {
 		last = p.decideResource(resolver, request.Operation, resource)
 		if !last.Allowed {
