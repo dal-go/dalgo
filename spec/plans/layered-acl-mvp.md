@@ -215,7 +215,10 @@ Classify DTQL, caller-native SQL/GraphQL and stored-procedure requests at truste
 
 **Id:** acl-10
 **Depends-On:** 2, 5
-**Status:** queued
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@7998895 (layered-acl-query)
+**Note:** Typed realm/kind/id subject and actor, immutable context, owner realms, persisted trusted token delegation and current membership resolver implemented. Existing provider authority reused; DataTug credential transport remains task 21.
+**Evidence:** dal-go/dalgo@ec6d984, ingitdb/dalgo2ingitdb@de6f64c, openvaultdb/openvaultdb-go@7998895, TestTypedGrantPoliciesAndCurrentMembership, TestTypedGrantPersistenceAndIsolation, standalone typed demo both engines fresh and remount, /tmp/ovdb-typed-acl-_scqxe5t
 
 **Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go; datatug/datatug-cli
 
