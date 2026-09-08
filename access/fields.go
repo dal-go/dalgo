@@ -320,6 +320,9 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuer
 				columns = append(columns, column)
 			}
 		}
+		if len(columns) == 0 {
+			return query, false
+		}
 	} else {
 		for _, name := range allowed {
 			columns = append(columns, dal.Column{Expression: dal.Field(name)})

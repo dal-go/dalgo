@@ -53,10 +53,11 @@ type Bindings struct {
 // then takes part in the ordinary intersection with database and context
 // policies, so a binding can never widen what another policy denies.
 type PrincipalPolicySet struct {
-	name     string
-	source   string
-	ruleSets map[string][]Rule
-	bindings Bindings
+	name       string
+	source     string
+	visibility string
+	ruleSets   map[string][]Rule
+	bindings   Bindings
 
 	mu    sync.Mutex
 	cache map[string]*AccessPolicy

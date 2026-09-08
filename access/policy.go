@@ -111,10 +111,11 @@ type Policy interface {
 
 // AccessPolicy is the declarative hierarchical Policy implementation.
 type AccessPolicy struct {
-	name     string
-	source   string
-	rules    []Rule
-	compiled []compiledRule
+	name       string
+	source     string
+	visibility string
+	rules      []Rule
+	compiled   []compiledRule
 }
 
 // NewPolicy constructs a default-deny access policy.
