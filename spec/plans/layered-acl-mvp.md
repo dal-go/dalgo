@@ -147,9 +147,12 @@ Load upper-owner policies, authenticate and resolve principals, scope token chec
 
 **Id:** acl-06
 **Depends-On:** 5
-**Status:** queued
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@5a67dfd (layered-acl-query)
+**Note:** Query capability matrix documented; adapter source/value validation and derived-field leak fixed, including upper-only protection. Cancellation boundaries documented without hard-resource-limit claims.
+**Evidence:** dal-go/dalgo2sql@45fe36c, ingitdb/dalgo2ingitdb@bb3446b, openvaultdb/openvaultdb-go@5a67dfd, docs/layered-acl-implementation.md, TestLayeredACL_UpperOnlySuppressesInGitDBDerivedValues, go test ./...
 
-**Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go; dal-go/dalgo2sql
+**Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go; dal-go/dalgo2sql; ingitdb/dalgo2ingitdb
 
 Finish the supported-profile matrix, resource limits, cancellation behavior and alternate-reader/transaction bypass checks. Audit custom SQL function, computed-field and hidden-predicate behavior; reject unsupported cases.
 
@@ -161,8 +164,10 @@ Finish the supported-profile matrix, resource limits, cancellation behavior and 
 
 **Id:** acl-07
 **Depends-On:** 2
-**Status:** in_progress
-**Note:** Implementing approved canonical scoped mask model and round-trip contracts.
+**Status:** complete
+**Implemented-by:** dal-go/dalgo@863f676 (layered-acl-query)
+**Note:** Portable model, canonical scoped masks, defensive normalization and approved fixture round trips implemented; enforcement activation remains acl-08/09.
+**Evidence:** access/mask_test.go, access/portable_test.go, go test ./..., go vet ./access
 
 **Repositories:** dal-go/dalgo; datatug/dtql
 
