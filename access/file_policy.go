@@ -25,59 +25,47 @@ type FilePolicyConfig struct {
 	Policies []string `json:"policies" yaml:"policies"`
 }
 
-type dtqlDocument struct {
+type DTQLDocument struct {
 	APIVersion     string                 `json:"apiVersion" yaml:"apiVersion"`
 	Kind           string                 `json:"kind" yaml:"kind"`
-	Metadata       dtqlMetadata           `json:"metadata" yaml:"metadata"`
-	Target         dtqlTarget             `json:"target" yaml:"target"`
+	Metadata       DTQLMetadata           `json:"metadata" yaml:"metadata"`
+	Target         DTQLTarget             `json:"target" yaml:"target"`
 	Composition    string                 `json:"composition" yaml:"composition"`
 	Default        string                 `json:"default" yaml:"default"`
-	Scopes         []dtqlScope            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
-	RuleSets       map[string][]dtqlScope `json:"ruleSets,omitempty" yaml:"ruleSets,omitempty"`
+	Scopes         []DTQLScope            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
+	RuleSets       map[string][]DTQLScope `json:"ruleSets,omitempty" yaml:"ruleSets,omitempty"`
 	Bindings       *DocumentBindings      `json:"bindings,omitempty" yaml:"bindings,omitempty"`
-	Execution      unsupportedFeature     `json:"execution,omitempty" yaml:"execution,omitempty"`
-	CollectionMask unsupportedFeature     `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
+	Execution      *ExecutionGate         `json:"execution,omitempty" yaml:"execution,omitempty"`
+	CollectionMask *Mask                  `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
 }
 
-type dtqlMetadata struct {
+type DTQLMetadata struct {
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 	Visibility  string `json:"visibility,omitempty" yaml:"visibility,omitempty"`
 }
 
-type dtqlTarget struct {
+type DTQLTarget struct {
 	Database string `json:"database" yaml:"database"`
 }
 
-type dtqlScope struct {
-	Path            string             `json:"path,omitempty" yaml:"path,omitempty"`
-	CollectionGroup string             `json:"collectionGroup,omitempty" yaml:"collectionGroup,omitempty"`
-	OpaqueQuery     bool               `json:"opaqueQuery,omitempty" yaml:"opaqueQuery,omitempty"`
-	Rules           []dtqlRule         `json:"rules,omitempty" yaml:"rules,omitempty"`
-	Scopes          []dtqlScope        `json:"scopes,omitempty" yaml:"scopes,omitempty"`
-	CollectionMask  unsupportedFeature `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
+type DTQLScope struct {
+	Path            string      `json:"path,omitempty" yaml:"path,omitempty"`
+	CollectionGroup string      `json:"collectionGroup,omitempty" yaml:"collectionGroup,omitempty"`
+	OpaqueQuery     bool        `json:"opaqueQuery,omitempty" yaml:"opaqueQuery,omitempty"`
+	Rules           []DTQLRule  `json:"rules,omitempty" yaml:"rules,omitempty"`
+	Scopes          []DTQLScope `json:"scopes,omitempty" yaml:"scopes,omitempty"`
+	CollectionMask  *Mask       `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
 }
 
-type dtqlRule struct {
+type DTQLRule struct {
 	ID         string             `json:"id" yaml:"id"`
 	Effect     string             `json:"effect" yaml:"effect"`
 	Operations []string           `json:"operations" yaml:"operations"`
 	Where      *DocumentCondition `json:"where,omitempty" yaml:"where,omitempty"`
 	Check      *DocumentCondition `json:"check,omitempty" yaml:"check,omitempty"`
 	Fields     []string           `json:"fields,omitempty" yaml:"fields,omitempty"`
-	FieldMask  unsupportedFeature `json:"fieldMask,omitempty" yaml:"fieldMask,omitempty"`
-}
-
-type unsupportedFeature struct{ present bool }
-
-func (feature *unsupportedFeature) UnmarshalJSON([]byte) error {
-	feature.present = true
-	return nil
-}
-
-func (feature *unsupportedFeature) UnmarshalYAML(*yaml.Node) error {
-	feature.present = true
-	return nil
+	FieldMask  *Mask              `json:"fieldMask,omitempty" yaml:"fieldMask,omitempty"`
 }
 
 // LoadPolicyFiles loads enabled DTQL portable policy documents from root.
@@ -155,7 +143,7 @@ func loadPolicyFile(root *os.Root, name, database string) (Policy, error) {
 		return nil, fmt.Errorf("access: policy file %q: %w", name, err)
 	}
 
-	var document dtqlDocument
+	var document DTQLDocument
 	switch strings.ToLower(filepath.Ext(name)) {
 	case ".json":
 		decoder := json.NewDecoder(bytes.NewReader(data))
@@ -181,7 +169,9 @@ func loadPolicyFile(root *os.Root, name, database string) (Policy, error) {
 	return policyFromDTQLDocument(document, database, name)
 }
 
-func validatePortablePolicyYAML(data []byte) error {
+func validatePortablePolicyYAML(data []byte) error { return validatePolicySyntax(data, false) }
+
+func validatePolicySyntax(data []byte, allowExtensions bool) error {
 	var document yaml.Node
 	if err := yaml.Unmarshal(data, &document); err != nil {
 		return nil // the format-specific strict decoder reports syntax errors
@@ -223,6 +213,9 @@ func validatePortablePolicyYAML(data []byte) error {
 		return nil
 	}
 	root := document.Content[0]
+	if allowExtensions {
+		return validateDTQLShape(root)
+	}
 	if feature := mappingFeature(root, "execution", "collectionMask"); feature != "" {
 		return fmt.Errorf("%s is not supported by this loader", feature)
 	}
@@ -284,7 +277,7 @@ func scopedPolicyFeature(scopes *yaml.Node) string {
 	return ""
 }
 
-func policyFromDTQLDocument(source dtqlDocument, database, reference string) (Policy, error) {
+func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Policy, error) {
 	if source.APIVersion != DTQLDocumentAPIVersion {
 		return nil, fmt.Errorf("access: unsupported apiVersion %q", source.APIVersion)
 	}
@@ -301,10 +294,10 @@ func policyFromDTQLDocument(source dtqlDocument, database, reference string) (Po
 	if source.Composition != "dalgo-hierarchical-v1" {
 		return nil, fmt.Errorf("access: unsupported policy composition %q", source.Composition)
 	}
-	if source.Execution.present {
+	if source.Execution != nil {
 		return nil, fmt.Errorf("access: execution gates are not supported by this loader")
 	}
-	if source.CollectionMask.present {
+	if source.CollectionMask != nil {
 		return nil, fmt.Errorf("access: collectionMask is not supported by this loader")
 	}
 	document := Document{APIVersion: DocumentAPIVersion, Kind: source.Kind, Metadata: DocumentMetadata{Name: source.Metadata.Name}, Default: source.Default, Bindings: source.Bindings}
@@ -337,18 +330,18 @@ func policyFromDTQLDocument(source dtqlDocument, database, reference string) (Po
 	return policy, err
 }
 
-func convertDTQLScopes(scopes []dtqlScope) ([]DocumentScope, error) {
+func convertDTQLScopes(scopes []DTQLScope) ([]DocumentScope, error) {
 	result := make([]DocumentScope, len(scopes))
 	for i, scope := range scopes {
 		if scope.CollectionGroup != "" || scope.OpaqueQuery {
 			return nil, fmt.Errorf("access: scopes[%d]: portable file policies support path scopes only", i)
 		}
-		if scope.CollectionMask.present {
+		if scope.CollectionMask != nil {
 			return nil, fmt.Errorf("access: scopes[%d]: collectionMask is not supported by this loader", i)
 		}
 		rules := make([]DocumentRule, len(scope.Rules))
 		for j, rule := range scope.Rules {
-			if rule.FieldMask.present {
+			if rule.FieldMask != nil {
 				return nil, fmt.Errorf("access: scopes[%d].rules[%d]: fieldMask is not supported by this loader", i, j)
 			}
 			rules[j] = DocumentRule{ID: rule.ID, Effect: rule.Effect, Operations: rule.Operations, Where: rule.Where, Check: rule.Check, Fields: rule.Fields}

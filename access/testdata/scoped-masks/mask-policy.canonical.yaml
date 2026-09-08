@@ -1,0 +1,50 @@
+apiVersion: dtql.org/access/v1
+collectionMask:
+  stages:
+  - include:
+    - a*
+    - b*
+  - exclude:
+    - "*c*"
+  - include:
+    - "*d"
+    - a*f
+composition: dalgo-hierarchical-v1
+default: deny
+execution:
+  allow:
+  - class: dtql
+  - class: stored_procedure
+    mask:
+      stages:
+      - include:
+        - User_*
+      - exclude:
+        - User_Delete
+    namespace: public
+kind: AccessPolicy
+metadata:
+  name: surface-masks
+  visibility: public
+scopes:
+- path: /
+  rules:
+  - effect: allow
+    fieldMask:
+      stages:
+      - include:
+        - "*"
+      - exclude:
+        - address.internal_*
+        - secret_*
+    id: surface
+    operations:
+    - get
+    - exists
+    - query
+    - insert
+    - set
+    - update
+    - delete
+target:
+  database: crm

@@ -1,0 +1,395 @@
+{
+  "mask": {
+    "stages": [
+      {
+        "include": [
+          "a*",
+          "b*"
+        ]
+      },
+      {
+        "exclude": [
+          "*c*"
+        ]
+      },
+      {
+        "include": [
+          "**d",
+          "a*f"
+        ]
+      }
+    ]
+  },
+  "expectedMembership": {
+    "apple": true,
+    "bacon": false,
+    "abcd": true,
+    "acf": true,
+    "bdf": true,
+    "zcd": false
+  },
+  "canonicalMask": {
+    "stages": [
+      {
+        "include": [
+          "a*",
+          "b*"
+        ]
+      },
+      {
+        "exclude": [
+          "*c*"
+        ]
+      },
+      {
+        "include": [
+          "*d",
+          "a*f"
+        ]
+      }
+    ]
+  },
+  "additionalCases": [
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "a*"
+            ]
+          },
+          {
+            "include": [
+              "b*"
+            ]
+          },
+          {
+            "exclude": [
+              "*c*"
+            ]
+          }
+        ]
+      },
+      "name": "banana",
+      "expected": true
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "a*",
+              "b*"
+            ]
+          },
+          {
+            "exclude": [
+              "*c*"
+            ]
+          },
+          {
+            "include": [
+              "**d",
+              "a*f"
+            ]
+          },
+          {
+            "exclude": [
+              "a*"
+            ]
+          }
+        ]
+      },
+      "name": "abcd",
+      "expected": false
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "a*",
+              "b*"
+            ]
+          },
+          {
+            "exclude": [
+              "*c*"
+            ]
+          },
+          {
+            "include": [
+              "**d",
+              "a*f"
+            ]
+          }
+        ]
+      },
+      "name": "zcd",
+      "anotherOwnerIncludes": [
+        "*"
+      ],
+      "expectedEffective": false
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "a*",
+              "b*"
+            ]
+          },
+          {
+            "exclude": [
+              "*c*"
+            ]
+          },
+          {
+            "include": [
+              "**d",
+              "a*f"
+            ]
+          }
+        ]
+      },
+      "name": "abcd",
+      "anotherOwnerExcludes": [
+        "abcd"
+      ],
+      "expectedEffective": false
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "*"
+            ]
+          },
+          {
+            "exclude": [
+              "a*"
+            ]
+          },
+          {
+            "exclude": [
+              "b*"
+            ]
+          },
+          {
+            "include": [
+              "*d"
+            ]
+          }
+        ]
+      },
+      "expectedMembership": {
+        "banana": false,
+        "bcd": true,
+        "b1": false
+      },
+      "canonicalMask": {
+        "stages": [
+          {
+            "include": [
+              "*"
+            ]
+          },
+          {
+            "exclude": [
+              "a*",
+              "b*"
+            ]
+          },
+          {
+            "include": [
+              "*d"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "a*",
+              "b*"
+            ]
+          },
+          {
+            "exclude": [
+              "*c*"
+            ]
+          },
+          {
+            "include": [
+              "**d",
+              "a*f"
+            ]
+          },
+          {
+            "exclude": [
+              "a*"
+            ]
+          }
+        ]
+      },
+      "name": "apple",
+      "expected": true
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "address.**"
+            ]
+          }
+        ]
+      },
+      "canonicalMask": {
+        "stages": [
+          {
+            "include": [
+              "address.*"
+            ]
+          }
+        ]
+      },
+      "expectedMembership": {
+        "address": true,
+        "address.city": true
+      }
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "*"
+            ]
+          },
+          {
+            "exclude": [
+              "secret_*",
+              "address.internal_*",
+              "secret_*"
+            ]
+          }
+        ]
+      },
+      "canonicalMask": {
+        "stages": [
+          {
+            "include": [
+              "*"
+            ]
+          },
+          {
+            "exclude": [
+              "address.internal_*",
+              "secret_*"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "*"
+            ]
+          },
+          {
+            "exclude": [
+              "*secret*"
+            ]
+          }
+        ]
+      },
+      "name": "my_secret_x",
+      "expected": false
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "*"
+            ]
+          },
+          {
+            "exclude": [
+              "address"
+            ]
+          },
+          {
+            "include": [
+              "address.city"
+            ]
+          }
+        ]
+      },
+      "image": {
+        "address": {
+          "city": "Dublin",
+          "secret": "hidden"
+        }
+      },
+      "expectedProjection": {
+        "address": {
+          "city": "Dublin"
+        }
+      },
+      "explicitWholeAddress": "deny",
+      "updateAddressCity": "mask permits; other policies/actions still required",
+      "wholeAddressEvidence": "unsupported/incomplete authorization"
+    },
+    {
+      "mask": {
+        "stages": [
+          {
+            "include": [
+              "*"
+            ]
+          },
+          {
+            "exclude": [
+              "address"
+            ]
+          },
+          {
+            "include": [
+              "address.city"
+            ]
+          }
+        ]
+      },
+      "preImage": {
+        "address": {
+          "city": "Dublin",
+          "secret": "hidden"
+        }
+      },
+      "mutation": {
+        "changes": [
+          {
+            "op": "set",
+            "path": [
+              "address"
+            ],
+            "value": {
+              "city": "Cork"
+            }
+          }
+        ]
+      },
+      "expected": "deny; parent replacement removes excluded address.secret"
+    }
+  ]
+}
