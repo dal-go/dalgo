@@ -216,6 +216,7 @@ func checkFields(operation Operations, images writeImages, w writeResidual, alte
 	} else {
 		refused = sets.disallowedPaths(images.post)
 	}
+	refused = append(refused, sets.disallowedMaskedMutation(images, operation)...)
 	if len(refused) == 0 {
 		return nil
 	}

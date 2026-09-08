@@ -1,7 +1,6 @@
 package access
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -139,33 +138,20 @@ func loadPolicyFile(root *os.Root, name, database string) (Policy, error) {
 	if len(data) > maxPolicyFileBytes {
 		return nil, fmt.Errorf("access: policy file %q exceeds %d bytes", name, maxPolicyFileBytes)
 	}
-	if err := validatePortablePolicyYAML(data); err != nil {
-		return nil, fmt.Errorf("access: policy file %q: %w", name, err)
-	}
-
-	var document DTQLDocument
 	switch strings.ToLower(filepath.Ext(name)) {
 	case ".json":
-		decoder := json.NewDecoder(bytes.NewReader(data))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&document); err != nil {
-			return nil, fmt.Errorf("access: decode policy file %q: %w", name, err)
-		}
-		if err := ensureSingleDocument(func(value any) error { return decoder.Decode(value) }); err != nil {
-			return nil, fmt.Errorf("access: decode policy file %q: %w", name, err)
+		if !json.Valid(data) {
+			return nil, fmt.Errorf("access: invalid JSON policy file %q", name)
 		}
 	case ".yaml", ".yml":
-		decoder := yaml.NewDecoder(bytes.NewReader(data))
-		decoder.KnownFields(true)
-		if err := decoder.Decode(&document); err != nil {
-			return nil, fmt.Errorf("access: decode policy file %q: %w", name, err)
-		}
-		if err := ensureSingleDocument(func(value any) error { return decoder.Decode(value) }); err != nil {
-			return nil, fmt.Errorf("access: decode policy file %q: %w", name, err)
-		}
 	default:
 		return nil, fmt.Errorf("access: policy file %q must use .yaml, .yml, or .json", name)
 	}
+	document, err := ParseDTQLPolicy(data)
+	if err != nil {
+		return nil, fmt.Errorf("access: decode policy file %q: %w", name, err)
+	}
+
 	return policyFromDTQLDocument(document, database, name)
 }
 
@@ -297,8 +283,13 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 	if source.Execution != nil {
 		return nil, fmt.Errorf("access: execution gates are not supported by this loader")
 	}
+	var collectionMask *CompiledMask
 	if source.CollectionMask != nil {
-		return nil, fmt.Errorf("access: collectionMask is not supported by this loader")
+		var err error
+		collectionMask, err = CompileMask(*source.CollectionMask, NameMask)
+		if err != nil {
+			return nil, err
+		}
 	}
 	document := Document{APIVersion: DocumentAPIVersion, Kind: source.Kind, Metadata: DocumentMetadata{Name: source.Metadata.Name}, Default: source.Default, Bindings: source.Bindings}
 	var err error
@@ -320,12 +311,14 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 		policy, err := principalPolicySetFromDocument(document, settings)
 		if err == nil {
 			policy.visibility = visibility
+			policy.collectionMask = collectionMask
 		}
 		return policy, err
 	}
 	policy, err := accessPolicyFromDocument(document, settings)
 	if err == nil {
 		policy.visibility = visibility
+		policy.collectionMask = collectionMask
 	}
 	return policy, err
 }
@@ -341,10 +334,7 @@ func convertDTQLScopes(scopes []DTQLScope) ([]DocumentScope, error) {
 		}
 		rules := make([]DocumentRule, len(scope.Rules))
 		for j, rule := range scope.Rules {
-			if rule.FieldMask != nil {
-				return nil, fmt.Errorf("access: scopes[%d].rules[%d]: fieldMask is not supported by this loader", i, j)
-			}
-			rules[j] = DocumentRule{ID: rule.ID, Effect: rule.Effect, Operations: rule.Operations, Where: rule.Where, Check: rule.Check, Fields: rule.Fields}
+			rules[j] = DocumentRule{ID: rule.ID, Effect: rule.Effect, Operations: rule.Operations, Where: rule.Where, Check: rule.Check, Fields: rule.Fields, fieldMask: rule.FieldMask}
 		}
 		children, err := convertDTQLScopes(scope.Scopes)
 		if err != nil {

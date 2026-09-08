@@ -55,8 +55,8 @@ func TestLoadPolicyFilesFailsClosed(t *testing.T) {
 		"unknown field":    {body: portablePolicy("p", "public", validPortableScopes+"unknown: true\n"), database: "db1", want: "field unknown"},
 		"bad visibility":   {body: portablePolicy("p", "secret", validPortableScopes), database: "db1", want: "visibility"},
 		"private accepted": {body: portablePolicy("p", "private", validPortableScopes), database: "db1"},
-		"field mask":       {body: portablePolicy("p", "public", `scopes: [{path: /cities/*, rules: [{id: read, effect: allow, operations: [get], fieldMask: {stages: [{include: ['*']}]}}]}]`), database: "db1", want: "fieldMask is not supported"},
-		"null field mask":  {body: portablePolicy("p", "public", `scopes: [{path: /cities/*, rules: [{id: read, effect: allow, operations: [get], fieldMask: null}]}]`), database: "db1", want: "fieldMask is not supported"},
+		"field mask":       {body: portablePolicy("p", "public", `scopes: [{path: /cities/*, rules: [{id: read, effect: allow, operations: [get], fieldMask: {stages: [{include: ['*']}]}}]}]`), database: "db1"},
+		"null field mask":  {body: portablePolicy("p", "public", `scopes: [{path: /cities/*, rules: [{id: read, effect: allow, operations: [get], fieldMask: null}]}]`), database: "db1", want: "mask requires an object"},
 		"opaque scope":     {body: portablePolicy("p", "public", `scopes: [{opaqueQuery: true, rules: [{id: read, effect: allow, operations: [query]}]}]`), database: "db1", want: "path scopes only"},
 	}
 	for name, test := range tests {

@@ -242,9 +242,51 @@ func (m *CompiledMask) CompleteSubtree(path string) bool {
 	if !m.Allows(path) {
 		return false
 	}
+	parts := strings.Split(path, ".")
+	allowed := false
 	for _, stage := range m.stages {
-		if !stage.include {
+		matched, potential := false, false
+		for _, pattern := range stage.patterns {
+			compatible := true
+			for i := 0; i < len(parts) && i < len(pattern); i++ {
+				if !globSegmentMatches(pattern[i], parts[i]) {
+					compatible = false
+					break
+				}
+			}
+			if compatible {
+				if len(pattern) <= len(parts) {
+					matched = true
+				} else {
+					potential = true
+				}
+			}
+		}
+		if matched {
+			allowed = stage.include
+			continue
+		}
+		if potential {
 			return false
+		}
+		return allowed
+	}
+	return allowed
+}
+
+func collectionMaskAllows(mask *CompiledMask, resource Resource) bool {
+	if mask == nil {
+		return true
+	}
+	if resource.kind != PathResource || len(resource.path) == 0 {
+		return false
+	}
+	for _, segment := range resource.path {
+		if segment.kind == collectionSegment {
+			name, ok := segment.value.(string)
+			if !ok || !mask.Allows(name) {
+				return false
+			}
 		}
 	}
 	return true

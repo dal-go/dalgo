@@ -56,6 +56,7 @@ type Rule struct {
 	where      dal.Condition
 	check      dal.Condition
 	fields     []string
+	fieldMask  *Mask
 }
 
 // Fields attaches an allow-list of field patterns to an allow rule: reads
@@ -67,6 +68,23 @@ type Rule struct {
 func (r Rule) Fields(patterns ...string) Rule {
 	r.fields = append([]string(nil), patterns...)
 	return r
+}
+
+// WithFieldMask applies a portable scoped mask. Fields and masks are mutually
+// exclusive; NewPolicy validates the complete declaration.
+func (r Rule) WithFieldMask(mask Mask) Rule {
+	copy := Mask{Stages: make([]MaskStage, len(mask.Stages))}
+	for i, stage := range mask.Stages {
+		copy.Stages[i] = MaskStage{Include: clonePatterns(stage.Include), Exclude: clonePatterns(stage.Exclude)}
+	}
+	r.fieldMask = &copy
+	return r
+}
+func clonePatterns(patterns []string) []string {
+	if patterns == nil {
+		return nil
+	}
+	return append([]string{}, patterns...)
 }
 
 // Where attaches a row condition to an allow rule: the rule applies only to
@@ -195,7 +213,7 @@ func compileRule(
 	allowedEffects map[effect]bool,
 	compiled *[]compiledRule,
 ) error {
-	if (rule.where != nil || rule.check != nil || rule.fields != nil) && rule.kind != directiveRule {
+	if (rule.where != nil || rule.check != nil || rule.fields != nil || rule.fieldMask != nil) && rule.kind != directiveRule {
 		return fmt.Errorf("access: conditions and fields are only valid on allow rules, not on scopes")
 	}
 	switch rule.kind {
@@ -221,6 +239,22 @@ func compileRule(
 				return fmt.Errorf("access: rule %q: %w", rule.name, err)
 			}
 			fields = parsed
+		}
+		if rule.fieldMask != nil {
+			if rule.fields != nil || rule.effect != effectAllow || resourceKind != PathResource {
+				return fmt.Errorf("access: fieldMask requires a path allow rule without fields")
+			}
+			if operations&Truncate != 0 {
+				if operations != Write && operations != ReadWrite {
+					return fmt.Errorf("access: fieldMask cannot authorize truncate")
+				}
+				operations &^= Truncate
+			}
+			mask, err := CompileMask(*rule.fieldMask, FieldMask)
+			if err != nil {
+				return err
+			}
+			fields = &fieldSet{mask: mask, sources: []string{"scoped field mask"}}
 		}
 		if rule.where != nil || rule.check != nil {
 			if rule.effect != effectAllow {

@@ -61,3 +61,13 @@ func TestPortableApprovedCanonicalFixtures(t *testing.T) {
 		}
 	}
 }
+
+func TestPortableNormalizationPreservesFieldPresence(t *testing.T) {
+	doc, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	require.NoError(t, err)
+	mask := restoredAddressMask()
+	doc.Scopes[0].Rules[0].FieldMask = &mask
+	doc.Scopes[0].Rules[0].Fields = []string{}
+	_, err = NormalizeDTQLPolicy(doc)
+	require.Error(t, err)
+}

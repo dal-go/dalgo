@@ -26,6 +26,7 @@ type fieldPattern struct {
 
 // fieldSet is a rule's allow-list. A nil *fieldSet means every field.
 type fieldSet struct {
+	mask     *CompiledMask
 	patterns []fieldPattern
 	sources  []string
 }
@@ -80,6 +81,9 @@ func (s *fieldSet) allows(path string) bool {
 	if s == nil {
 		return true
 	}
+	if s.mask != nil {
+		return s.mask.Allows(path)
+	}
 	segments := strings.Split(path, ".")
 	for _, pattern := range s.patterns {
 		if len(pattern.segments) > len(segments) {
@@ -103,7 +107,7 @@ func (s *fieldSet) allows(path string) bool {
 // when no pattern uses a wildcard in its first segment; otherwise ok is false
 // and callers must fall back to redaction.
 func (s *fieldSet) enumerable() (names []string, ok bool) {
-	if s == nil {
+	if s == nil || s.mask != nil {
 		return nil, false
 	}
 	seen := map[string]struct{}{}
@@ -200,7 +204,7 @@ func (sets fieldSets) disallowedPaths(data map[string]any) []string {
 			}
 			return
 		}
-		if !sets.allows(prefix) {
+		if !sets.allowsValue(prefix, value) {
 			refused = append(refused, prefix)
 		}
 	}
@@ -241,7 +245,7 @@ func (sets fieldSets) redactMap(prefix string, data map[string]any) {
 			}
 			continue
 		}
-		if !sets.allows(path) {
+		if !sets.allowsValue(path, value) {
 			delete(data, key)
 		}
 	}
@@ -305,6 +309,15 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuer
 	if !sets.restrictive() {
 		return query, true
 	}
+	if selected := query.Columns(); len(selected) > 0 {
+		for _, column := range selected {
+			field, ok := column.Expression.(dal.FieldRef)
+			if !ok || !sets.allowsWhole(field.Name()) {
+				return query, false
+			}
+		}
+		return query, true
+	}
 	allowed, ok := sets.enumerable()
 	if !ok {
 		return query, false
@@ -332,3 +345,91 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuer
 }
 
 var _ = context.Background
+
+// allowsWhole prevents a whole-object query probe from observing masked leaves.
+// Masks may conservatively reject an object when subtree coverage is uncertain.
+func (sets fieldSets) allowsWhole(path string) bool {
+	for _, set := range sets {
+		if set != nil && set.mask != nil {
+			if !set.mask.CompleteSubtree(path) {
+				return false
+			}
+		} else if !set.allows(path) {
+			return false
+		}
+	}
+	return true
+}
+func (sets fieldSets) allowsValue(path string, value any) bool {
+	v := reflect.ValueOf(value)
+	if v.IsValid() && (v.Kind() == reflect.Array || v.Kind() == reflect.Slice || v.Kind() == reflect.Map || v.Kind() == reflect.Struct || v.Kind() == reflect.Pointer) {
+		return sets.allowsWhole(path)
+	}
+	return sets.allows(path)
+}
+
+// Masked parent mutations must authorize all affected descendants, including
+// removed pre-image fields. A leaf update does not acquire an ancestor veto.
+func (sets fieldSets) disallowedMaskedMutation(images writeImages, operation Operations) []string {
+	masked := false
+	for _, set := range sets {
+		if set != nil && set.mask != nil {
+			masked = true
+		}
+	}
+	if !masked {
+		return nil
+	}
+	var refused []string
+	var walk func(string, any)
+	walk = func(path string, value any) {
+		nested, knownObject := value.(map[string]any)
+		allowed := sets.allowsValue(path, value)
+		if knownObject {
+			allowed = sets.allows(path)
+		}
+		if !allowed {
+			refused = append(refused, path)
+		}
+		if knownObject {
+			for key, child := range nested {
+				walk(path+"."+key, child)
+			}
+		}
+	}
+	if operation == Update {
+		for _, item := range images.updates {
+			path := item.FieldName()
+			if len(item.FieldPath()) > 0 {
+				path = strings.Join(item.FieldPath(), ".")
+			}
+			for _, data := range []map[string]any{images.pre, images.post} {
+				var value any = data
+				found := true
+				for _, segment := range strings.Split(path, ".") {
+					m, ok := value.(map[string]any)
+					if !ok {
+						found = false
+						break
+					}
+					value, ok = m[segment]
+					if !ok {
+						found = false
+						break
+					}
+				}
+				if found {
+					walk(path, value)
+				}
+			}
+		}
+	} else {
+		for _, data := range []map[string]any{images.pre, images.post} {
+			for path, value := range data {
+				walk(path, value)
+			}
+		}
+	}
+	sort.Strings(refused)
+	return refused
+}

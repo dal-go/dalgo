@@ -53,11 +53,12 @@ type Bindings struct {
 // then takes part in the ordinary intersection with database and context
 // policies, so a binding can never widen what another policy denies.
 type PrincipalPolicySet struct {
-	name       string
-	source     string
-	visibility string
-	ruleSets   map[string][]Rule
-	bindings   Bindings
+	name           string
+	source         string
+	visibility     string
+	collectionMask *CompiledMask
+	ruleSets       map[string][]Rule
+	bindings       Bindings
 
 	mu    sync.Mutex
 	cache map[string]*AccessPolicy
@@ -124,6 +125,12 @@ func (p *PrincipalPolicySet) Source() string { return p.source }
 // request against them as one policy. Without any applicable binding the
 // request is denied.
 func (p *PrincipalPolicySet) Decide(ctx context.Context, request Request) Decision {
+	for _, resource := range request.Resources {
+		if !collectionMaskAllows(p.collectionMask, resource) {
+			return Decision{Operation: request.Operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectDeny.String(), Explanation: "collection mask denies resource"}
+		}
+	}
+
 	principal, present := PrincipalFrom(ctx)
 	sets, attribution := p.boundSets(principal, present)
 	if len(sets) == 0 {

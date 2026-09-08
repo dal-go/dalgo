@@ -62,7 +62,7 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 		if !ok {
 			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Explanation: fmt.Sprintf("%s expression cannot be safely checked against allowed fields", usage)}}
 		}
-		if !sets.allows(field.Name()) {
+		if !sets.allowsWhole(field.Name()) {
 			return deny(usage, field.Name())
 		}
 		return nil

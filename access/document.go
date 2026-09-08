@@ -68,7 +68,8 @@ type DocumentRule struct {
 	// written under the rule must satisfy afterwards. Defaults to Where.
 	Check *DocumentCondition `json:"check,omitempty" yaml:"check,omitempty"`
 	// Fields is an optional allow-list of field patterns on an allow rule.
-	Fields []string `json:"fields,omitempty" yaml:"fields,omitempty"`
+	Fields    []string `json:"fields,omitempty" yaml:"fields,omitempty"`
+	fieldMask *Mask
 }
 
 // Codec decouples policy loading from both its syntax and its storage. A
@@ -242,6 +243,9 @@ func EncodePrincipalPolicySet(writer io.Writer, codec Codec, set *PrincipalPolic
 	if set == nil {
 		return fmt.Errorf("access: principal policy set is required")
 	}
+	if set.collectionMask != nil {
+		return fmt.Errorf("%w: collection masks require DTQL serialization", ErrNotSerializable)
+	}
 	document := Document{
 		APIVersion: DocumentAPIVersion,
 		Kind:       AccessPolicyKind,
@@ -347,6 +351,9 @@ func decodeDocument(reader io.Reader, codec Codec, options []DecodeOption) (Docu
 func EncodeAccessPolicy(writer io.Writer, codec Codec, policy *AccessPolicy) error {
 	if policy == nil {
 		return fmt.Errorf("access: policy is required")
+	}
+	if policy.collectionMask != nil {
+		return fmt.Errorf("%w: collection masks require DTQL serialization", ErrNotSerializable)
 	}
 	document, err := documentFromRules(AccessPolicyKind, policy.name, effectDeny, policy.rules)
 	if err != nil {
@@ -511,6 +518,9 @@ func ruleFromDocumentRule(documentRule DocumentRule, allowedEffects map[effect]b
 		}
 		rule = rule.Check(condition)
 	}
+	if documentRule.fieldMask != nil {
+		rule = rule.WithFieldMask(*documentRule.fieldMask)
+	}
 	if documentRule.Fields != nil {
 		rule = rule.Fields(documentRule.Fields...)
 	}
@@ -630,6 +640,9 @@ func documentScopeFromRule(rule Rule) (DocumentScope, error) {
 }
 
 func documentRuleFromRule(rule Rule) (DocumentRule, error) {
+	if rule.fieldMask != nil {
+		return DocumentRule{}, fmt.Errorf("%w: scoped masks require DTQL serialization", ErrNotSerializable)
+	}
 	if rule.kind != directiveRule || strings.TrimSpace(rule.name) == "" {
 		return DocumentRule{}, fmt.Errorf("%w: every encoded directive requires an explicit rule name", ErrNotSerializable)
 	}

@@ -111,11 +111,12 @@ type Policy interface {
 
 // AccessPolicy is the declarative hierarchical Policy implementation.
 type AccessPolicy struct {
-	name       string
-	source     string
-	visibility string
-	rules      []Rule
-	compiled   []compiledRule
+	name           string
+	source         string
+	visibility     string
+	collectionMask *CompiledMask
+	rules          []Rule
+	compiled       []compiledRule
 }
 
 // NewPolicy constructs a default-deny access policy.
@@ -192,6 +193,10 @@ func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 }
 
 func (p *AccessPolicy) decideResource(resolver variableResolver, operation Operations, resource Resource) Decision {
+	if !collectionMaskAllows(p.collectionMask, resource) {
+		return Decision{Operation: operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectDeny.String(), Explanation: "collection mask denies resource"}
+	}
+
 	matching := matchingRules(p.compiled, operation, resource)
 	if len(matching) == 0 {
 		return Decision{

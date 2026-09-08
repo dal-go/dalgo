@@ -53,6 +53,30 @@ func ParseDTQLPolicy(data []byte) (DTQLDocument, error) {
 // NormalizeDTQLPolicy returns a validated deep copy with canonical scoped
 // masks. It preserves policy/rule identity and stage action-change order.
 func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
+	// Check presence before encoding: omitempty must not turn an explicitly
+	// supplied empty fields list into an absent list beside a fieldMask.
+	var checkFields func([]DTQLScope) error
+	checkFields = func(scopes []DTQLScope) error {
+		for _, scope := range scopes {
+			for _, rule := range scope.Rules {
+				if rule.FieldMask != nil && rule.Fields != nil {
+					return fmt.Errorf("access: fields and fieldMask are mutually exclusive")
+				}
+			}
+			if err := checkFields(scope.Scopes); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := checkFields(document.Scopes); err != nil {
+		return DTQLDocument{}, err
+	}
+	for _, scopes := range document.RuleSets {
+		if err := checkFields(scopes); err != nil {
+			return DTQLDocument{}, err
+		}
+	}
 	// Reusing the document's JSON shape supplies a defensive deep copy, including
 	// row predicates and principal binding slices.
 	data, err := json.Marshal(document)
