@@ -243,8 +243,8 @@ func EncodePrincipalPolicySet(writer io.Writer, codec Codec, set *PrincipalPolic
 	if set == nil {
 		return fmt.Errorf("access: principal policy set is required")
 	}
-	if set.collectionMask != nil {
-		return fmt.Errorf("%w: collection masks require DTQL serialization", ErrNotSerializable)
+	if set.collectionMask != nil || set.execution != nil {
+		return fmt.Errorf("%w: portable gates require DTQL serialization", ErrNotSerializable)
 	}
 	document := Document{
 		APIVersion: DocumentAPIVersion,
@@ -352,8 +352,8 @@ func EncodeAccessPolicy(writer io.Writer, codec Codec, policy *AccessPolicy) err
 	if policy == nil {
 		return fmt.Errorf("access: policy is required")
 	}
-	if policy.collectionMask != nil {
-		return fmt.Errorf("%w: collection masks require DTQL serialization", ErrNotSerializable)
+	if policy.collectionMask != nil || policy.execution != nil {
+		return fmt.Errorf("%w: portable gates require DTQL serialization", ErrNotSerializable)
 	}
 	document, err := documentFromRules(AccessPolicyKind, policy.name, effectDeny, policy.rules)
 	if err != nil {

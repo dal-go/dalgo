@@ -27,6 +27,8 @@ type Request struct {
 	// future predicate, projection, index, and cost constraints. It is nil for
 	// non-query operations; v1 declarative policies authorize query sources.
 	Query dal.Query
+	// Execution is trusted assessment metadata, never a caller override of Query.
+	Execution *ExecutionTarget
 }
 
 // Decision explains an access-policy result.
@@ -115,6 +117,7 @@ type AccessPolicy struct {
 	source         string
 	visibility     string
 	collectionMask *CompiledMask
+	execution      *compiledExecutionGate
 	rules          []Rule
 	compiled       []compiledRule
 }
@@ -147,6 +150,9 @@ func (p *AccessPolicy) Name() string { return p.name }
 func (p *AccessPolicy) Source() string { return p.source }
 
 func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
+	if !p.execution.allows(request) {
+		return executionDenied(request, p.name, p.source)
+	}
 	if !request.Operation.validLeaf() {
 		return Decision{
 			Operation:    request.Operation,

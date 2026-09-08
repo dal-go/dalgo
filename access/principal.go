@@ -57,6 +57,7 @@ type PrincipalPolicySet struct {
 	source         string
 	visibility     string
 	collectionMask *CompiledMask
+	execution      *compiledExecutionGate
 	ruleSets       map[string][]Rule
 	bindings       Bindings
 
@@ -125,6 +126,9 @@ func (p *PrincipalPolicySet) Source() string { return p.source }
 // request against them as one policy. Without any applicable binding the
 // request is denied.
 func (p *PrincipalPolicySet) Decide(ctx context.Context, request Request) Decision {
+	if !p.execution.allows(request) {
+		return executionDenied(request, p.name, p.source)
+	}
 	for _, resource := range request.Resources {
 		if !collectionMaskAllows(p.collectionMask, resource) {
 			return Decision{Operation: request.Operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectDeny.String(), Explanation: "collection mask denies resource"}

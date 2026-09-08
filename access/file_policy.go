@@ -280,8 +280,9 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 	if source.Composition != "dalgo-hierarchical-v1" {
 		return nil, fmt.Errorf("access: unsupported policy composition %q", source.Composition)
 	}
-	if source.Execution != nil {
-		return nil, fmt.Errorf("access: execution gates are not supported by this loader")
+	execution, compileErr := compileExecutionGate(source.Execution)
+	if compileErr != nil {
+		return nil, compileErr
 	}
 	var collectionMask *CompiledMask
 	if source.CollectionMask != nil {
@@ -312,6 +313,7 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 		if err == nil {
 			policy.visibility = visibility
 			policy.collectionMask = collectionMask
+			policy.execution = execution
 		}
 		return policy, err
 	}
@@ -319,6 +321,7 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 	if err == nil {
 		policy.visibility = visibility
 		policy.collectionMask = collectionMask
+		policy.execution = execution
 	}
 	return policy, err
 }
