@@ -181,7 +181,10 @@ Implement the A3 ordered include/exclude stage AST and arbitrary-position segmen
 
 **Id:** acl-08
 **Depends-On:** 7
-**Status:** queued
+**Status:** complete
+**Implemented-by:** dal-go/dalgo@4e7aa78 (layered-acl-query)
+**Note:** Scoped masks enforce collection admission, redaction, query evidence and affected parent-write descendants; opaque containers fail closed. Persisted masks pass both HTTP adapters and remount tests.
+**Evidence:** access/mask_enforcement_test.go, go test ./access, go vet ./access, openvaultdb/openvaultdb-go@73919a4, TestLayeredACL_DTQL
 
 **Repositories:** dal-go/dalgo
 
@@ -195,7 +198,10 @@ Integrate collectionMask and fieldMask into existing policy decisions, field-set
 
 **Id:** acl-09
 **Depends-On:** 7, 8
-**Status:** queued
+**Status:** complete
+**Implemented-by:** dal-go/dalgo@cd81e2a (layered-acl-query)
+**Note:** Conjunctive execution gates load and enforce on typed DTQL; opaque text cannot relabel itself. Namespaced procedure masks assess only; native/procedure effects remain unsupported.
+**Evidence:** access/execution_test.go, go test ./access, go vet ./access, openvaultdb/openvaultdb-go@c05a411, TestLayeredACL_DTQL, TestLayeredACL_UpperOnlySuppressesInGitDBDerivedValues
 
 **Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go
 
