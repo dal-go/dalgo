@@ -37,6 +37,24 @@ func TestProtectedOperationConstructorBoundaries(t *testing.T) {
 	if cloneKey(nil) != nil || cloneMap(nil) != nil {
 		t.Fatal("nil clones changed")
 	}
+	if _, err := NewProtectedEvidenceRead("x", Get, nil, [][]string{{"name"}}); err == nil {
+		t.Fatal("nil evidence key accepted")
+	}
+	op, _ := NewProtectedEvidenceRead("x", Get, key, [][]string{{"name"}})
+	columns := op.Columns()
+	columns[0][0] = "changed"
+	if op.Columns()[0][0] != "name" {
+		t.Fatal("columns exposed mutable state")
+	}
+	if _, err := NewStaticParticipant("owner"); err == nil {
+		t.Fatal("empty static participant accepted")
+	}
+	lease, _ := NewStaticPolicyLease(MustPolicy("p", Root(Allow(Get))))
+	_ = lease.Revision()
+	lease.Release()
+	if _, err := NewStaticParticipant("", MustPolicy("p", Root(Allow(Get)))); err == nil {
+		t.Fatal("empty layer accepted")
+	}
 }
 
 func TestInspectionSessionLifetimeAndContextBoundaries(t *testing.T) {

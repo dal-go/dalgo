@@ -32,4 +32,8 @@ func TestMaskDefensiveBoundaries(t *testing.T) {
 	if collectionMaskAllows(c, bad) {
 		t.Fatal("non-string collection allowed")
 	}
+	all, _ := CompileMask(Mask{Stages: []MaskStage{{Include: []string{"*"}}}}, FieldMask)
+	if !all.CompleteSubtree("anything") {
+		t.Fatal("complete include not complete")
+	}
 }

@@ -39,6 +39,15 @@ func TestPortablePolicyRejectsMalformedSecurityShapes(t *testing.T) {
 	}
 }
 
+func TestLegacyPortableSyntaxAcceptsOrdinaryPolicy(t *testing.T) {
+	if err := validatePortablePolicyYAML([]byte("scopes: [{path: /x, rules: []}]")); err != nil {
+		t.Fatal(err)
+	}
+	if scopedPolicyFeature(nil) != "" {
+		t.Fatal("nil scopes reported feature")
+	}
+}
+
 func TestNormalizePortablePolicyDefensiveErrors(t *testing.T) {
 	mask := Mask{Stages: []MaskStage{{Include: []string{"*"}}}}
 	rule := DTQLRule{ID: "r", Effect: "allow", Operations: []string{"get"}, Fields: []string{}, FieldMask: &mask}

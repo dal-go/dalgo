@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -490,5 +491,13 @@ func TestTypedPrincipalAndRealmConstructorFailures(t *testing.T) {
 	}
 	if _, err := NewPrincipalPolicySetForRealm("app", "", nil, Bindings{}); err == nil {
 		t.Fatal("invalid set accepted")
+	}
+}
+
+func TestLegacyPrincipalEncodingRejectsPortableGates(t *testing.T) {
+	set := MustPrincipalPolicySet("p", map[string][]Rule{"r": {Root(Allow(Get, "g"))}}, Bindings{Everyone: []string{"r"}})
+	set.execution = &compiledExecutionGate{}
+	if err := EncodePrincipalPolicySet(io.Discard, YAMLCodec{}, set); !errors.Is(err, ErrNotSerializable) {
+		t.Fatalf("err=%v", err)
 	}
 }
