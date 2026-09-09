@@ -230,6 +230,85 @@ func TestRestrictionRepresentationsValidate(t *testing.T) {
 	}
 }
 
+func TestResultValidationLimitsReferencesAndSampleSummary(t *testing.T) {
+	base, _ := ParseResult([]byte(inspectResultFixture))
+	mutations := map[string]func(*Result){
+		"operation limit": func(r *Result) { r.Operations = make([]OperationResult, 101) },
+		"duplicate restriction": func(r *Result) {
+			r.Result, r.Allowed = OutcomeConditional, false
+			x := Restriction{ID: "r", OperationID: "u1", Representation: "reference", Kind: "opaque", OmissionReason: "private"}
+			r.Restrictions = []Restriction{x, x}
+		},
+		"restriction sets differ": func(r *Result) {
+			r.Result, r.Allowed = OutcomeConditional, false
+			r.Operations[0].RestrictionIDs = []string{"r"}
+		},
+		"resource database":        func(r *Result) { r.Operations[0].Resource.DatabaseID = "" },
+		"resource field empty":     func(r *Result) { r.Operations[0].Resource.Columns = [][]string{{}} },
+		"resource duplicate field": func(r *Result) { r.Operations[0].Resource.Columns = [][]string{{"name"}, {"name"}} },
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			result := base
+			result.Operations = append([]OperationResult(nil), base.Operations...)
+			result.Operations[0].Resource.Columns = append([][]string(nil), base.Operations[0].Resource.Columns...)
+			mutate(&result)
+			if err := result.Validate(); err == nil {
+				t.Fatal("invalid result accepted")
+			}
+		})
+	}
+	data, err := os.ReadFile("testdata/sample-result.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	validSample, err := ParseResult(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*Sample){
+		"limit":           func(s *Sample) { s.RequestedLimit = 0 },
+		"count":           func(s *Sample) { s.EvaluatedCount = s.RequestedLimit + 1 },
+		"selection":       func(s *Sample) { s.Selection = "future" },
+		"template":        func(s *Sample) { s.TemplateOperationID = "" },
+		"resource":        func(s *Sample) { s.SelectionResource.Path = "" },
+		"order empty":     func(s *Sample) { s.Order = nil },
+		"order field":     func(s *Sample) { s.Order[0].Field = nil },
+		"order direction": func(s *Sample) { s.Order[0].Direction = "future" },
+	} {
+		t.Run("sample "+name, func(t *testing.T) {
+			result := validSample
+			sample := *validSample.Sample
+			sample.Order = append([]SampleOrder(nil), validSample.Sample.Order...)
+			result.Sample = &sample
+			mutate(result.Sample)
+			if err := result.Validate(); err == nil {
+				t.Fatal("invalid sample accepted")
+			}
+		})
+	}
+}
+
+func TestResultDecoderRejectsMalformedAndMissingNestedFields(t *testing.T) {
+	tests := map[string]string{
+		"malformed":            "{",
+		"trailing":             inspectResultFixture + " {}",
+		"missing root":         strings.Replace(inspectResultFixture, `"requestId":"req-1",`, "", 1),
+		"missing operation":    strings.Replace(inspectResultFixture, `"requestOperationId":"u1",`, "", 1),
+		"missing layer source": strings.Replace(inspectResultFixture, `"ownerId":"ingit-local",`, "", 1),
+		"missing decision":     strings.Replace(inspectResultFixture, `"scope":"operation","restrictionIds":[]`, `"restrictionIds":[]`, 1),
+		"missing coverage":     strings.Replace(inspectResultFixture, `"truncated":false,`, "", 1),
+		"nested duplicate":     strings.Replace(inspectResultFixture, `"databaseId":"crm","path"`, `"databaseId":"crm","databaseId":"other","path"`, 1),
+	}
+	for name, source := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseResult([]byte(source)); err == nil {
+				t.Fatal("malformed result accepted")
+			}
+		})
+	}
+}
+
 var structuralCondition = func() (condition access.DocumentCondition) { return }()
 
 func jsonEqual(a, b any) bool { return string(mustJSON(a)) == string(mustJSON(b)) }
