@@ -317,6 +317,15 @@ func TestQueryFieldValidationHandlesPointerExpressionsAndConditions(t *testing.T
 			t.Fatal(err)
 		}
 	}
+	grouped := dal.NewGroupCondition(dal.And, dal.WhereField("name", dal.Equal, "ok"), dal.WhereField("secret", dal.Equal, "x"))
+	query = dal.NewQueryBuilder(from).Where(grouped).SelectColumns(dal.Column{Expression: dal.Field("name")})
+	if err := validateRequestedQueryFields(query, sets); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("grouped err=%v", err)
+	}
+	computed := dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Constant{Value: 1}})
+	if _, ok := projectQuery(computed, sets); ok {
+		t.Fatal("computed projection accepted")
+	}
 }
 
 func TestNestedQueryPoliciesPreserveCallerAndEffectiveQueries(t *testing.T) {
