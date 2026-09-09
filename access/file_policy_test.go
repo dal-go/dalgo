@@ -31,6 +31,9 @@ func TestLoadPolicyFiles(t *testing.T) {
 	assert.Equal(t, "policy-one", policies[0].Name())
 	assert.Equal(t, "policy.yaml", policies[0].(*AccessPolicy).Source())
 	assert.Equal(t, "people", policies[0].(*AccessPolicy).realm)
+	metadata := DescribePolicy(policies[0])
+	assert.Equal(t, PolicyMetadata{ID: "policy-one", Revision: metadata.Revision, Visibility: PolicyVisibilityPublic, Source: "policy.yaml"}, metadata)
+	assert.True(t, strings.HasPrefix(metadata.Revision, "sha256:"))
 	for _, realm := range []string{" people", "people\x00", string([]byte{0xff})} {
 		_, err := LoadPolicyFiles(root, FilePolicyConfig{Enabled: true, Database: "db1", Realm: realm, Policies: []string{"policy.yaml"}})
 		require.ErrorContains(t, err, "policy realm")

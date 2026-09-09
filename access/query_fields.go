@@ -50,7 +50,11 @@ func preserveRequestedQuery(query dal.Query, requested dal.StructuredQuery) dal.
 func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) error {
 	resource := resourcesForQuery(query)[0]
 	deny := func(usage, field string) error {
-		return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Explanation: fmt.Sprintf("%s field %q is not allowed", usage, field)}}
+		slot := DecisionSlotFields
+		if usage == "filter" {
+			slot = DecisionSlotWhere
+		}
+		return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeColumnDenied, Scope: DecisionScopeColumn, Slot: slot, Columns: [][]string{{field}}, Explanation: fmt.Sprintf("%s field %q is not allowed", usage, field)}}
 	}
 	checkExpression := func(expression dal.Expression, usage string) error {
 		field, ok := expression.(dal.FieldRef)
@@ -60,7 +64,7 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			}
 		}
 		if !ok {
-			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Explanation: fmt.Sprintf("%s expression cannot be safely checked against allowed fields", usage)}}
+			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotFields, Explanation: fmt.Sprintf("%s expression cannot be safely checked against allowed fields", usage)}}
 		}
 		if !sets.allowsWhole(field.Name()) {
 			return deny(usage, field.Name())
@@ -101,7 +105,7 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			}
 			return checkCondition(*condition)
 		default:
-			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Explanation: "filter condition cannot be safely checked against allowed fields"}}
+			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotWhere, Explanation: "filter condition cannot be safely checked against allowed fields"}}
 		}
 	}
 	if err := checkCondition(query.Where()); err != nil {

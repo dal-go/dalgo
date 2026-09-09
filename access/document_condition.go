@@ -26,6 +26,38 @@ type DocumentExpression struct {
 	Param  string `json:"param,omitempty" yaml:"param,omitempty"`
 }
 
+func cloneDocumentConditions(conditions []*DocumentCondition) []*DocumentCondition {
+	cloned := make([]*DocumentCondition, len(conditions))
+	for i := range conditions {
+		cloned[i] = cloneDocumentCondition(conditions[i])
+	}
+	return cloned
+}
+
+func cloneDocumentCondition(condition *DocumentCondition) *DocumentCondition {
+	if condition == nil {
+		return nil
+	}
+	clone := *condition
+	if condition.Left != nil {
+		left := *condition.Left
+		clone.Left = &left
+	}
+	if condition.Right != nil {
+		right := *condition.Right
+		clone.Right = &right
+	}
+	clone.And = make([]DocumentCondition, len(condition.And))
+	for i := range condition.And {
+		clone.And[i] = *cloneDocumentCondition(&condition.And[i])
+	}
+	clone.Or = make([]DocumentCondition, len(condition.Or))
+	for i := range condition.Or {
+		clone.Or[i] = *cloneDocumentCondition(&condition.Or[i])
+	}
+	return &clone
+}
+
 // ValidateDocumentCondition validates the portable condition shape without
 // compiling or evaluating a policy.
 func ValidateDocumentCondition(condition DocumentCondition) error {

@@ -101,7 +101,7 @@ func (gate *compiledExecutionGate) allows(request Request) bool {
 }
 
 func executionDenied(request Request, name, source string) Decision {
-	decision := Decision{Operation: request.Operation, Policy: name, PolicySource: source, Effect: effectDeny.String(), Explanation: "execution gate denies request"}
+	decision := Decision{Operation: request.Operation, Policy: name, PolicySource: source, Effect: effectDeny.String(), Code: CodeExecutionClassDenied, Scope: DecisionScopeOperation, Explanation: "execution gate denies request"}
 	if len(request.Resources) > 0 {
 		decision.Resource = request.Resources[0]
 	}

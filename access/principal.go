@@ -138,6 +138,7 @@ type PrincipalPolicySet struct {
 	name           string
 	source         string
 	visibility     string
+	revision       string
 	realm          string
 	collectionMask *CompiledMask
 	execution      *compiledExecutionGate
@@ -205,6 +206,14 @@ func (p *PrincipalPolicySet) Name() string { return p.name }
 // document, if any.
 func (p *PrincipalPolicySet) Source() string { return p.source }
 
+func (p *PrincipalPolicySet) PolicyMetadata() PolicyMetadata {
+	visibility := PolicyVisibility(p.visibility)
+	if visibility == "" {
+		visibility = PolicyVisibilityPrivate
+	}
+	return PolicyMetadata{ID: p.name, Revision: p.revision, Visibility: visibility, Source: p.source}
+}
+
 // Decide unions the rule sets bound to the principal on ctx and evaluates the
 // request against them as one policy. Without any applicable binding the
 // request is denied.
@@ -217,7 +226,7 @@ func (p *PrincipalPolicySet) Decide(ctx context.Context, request Request) Decisi
 	}
 	for _, resource := range request.Resources {
 		if !collectionMaskAllows(p.collectionMask, resource) {
-			return Decision{Operation: request.Operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectDeny.String(), Explanation: "collection mask denies resource"}
+			return Decision{Operation: request.Operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectDeny.String(), Code: CodeCollectionDenied, Scope: DecisionScopeTable, Explanation: "collection mask denies resource"}
 		}
 	}
 
@@ -229,6 +238,8 @@ func (p *PrincipalPolicySet) Decide(ctx context.Context, request Request) Decisi
 			Policy:       p.name,
 			PolicySource: p.source,
 			Effect:       effectDeny.String(),
+			Code:         CodeNoMatch,
+			Scope:        DecisionScopePrincipal,
 			Explanation:  fmt.Sprintf("no binding applies to principal %v", principalLabel(principal, present)),
 		}
 	}
@@ -306,7 +317,7 @@ func policyRealmAllows(ctx context.Context, realm string) bool {
 }
 
 func principalRealmDenied(request Request, policy, source string) Decision {
-	decision := Decision{Operation: request.Operation, Policy: policy, PolicySource: source, Effect: effectDeny.String(), Explanation: "principal is not valid in the policy realm"}
+	decision := Decision{Operation: request.Operation, Policy: policy, PolicySource: source, Effect: effectDeny.String(), Code: CodePrincipalUnresolved, Scope: DecisionScopePrincipal, Explanation: "principal is not valid in the policy realm"}
 	if len(request.Resources) > 0 {
 		decision.Resource = request.Resources[0]
 	}

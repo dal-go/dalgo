@@ -184,55 +184,24 @@ func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]resid
 	policies = append(policies, g.databasePolicies...)
 	policies = append(policies, g.boundPolicies...)
 	policies = append(policies, dynamicPolicies...)
-	var residuals [][]residual
-	var writes [][]writeResidual
-	var decisions []Decision
-	var firstDenial *Decision
-	for _, policy := range policies {
-		decision := policy.Decide(ctx, request)
-		decisions = append(decisions, decision)
-		if !decision.Allowed {
-			if firstDenial == nil {
-				copy := decision
-				firstDenial = &copy
-			}
-			continue
+	assessment := assessPolicies(ctx, request, policies)
+	if assessment.firstDenial != nil {
+		decisions := make([]Decision, len(assessment.assessment.Policies))
+		for i := range assessment.assessment.Policies {
+			decisions[i] = cloneDecision(assessment.assessment.Policies[i].Decision)
 		}
-		for i, condition := range decision.Residuals {
-			if condition == nil || i >= len(request.Resources) {
-				continue
-			}
-			if residuals == nil {
-				residuals = make([][]residual, len(request.Resources))
-			}
-			residuals[i] = append(residuals[i], residual{
-				policy:       decision.Policy,
-				policySource: decision.PolicySource,
-				rule:         decision.Rule,
-				text:         decision.Condition,
-				resource:     request.Resources[i],
-				condition:    condition,
-			})
+		return nil, nil, &DeniedError{Decision: *assessment.firstDenial, Decisions: decisions}
+	}
+	if !assessment.assessment.Complete {
+		decisions := make([]Decision, len(assessment.assessment.Policies))
+		for i := range assessment.assessment.Policies {
+			decisions[i] = cloneDecision(assessment.assessment.Policies[i].Decision)
 		}
-		for i, write := range decision.Writes {
-			if write == nil || i >= len(request.Resources) {
-				continue
-			}
-			if writes == nil {
-				writes = make([][]writeResidual, len(request.Resources))
-			}
-			writes[i] = append(writes[i], writeResidual{
-				policy:       decision.Policy,
-				policySource: decision.PolicySource,
-				resource:     request.Resources[i],
-				residual:     write,
-			})
+		if assessment.firstIndeterminate != nil {
+			return nil, nil, &DeniedError{Decision: *assessment.firstIndeterminate, Decisions: decisions}
 		}
 	}
-	if firstDenial != nil {
-		return nil, nil, &DeniedError{Decision: *firstDenial, Decisions: decisions}
-	}
-	return residuals, writes, nil
+	return assessment.residuals, assessment.writes, nil
 }
 
 func (g guard) pinDatabasePolicies(ctx context.Context) (guard, error) {

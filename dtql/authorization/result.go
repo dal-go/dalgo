@@ -70,24 +70,24 @@ const (
 	ExecutionStoredProcedure ExecutionClass = "stored_procedure"
 )
 
-type ReasonCode string
+type ReasonCode = access.ReasonCode
 
 const (
-	CodeAccessDenied           ReasonCode = "ACCESS_DENIED"
-	CodeRuleDenied             ReasonCode = "ACL_RULE_DENIED"
-	CodeNoMatch                ReasonCode = "ACL_NO_MATCH"
-	CodeRowPredicateFailed     ReasonCode = "ACL_ROW_PREDICATE_FAILED"
-	CodePostImageFailed        ReasonCode = "ACL_POST_IMAGE_FAILED"
-	CodeColumnDenied           ReasonCode = "ACL_COLUMN_DENIED"
-	CodeEvaluationFailed       ReasonCode = "ACL_EVALUATION_FAILED"
-	CodeConfigurationInvalid   ReasonCode = "ACL_CONFIGURATION_INVALID"
-	CodeSourceUnavailable      ReasonCode = "ACL_SOURCE_UNAVAILABLE"
-	CodeEnforcementUnsupported ReasonCode = "ACL_ENFORCEMENT_UNSUPPORTED"
-	CodePrincipalUnresolved    ReasonCode = "ACL_PRINCIPAL_UNRESOLVED"
-	CodeCapabilityDenied       ReasonCode = "ACL_CAPABILITY_DENIED"
-	CodeExecutionClassDenied   ReasonCode = "ACL_EXECUTION_CLASS_DENIED"
-	CodeCallableDenied         ReasonCode = "ACL_CALLABLE_DENIED"
-	CodeCollectionDenied       ReasonCode = "ACL_COLLECTION_DENIED"
+	CodeAccessDenied           = access.CodeAccessDenied
+	CodeRuleDenied             = access.CodeRuleDenied
+	CodeNoMatch                = access.CodeNoMatch
+	CodeRowPredicateFailed     = access.CodeRowPredicateFailed
+	CodePostImageFailed        = access.CodePostImageFailed
+	CodeColumnDenied           = access.CodeColumnDenied
+	CodeEvaluationFailed       = access.CodeEvaluationFailed
+	CodeConfigurationInvalid   = access.CodeConfigurationInvalid
+	CodeSourceUnavailable      = access.CodeSourceUnavailable
+	CodeEnforcementUnsupported = access.CodeEnforcementUnsupported
+	CodePrincipalUnresolved    = access.CodePrincipalUnresolved
+	CodeCapabilityDenied       = access.CodeCapabilityDenied
+	CodeExecutionClassDenied   = access.CodeExecutionClassDenied
+	CodeCallableDenied         = access.CodeCallableDenied
+	CodeCollectionDenied       = access.CodeCollectionDenied
 )
 
 type Result struct {

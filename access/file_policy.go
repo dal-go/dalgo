@@ -1,6 +1,7 @@
 package access
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -288,6 +289,11 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 	if visibility != "public" && visibility != "private" {
 		return nil, fmt.Errorf("access: metadata.visibility must be public or private")
 	}
+	canonical, err := json.Marshal(source)
+	if err != nil {
+		return nil, fmt.Errorf("access: canonicalize policy: %w", err)
+	}
+	revision := fmt.Sprintf("sha256:%x", sha256.Sum256(canonical))
 	if source.Target.Database != database {
 		return nil, fmt.Errorf("access: policy target database %q does not match configured database %q", source.Target.Database, database)
 	}
@@ -307,7 +313,6 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 		}
 	}
 	document := Document{APIVersion: DocumentAPIVersion, Kind: source.Kind, Metadata: DocumentMetadata{Name: source.Metadata.Name}, Default: source.Default, Bindings: source.Bindings}
-	var err error
 	document.Scopes, err = convertDTQLScopes(source.Scopes)
 	if err != nil {
 		return nil, err
@@ -326,6 +331,7 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 		policy, err := principalPolicySetFromDocument(document, settings)
 		if err == nil {
 			policy.visibility = visibility
+			policy.revision = revision
 			policy.collectionMask = collectionMask
 			policy.execution = execution
 		}
@@ -334,6 +340,7 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 	policy, err := accessPolicyFromDocument(document, settings)
 	if err == nil {
 		policy.visibility = visibility
+		policy.revision = revision
 		policy.collectionMask = collectionMask
 		policy.execution = execution
 	}
