@@ -1,6 +1,8 @@
 package access
 
 import (
+	"encoding/json"
+	"math"
 	"strings"
 	"testing"
 )
@@ -46,5 +48,55 @@ func TestNormalizePortablePolicyDefensiveErrors(t *testing.T) {
 	}
 	if _, err := NormalizeDTQLPolicy(DTQLDocument{}); err == nil || !strings.Contains(err.Error(), "target.database") {
 		t.Fatalf("missing target err=%v", err)
+	}
+}
+
+func TestNormalizePortablePolicyRecursiveFailures(t *testing.T) {
+	base, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mask := Mask{Stages: []MaskStage{{Include: []string{"*"}}}}
+	candidate := base
+	candidate.Scopes[0].Scopes = []DTQLScope{{Path: "/child", Rules: []DTQLRule{{ID: "r", Effect: "allow", Operations: []string{"get"}, Fields: []string{}, FieldMask: &mask}}}}
+	if _, err := NormalizeDTQLPolicy(candidate); err == nil {
+		t.Fatal("nested duplicate selector accepted")
+	}
+	base, _ = ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	candidate = base
+	candidate.Scopes[0].Rules[0].Where = &DocumentCondition{Op: "==", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Value: make(chan int)}}
+	if _, err := NormalizeDTQLPolicy(candidate); err == nil {
+		t.Fatal("unmarshalable constant accepted")
+	}
+	base, _ = ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	candidate = base
+	candidate.Scopes[0].Rules[0].Where = &DocumentCondition{Op: "==", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Value: uint64(math.MaxUint64)}}
+	if _, err := NormalizeDTQLPolicy(candidate); err != nil {
+		t.Fatalf("uint64 restore: %v", err)
+	}
+	tooLarge := json.Number("18446744073709551616")
+	failing := &DocumentCondition{And: []DocumentCondition{{Or: []DocumentCondition{{Op: "==", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Values: []any{map[string]any{"n": tooLarge}}}}}}}}
+	for name, mutate := range map[string]func(*DTQLDocument){
+		"where": func(d *DTQLDocument) { d.Scopes[0].Rules[0].Where = failing },
+		"check": func(d *DTQLDocument) {
+			d.Scopes[0].Rules[0].Operations = []string{"set"}
+			d.Scopes[0].Rules[0].Check = failing
+		},
+		"nested": func(d *DTQLDocument) {
+			d.Scopes[0].Scopes = []DTQLScope{{Path: "/child", Rules: []DTQLRule{{ID: "r", Effect: "allow", Operations: []string{"get"}, Where: failing}}}}
+		},
+		"ruleset": func(d *DTQLDocument) {
+			d.RuleSets = map[string][]DTQLScope{"r": {{Path: "/x", Rules: []DTQLRule{{ID: "r", Effect: "allow", Operations: []string{"get"}, Where: failing}}}}}
+			d.Scopes = nil
+			d.Bindings = &DocumentBindings{Everyone: []string{"r"}}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			d, _ := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+			mutate(&d)
+			if _, err := NormalizeDTQLPolicy(d); err == nil {
+				t.Fatal("oversized nested number accepted")
+			}
+		})
 	}
 }
