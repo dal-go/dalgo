@@ -828,16 +828,18 @@ func evaluateEvidence(op ProtectedOperation, evidence ProtectedEvidence, assessm
 		} else {
 			data = evidence.PreImage
 		}
-		for _, c := range d.Residuals {
-			ok, err := condeval.Match(data, c)
-			if err != nil {
-				d.Allowed = false
-				d.Code = CodeEvaluationFailed
-			} else if !ok {
-				d.Allowed = false
-				d.Code = CodeRowPredicateFailed
-				d.Scope = DecisionScopeRow
-				d.Slot = DecisionSlotWhere
+		if op.action != Insert && (op.action != Set || evidence.Exists) {
+			for _, c := range d.Residuals {
+				ok, err := condeval.Match(data, c)
+				if err != nil {
+					d.Allowed = false
+					d.Code = CodeEvaluationFailed
+				} else if !ok {
+					d.Allowed = false
+					d.Code = CodeRowPredicateFailed
+					d.Scope = DecisionScopeRow
+					d.Slot = DecisionSlotWhere
+				}
 			}
 		}
 		if d.Allowed && op.action == Get && len(op.columns) > 0 && len(d.Writes) > 0 && d.Writes[0] != nil {

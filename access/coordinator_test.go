@@ -10,6 +10,7 @@ import (
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
 	"github.com/dal-go/record/update"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPreparationFailureIsAssessedWithoutDisclosureOrExecution(t *testing.T) {
@@ -46,6 +47,31 @@ func TestPreparationFailureIsAssessedWithoutDisclosureOrExecution(t *testing.T) 
 	}
 	if strings.Join(events, ",") != "storage-enter,evidence,storage-abort" {
 		t.Fatalf("events=%v", events)
+	}
+}
+
+func TestNewRowAdmissionUsesCheckInsteadOfWhere(t *testing.T) {
+	for _, action := range []Operations{Insert, Set} {
+		t.Run(action.String(), func(t *testing.T) {
+			key := record.NewKeyWithID("docs", "new")
+			candidate := map[string]any{"status": "draft"}
+			events := []string{}
+			storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", CandidateRevision: "candidate", Complete: true, CandidateImage: candidate}}}
+			rule := Allow(action, "create").Where(dal.WhereField("owner", dal.Equal, dal.Constant{Value: "existing"})).Check(dal.WhereField("status", dal.Equal, dal.Constant{Value: "draft"}))
+			policy := MustPolicy("owner", Scope("docs", AnyID, rule))
+			lease, _ := NewStaticPolicyLease(policy)
+			coordinator, err := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+			require.NoError(t, err)
+			var op ProtectedOperation
+			if action == Insert {
+				op, err = NewProtectedInsert("op", key, candidate)
+			} else {
+				op, err = NewProtectedSet("op", key, candidate, "")
+			}
+			require.NoError(t, err)
+			err = coordinator.WithinExecution(context.Background(), []ProtectedOperation{op}, func(session ExecutionSession) error { _, err := session.Execute(context.Background()); return err })
+			require.NoError(t, err)
+		})
 	}
 }
 

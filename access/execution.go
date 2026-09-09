@@ -100,8 +100,20 @@ func (gate *compiledExecutionGate) allows(request Request) bool {
 	return false
 }
 
-func executionDenied(request Request, name, source string) Decision {
-	decision := Decision{Operation: request.Operation, Policy: name, PolicySource: source, Effect: effectDeny.String(), Code: CodeExecutionClassDenied, Scope: DecisionScopeOperation, Explanation: "execution gate denies request"}
+func (gate *compiledExecutionGate) deniedCode(request Request) ReasonCode {
+	target, err := classifyExecution(request)
+	if err == nil && target.Class == ExecutionStoredProcedure {
+		for _, entry := range gate.entries {
+			if entry.class == target.Class && entry.namespace == target.Namespace {
+				return CodeCallableDenied
+			}
+		}
+	}
+	return CodeExecutionClassDenied
+}
+
+func executionDenied(request Request, name, source string, gate *compiledExecutionGate) Decision {
+	decision := Decision{Operation: request.Operation, Policy: name, PolicySource: source, Effect: effectDeny.String(), Code: gate.deniedCode(request), Scope: DecisionScopeOperation, Explanation: "execution gate denies request"}
 	if len(request.Resources) > 0 {
 		decision.Resource = request.Resources[0]
 	}

@@ -43,6 +43,9 @@ execution:
 		request.Execution = &test.target
 		d := policies[0].Decide(context.Background(), request)
 		require.Equal(t, test.allowed, d.Allowed, test.target)
+		if !test.allowed && test.target.Class == ExecutionStoredProcedure && test.target.Namespace == "public" && test.target.Name != "User_*" {
+			require.Equal(t, CodeCallableDenied, d.Code)
+		}
 		require.Equal(t, "gated", d.Policy)
 		require.Equal(t, "gate.yaml", d.PolicySource)
 	}

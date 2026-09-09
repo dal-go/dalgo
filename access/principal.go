@@ -222,7 +222,7 @@ func (p *PrincipalPolicySet) Decide(ctx context.Context, request Request) Decisi
 		return principalRealmDenied(ctx, request, p.name, p.source)
 	}
 	if !p.execution.allows(request) {
-		return executionDenied(request, p.name, p.source)
+		return executionDenied(request, p.name, p.source, p.execution)
 	}
 	for _, resource := range request.Resources {
 		if !collectionMaskAllows(p.collectionMask, resource) {

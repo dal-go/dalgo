@@ -272,7 +272,7 @@ func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 		return principalRealmDenied(ctx, request, p.name, p.source)
 	}
 	if !p.execution.allows(request) {
-		return executionDenied(request, p.name, p.source)
+		return executionDenied(request, p.name, p.source, p.execution)
 	}
 	if !request.Operation.validLeaf() {
 		return Decision{
