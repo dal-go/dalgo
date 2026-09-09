@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
@@ -83,5 +84,29 @@ func TestExecutionGateAllExceptSystemProcedures(t *testing.T) {
 	require.NoError(t, err)
 	for name, allowed := range map[string]bool{"User_Read": true, "sys_Read": false} {
 		require.Equal(t, allowed, gate.allows(Request{Execution: &ExecutionTarget{Class: ExecutionStoredProcedure, Namespace: "public", Name: name}}))
+	}
+}
+
+func TestExecutionClassificationBoundaries(t *testing.T) {
+	if gate, err := compileExecutionGate(nil); err != nil || gate != nil {
+		t.Fatalf("nil gate=%v err=%v", gate, err)
+	}
+	badMask := Mask{}
+	if _, err := compileExecutionGate(&ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionStoredProcedure, Mask: &badMask}}}); err == nil {
+		t.Fatal("invalid callable mask accepted")
+	}
+	structured := dal.NewQueryBuilder(dal.From(dal.NewRootCollectionRef("x", ""))).SelectKeysOnly(reflect.String)
+	for name, request := range map[string]Request{
+		"opaque":                  {Query: dal.NewTextQuery("select 1", nil)},
+		"structured relabeled":    {Query: structured, Execution: &ExecutionTarget{Class: ExecutionNativeSQL}},
+		"nonprocedure names":      {Execution: &ExecutionTarget{Class: ExecutionDTQL, Name: "x"}},
+		"bad procedure namespace": {Execution: &ExecutionTarget{Class: ExecutionStoredProcedure, Namespace: "bad/name", Name: "x"}},
+		"unknown class":           {Execution: &ExecutionTarget{Class: ExecutionClass("future")}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := classifyExecution(request); err == nil {
+				t.Fatal("invalid execution accepted")
+			}
+		})
 	}
 }
