@@ -121,3 +121,26 @@ func TestCoordinatorEvidenceHelpers(t *testing.T) {
 		t.Fatalf("reduced deny to %s", got)
 	}
 }
+
+func TestProtectedEvidenceValidationRejectsIncompleteOrMismatchedFacts(t *testing.T) {
+	key := record.NewKeyWithID("docs", "one")
+	op, _ := NewProtectedRead("one", Get, key)
+	valid := ProtectedEvidence{OperationID: "one", CanonicalTarget: key.String(), SnapshotToken: "s", Complete: true, Exists: true, PreImage: map[string]any{}}
+	cases := map[string][]ProtectedEvidence{
+		"missing":               nil,
+		"duplicate":             {valid, valid},
+		"empty id":              {{CanonicalTarget: key.String(), SnapshotToken: "s", Complete: true}},
+		"incomplete":            {{OperationID: "one", CanonicalTarget: key.String(), SnapshotToken: "s"}},
+		"wrong target":          {{OperationID: "one", CanonicalTarget: "wrong", SnapshotToken: "s", Complete: true}},
+		"present without image": {{OperationID: "one", CanonicalTarget: key.String(), SnapshotToken: "s", Complete: true, Exists: true}},
+		"absent with image":     {{OperationID: "one", CanonicalTarget: key.String(), SnapshotToken: "s", Complete: true, PreImage: map[string]any{}}},
+		"failed carrying facts": {{OperationID: "one", CanonicalTarget: key.String(), PreparationError: errors.New("private"), Complete: true}},
+	}
+	for name, evidence := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, err := assessProtected(context.Background(), []ProtectedOperation{op}, evidence, nil, nil, true); err == nil {
+				t.Fatal("invalid evidence accepted")
+			}
+		})
+	}
+}
