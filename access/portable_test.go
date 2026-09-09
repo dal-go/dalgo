@@ -72,6 +72,25 @@ func TestPortableNormalizationPreservesFieldPresence(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestPortableNormalizationTraversesNestedRuleSetsAndConstants(t *testing.T) {
+	doc, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	require.NoError(t, err)
+	rule := doc.Scopes[0].Rules[0]
+	rule.Where = &DocumentCondition{And: []DocumentCondition{{Op: "in", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Values: []any{uint64(1), map[string]any{"n": float64(1.5)}}}}}}
+	doc.Scopes = nil
+	doc.RuleSets = map[string][]DTQLScope{"reader": {{Path: "/users", Rules: []DTQLRule{rule}, Scopes: []DTQLScope{{Path: "/*", Rules: []DTQLRule{{ID: "nested", Effect: "allow", Operations: []string{"get"}}}}}}}}
+	doc.Bindings = &DocumentBindings{Everyone: []string{"reader"}}
+	_, err = NormalizeDTQLPolicy(doc)
+	require.Error(t, err, "non-scalar nested constant must be rejected after recursive normalization")
+
+	doc, err = ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	require.NoError(t, err)
+	bad := Mask{}
+	doc.Scopes[0].Rules[0].FieldMask = &bad
+	_, err = NormalizeDTQLPolicy(doc)
+	require.Error(t, err)
+}
+
 func TestPortableNormalizationRejectsUnsafeExtensions(t *testing.T) {
 	base, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
 	require.NoError(t, err)
