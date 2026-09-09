@@ -270,10 +270,15 @@ func TestQueryFieldRestrictionsCoverCallerExpressions(t *testing.T) {
 	session := SecureReadwriteSession(stub, MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name"))))
 	from := dal.From(dal.NewRootCollectionRef("users", ""))
 	tests := map[string]dal.StructuredQuery{
-		"where":          dal.NewQueryBuilder(from).WhereField("secret", dal.Equal, "guess").SelectKeysOnly(reflect.String),
-		"order":          dal.NewQueryBuilder(from).OrderBy(dal.AscendingField("secret")).SelectKeysOnly(reflect.String),
-		"select":         dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Field("secret")}),
-		"aliased select": dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Field("secret"), Alias: "value"}),
+		"where":           dal.NewQueryBuilder(from).WhereField("secret", dal.Equal, "guess").SelectKeysOnly(reflect.String),
+		"order":           dal.NewQueryBuilder(from).OrderBy(dal.AscendingField("secret")).SelectKeysOnly(reflect.String),
+		"select":          dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Field("secret")}),
+		"aliased select":  dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Field("secret"), Alias: "value"}),
+		"group":           dal.NewQueryBuilder(from).GroupBy(dal.Field("secret")).SelectKeysOnly(reflect.String),
+		"having":          dal.NewQueryBuilder(from).Having(dal.WhereField("secret", dal.Equal, "guess")).SelectKeysOnly(reflect.String),
+		"constant select": dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Constant{Value: "x"}}),
+		"nil select":      dal.NewQueryBuilder(from).SelectColumns(dal.Column{}),
+		"nil order":       dal.NewQueryBuilder(from).OrderBy(nil).SelectKeysOnly(reflect.String),
 	}
 	for name, query := range tests {
 		t.Run(name, func(t *testing.T) {
