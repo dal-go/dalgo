@@ -40,13 +40,17 @@ func TestMaskMutationDescendants(t *testing.T) {
 	pre := map[string]any{"address": map[string]any{"city": "Dublin", "secret": "hidden"}}
 	post := map[string]any{"address": map[string]any{"city": "Cork"}}
 	whole := writeImages{pre: pre, post: post, updates: []update.Update{update.ByFieldName("address", post["address"])}}
-	refused := sets.disallowedMaskedMutation(whole, Update)
+	refused, unsupported := sets.disallowedMaskedMutation(whole, Update)
+	require.False(t, unsupported)
 	require.Contains(t, refused, "address.secret")
 	require.Contains(t, refused, "address")
 	leaf := writeImages{pre: pre, post: post, updates: []update.Update{update.ByFieldPath(update.FieldPath{"address", "city"}, "Cork")}}
-	require.Empty(t, sets.disallowedMaskedMutation(leaf, Update))
+	refused, unsupported = sets.disallowedMaskedMutation(leaf, Update)
+	require.Empty(t, refused)
+	require.False(t, unsupported)
 	for _, operation := range []Operations{Set, Delete} {
-		refused = sets.disallowedMaskedMutation(writeImages{pre: pre, post: post}, operation)
+		refused, unsupported = sets.disallowedMaskedMutation(writeImages{pre: pre, post: post}, operation)
+		require.False(t, unsupported)
 		require.Contains(t, refused, "address.secret")
 	}
 	// Arrays are opaque: a child restoration does not authorize the whole array.
@@ -103,4 +107,22 @@ func TestMaskOpaqueContainersDoNotLeakDescendants(t *testing.T) {
 	}
 	require.True(t, c.CompleteSubtree("name"))
 	require.False(t, c.CompleteSubtree("address"))
+}
+
+func TestMaskMutationDistinguishesOpaqueCoverageFromDefiniteExclusion(t *testing.T) {
+	c, err := CompileMask(Mask{Stages: []MaskStage{{Include: []string{"*"}}, {Exclude: []string{"address.secret"}}}}, FieldMask)
+	require.NoError(t, err)
+	w := writeResidual{policy: "p", residual: &WriteResidual{Terminal: &WriteAlternative{Rule: "r", fields: &fieldSet{mask: c}}}}
+	for name, value := range map[string]any{"opaque": struct{ Secret string }{"hidden"}, "enumerable": map[string]any{"secret": "hidden"}} {
+		t.Run(name, func(t *testing.T) {
+			err := checkFields(Set, writeImages{post: map[string]any{"address": value}}, w, *w.residual.Terminal)
+			var denied *DeniedError
+			require.ErrorAs(t, err, &denied)
+			if name == "opaque" {
+				require.Equal(t, CodeEnforcementUnsupported, denied.Decision.Code)
+			} else {
+				require.Equal(t, CodeColumnDenied, denied.Decision.Code)
+			}
+		})
+	}
 }

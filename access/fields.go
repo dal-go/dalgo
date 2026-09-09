@@ -355,7 +355,7 @@ func (sets fieldSets) allowsValue(path string, value any) bool {
 
 // Masked parent mutations must authorize all affected descendants, including
 // removed pre-image fields. A leaf update does not acquire an ancestor veto.
-func (sets fieldSets) disallowedMaskedMutation(images writeImages, operation Operations) []string {
+func (sets fieldSets) disallowedMaskedMutation(images writeImages, operation Operations) (refused []string, unsupported bool) {
 	masked := false
 	for _, set := range sets {
 		if set != nil && set.mask != nil {
@@ -363,9 +363,8 @@ func (sets fieldSets) disallowedMaskedMutation(images writeImages, operation Ope
 		}
 	}
 	if !masked {
-		return nil
+		return nil, false
 	}
-	var refused []string
 	var walk func(string, any)
 	walk = func(path string, value any) {
 		nested, knownObject := value.(map[string]any)
@@ -375,6 +374,10 @@ func (sets fieldSets) disallowedMaskedMutation(images writeImages, operation Ope
 		}
 		if !allowed {
 			refused = append(refused, path)
+			kind := reflect.ValueOf(value)
+			if !knownObject && kind.IsValid() && (kind.Kind() == reflect.Array || kind.Kind() == reflect.Slice || kind.Kind() == reflect.Map || kind.Kind() == reflect.Struct || kind.Kind() == reflect.Pointer) {
+				unsupported = true
+			}
 		}
 		if knownObject {
 			for key, child := range nested {
@@ -416,5 +419,5 @@ func (sets fieldSets) disallowedMaskedMutation(images writeImages, operation Ope
 		}
 	}
 	sort.Strings(refused)
-	return refused
+	return refused, unsupported
 }

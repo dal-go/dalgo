@@ -224,9 +224,13 @@ func checkFields(operation Operations, images writeImages, w writeResidual, alte
 	} else {
 		refused = sets.disallowedPaths(images.post)
 	}
-	refused = append(refused, sets.disallowedMaskedMutation(images, operation)...)
+	maskedRefused, unsupported := sets.disallowedMaskedMutation(images, operation)
+	refused = append(refused, maskedRefused...)
 	if len(refused) == 0 {
 		return nil
+	}
+	if unsupported {
+		return w.denyWith(operation, alternative.Rule, sets.sources(), CodeEnforcementUnsupported, DecisionScopeColumn, DecisionSlotFields, "field-mask coverage of an opaque composite value cannot be proven")
 	}
 	sort.Strings(refused)
 	columns := make([][]string, 0, len(refused))
