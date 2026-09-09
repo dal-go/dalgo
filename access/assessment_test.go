@@ -12,7 +12,8 @@ import (
 
 type malformedAssessmentPolicy struct{}
 
-func (malformedAssessmentPolicy) Name() string { return "bad" }
+func (malformedAssessmentPolicy) Name() string         { return "bad" }
+func (malformedAssessmentPolicy) InspectionPure() bool { return true }
 func (malformedAssessmentPolicy) Decide(context.Context, Request) Decision {
 	return Decision{Effect: "allow"}
 }
@@ -94,6 +95,45 @@ func TestAssessPlanEmptyAndMalformedAreIndeterminate(t *testing.T) {
 	assessment := AssessPlan(context.Background(), request, []Policy{malformedAssessmentPolicy{}})
 	if assessment.Outcome != AssessmentIndeterminate || assessment.Complete || assessment.Policies[0].Decision.Code != CodeEvaluationFailed {
 		t.Fatalf("malformed assessment = %+v", assessment)
+	}
+}
+
+type impureAssessmentPolicy struct{ calls *int }
+
+func (p impureAssessmentPolicy) Name() string { return "custom" }
+func (p impureAssessmentPolicy) Decide(_ context.Context, request Request) Decision {
+	*p.calls++
+	return Decision{Allowed: true, Operation: request.Operation}
+}
+func (p impureAssessmentPolicy) Authorize(ctx context.Context, request Request) error {
+	if p.Decide(ctx, request).Allowed {
+		return nil
+	}
+	return ErrAccessDenied
+}
+
+func TestAssessPlanRequiresExplicitCustomPolicyPurity(t *testing.T) {
+	request := Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("docs", "d1"))}}
+	calls := 0
+	custom := impureAssessmentPolicy{calls: &calls}
+	assessment := AssessPlan(context.Background(), request, []Policy{custom})
+	if calls != 0 || assessment.Outcome != AssessmentIndeterminate || assessment.Complete || assessment.Policies[0].Decision.Code != CodeEnforcementUnsupported {
+		t.Fatalf("calls=%d assessment=%+v", calls, assessment)
+	}
+	pure, err := DeclareInspectionPure(custom)
+	if err != nil || !CanInspectPolicy(pure) {
+		t.Fatalf("pure=%T err=%v", pure, err)
+	}
+	described, err := WithPolicyMetadata(pure, PolicyMetadata{ID: "public-custom", Revision: "r1", Visibility: PolicyVisibilityPublic})
+	if err != nil || !CanInspectPolicy(described) {
+		t.Fatalf("described purity lost: %T err=%v", described, err)
+	}
+	assessment = AssessPlan(context.Background(), request, []Policy{described})
+	if calls != 1 || assessment.Outcome != AssessmentAllow || assessment.Policies[0].Policy.ID != "public-custom" {
+		t.Fatalf("calls=%d assessment=%+v", calls, assessment)
+	}
+	if _, err := DeclareInspectionPure(nil); err == nil {
+		t.Fatal("nil custom policy accepted")
 	}
 }
 

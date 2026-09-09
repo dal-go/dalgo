@@ -259,6 +259,8 @@ func (p *PrincipalPolicySet) Decide(ctx context.Context, request Request) Decisi
 	return decision
 }
 
+func (*PrincipalPolicySet) InspectionPure() bool { return true }
+
 func (p *PrincipalPolicySet) Authorize(ctx context.Context, request Request) error {
 	decision := p.Decide(ctx, request)
 	if decision.Allowed {

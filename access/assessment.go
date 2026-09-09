@@ -104,6 +104,7 @@ type describedPolicy struct {
 }
 
 func (p describedPolicy) PolicyMetadata() PolicyMetadata { return p.metadata }
+func (p describedPolicy) InspectionPure() bool           { return CanInspectPolicy(p.Policy) }
 
 // WithPolicyMetadata attaches immutable owner snapshot metadata to a policy.
 func WithPolicyMetadata(policy Policy, metadata PolicyMetadata) (Policy, error) {
@@ -181,7 +182,7 @@ func AssessPlan(ctx context.Context, request Request, policies []Policy) Assessm
 	if len(policies) == 0 {
 		return Assessment{Outcome: AssessmentIndeterminate, Complete: false, Policies: []PolicyAssessment{}, Restrictions: []AssessmentRestriction{}}
 	}
-	assessment := assessPolicies(ctx, request, policies)
+	assessment := assessPoliciesForInspection(ctx, request, policies)
 	assessment.applyStaticFieldValidation(request)
 	return assessment.public()
 }
@@ -266,12 +267,34 @@ func writeMayAllowField(write *WriteResidual, field string) bool {
 }
 
 func assessPolicies(ctx context.Context, request Request, policies []Policy) policyAssessment {
+	return assessPoliciesMode(ctx, request, policies, false)
+}
+
+func assessPoliciesForInspection(ctx context.Context, request Request, policies []Policy) policyAssessment {
+	return assessPoliciesMode(ctx, request, policies, true)
+}
+
+func assessPoliciesMode(ctx context.Context, request Request, policies []Policy, inspection bool) policyAssessment {
 	a := policyAssessment{assessment: Assessment{Outcome: AssessmentAllow, Complete: true}}
 	for policyIndex, policy := range policies {
 		if policy == nil {
 			decision := Decision{Operation: request.Operation, Effect: effectDeny.String(), Code: CodeEvaluationFailed, Scope: DecisionScopeConfiguration, Explanation: "nil mandatory policy"}
 			a.assessment.Policies = append(a.assessment.Policies, PolicyAssessment{Decision: decision})
 			a.assessment.Complete = false
+			continue
+		}
+		if inspection && !CanInspectPolicy(policy) {
+			metadata := DescribePolicy(policy)
+			decision := Decision{Operation: request.Operation, Policy: policy.Name(), PolicySource: metadata.Source, Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeOperation, Explanation: "policy is not declared safe for inspection"}
+			if len(request.Resources) > 0 {
+				decision.Resource = request.Resources[0]
+			}
+			a.assessment.Policies = append(a.assessment.Policies, PolicyAssessment{Policy: metadata, Decision: decision})
+			a.assessment.Complete = false
+			if a.firstIndeterminate == nil {
+				copy := decision
+				a.firstIndeterminate = &copy
+			}
 			continue
 		}
 		decision := normalizeDecision(policy, request, policy.Decide(ctx, request))

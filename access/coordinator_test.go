@@ -98,6 +98,44 @@ func TestPreparationFailureCannotCarryPrivateEvidence(t *testing.T) {
 	}
 }
 
+func TestCoordinatorDoesNotReplayImpurePolicyForInspectionOrVisibility(t *testing.T) {
+	events := []string{}
+	key := record.NewKeyWithID("docs", "d1")
+	evidence := []ProtectedEvidence{{OperationID: "op1", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{}, CandidateImage: map[string]any{"title": "new"}, CandidateRevision: "v2", Complete: true}}
+	storage := &coordinatorStorage{events: &events, evidence: evidence}
+	calls := 0
+	custom := impureAssessmentPolicy{calls: &calls}
+	lease, _ := NewStaticPolicyLease(custom)
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+	op, _ := NewProtectedSet("op1", key, map[string]any{"title": "new"}, "")
+	err := coordinator.WithinInspection(context.Background(), []ProtectedOperation{op}, func(session InspectionSession) error {
+		assessment, err := session.Assess(context.Background())
+		if err != nil || calls != 0 || assessment.Outcome != AssessmentIndeterminate || assessment.Policies[0].Decision.Code != CodeEnforcementUnsupported {
+			t.Fatalf("calls=%d assessment=%+v err=%v", calls, assessment, err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events = nil
+	err = coordinator.WithinExecution(context.Background(), []ProtectedOperation{op}, func(session ExecutionSession) error {
+		assessment, err := session.Assess(context.Background())
+		if err != nil || assessment.Outcome != AssessmentAllow || calls != 1 {
+			t.Fatalf("calls=%d assessment=%+v err=%v", calls, assessment, err)
+		}
+		visible, err := session.ReadVisibility(context.Background())
+		if err != nil || visible["op1"] || calls != 1 {
+			t.Fatalf("visibility=%v calls=%d err=%v", visible, calls, err)
+		}
+		_, err = session.Execute(context.Background())
+		return err
+	})
+	if err != nil || calls != 1 {
+		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+}
+
 type coordinatorStorage struct {
 	events      *[]string
 	evidence    []ProtectedEvidence

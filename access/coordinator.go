@@ -310,7 +310,7 @@ func (c *EnforcementCoordinator) WithinInspection(ctx context.Context, operation
 			return err
 		}
 		validationErr := c.validateCandidates(ctx, operations, evidence)
-		session, err := newInspectionSession(ctx, operations, evidence, c.participants, leases, validationErr)
+		session, err := newInspectionSession(ctx, operations, evidence, c.participants, leases, validationErr, true)
 		if err != nil {
 			return err
 		}
@@ -441,7 +441,8 @@ type unavailablePolicy struct {
 	cause error
 }
 
-func (p unavailablePolicy) Name() string { return p.name }
+func (p unavailablePolicy) Name() string       { return p.name }
+func (unavailablePolicy) InspectionPure() bool { return true }
 func (p unavailablePolicy) PolicyMetadata() PolicyMetadata {
 	return PolicyMetadata{ID: p.name, Visibility: PolicyVisibilityPrivate}
 }
@@ -557,7 +558,7 @@ func (s *inspectionSession) evaluateReadVisibility(ctx context.Context) (map[str
 		read.action = Get
 		read.revision = ""
 		read.columns = nil
-		assessment, err := assessProtected(ctx, []ProtectedOperation{read}, filterEvidence(s.evidence, op.id), s.participants, s.leases)
+		assessment, err := assessProtected(ctx, []ProtectedOperation{read}, filterEvidence(s.evidence, op.id), s.participants, s.leases, true)
 		if err != nil {
 			return nil, err
 		}
@@ -705,8 +706,8 @@ func (s *executionSession) Revisions(ctx context.Context) (map[string]string, er
 	return result, nil
 }
 
-func newInspectionSession(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease, validationErr error) (*inspectionSession, error) {
-	assessment, err := assessProtected(ctx, ops, evidence, participants, leases)
+func newInspectionSession(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease, validationErr error, inspection bool) (*inspectionSession, error) {
+	assessment, err := assessProtected(ctx, ops, evidence, participants, leases, inspection)
 	if err != nil {
 		return nil, err
 	}
@@ -734,14 +735,14 @@ func newInspectionSession(ctx context.Context, ops []ProtectedOperation, evidenc
 	return &inspectionSession{alive: true, assessment: assessment, operations: append([]ProtectedOperation(nil), ops...), evidence: cloneProtectedEvidence(evidence), revisionConflict: conflict, admissionErr: admissionErr, ingress: ctx, participants: append([]MandatoryParticipant(nil), participants...), leases: append([]PolicyLease(nil), leases...)}, nil
 }
 func newExecutionSession(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease, storage ProtectedExecutionStorage, validationErr error) (*executionSession, error) {
-	inspection, err := newInspectionSession(ctx, ops, evidence, participants, leases, validationErr)
+	inspection, err := newInspectionSession(ctx, ops, evidence, participants, leases, validationErr, false)
 	if err != nil {
 		return nil, err
 	}
 	return &executionSession{inspectionSession: inspection, storage: storage}, nil
 }
 
-func assessProtected(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease) (Assessment, error) {
+func assessProtected(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease, inspection bool) (Assessment, error) {
 	if len(evidence) != len(ops) {
 		return Assessment{}, fmt.Errorf("access: incomplete protected evidence")
 	}
@@ -774,7 +775,7 @@ func assessProtected(ctx context.Context, ops []ProtectedOperation, evidence []P
 		}
 		request := Request{Operation: op.action, Resources: []Resource{RecordResourceForKey(op.key)}, Columns: clonePaths(op.columns)}
 		for i, lease := range leases {
-			internal := assessPolicies(ctx, request, lease.Policies())
+			internal := assessPoliciesMode(ctx, request, lease.Policies(), inspection)
 			internal.applyStaticFieldValidation(request)
 			planned := internal.public()
 			for j := range planned.Policies {

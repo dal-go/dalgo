@@ -186,6 +186,37 @@ type Policy interface {
 	Authorize(context.Context, Request) error
 }
 
+// InspectionPurePolicy declares that Decide is deterministic and free of
+// externally observable side effects, so it may be evaluated by plan and
+// inspection APIs without performing the represented operation.
+type InspectionPurePolicy interface {
+	Policy
+	InspectionPure() bool
+}
+
+type declaredInspectionPurePolicy struct{ Policy }
+
+func (declaredInspectionPurePolicy) InspectionPure() bool { return true }
+func (p declaredInspectionPurePolicy) PolicyMetadata() PolicyMetadata {
+	return DescribePolicy(p.Policy)
+}
+
+// DeclareInspectionPure explicitly opts a custom policy into plan and
+// inspection evaluation. The caller is responsible for the purity claim.
+func DeclareInspectionPure(policy Policy) (Policy, error) {
+	if policy == nil {
+		return nil, fmt.Errorf("access: inspection-pure policy is nil")
+	}
+	return declaredInspectionPurePolicy{Policy: policy}, nil
+}
+
+// CanInspectPolicy reports whether plan and inspection APIs may safely call
+// the policy's Decide method.
+func CanInspectPolicy(policy Policy) bool {
+	pure, ok := policy.(InspectionPurePolicy)
+	return ok && pure.InspectionPure()
+}
+
 // AccessPolicy is the declarative hierarchical Policy implementation.
 type AccessPolicy struct {
 	name           string
@@ -221,6 +252,8 @@ func MustPolicy(name string, rules ...Rule) *AccessPolicy {
 }
 
 func (p *AccessPolicy) Name() string { return p.name }
+
+func (*AccessPolicy) InspectionPure() bool { return true }
 
 // Source returns an optional storage-neutral reference supplied while loading
 // a policy document, such as an object key, URL, database key, or file path.
