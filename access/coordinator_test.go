@@ -203,3 +203,53 @@ func TestProtectedProfileRejectsDynamicWorkerBeforeInvocation(t *testing.T) {
 		t.Fatalf("err=%v called=%v", err, called)
 	}
 }
+
+func TestValidationOnlyParticipantDoesNotCreateACLLayer(t *testing.T) {
+	events := []string{}
+	key := record.NewKeyWithID("docs", "d1")
+	storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{{OperationID: "op1", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: false, CandidateImage: map[string]any{"title": "x"}, CandidateRevision: "v1", Complete: true}}}
+	allow := MustPolicy("allow", Scope("docs", AnyID, Allow(Insert)))
+	lease, _ := NewStaticPolicyLease(allow)
+	validated := false
+	coordinator, err := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "schema", Validator: func(context.Context, ProtectedOperation, map[string]any) error { validated = true; return nil }}, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	op, _ := NewProtectedInsert("op1", key, map[string]any{"title": "x"})
+	err = coordinator.WithinInspection(context.Background(), []ProtectedOperation{op}, func(session InspectionSession) error {
+		assessment, err := session.Assess(context.Background())
+		if err != nil {
+			return err
+		}
+		if len(assessment.Policies) != 1 || assessment.Policies[0].LayerID != "owner" {
+			t.Fatalf("policies=%+v", assessment.Policies)
+		}
+		return nil
+	})
+	if err != nil || !validated {
+		t.Fatalf("err=%v validated=%v", err, validated)
+	}
+}
+
+func TestUnavailableProviderStillCollectsDefinitiveDenial(t *testing.T) {
+	events := []string{}
+	key := record.NewKeyWithID("docs", "d1")
+	storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{{OperationID: "read", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{}, Complete: true}}}
+	deny := MustPolicy("deny", Scope("docs", AnyID, Deny(Get)))
+	lease, _ := NewStaticPolicyLease(deny)
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "offline", Provider: func(context.Context) (PolicyLease, error) { return nil, errors.New("offline detail") }}, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+	op, _ := NewProtectedRead("read", Get, key)
+	err := coordinator.WithinInspection(context.Background(), []ProtectedOperation{op}, func(session InspectionSession) error {
+		assessment, err := session.Assess(context.Background())
+		if err != nil {
+			return err
+		}
+		if assessment.Outcome != AssessmentDeny || len(assessment.Policies) != 2 || assessment.Policies[0].Decision.Code != CodeSourceUnavailable || assessment.Policies[1].Decision.Code != CodeRuleDenied {
+			t.Fatalf("assessment=%+v", assessment)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

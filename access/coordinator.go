@@ -95,14 +95,14 @@ func newProtectedOperation(id string, action Operations, key *record.Key, data m
 	if err := key.Validate(); err != nil {
 		return ProtectedOperation{}, fmt.Errorf("access: protected operation key: %w", err)
 	}
-	return ProtectedOperation{id: id, action: action, key: cloneKey(key), target: key.String(), data: condeval.CloneMap(data), updates: cloneProtectedUpdates(updates), revision: revision}, nil
+	return ProtectedOperation{id: id, action: action, key: cloneKey(key), target: key.String(), data: cloneMap(data), updates: cloneProtectedUpdates(updates), revision: revision}, nil
 }
 
 func (o ProtectedOperation) ID() string                 { return o.id }
 func (o ProtectedOperation) Action() Operations         { return o.action }
 func (o ProtectedOperation) Key() *record.Key           { return cloneKey(o.key) }
 func (o ProtectedOperation) CanonicalTarget() string    { return o.target }
-func (o ProtectedOperation) Data() map[string]any       { return condeval.CloneMap(o.data) }
+func (o ProtectedOperation) Data() map[string]any       { return cloneMap(o.data) }
 func (o ProtectedOperation) Updates() []ProtectedUpdate { return cloneProtectedUpdates(o.updates) }
 func (o ProtectedOperation) IfDataRevision() string     { return o.revision }
 func (o ProtectedOperation) Columns() [][]string        { return clonePaths(o.columns) }
@@ -126,6 +126,12 @@ func cloneValue(value any) any {
 		return out
 	}
 	return value
+}
+func cloneMap(value map[string]any) map[string]any {
+	if value == nil {
+		return nil
+	}
+	return condeval.CloneMap(value)
 }
 func cloneKey(key *record.Key) *record.Key {
 	if key == nil {
@@ -235,9 +241,10 @@ type ExecutionReceipt struct {
 }
 
 type EnforcementCoordinator struct {
-	storage      ProtectedStorage
-	participants []MandatoryParticipant
-	validator    CandidateValidator
+	storage                ProtectedStorage
+	participants           []MandatoryParticipant
+	validationParticipants []MandatoryParticipant
+	validator              CandidateValidator
 }
 
 // CandidateValidator performs pure schema/business validation of one complete
@@ -256,13 +263,23 @@ func NewValidatedEnforcementCoordinator(storage ProtectedStorage, validator Cand
 		return nil, fmt.Errorf("access: at least one mandatory participant is required")
 	}
 	seen := map[string]bool{}
+	var policyParticipants, validationParticipants []MandatoryParticipant
 	for i, p := range participants {
-		if p.LayerID == "" || p.Provider == nil || seen[p.LayerID] {
+		if p.LayerID == "" || (p.Provider == nil && p.Validator == nil) || seen[p.LayerID] {
 			return nil, fmt.Errorf("access: invalid mandatory participant at index %d", i)
 		}
 		seen[p.LayerID] = true
+		if p.Provider != nil {
+			policyParticipants = append(policyParticipants, p)
+		}
+		if p.Validator != nil {
+			validationParticipants = append(validationParticipants, p)
+		}
 	}
-	return &EnforcementCoordinator{storage: storage, participants: append([]MandatoryParticipant(nil), participants...), validator: validator}, nil
+	if len(policyParticipants) == 0 {
+		return nil, fmt.Errorf("access: at least one mandatory policy participant is required")
+	}
+	return &EnforcementCoordinator{storage: storage, participants: append([]MandatoryParticipant(nil), policyParticipants...), validationParticipants: append([]MandatoryParticipant(nil), validationParticipants...), validator: validator}, nil
 }
 
 func (c *EnforcementCoordinator) WithinInspection(ctx context.Context, operations []ProtectedOperation, inspect func(InspectionSession) error) error {
@@ -288,10 +305,8 @@ func (c *EnforcementCoordinator) WithinInspection(ctx context.Context, operation
 		if err != nil {
 			return err
 		}
-		if err := c.validateCandidates(ctx, operations, evidence); err != nil {
-			return err
-		}
-		session, err := newInspectionSession(ctx, operations, evidence, c.participants, leases)
+		validationErr := c.validateCandidates(ctx, operations, evidence)
+		session, err := newInspectionSession(ctx, operations, evidence, c.participants, leases, validationErr)
 		if err != nil {
 			return err
 		}
@@ -324,10 +339,8 @@ func (c *EnforcementCoordinator) WithinExecution(ctx context.Context, operations
 		if err != nil {
 			return err
 		}
-		if err := c.validateCandidates(ctx, operations, evidence); err != nil {
-			return err
-		}
-		session, err := newExecutionSession(ctx, operations, evidence, c.participants, leases, storage)
+		validationErr := c.validateCandidates(ctx, operations, evidence)
+		session, err := newExecutionSession(ctx, operations, evidence, c.participants, leases, storage, validationErr)
 		if err != nil {
 			return err
 		}
@@ -347,29 +360,32 @@ func (c *EnforcementCoordinator) validateCandidates(ctx context.Context, operati
 		layer    string
 		validate CandidateValidator
 	}
-	validators := make([]registeredValidator, 0, len(c.participants)+1)
+	validators := make([]registeredValidator, 0, len(c.validationParticipants)+1)
 	if c.validator != nil {
 		validators = append(validators, registeredValidator{validate: c.validator})
 	}
-	for _, participant := range c.participants {
+	for _, participant := range c.validationParticipants {
 		if participant.Validator != nil {
 			validators = append(validators, registeredValidator{layer: participant.LayerID, validate: participant.Validator})
 		}
-	}
-	if len(validators) == 0 {
-		return nil
 	}
 	byID := map[string]ProtectedEvidence{}
 	for _, item := range evidence {
 		byID[item.OperationID] = item
 	}
 	for _, op := range operations {
-		if op.action == Delete || op.action == Get || op.action == Exists {
+		if op.action == Get || op.action == Exists {
 			continue
 		}
 		item, ok := byID[op.id]
-		if !ok || item.CandidateImage == nil {
+		if !ok || (op.action != Delete && item.CandidateImage == nil) || (op.action == Delete && item.CandidateImage != nil) {
 			return fmt.Errorf("access: candidate validation lacks complete image for %q", op.id)
+		}
+		if item.CandidateRevision == "" {
+			return fmt.Errorf("access: candidate validation lacks revision for %q", op.id)
+		}
+		if op.action == Delete {
+			continue
 		}
 		for _, validator := range validators {
 			if err := validator.validate(ctx, op, condeval.CloneMap(item.CandidateImage)); err != nil {
@@ -384,21 +400,60 @@ func (c *EnforcementCoordinator) acquire(ctx context.Context) ([]PolicyLease, er
 	leases := make([]PolicyLease, 0, len(c.participants))
 	for _, p := range c.participants {
 		lease, err := p.Provider(ctx)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			if lease != nil {
+				lease.Release()
+			}
+			releaseLeases(leases)
+			return nil, ctxErr
+		}
 		var policies []Policy
 		if lease != nil {
 			policies = lease.Policies()
 		}
 		if err != nil || lease == nil || len(policies) == 0 || len(policies) > 100 {
-			releaseLeases(leases)
-			if err == nil {
-				err = fmt.Errorf("empty policy lease")
+			if lease != nil {
+				lease.Release()
 			}
-			return nil, &PolicyProviderError{Err: err}
+			code := CodeSourceUnavailable
+			if err == nil {
+				err = fmt.Errorf("invalid policy snapshot")
+				code = CodeConfigurationInvalid
+			}
+			leases = append(leases, &unavailablePolicyLease{policy: unavailablePolicy{name: p.LayerID, code: code, cause: err}})
+			continue
 		}
 		leases = append(leases, &pinnedPolicyLease{PolicyLease: lease, policies: append([]Policy(nil), policies...)})
 	}
 	return leases, nil
 }
+
+type unavailablePolicy struct {
+	name  string
+	code  ReasonCode
+	cause error
+}
+
+func (p unavailablePolicy) Name() string { return p.name }
+func (p unavailablePolicy) PolicyMetadata() PolicyMetadata {
+	return PolicyMetadata{ID: p.name, Visibility: PolicyVisibilityPrivate}
+}
+func (p unavailablePolicy) Decide(_ context.Context, request Request) Decision {
+	decision := Decision{Operation: request.Operation, Policy: p.name, Effect: effectDeny.String(), Code: p.code, Scope: DecisionScopeConfiguration, Explanation: "mandatory policy participant is unavailable"}
+	if len(request.Resources) > 0 {
+		decision.Resource = request.Resources[0]
+	}
+	return decision
+}
+func (p unavailablePolicy) Authorize(ctx context.Context, request Request) error {
+	return &DeniedError{Decision: p.Decide(ctx, request)}
+}
+
+type unavailablePolicyLease struct{ policy unavailablePolicy }
+
+func (l *unavailablePolicyLease) Policies() []Policy { return []Policy{l.policy} }
+func (*unavailablePolicyLease) Revision() string     { return "" }
+func (*unavailablePolicyLease) Release()             {}
 
 type pinnedPolicyLease struct {
 	PolicyLease
@@ -565,8 +620,7 @@ func (s *inspectionSession) Assess(ctx context.Context) (Assessment, error) {
 		return assessment, s.admissionErr
 	}
 	if s.revisionConflict && assessment.Outcome == AssessmentAllow {
-		assessment.Outcome = AssessmentIndeterminate
-		assessment.Complete = false
+		return assessment, ErrDataRevisionConflict
 	}
 	return assessment, nil
 }
@@ -644,13 +698,13 @@ func (s *executionSession) Revisions(ctx context.Context) (map[string]string, er
 	return result, nil
 }
 
-func newInspectionSession(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease) (*inspectionSession, error) {
+func newInspectionSession(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease, validationErr error) (*inspectionSession, error) {
 	assessment, err := assessProtected(ctx, ops, evidence, participants, leases)
 	if err != nil {
 		return nil, err
 	}
 	conflict := false
-	var admissionErr error
+	admissionErr := validationErr
 	for _, op := range ops {
 		for _, item := range evidence {
 			if item.OperationID != op.id {
@@ -669,8 +723,8 @@ func newInspectionSession(ctx context.Context, ops []ProtectedOperation, evidenc
 	}
 	return &inspectionSession{alive: true, assessment: assessment, operations: append([]ProtectedOperation(nil), ops...), evidence: cloneProtectedEvidence(evidence), revisionConflict: conflict, admissionErr: admissionErr, ingress: ctx, participants: append([]MandatoryParticipant(nil), participants...), leases: append([]PolicyLease(nil), leases...)}, nil
 }
-func newExecutionSession(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease, storage ProtectedExecutionStorage) (*executionSession, error) {
-	inspection, err := newInspectionSession(ctx, ops, evidence, participants, leases)
+func newExecutionSession(ctx context.Context, ops []ProtectedOperation, evidence []ProtectedEvidence, participants []MandatoryParticipant, leases []PolicyLease, storage ProtectedExecutionStorage, validationErr error) (*executionSession, error) {
+	inspection, err := newInspectionSession(ctx, ops, evidence, participants, leases, validationErr)
 	if err != nil {
 		return nil, err
 	}
@@ -699,15 +753,6 @@ func assessProtected(ctx context.Context, ops []ProtectedOperation, evidence []P
 		}
 		if !item.Exists && item.PreImage != nil {
 			return Assessment{}, fmt.Errorf("access: absent evidence carries a pre-image for %q", op.id)
-		}
-		if op.action != Delete && op.action != Get && op.action != Exists && item.CandidateImage == nil {
-			return Assessment{}, fmt.Errorf("access: write evidence lacks final candidate for %q", op.id)
-		}
-		if op.action == Delete && item.CandidateImage != nil {
-			return Assessment{}, fmt.Errorf("access: delete evidence carries a candidate for %q", op.id)
-		}
-		if op.action != Get && op.action != Exists && item.CandidateRevision == "" {
-			return Assessment{}, fmt.Errorf("access: write evidence lacks candidate revision for %q", op.id)
 		}
 		request := Request{Operation: op.action, Resources: []Resource{RecordResourceForKey(op.key)}, Columns: clonePaths(op.columns)}
 		for i, lease := range leases {
@@ -814,8 +859,8 @@ func cloneProtectedEvidence(in []ProtectedEvidence) []ProtectedEvidence {
 	out := make([]ProtectedEvidence, len(in))
 	for i := range in {
 		out[i] = in[i]
-		out[i].PreImage = condeval.CloneMap(in[i].PreImage)
-		out[i].CandidateImage = condeval.CloneMap(in[i].CandidateImage)
+		out[i].PreImage = cloneMap(in[i].PreImage)
+		out[i].CandidateImage = cloneMap(in[i].CandidateImage)
 	}
 	return out
 }
@@ -824,7 +869,7 @@ func cloneProtectedOperations(in []ProtectedOperation) []ProtectedOperation {
 	for i := range in {
 		out[i] = in[i]
 		out[i].key = cloneKey(in[i].key)
-		out[i].data = condeval.CloneMap(in[i].data)
+		out[i].data = cloneMap(in[i].data)
 		out[i].updates = cloneProtectedUpdates(in[i].updates)
 		out[i].columns = clonePaths(in[i].columns)
 	}
