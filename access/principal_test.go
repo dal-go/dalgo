@@ -463,3 +463,32 @@ func TestApplicationPolicyTypedRealmConstructors(t *testing.T) {
 		t.Fatal("empty realm allowed")
 	}
 }
+
+func TestTypedPrincipalAndRealmConstructorFailures(t *testing.T) {
+	invalid := PrincipalRef{Realm: "", Kind: PrincipalKindUser, ID: "u"}
+	if _, err := NewPrincipal(invalid, nil, nil); err == nil {
+		t.Fatal("invalid subject accepted")
+	}
+	for name, principal := range map[string]Principal{
+		"subject": {Subject: &invalid},
+		"actor":   {Actor: &invalid},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("invalid principal did not panic")
+				}
+			}()
+			_ = WithPrincipal(context.Background(), principal)
+		})
+	}
+	if _, err := NewPolicyForRealm("app", "", Root(Allow(Get))); err == nil {
+		t.Fatal("invalid policy accepted")
+	}
+	if _, err := NewPrincipalPolicySetForRealm("", "x", nil, Bindings{}); err == nil {
+		t.Fatal("invalid set realm accepted")
+	}
+	if _, err := NewPrincipalPolicySetForRealm("app", "", nil, Bindings{}); err == nil {
+		t.Fatal("invalid set accepted")
+	}
+}
