@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/dal-go/dalgo/condeval"
@@ -837,6 +838,35 @@ func evaluateEvidence(op ProtectedOperation, evidence ProtectedEvidence, assessm
 				d.Code = CodeRowPredicateFailed
 				d.Scope = DecisionScopeRow
 				d.Slot = DecisionSlotWhere
+			}
+		}
+		if d.Allowed && op.action == Get && len(op.columns) > 0 && len(d.Writes) > 0 && d.Writes[0] != nil {
+			w := writeResidual{policy: d.Policy, policySource: d.PolicySource, resource: d.Resource, residual: d.Writes[0]}
+			sets, err := decidingFields(Get, data, []writeResidual{w})
+			if err != nil {
+				d.Allowed = false
+				var denied *DeniedError
+				if errors.As(err, &denied) {
+					d.Rule, d.Condition, d.Explanation = denied.Decision.Rule, denied.Decision.Condition, denied.Decision.Explanation
+					d.Code, d.Scope, d.Slot, d.Columns = denied.Decision.Code, denied.Decision.Scope, denied.Decision.Slot, clonePaths(denied.Decision.Columns)
+				}
+				d.Effect = effectDeny.String()
+			} else {
+				var refused [][]string
+				for _, path := range op.columns {
+					if !sets.allowsWhole(strings.Join(path, ".")) {
+						refused = append(refused, append([]string(nil), path...))
+					}
+				}
+				if len(refused) > 0 {
+					d.Allowed = false
+					d.Effect = effectDeny.String()
+					d.Code = CodeColumnDenied
+					d.Scope = DecisionScopeColumn
+					d.Slot = DecisionSlotFields
+					d.Columns = refused
+					d.Explanation = "requested evidence fields are not allowed by the rule selected for the stored row"
+				}
 			}
 		}
 		if d.Allowed && len(d.Writes) > 0 && d.Writes[0] != nil && (op.action == Insert || op.action == Set || op.action == Update || op.action == Delete) {

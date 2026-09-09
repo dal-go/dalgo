@@ -398,6 +398,53 @@ func TestAuthorizedPointEvidenceReturnsOnlyDeclaredFields(t *testing.T) {
 	}
 }
 
+func TestAuthorizedEvidenceUsesRowDecidingFieldAlternativeAcrossLayers(t *testing.T) {
+	key := record.NewKeyWithID("docs", "d1")
+	owner := MustPolicy("owner",
+		Root(Allow(Get, "fallback").Fields("name")),
+		Scope("docs", AnyID, Allow(Get, "own").Where(dal.WhereField("ownerID", dal.Equal, dal.NewParam("currentUser"))).Fields("secret")),
+	)
+	upper := MustPolicy("upper", Scope("docs", AnyID, Allow(Get, "upper-secret").Fields("secret")))
+	ownerLease, _ := NewStaticPolicyLease(owner)
+	upperLease, _ := NewStaticPolicyLease(upper)
+	participants := []MandatoryParticipant{
+		{LayerID: "upper", Provider: func(context.Context) (PolicyLease, error) { return upperLease, nil }},
+		{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return ownerLease, nil }},
+	}
+	op, _ := NewProtectedEvidenceRead("read", Get, key, [][]string{{"secret"}})
+	for name, rowOwner := range map[string]string{"own": "u1", "other": "u2"} {
+		t.Run(name, func(t *testing.T) {
+			events := []string{}
+			storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{{OperationID: "read", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{"ownerID": rowOwner, "name": "visible", "secret": "hidden"}, DataRevision: "r1", Complete: true}}}
+			coordinator, _ := NewEnforcementCoordinator(storage, participants...)
+			err := coordinator.WithinInspection(WithCurrentUser(context.Background(), "u1"), []ProtectedOperation{op}, func(session InspectionSession) error {
+				assessment, err := session.Assess(context.Background())
+				if err != nil {
+					return err
+				}
+				facts, evidenceErr := session.Evidence(context.Background())
+				if rowOwner == "u1" {
+					if assessment.Outcome != AssessmentAllow || evidenceErr != nil || len(facts) != 1 || facts[0].Fields[0].Value != "hidden" {
+						t.Fatalf("own assessment=%+v facts=%+v err=%v", assessment, facts, evidenceErr)
+					}
+				} else {
+					if assessment.Outcome != AssessmentDeny || !errors.Is(evidenceErr, ErrAccessDenied) || len(facts) != 0 {
+						t.Fatalf("other assessment=%+v facts=%+v err=%v", assessment, facts, evidenceErr)
+					}
+					last := assessment.Policies[len(assessment.Policies)-1].Decision
+					if last.Code != CodeColumnDenied || !reflect.DeepEqual(last.Columns, [][]string{{"secret"}}) {
+						t.Fatalf("blocker=%+v", last)
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestExecutionWithoutExecuteAbortsAndReleasesLease(t *testing.T) {
 	events := []string{}
 	key := record.NewKeyWithID("docs", "d1")
