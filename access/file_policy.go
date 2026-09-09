@@ -88,7 +88,8 @@ func LoadPolicyFiles(root string, config FilePolicyConfig) ([]Policy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("access: open policy root: %w", err)
 	}
-	defer rootFS.Close()
+	// Closing this read-only directory handle cannot change the loaded policy.
+	defer func() { _ = rootFS.Close() }()
 
 	policies := make([]Policy, 0, len(config.Policies))
 	names := make(map[string]string, len(config.Policies))
@@ -147,7 +148,8 @@ func loadPolicyFile(root policyRoot, name, database string) (Policy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("access: open policy file %q: %w", name, err)
 	}
-	defer file.Close()
+	// Closing this read-only file cannot change bytes already validated below.
+	defer func() { _ = file.Close() }()
 	opened, err := file.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("access: inspect open policy file %q: %w", name, err)

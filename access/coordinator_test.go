@@ -167,7 +167,6 @@ type coordinatorStorage struct {
 	evidence    []ProtectedEvidence
 	evidenceErr error
 	executeErr  error
-	callbackErr error
 }
 type coordinatorInspectionStorage struct{ parent *coordinatorStorage }
 

@@ -216,10 +216,10 @@ func (m *CompiledMask) Allows(path string) bool {
 // globSegmentMatches uses bounded dynamic programming over Unicode codepoints.
 // It has no regex/backtracking explosion, and never crosses a path separator.
 func globSegmentMatches(pattern, value string) bool {
-	p, v := []rune(pattern), []rune(value)
+	v := []rune(value)
 	previous := make([]bool, len(v)+1)
 	previous[0] = true
-	for _, r := range p {
+	for _, r := range pattern {
 		next := make([]bool, len(v)+1)
 		if r == '*' {
 			next[0] = previous[0]

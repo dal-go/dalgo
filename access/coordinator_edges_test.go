@@ -127,7 +127,7 @@ func TestInspectionSessionLifetimeAndContextBoundaries(t *testing.T) {
 func TestExecutionSessionLifetimeAndReceiptsBoundaries(t *testing.T) {
 	closed := &executionSession{inspectionSession: &inspectionSession{}}
 	closed.executionSession()
-	closed.inspectionSession.isInspectionSession()
+	closed.isInspectionSession()
 	if _, err := closed.Execute(context.Background()); err == nil {
 		t.Fatal("closed execute accepted")
 	}

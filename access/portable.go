@@ -342,8 +342,7 @@ func MarshalDTQLPolicyJSON(document DTQLDocument) ([]byte, error) {
 // Explicit null is not absence for security-bearing selectors. The typed
 // decoders otherwise collapse null pointers and empty collections.
 func validateDTQLShape(root *yaml.Node) error {
-	var mask func(*yaml.Node) error
-	mask = func(node *yaml.Node) error {
+	mask := func(node *yaml.Node) error {
 		if node == nil {
 			return nil
 		}
