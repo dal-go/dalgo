@@ -139,6 +139,7 @@ func TestCoordinatorDoesNotReplayImpurePolicyForInspectionOrVisibility(t *testin
 type coordinatorStorage struct {
 	events      *[]string
 	evidence    []ProtectedEvidence
+	evidenceErr error
 	executeErr  error
 	callbackErr error
 }
@@ -146,6 +147,9 @@ type coordinatorInspectionStorage struct{ parent *coordinatorStorage }
 
 func (s coordinatorInspectionStorage) Evidence(context.Context) ([]ProtectedEvidence, error) {
 	*s.parent.events = append(*s.parent.events, "evidence")
+	if s.parent.evidenceErr != nil {
+		return nil, s.parent.evidenceErr
+	}
 	return cloneProtectedEvidence(s.parent.evidence), nil
 }
 
@@ -555,4 +559,98 @@ func mustProtectedSet(t *testing.T, id string, key *record.Key, revision string)
 		t.Fatal(err)
 	}
 	return op
+}
+
+func TestCoordinatorSessionLifetimeCancellationAndReceipts(t *testing.T) {
+	key := record.NewKeyWithID("docs", "d1")
+	allow := MustPolicy("allow", Scope("docs", AnyID, Allow(Set|Get).Fields("name")))
+	lease, _ := NewStaticPolicyLease(allow)
+	provider := func(context.Context) (PolicyLease, error) { return lease, nil }
+	evidence := []ProtectedEvidence{{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{"name": "old"}, DataRevision: "r1", CandidateImage: map[string]any{"name": "new"}, CandidateRevision: "r2", Complete: true}}
+	events := []string{}
+	storage := &coordinatorStorage{events: &events, evidence: evidence}
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: provider})
+	op, _ := NewProtectedSet("op", key, map[string]any{"name": "new"}, "")
+	ctx, cancel := context.WithCancel(context.Background())
+	var retained ExecutionSession
+	err := coordinator.WithinExecution(ctx, []ProtectedOperation{op}, func(session ExecutionSession) error {
+		retained = session
+		if _, err := session.Receipts(context.Background()); err == nil {
+			t.Fatal("receipts available before execution")
+		}
+		canceled, stop := context.WithCancel(context.Background())
+		stop()
+		if _, err := session.Assess(canceled); !errors.Is(err, context.Canceled) {
+			t.Fatalf("Assess canceled err=%v", err)
+		}
+		if _, err := session.ReadVisibility(canceled); !errors.Is(err, context.Canceled) {
+			t.Fatalf("ReadVisibility canceled err=%v", err)
+		}
+		if _, err := session.Evidence(canceled); !errors.Is(err, context.Canceled) {
+			t.Fatalf("Evidence canceled err=%v", err)
+		}
+		if _, err := session.Execute(canceled); !errors.Is(err, context.Canceled) {
+			t.Fatalf("Execute canceled err=%v", err)
+		}
+		assessment, err := session.Execute(context.Background())
+		if err != nil || assessment.Outcome != AssessmentAllow {
+			t.Fatalf("Execute assessment=%+v err=%v", assessment, err)
+		}
+		receipts, err := session.Receipts(context.Background())
+		if err != nil || len(receipts) != 1 || receipts[0].DataRevision != "r2" {
+			t.Fatalf("receipts=%v err=%v", receipts, err)
+		}
+		receipts[0].DataRevision = "changed"
+		again, _ := session.Receipts(context.Background())
+		if again[0].DataRevision != "r2" {
+			t.Fatal("receipt result was mutable")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	if _, err := retained.Assess(context.Background()); err == nil {
+		t.Fatal("closed Assess succeeded")
+	}
+	if _, err := retained.ReadVisibility(context.Background()); err == nil {
+		t.Fatal("closed ReadVisibility succeeded")
+	}
+	if _, err := retained.Evidence(context.Background()); err == nil {
+		t.Fatal("closed Evidence succeeded")
+	}
+	if _, err := retained.Execute(context.Background()); err == nil {
+		t.Fatal("closed Execute succeeded")
+	}
+	if _, err := retained.Receipts(context.Background()); err == nil {
+		t.Fatal("closed Receipts succeeded")
+	}
+	if _, err := retained.Revisions(context.Background()); err == nil {
+		t.Fatal("closed Revisions succeeded")
+	}
+}
+
+func TestCoordinatorStorageAndExecutionFailuresAbort(t *testing.T) {
+	key := record.NewKeyWithID("docs", "d1")
+	op, _ := NewProtectedSet("op", key, map[string]any{"name": "new"}, "")
+	allow := MustPolicy("allow", Scope("docs", AnyID, Allow(Set)))
+	lease, _ := NewStaticPolicyLease(allow)
+	provider := func(context.Context) (PolicyLease, error) { return lease, nil }
+	evidence := []ProtectedEvidence{{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{}, CandidateImage: map[string]any{"name": "new"}, CandidateRevision: "r2", Complete: true}}
+	for name, storage := range map[string]*coordinatorStorage{
+		"evidence": {events: &[]string{}, evidenceErr: errors.New("evidence failed")},
+		"execute":  {events: &[]string{}, evidence: evidence, executeErr: errors.New("execute failed")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: provider})
+			err := coordinator.WithinExecution(context.Background(), []ProtectedOperation{op}, func(session ExecutionSession) error {
+				_, err := session.Execute(context.Background())
+				return err
+			})
+			if err == nil || !strings.Contains(strings.Join(*storage.events, ","), "storage-abort") {
+				t.Fatalf("err=%v events=%v", err, *storage.events)
+			}
+		})
+	}
 }
