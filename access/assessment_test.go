@@ -151,6 +151,59 @@ func TestPolicyMetadataDefaultsPrivateAndIsDefensive(t *testing.T) {
 	}
 }
 
+func TestPolicyMetadataAndRestrictionValidationFailures(t *testing.T) {
+	policy := MustPolicy("p", Root(Allow(Get)))
+	for name, metadata := range map[string]PolicyMetadata{
+		"id":         {ID: " bad ", Visibility: PolicyVisibilityPublic},
+		"visibility": {ID: "p", Visibility: "future"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := WithPolicyMetadata(policy, metadata); err == nil {
+				t.Fatal("invalid metadata accepted")
+			}
+		})
+	}
+	if _, err := WithPolicyMetadata(nil, PolicyMetadata{ID: "p", Visibility: PolicyVisibilityPublic}); err == nil {
+		t.Fatal("nil policy accepted")
+	}
+	if document, err := (AssessmentRestriction{}).DocumentCondition(); err != nil || document != nil {
+		t.Fatalf("empty restriction document=%v err=%v", document, err)
+	}
+	if _, err := (AssessmentRestriction{Condition: fakeCond{}}).DocumentCondition(); !errors.Is(err, ErrNotSerializable) {
+		t.Fatalf("opaque condition err=%v", err)
+	}
+}
+
+func TestValidateDocumentConditionShapes(t *testing.T) {
+	field := &DocumentExpression{Field: "owner"}
+	value := &DocumentExpression{Value: "u1"}
+	valid := []DocumentCondition{
+		{Op: "==", Left: field, Right: value},
+		{And: []DocumentCondition{{Op: "==", Left: field, Right: value}}},
+		{Or: []DocumentCondition{{Op: "In", Left: field, Right: &DocumentExpression{Values: []any{"u1"}}}}},
+	}
+	for _, condition := range valid {
+		if err := ValidateDocumentCondition(condition); err != nil {
+			t.Fatalf("valid condition %+v: %v", condition, err)
+		}
+	}
+	invalid := []DocumentCondition{
+		{},
+		{Op: "==", Left: field, Right: value, And: []DocumentCondition{{}}},
+		{Op: "future", Left: field, Right: value},
+		{Op: "==", Left: field},
+		{Op: "==", Left: &DocumentExpression{Field: "owner", Param: "x"}, Right: value},
+		{Op: "==", Left: field, Right: &DocumentExpression{Param: "bad name"}},
+		{And: []DocumentCondition{}},
+		{Or: []DocumentCondition{{}}},
+	}
+	for _, condition := range invalid {
+		if err := ValidateDocumentCondition(condition); err == nil {
+			t.Fatalf("invalid condition accepted: %+v", condition)
+		}
+	}
+}
+
 func TestDecisionsFromErrorDeepCopiesSlices(t *testing.T) {
 	original := Decision{Residuals: []dal.Condition{dal.WhereField("id", dal.Equal, "x")}, Columns: [][]string{{"profile", "name"}}, Writes: []*WriteResidual{{Terminal: &WriteAlternative{Rule: "allow", Fields: []string{"name"}}}}}
 	err := &DeniedError{Decision: original, Decisions: []Decision{original}}
