@@ -419,9 +419,10 @@ Integrate authenticated OpenVaultDB query/write transport and render structured 
 
 **Id:** acl-22
 **Depends-On:** 6, 9, 11, 20, 21
-**Status:** in_progress
-**Note:** HTTP/conformance and browser E2E pass both engines. InGitDB84.7%, OVDB60.6%, SQL90.1%, CLI59.1% pass unchanged gates. DALgo access97.2% remains below100%; final browser rerun active after C2 client fix.
-**Evidence:** openvaultdb/openvaultdb-go@1a03797:docs/layered-acl-acceptance.md, ingitdb/dalgo2ingitdb@ffb1f12, dal-go/dalgo2sql@4bb140a, datatug/datatug-apps@5ebb264
+**Status:** complete
+**Implemented-by:** dal-go/dalgo@f95561e (layered-acl-query)
+**Note:** Local acceptance and unchanged gates pass: standalone DALgo100.0%+vet, SQL90.1%+nestedCGO suites, InGitDB84.7%, OVDB60.6%, CLI59.1%, DataTug26unit/lint/build and browser2/2. Unlinked consumer release verification remains task24.
+**Evidence:** openvaultdb/openvaultdb-go@91a11af:docs/layered-acl-acceptance.md, dal-go/dalgo@f4f8955, dal-go/dalgo@f95561e, ingitdb/dalgo2ingitdb@3b86e58, dal-go/dalgo2sql@4bb140a, datatug/datatug-apps@5ebb264
 
 **Repositories:** all participating repos
 
@@ -437,9 +438,10 @@ Run the reviewed full acceptance matrix with masks, principal kinds, independent
 
 **Id:** acl-23
 **Depends-On:** 22
-**Status:** in_progress
-**Note:** Both blind reviews and separate reconciliation complete; all11 numbered findings plus A1 fixed. Astra B independently found and verified closure of later synthetic-ID predicate edge in InGitDB3b86e58. Final browser2/2, client26units, lint/build pass. Review reports and actual available cost metrics durable; waiting task22 coverage gate before delivery closure.
-**Evidence:** openvaultdb/openvaultdb-go@877dcdd:docs/layered-acl-review/report.md, ingitdb/dalgo2ingitdb@3b86e58, datatug/datatug-apps@5ebb264, dal-go/dalgo@ce68a45
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@877dcdd (layered-acl-query)
+**Note:** Both blind implementation reviews and separate reconciliation completed. All11 numbered findings plus A1 fixed; independent InGitDB predicate follow-up D1 closed. Regression evidence and measured/unavailable review telemetry retained in durable report.
+**Evidence:** openvaultdb/openvaultdb-go@877dcdd:docs/layered-acl-review/report.md, ingitdb/dalgo2ingitdb@3b86e58, dal-go/dalgo@ce68a45, datatug/datatug-apps@5ebb264
 
 **Repositories:** all participating repos
 
@@ -456,9 +458,9 @@ Review the final implementation against the approved packet using independent re
 
 **Id:** acl-24
 **Depends-On:** 23
-**Status:** queued
-**Note:** DTQL approved packet landed and cleaned via WB at c2d0487. Independent HTTP adapter fix passes GOWORK=off and WB preparation; landing in progress. Main DALgo/provider/consumer publication wave remains gated by task22.
-**Evidence:** datatug/dtql@c2d0487, openvaultdb/openvaultdb-go@877dcdd:docs/layered-acl-delivery.md, dal-go/dalgo2openvaultdb@cacd422
+**Status:** in_progress
+**Note:** DTQL packet and independent HTTP adapter landed through WB; exact receipts and HTTP adapter pseudo-version recorded. Main provider-first publication, published-version consumer convergence and final unlinked E2E now underway.
+**Evidence:** datatug/dtql@c2d0487, dal-go/dalgo2openvaultdb@cacd422, openvaultdb/openvaultdb-go@3b482ff:docs/layered-acl-delivery.md
 
 **Repositories:** all participating repos
 
