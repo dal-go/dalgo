@@ -176,6 +176,77 @@ func (s *coordinatorStorage) WithinProtectedExecution(_ context.Context, _ []Pro
 	return nil
 }
 
+func TestProtectedOperationConstructionIsDefensive(t *testing.T) {
+	parent := record.NewKeyWithID("accounts", "a1")
+	key, err := record.NewKeyWithOptions("docs", record.WithKeyID("d1"), record.WithParentKey(parent))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := map[string]any{"nested": map[string]any{"items": []any{map[string]any{"value": "original"}}}}
+	op, err := NewProtectedSet("set", key, data, "r1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data["nested"].(map[string]any)["items"].([]any)[0].(map[string]any)["value"] = "mutated"
+	got := op.Data()
+	if got["nested"].(map[string]any)["items"].([]any)[0].(map[string]any)["value"] != "original" {
+		t.Fatal("constructor retained mutable input")
+	}
+	got["nested"].(map[string]any)["items"].([]any)[0].(map[string]any)["value"] = "returned"
+	if op.Data()["nested"].(map[string]any)["items"].([]any)[0].(map[string]any)["value"] != "original" {
+		t.Fatal("Data exposed mutable operation state")
+	}
+	if op.ID() != "set" || op.Action() != Set || op.IfDataRevision() != "r1" || op.CanonicalTarget() != key.String() || op.Key().Parent().ID != "a1" {
+		t.Fatalf("operation accessors changed values: %+v", op)
+	}
+
+	changes := []update.Update{update.ByFieldPath(update.FieldPath{"profile", "name"}, []any{map[string]any{"v": "x"}}), update.DeleteByFieldPath("obsolete")}
+	updated, err := NewProtectedUpdate("update", key, changes, "r2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := updated.Updates()
+	first[0].Path[0] = "changed"
+	first[0].Value.([]any)[0].(map[string]any)["v"] = "changed"
+	if again := updated.Updates(); again[0].Path[0] != "profile" || again[0].Value.([]any)[0].(map[string]any)["v"] != "x" || !again[1].Delete {
+		t.Fatalf("Updates exposed mutable state: %+v", again)
+	}
+	if deleted, err := NewProtectedDelete("delete", key, "r3"); err != nil || deleted.Action() != Delete {
+		t.Fatalf("delete=%+v err=%v", deleted, err)
+	}
+	if _, err := NewProtectedRead("bad", Update, key); err == nil {
+		t.Fatal("invalid protected read action accepted")
+	}
+	if _, err := NewProtectedUpdate("bad", key, []update.Update{nil}, ""); err == nil {
+		t.Fatal("nil update accepted")
+	}
+}
+
+func TestReadVisibilityForRequiresBothPrincipals(t *testing.T) {
+	events := []string{}
+	key := record.NewKeyWithID("docs", "d1")
+	storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{{OperationID: "read", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{"ownerID": "u1"}, Complete: true}}}
+	policy := MustPolicy("owner", Scope("docs", AnyID, Allow(Get).Where(dal.WhereField("ownerID", dal.Equal, dal.NewParam("currentUser")))))
+	lease, _ := NewStaticPolicyLease(policy)
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+	op, _ := NewProtectedRead("read", Get, key)
+	err := coordinator.WithinInspection(WithCurrentUser(context.Background(), "u1"), []ProtectedOperation{op}, func(session InspectionSession) error {
+		other, owner := "u2", "u1"
+		visible, err := session.ReadVisibilityFor(context.Background(), Principal{ID: &other})
+		if err != nil || visible["read"] {
+			t.Fatalf("other visibility=%v err=%v", visible, err)
+		}
+		visible, err = session.ReadVisibilityFor(context.Background(), Principal{ID: &owner})
+		if err != nil || !visible["read"] {
+			t.Fatalf("owner visibility=%v err=%v", visible, err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 type eventLease struct {
 	policies []Policy
 	events   *[]string

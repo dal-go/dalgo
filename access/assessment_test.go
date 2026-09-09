@@ -128,6 +128,9 @@ func TestAssessPlanRequiresExplicitCustomPolicyPurity(t *testing.T) {
 	if err != nil || !CanInspectPolicy(described) {
 		t.Fatalf("described purity lost: %T err=%v", described, err)
 	}
+	if metadata := DescribePolicy(pure); metadata.ID != "custom" || metadata.Visibility != PolicyVisibilityPrivate {
+		t.Fatalf("declared policy metadata=%+v", metadata)
+	}
 	assessment = AssessPlan(context.Background(), request, []Policy{described})
 	if calls != 1 || assessment.Outcome != AssessmentAllow || assessment.Policies[0].Policy.ID != "public-custom" {
 		t.Fatalf("calls=%d assessment=%+v", calls, assessment)

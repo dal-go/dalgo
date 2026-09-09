@@ -206,7 +206,7 @@ func TestPrincipalPolicySetConstruction(t *testing.T) {
 		MustPrincipalPolicySet("", nil, Bindings{})
 	}()
 	set := MustPrincipalPolicySet("docs", docsRuleSets(), docsBindings())
-	if set.Name() != "docs" || set.Source() != "" {
+	if set.Name() != "docs" || set.Source() != "" || !CanInspectPolicy(set) {
 		t.Errorf("name/source = %q/%q", set.Name(), set.Source())
 	}
 }
