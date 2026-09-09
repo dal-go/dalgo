@@ -857,3 +857,42 @@ func TestPolicyLeaseSnapshotFailuresAndCancellation(t *testing.T) {
 		t.Fatal("empty static participant layer accepted")
 	}
 }
+
+type pureDecisionPolicy struct{ decision Decision }
+
+func (pureDecisionPolicy) Name() string                               { return "custom" }
+func (pureDecisionPolicy) InspectionPure() bool                       { return true }
+func (p pureDecisionPolicy) Decide(context.Context, Request) Decision { return p.decision }
+func (p pureDecisionPolicy) Authorize(context.Context, Request) error {
+	if p.decision.Allowed {
+		return nil
+	}
+	return ErrAccessDenied
+}
+
+func TestProtectedEvidenceEvaluatesRowAndWriteObligations(t *testing.T) {
+	key := record.NewKeyWithID("docs", "d1")
+	resource := RecordResourceForKey(key)
+	get, _ := NewProtectedRead("op", Get, key)
+	readEvidence := ProtectedEvidence{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{"owner": "u2"}, Complete: true}
+	for name, policy := range map[string]Policy{
+		"row false": MustPolicy("row", Scope("docs", AnyID, Allow(Get).Where(dal.WhereField("owner", dal.Equal, "u1")))),
+		"row error": pureDecisionPolicy{decision: Decision{Allowed: true, Operation: Get, Resource: resource, Effect: "allow", Residuals: []dal.Condition{fakeCond{}}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			lease, _ := NewStaticPolicyLease(policy)
+			assessment, err := assessProtected(context.Background(), []ProtectedOperation{get}, []ProtectedEvidence{readEvidence}, []MandatoryParticipant{{LayerID: "owner"}}, []PolicyLease{lease}, false)
+			if err != nil || assessment.Outcome == AssessmentAllow {
+				t.Fatalf("assessment=%+v err=%v", assessment, err)
+			}
+		})
+	}
+	updateOp, _ := NewProtectedUpdate("op", key, []update.Update{update.DeleteByFieldPath("obsolete")}, "")
+	writeEvidence := ProtectedEvidence{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{"owner": "u2", "obsolete": "x"}, CandidateImage: map[string]any{"owner": "u2"}, CandidateRevision: "r2", Complete: true}
+	writePolicy := MustPolicy("write", Scope("docs", AnyID, Allow(Update).Where(dal.WhereField("owner", dal.Equal, "u1"))))
+	lease, _ := NewStaticPolicyLease(writePolicy)
+	assessment, err := assessProtected(context.Background(), []ProtectedOperation{updateOp}, []ProtectedEvidence{writeEvidence}, []MandatoryParticipant{{LayerID: "owner"}}, []PolicyLease{lease}, false)
+	if err != nil || assessment.Outcome != AssessmentDeny || assessment.Policies[0].Decision.Code != CodeRowPredicateFailed {
+		t.Fatalf("assessment=%+v err=%v", assessment, err)
+	}
+}
