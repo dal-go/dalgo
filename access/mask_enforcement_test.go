@@ -45,6 +45,10 @@ func TestMaskMutationDescendants(t *testing.T) {
 	require.Contains(t, refused, "address")
 	leaf := writeImages{pre: pre, post: post, updates: []update.Update{update.ByFieldPath(update.FieldPath{"address", "city"}, "Cork")}}
 	require.Empty(t, sets.disallowedMaskedMutation(leaf, Update))
+	for _, operation := range []Operations{Set, Delete} {
+		refused = sets.disallowedMaskedMutation(writeImages{pre: pre, post: post}, operation)
+		require.Contains(t, refused, "address.secret")
+	}
 	// Arrays are opaque: a child restoration does not authorize the whole array.
 	data := map[string]any{"address": []any{map[string]any{"city": "Dublin", "secret": "hidden"}}}
 	sets.redactMap("", data)

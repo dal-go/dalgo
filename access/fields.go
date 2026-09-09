@@ -322,24 +322,9 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuer
 	if !ok {
 		return query, false
 	}
-	var columns []dal.Column
-	if selected := query.Columns(); len(selected) > 0 {
-		for _, column := range selected {
-			field, isField := column.Expression.(dal.FieldRef)
-			if !isField {
-				return query, false
-			}
-			if sets.allows(field.Name()) {
-				columns = append(columns, column)
-			}
-		}
-		if len(columns) == 0 {
-			return query, false
-		}
-	} else {
-		for _, name := range allowed {
-			columns = append(columns, dal.Column{Expression: dal.Field(name)})
-		}
+	columns := make([]dal.Column, 0, len(allowed))
+	for _, name := range allowed {
+		columns = append(columns, dal.Column{Expression: dal.Field(name)})
 	}
 	return dal.WithColumns(query, columns), true
 }

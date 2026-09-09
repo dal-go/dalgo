@@ -329,9 +329,13 @@ func (s securedWriteSession) executeProtected(ctx context.Context, operations []
 	return s.coordinator.WithinExecution(ctx, operations, func(session ExecutionSession) error {
 		assessment, err := session.Execute(ctx)
 		if errors.Is(err, ErrAccessDenied) {
+			decisions := make([]Decision, len(assessment.Policies))
+			for i := range assessment.Policies {
+				decisions[i] = cloneDecision(assessment.Policies[i].Decision)
+			}
 			for _, policy := range assessment.Policies {
 				if !policy.Decision.Allowed {
-					return &DeniedError{Decision: policy.Decision}
+					return &DeniedError{Decision: cloneDecision(policy.Decision), Decisions: decisions}
 				}
 			}
 		}

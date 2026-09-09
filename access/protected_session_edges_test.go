@@ -55,3 +55,23 @@ func TestProtectedWriteReturnsConcretePolicyDenial(t *testing.T) {
 		t.Fatalf("denial=%+v err=%v", denied, err)
 	}
 }
+
+func TestProtectedWriteRetainsEveryMandatoryPolicyDecision(t *testing.T) {
+	storage := &automaticCoordinatorStorage{}
+	first := MustPolicy("upper", Scope("docs", AnyID, Deny(Update, "upper-deny")))
+	second := MustPolicy("owner", Scope("docs", AnyID, Deny(Update, "owner-deny")))
+	firstLease, _ := NewStaticPolicyLease(first)
+	secondLease, _ := NewStaticPolicyLease(second)
+	coordinator, err := NewEnforcementCoordinator(storage,
+		MandatoryParticipant{LayerID: "upper", Provider: func(context.Context) (PolicyLease, error) { return firstLease, nil }},
+		MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return secondLease, nil }},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = (securedWriteSession{coordinator: coordinator}).Update(context.Background(), record.NewKeyWithID("docs", "one"), nil)
+	decisions := DecisionsFromError(err)
+	if len(decisions) != 2 || decisions[0].Policy != "upper" || decisions[1].Policy != "owner" {
+		t.Fatalf("decisions=%+v err=%v", decisions, err)
+	}
+}
