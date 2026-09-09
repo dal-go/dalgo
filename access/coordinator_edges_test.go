@@ -102,3 +102,22 @@ func TestExecutionSessionLifetimeAndReceiptsBoundaries(t *testing.T) {
 		t.Fatal("premature receipts accepted")
 	}
 }
+
+func TestCoordinatorEvidenceHelpers(t *testing.T) {
+	items := []ProtectedEvidence{{OperationID: "one", Exists: true}}
+	if got := filterEvidence(items, "missing"); got != nil {
+		t.Fatalf("missing filter=%v", got)
+	}
+	if evidenceExists(items, "missing") {
+		t.Fatal("missing evidence exists")
+	}
+	if _, ok := valueAtPath(map[string]any{"a": "scalar"}, []string{"a", "b"}); ok {
+		t.Fatal("traversed scalar")
+	}
+	if _, ok := valueAtPath(map[string]any{"a": map[string]any{}}, []string{"a", "b"}); ok {
+		t.Fatal("missing nested value present")
+	}
+	if got := reduceOutcome(AssessmentDeny, AssessmentAllow); got != AssessmentDeny {
+		t.Fatalf("reduced deny to %s", got)
+	}
+}
