@@ -236,7 +236,7 @@ func (p *AccessPolicy) PolicyMetadata() PolicyMetadata {
 
 func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 	if !policyRealmAllows(ctx, p.realm) {
-		return principalRealmDenied(request, p.name, p.source)
+		return principalRealmDenied(ctx, request, p.name, p.source)
 	}
 	if !p.execution.allows(request) {
 		return executionDenied(request, p.name, p.source)

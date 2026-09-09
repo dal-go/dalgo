@@ -47,13 +47,17 @@ func cloneDocumentCondition(condition *DocumentCondition) *DocumentCondition {
 		right := *condition.Right
 		clone.Right = &right
 	}
-	clone.And = make([]DocumentCondition, len(condition.And))
-	for i := range condition.And {
-		clone.And[i] = *cloneDocumentCondition(&condition.And[i])
+	if condition.And != nil {
+		clone.And = make([]DocumentCondition, len(condition.And))
+		for i := range condition.And {
+			clone.And[i] = *cloneDocumentCondition(&condition.And[i])
+		}
 	}
-	clone.Or = make([]DocumentCondition, len(condition.Or))
-	for i := range condition.Or {
-		clone.Or[i] = *cloneDocumentCondition(&condition.Or[i])
+	if condition.Or != nil {
+		clone.Or = make([]DocumentCondition, len(condition.Or))
+		for i := range condition.Or {
+			clone.Or[i] = *cloneDocumentCondition(&condition.Or[i])
+		}
 	}
 	return &clone
 }

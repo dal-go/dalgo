@@ -219,7 +219,7 @@ func (p *PrincipalPolicySet) PolicyMetadata() PolicyMetadata {
 // request is denied.
 func (p *PrincipalPolicySet) Decide(ctx context.Context, request Request) Decision {
 	if !policyRealmAllows(ctx, p.realm) {
-		return principalRealmDenied(request, p.name, p.source)
+		return principalRealmDenied(ctx, request, p.name, p.source)
 	}
 	if !p.execution.allows(request) {
 		return executionDenied(request, p.name, p.source)
@@ -316,8 +316,12 @@ func policyRealmAllows(ctx context.Context, realm string) bool {
 	return ok && principal.Subject != nil && principal.Subject.Realm == realm
 }
 
-func principalRealmDenied(request Request, policy, source string) Decision {
-	decision := Decision{Operation: request.Operation, Policy: policy, PolicySource: source, Effect: effectDeny.String(), Code: CodePrincipalUnresolved, Scope: DecisionScopePrincipal, Explanation: "principal is not valid in the policy realm"}
+func principalRealmDenied(ctx context.Context, request Request, policy, source string) Decision {
+	code := CodePrincipalUnresolved
+	if principal, present := PrincipalFrom(ctx); present && principal.Subject != nil {
+		code = CodeNoMatch
+	}
+	decision := Decision{Operation: request.Operation, Policy: policy, PolicySource: source, Effect: effectDeny.String(), Code: code, Scope: DecisionScopePrincipal, Explanation: "principal is not valid in the policy realm"}
 	if len(request.Resources) > 0 {
 		decision.Resource = request.Resources[0]
 	}

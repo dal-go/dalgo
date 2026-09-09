@@ -7,12 +7,28 @@ import (
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
 	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 )
 
 type secureDBOptions struct {
 	databasePolicies []Policy
 	policyProvider   PolicyProvider
 	requireContext   bool
+	coordinator      *EnforcementCoordinator
+}
+
+// WithEnforcementCoordinator enables the bounded protected write profile.
+func WithEnforcementCoordinator(coordinator *EnforcementCoordinator) DBOption {
+	return func(options *secureDBOptions) error {
+		if coordinator == nil {
+			return fmt.Errorf("access: enforcement coordinator is required")
+		}
+		if options.coordinator != nil {
+			return fmt.Errorf("access: enforcement coordinator already configured")
+		}
+		options.coordinator = coordinator
+		return nil
+	}
 }
 
 // PolicyProvider returns one immutable owner policy snapshot for an operation.
@@ -71,14 +87,19 @@ func SecureDB(db dal.DB, options ...DBOption) (dal.DB, error) {
 			return nil, err
 		}
 	}
-	return &securedDB{
-		DB: db,
+	secured := &securedDB{
+		DB:          db,
+		coordinator: settings.coordinator,
 		guard: guard{
 			databasePolicies: append([]Policy(nil), settings.databasePolicies...),
 			policyProvider:   settings.policyProvider,
 			requireContext:   settings.requireContext,
 		},
-	}, nil
+	}
+	if writer, ok := db.(dal.WriteSession); ok || settings.coordinator != nil {
+		return &securedWriteDB{securedDB: secured, writer: writer}, nil
+	}
+	return secured, nil
 }
 
 // MustSecureDB wraps db and panics when configuration is invalid.
@@ -94,6 +115,11 @@ func MustSecureDB(db dal.DB, options ...DBOption) dal.DB {
 // operation context cannot remove them, while additional policies still narrow
 // the capability.
 func BindDB(db dal.DB, ctx context.Context) dal.DB {
+	if secured, ok := db.(*securedWriteDB); ok {
+		bound := *secured.securedDB
+		bound.guard = secured.guard.bind(ctx)
+		return &securedWriteDB{securedDB: &bound, writer: secured.writer}
+	}
 	if secured, ok := db.(*securedDB); ok {
 		bound := *secured
 		bound.guard = secured.guard.bind(ctx)
@@ -108,7 +134,8 @@ func BindDB(db dal.DB, ctx context.Context) dal.DB {
 // method securedDB does not override.
 type securedDB struct {
 	dal.DB
-	guard guard
+	guard       guard
+	coordinator *EnforcementCoordinator
 }
 
 func (db *securedDB) ID() string { return db.DB.ID() }
@@ -162,6 +189,9 @@ func (db *securedDB) RunReadonlyTransaction(ctx context.Context, worker dal.ROTx
 }
 
 func (db *securedDB) RunReadwriteTransaction(ctx context.Context, worker dal.RWTxWorker, options ...dal.TransactionOption) error {
+	if db.coordinator != nil {
+		return enforcementUnsupported(Update, "dynamic read-write transactions are unavailable under the protected profile")
+	}
 	if err := db.guard.checkContext(ctx); err != nil {
 		return err
 	}
@@ -182,6 +212,46 @@ func (db *securedDB) RunReadwriteTransaction(ctx context.Context, worker dal.RWT
 		workerCtx = dal.NewContextWithTransaction(workerCtx, securedTx)
 		return worker(workerCtx, securedTx)
 	}, options...)
+}
+
+type securedWriteDB struct {
+	*securedDB
+	writer dal.WriteSession
+}
+
+func (db *securedWriteDB) writeSession() securedWriteSession {
+	return securedWriteSession{session: db.writer, guard: db.guard, coordinator: db.coordinator}
+}
+func (db *securedWriteDB) Set(ctx context.Context, rec record.Record) error {
+	return db.writeSession().Set(ctx, rec)
+}
+func (db *securedWriteDB) SetMulti(ctx context.Context, records []record.Record) error {
+	return db.writeSession().SetMulti(ctx, records)
+}
+func (db *securedWriteDB) Insert(ctx context.Context, rec record.Record, options ...dal.InsertOption) error {
+	return db.writeSession().Insert(ctx, rec, options...)
+}
+func (db *securedWriteDB) InsertMulti(ctx context.Context, records []record.Record, options ...dal.InsertOption) error {
+	return db.writeSession().InsertMulti(ctx, records, options...)
+}
+func (db *securedWriteDB) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+	return db.writeSession().Update(ctx, key, updates, preconditions...)
+}
+func (db *securedWriteDB) UpdateRecord(ctx context.Context, rec record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
+	return db.writeSession().UpdateRecord(ctx, rec, updates, preconditions...)
+}
+func (db *securedWriteDB) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+	return db.writeSession().UpdateMulti(ctx, keys, updates, preconditions...)
+}
+func (db *securedWriteDB) Delete(ctx context.Context, key *record.Key) error {
+	return db.writeSession().Delete(ctx, key)
+}
+func (db *securedWriteDB) DeleteMulti(ctx context.Context, keys []*record.Key) error {
+	return db.writeSession().DeleteMulti(ctx, keys)
+}
+
+func enforcementUnsupported(operation Operations, explanation string) error {
+	return &DeniedError{Decision: Decision{Operation: operation, Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeOperation, Explanation: explanation}}
 }
 
 type securedReadTransaction struct {

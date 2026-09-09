@@ -135,13 +135,16 @@ const (
 )
 
 type PolicyAssessment struct {
-	Policy   PolicyMetadata
-	Decision Decision
+	OperationID string
+	LayerID     string
+	Policy      PolicyMetadata
+	Decision    Decision
 }
 
 // AssessmentRestriction is an outstanding enforceable obligation. In plan
 // mode it is complete metadata, not missing evidence.
 type AssessmentRestriction struct {
+	OperationID   string
 	PolicyIndex   int
 	ResourceIndex int
 	Rule          string

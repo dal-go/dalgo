@@ -2,8 +2,10 @@ package access
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/dal-go/dalgo/condeval"
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
 	"github.com/dal-go/record"
@@ -147,11 +149,19 @@ func (s securedReadSession) authorizeQuery(ctx context.Context, query dal.Query)
 }
 
 type securedWriteSession struct {
-	session dal.WriteSession
-	guard   guard
+	session     dal.WriteSession
+	guard       guard
+	coordinator *EnforcementCoordinator
 }
 
 func (s securedWriteSession) Set(ctx context.Context, record record.Record) error {
+	if s.coordinator != nil {
+		op, err := protectedRecordOperation("op1", Set, record)
+		if err != nil {
+			return err
+		}
+		return s.executeProtected(ctx, []ProtectedOperation{op})
+	}
 	if err := s.authorizeAndEnforce(ctx, Set, []writeTarget{{key: record.Key(), data: record.Data()}}); err != nil {
 		return err
 	}
@@ -159,6 +169,13 @@ func (s securedWriteSession) Set(ctx context.Context, record record.Record) erro
 }
 
 func (s securedWriteSession) SetMulti(ctx context.Context, records []record.Record) error {
+	if s.coordinator != nil {
+		ops, err := protectedRecordOperations(Set, records)
+		if err != nil {
+			return err
+		}
+		return s.executeProtected(ctx, ops)
+	}
 	if err := s.authorizeAndEnforce(ctx, Set, targetsForRecords(records)); err != nil {
 		return err
 	}
@@ -166,6 +183,16 @@ func (s securedWriteSession) SetMulti(ctx context.Context, records []record.Reco
 }
 
 func (s securedWriteSession) Insert(ctx context.Context, record record.Record, options ...dal.InsertOption) error {
+	if s.coordinator != nil {
+		if len(options) > 0 {
+			return enforcementUnsupported(Insert, "insert options are unavailable under the protected profile")
+		}
+		op, err := protectedRecordOperation("op1", Insert, record)
+		if err != nil {
+			return err
+		}
+		return s.executeProtected(ctx, []ProtectedOperation{op})
+	}
 	if err := s.authorizeAndEnforce(ctx, Insert, []writeTarget{{key: record.Key(), data: record.Data()}}); err != nil {
 		return err
 	}
@@ -173,6 +200,16 @@ func (s securedWriteSession) Insert(ctx context.Context, record record.Record, o
 }
 
 func (s securedWriteSession) InsertMulti(ctx context.Context, records []record.Record, options ...dal.InsertOption) error {
+	if s.coordinator != nil {
+		if len(options) > 0 {
+			return enforcementUnsupported(Insert, "insert options are unavailable under the protected profile")
+		}
+		ops, err := protectedRecordOperations(Insert, records)
+		if err != nil {
+			return err
+		}
+		return s.executeProtected(ctx, ops)
+	}
 	if err := s.authorizeAndEnforce(ctx, Insert, targetsForRecords(records)); err != nil {
 		return err
 	}
@@ -180,6 +217,16 @@ func (s securedWriteSession) InsertMulti(ctx context.Context, records []record.R
 }
 
 func (s securedWriteSession) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+	if s.coordinator != nil {
+		if len(preconditions) > 0 {
+			return enforcementUnsupported(Update, "write preconditions are unavailable under the protected profile")
+		}
+		op, err := NewProtectedUpdate("op1", key, updates, "")
+		if err != nil {
+			return err
+		}
+		return s.executeProtected(ctx, []ProtectedOperation{op})
+	}
 	if err := s.authorizeAndEnforce(ctx, Update, []writeTarget{{key: key, updates: updates}}); err != nil {
 		return err
 	}
@@ -187,6 +234,9 @@ func (s securedWriteSession) Update(ctx context.Context, key *record.Key, update
 }
 
 func (s securedWriteSession) UpdateRecord(ctx context.Context, record record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
+	if s.coordinator != nil {
+		return s.Update(ctx, record.Key(), updates, preconditions...)
+	}
 	if err := s.authorizeAndEnforce(ctx, Update, []writeTarget{{key: record.Key(), updates: updates}}); err != nil {
 		return err
 	}
@@ -194,6 +244,20 @@ func (s securedWriteSession) UpdateRecord(ctx context.Context, record record.Rec
 }
 
 func (s securedWriteSession) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+	if s.coordinator != nil {
+		if len(preconditions) > 0 {
+			return enforcementUnsupported(Update, "write preconditions are unavailable under the protected profile")
+		}
+		ops := make([]ProtectedOperation, len(keys))
+		for i, key := range keys {
+			op, err := NewProtectedUpdate(fmt.Sprintf("op%d", i+1), key, updates, "")
+			if err != nil {
+				return err
+			}
+			ops[i] = op
+		}
+		return s.executeProtected(ctx, ops)
+	}
 	targets := make([]writeTarget, len(keys))
 	for i, key := range keys {
 		targets[i] = writeTarget{key: key, updates: updates}
@@ -205,6 +269,13 @@ func (s securedWriteSession) UpdateMulti(ctx context.Context, keys []*record.Key
 }
 
 func (s securedWriteSession) Delete(ctx context.Context, key *record.Key) error {
+	if s.coordinator != nil {
+		op, err := NewProtectedDelete("op1", key, "")
+		if err != nil {
+			return err
+		}
+		return s.executeProtected(ctx, []ProtectedOperation{op})
+	}
 	if err := s.authorizeAndEnforce(ctx, Delete, []writeTarget{{key: key}}); err != nil {
 		return err
 	}
@@ -212,6 +283,17 @@ func (s securedWriteSession) Delete(ctx context.Context, key *record.Key) error 
 }
 
 func (s securedWriteSession) DeleteMulti(ctx context.Context, keys []*record.Key) error {
+	if s.coordinator != nil {
+		ops := make([]ProtectedOperation, len(keys))
+		for i, key := range keys {
+			op, err := NewProtectedDelete(fmt.Sprintf("op%d", i+1), key, "")
+			if err != nil {
+				return err
+			}
+			ops[i] = op
+		}
+		return s.executeProtected(ctx, ops)
+	}
 	targets := make([]writeTarget, len(keys))
 	for i, key := range keys {
 		targets[i] = writeTarget{key: key}
@@ -220,6 +302,41 @@ func (s securedWriteSession) DeleteMulti(ctx context.Context, keys []*record.Key
 		return err
 	}
 	return s.session.DeleteMulti(ctx, keys)
+}
+
+func protectedRecordOperation(id string, operation Operations, rec record.Record) (ProtectedOperation, error) {
+	data, err := condeval.ToMap(rec.Data())
+	if err != nil {
+		return ProtectedOperation{}, fmt.Errorf("access: normalize record data: %w", err)
+	}
+	if operation == Insert {
+		return NewProtectedInsert(id, rec.Key(), data)
+	}
+	return NewProtectedSet(id, rec.Key(), data, "")
+}
+func protectedRecordOperations(operation Operations, records []record.Record) ([]ProtectedOperation, error) {
+	ops := make([]ProtectedOperation, len(records))
+	for i, rec := range records {
+		op, err := protectedRecordOperation(fmt.Sprintf("op%d", i+1), operation, rec)
+		if err != nil {
+			return nil, err
+		}
+		ops[i] = op
+	}
+	return ops, nil
+}
+func (s securedWriteSession) executeProtected(ctx context.Context, operations []ProtectedOperation) error {
+	return s.coordinator.WithinExecution(ctx, operations, func(session ExecutionSession) error {
+		assessment, err := session.Execute(ctx)
+		if errors.Is(err, ErrAccessDenied) {
+			for _, policy := range assessment.Policies {
+				if !policy.Decision.Allowed {
+					return &DeniedError{Decision: policy.Decision}
+				}
+			}
+		}
+		return err
+	})
 }
 
 // authorizeAndEnforce authorizes a write on every target and then enforces
