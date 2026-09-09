@@ -270,8 +270,15 @@ func (result Result) validate(allowUnknownReasonCodes bool) error {
 	if result.Allowed != (result.Result == OutcomeAllow && result.Coverage.Evaluation == EvaluationComplete) {
 		return fmt.Errorf("authorization result: allowed is inconsistent with result and coverage")
 	}
-	if result.Allowed && (len(result.Blockers) > 0 || len(result.Restrictions) > 0) {
-		return fmt.Errorf("authorization result: allowed result contains blockers or restrictions")
+	if result.Allowed && len(result.Blockers) > 0 {
+		return fmt.Errorf("authorization result: allowed result contains blockers")
+	}
+	if result.Allowed {
+		for _, restriction := range result.Restrictions {
+			if !restriction.Enforced {
+				return fmt.Errorf("authorization result: allowed result contains an unenforced restriction")
+			}
+		}
 	}
 	if result.Mode == ModeSample {
 		if result.Sample == nil || result.Scope != ScopeSample {

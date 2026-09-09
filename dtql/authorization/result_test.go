@@ -38,6 +38,28 @@ func TestFrozenInspectResultRoundTrip(t *testing.T) {
 	}
 }
 
+func TestAllowedExecutionMayReportEnforcedRestrictions(t *testing.T) {
+	result, err := ParseResult([]byte(inspectResultFixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	restriction := Restriction{ID: "r1", OperationID: "u1", LayerID: "ingit-crm", Kind: "field_allowlist", Representation: "fields", Fields: []string{"name"}, Enforced: true}
+	result.Restrictions = []Restriction{restriction}
+	result.Operations[0].RestrictionIDs = []string{"r1"}
+	result.Operations[0].AllOf = []string{"r1"}
+	result.Layers[0].Decisions[0].RestrictionIDs = []string{"r1"}
+	if err := result.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := MarshalResult(result); err != nil {
+		t.Fatal(err)
+	}
+	result.Restrictions[0].Enforced = false
+	if err := result.Validate(); err == nil {
+		t.Fatal("allowed result accepted unenforced restriction")
+	}
+}
+
 func TestFrozenResultFixturesValidateAndRoundTrip(t *testing.T) {
 	files, err := filepath.Glob("testdata/*.json")
 	if err != nil {
