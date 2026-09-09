@@ -239,4 +239,11 @@ func TestAssessmentDefensiveDefaults(t *testing.T) {
 	}
 	_ = namedPolicy("x").Decide(context.Background(), Request{})
 	_ = namedPolicy("x").Authorize(context.Background(), Request{})
+	if DecisionsFromError(errors.New("other")) != nil {
+		t.Fatal("unrelated error yielded decisions")
+	}
+	legacy := DecisionsFromError(&DeniedError{Decision: Decision{Policy: "legacy"}})
+	if len(legacy) != 1 || legacy[0].Policy != "legacy" {
+		t.Fatalf("legacy=%+v", legacy)
+	}
 }

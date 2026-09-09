@@ -120,6 +120,18 @@ func TestCoordinatorEvidenceHelpers(t *testing.T) {
 	if got := reduceOutcome(AssessmentDeny, AssessmentAllow); got != AssessmentDeny {
 		t.Fatalf("reduced deny to %s", got)
 	}
+	(&unavailablePolicyLease{}).Release()
+}
+
+func TestReadVisibilityForRejectsInvalidRequester(t *testing.T) {
+	s := &inspectionSession{alive: true, ingress: context.Background()}
+	invalid := PrincipalRef{Kind: PrincipalKindUser, ID: "u"}
+	if _, err := s.ReadVisibilityFor(context.Background(), Principal{Subject: &invalid}); err == nil {
+		t.Fatal("invalid subject accepted")
+	}
+	if _, err := s.ReadVisibilityFor(context.Background(), Principal{Actor: &invalid}); err == nil {
+		t.Fatal("invalid actor accepted")
+	}
 }
 
 func TestProtectedEvidenceValidationRejectsIncompleteOrMismatchedFacts(t *testing.T) {
