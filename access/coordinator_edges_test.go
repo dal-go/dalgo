@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/record"
+	"github.com/dal-go/record/update"
 )
 
 func TestProtectedOperationConstructorBoundaries(t *testing.T) {
@@ -128,6 +129,11 @@ func TestCoordinatorEvidenceHelpers(t *testing.T) {
 	l := &unavailablePolicyLease{policy: u}
 	if l.Revision() != "" || len(l.Policies()) != 1 {
 		t.Fatal("unavailable lease changed")
+	}
+	op := ProtectedOperation{updates: []ProtectedUpdate{{Path: []string{"gone"}, Delete: true}, {Path: []string{"name"}, Value: "new"}}}
+	updates := operationUpdates(op)
+	if len(updates) != 2 || updates[0].Value() != update.DeleteField || updates[1].Value() != "new" {
+		t.Fatalf("updates=%v", updates)
 	}
 }
 
