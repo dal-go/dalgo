@@ -71,3 +71,58 @@ func TestPortableNormalizationPreservesFieldPresence(t *testing.T) {
 	_, err = NormalizeDTQLPolicy(doc)
 	require.Error(t, err)
 }
+
+func TestPortableNormalizationRejectsUnsafeExtensions(t *testing.T) {
+	base, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	require.NoError(t, err)
+	mask := Mask{Stages: []MaskStage{{Include: []string{"*"}}}}
+	tests := map[string]func(*DTQLDocument){
+		"target":                func(d *DTQLDocument) { d.Target.Database = " " },
+		"scope collection mask": func(d *DTQLDocument) { d.Scopes[0].CollectionMask = &mask },
+		"deny field mask":       func(d *DTQLDocument) { d.Scopes[0].Rules[0].Effect = "deny"; d.Scopes[0].Rules[0].FieldMask = &mask },
+		"empty execution":       func(d *DTQLDocument) { d.Execution = &ExecutionGate{} },
+		"too many execution entries": func(d *DTQLDocument) {
+			d.Execution = &ExecutionGate{Allow: make([]ExecutionEntry, 33)}
+		},
+		"duplicate execution": func(d *DTQLDocument) {
+			d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionDTQL}, {Class: ExecutionDTQL}}}
+		},
+		"dtql namespace": func(d *DTQLDocument) {
+			d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionDTQL, Namespace: "x"}}}
+		},
+		"procedure namespace": func(d *DTQLDocument) {
+			d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionStoredProcedure, Namespace: "bad.*", Mask: &mask}}}
+		},
+		"procedure no mask": func(d *DTQLDocument) {
+			d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionStoredProcedure, Namespace: "public"}}}
+		},
+		"unknown execution": func(d *DTQLDocument) { d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: "future"}}} },
+		"raw mask limit": func(d *DTQLDocument) {
+			patterns := make([]string, MaxMaskPatterns+1)
+			for i := range patterns {
+				patterns[i] = "x"
+			}
+			d.CollectionMask = &Mask{Stages: []MaskStage{{Include: patterns}}}
+		},
+	}
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			candidate := base
+			candidate.Scopes = append([]DTQLScope(nil), base.Scopes...)
+			candidate.Scopes[0].Rules = append([]DTQLRule(nil), base.Scopes[0].Rules...)
+			mutate(&candidate)
+			if _, err := NormalizeDTQLPolicy(candidate); err == nil {
+				t.Fatal("unsafe extension accepted")
+			}
+			if _, err := MarshalDTQLPolicyJSON(candidate); err == nil {
+				t.Fatal("JSON marshal accepted unsafe extension")
+			}
+			if _, err := MarshalDTQLPolicyYAML(candidate); err == nil {
+				t.Fatal("YAML marshal accepted unsafe extension")
+			}
+		})
+	}
+	if _, err := ParseDTQLPolicy(make([]byte, maxPolicyFileBytes+1)); err == nil {
+		t.Fatal("oversize policy parsed")
+	}
+}
