@@ -1,20 +1,71 @@
 package access
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type fakePolicyRoot struct {
+	info              os.FileInfo
+	lstatErr, openErr error
+	file              policyFile
+}
+
+func (r fakePolicyRoot) Lstat(string) (os.FileInfo, error) { return r.info, r.lstatErr }
+func (r fakePolicyRoot) Open(string) (policyFile, error)   { return r.file, r.openErr }
+
+type fakePolicyFile struct {
+	io.Reader
+	info    os.FileInfo
+	statErr error
+}
+
+func (f fakePolicyFile) Close() error               { return nil }
+func (f fakePolicyFile) Stat() (os.FileInfo, error) { return f.info, f.statErr }
 
 func TestLoadPolicyFilesDisabled(t *testing.T) {
 	policies, err := LoadPolicyFiles("", FilePolicyConfig{})
 	require.NoError(t, err)
 	assert.Nil(t, policies)
 }
+
+func TestLoadPolicyFileIOFailures(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "p.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("x"), 0o600))
+	info, err := os.Lstat(path)
+	require.NoError(t, err)
+	boom := errors.New("boom")
+	for name, root := range map[string]policyRoot{
+		"open":    fakePolicyRoot{info: info, openErr: boom},
+		"stat":    fakePolicyRoot{info: info, file: fakePolicyFile{Reader: strings.NewReader("x"), statErr: boom}},
+		"changed": fakePolicyRoot{info: info, file: fakePolicyFile{Reader: strings.NewReader("x"), info: fakeFileInfo{FileInfo: info}}},
+		"read":    fakePolicyRoot{info: info, file: fakePolicyFile{Reader: errReader{}, info: info}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := loadPolicyFile(root, "p.yaml", "db"); err == nil {
+				t.Fatal("failure accepted")
+			}
+		})
+	}
+}
+
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, errors.New("read") }
+
+type fakeFileInfo struct{ os.FileInfo }
+
+func (fakeFileInfo) ModTime() time.Time { return time.Now().Add(time.Hour) }
+func (fakeFileInfo) Sys() any           { return nil }
 
 func TestLoadPolicyFiles(t *testing.T) {
 	root := t.TempDir()

@@ -93,7 +93,7 @@ func LoadPolicyFiles(root string, config FilePolicyConfig) ([]Policy, error) {
 	policies := make([]Policy, 0, len(config.Policies))
 	names := make(map[string]string, len(config.Policies))
 	for _, name := range config.Policies {
-		policy, err := loadPolicyFile(rootFS, name, config.Database)
+		policy, err := loadPolicyFile(osPolicyRoot{rootFS}, name, config.Database)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +116,20 @@ func setPolicyRealm(policy Policy, realm string) {
 	}
 }
 
-func loadPolicyFile(root *os.Root, name, database string) (Policy, error) {
+type policyFile interface {
+	io.Reader
+	io.Closer
+	Stat() (os.FileInfo, error)
+}
+type policyRoot interface {
+	Lstat(string) (os.FileInfo, error)
+	Open(string) (policyFile, error)
+}
+type osPolicyRoot struct{ *os.Root }
+
+func (r osPolicyRoot) Open(name string) (policyFile, error) { return r.Root.Open(name) }
+
+func loadPolicyFile(root policyRoot, name, database string) (Policy, error) {
 	if name == "" || filepath.IsAbs(name) {
 		return nil, fmt.Errorf("access: invalid policy file %q", name)
 	}
