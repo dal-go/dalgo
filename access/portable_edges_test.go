@@ -142,3 +142,30 @@ func TestNormalizePortablePolicyRechecksSelectorsAfterMarshal(t *testing.T) {
 		t.Fatalf("post-marshal mutation err=%v", err)
 	}
 }
+
+func TestNormalizePortablePolicyPropagatesNestedExtensionErrors(t *testing.T) {
+	mask := Mask{Stages: []MaskStage{{Include: []string{"*"}}}}
+	for name, mutate := range map[string]func(*DTQLDocument){
+		"nested": func(d *DTQLDocument) {
+			d.Scopes[0].Scopes = []DTQLScope{{Path: "/child", Rules: []DTQLRule{{ID: "r", Effect: "deny", Operations: []string{"get"}, FieldMask: &mask}}}}
+		},
+		"ruleset": func(d *DTQLDocument) {
+			d.RuleSets = map[string][]DTQLScope{"r": {{Path: "/x", Rules: []DTQLRule{{ID: "r", Effect: "deny", Operations: []string{"get"}, FieldMask: &mask}}}}}
+		},
+		"namespace": func(d *DTQLDocument) {
+			d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionStoredProcedure, Namespace: " public", Mask: &mask}}}
+		},
+		"procedure mask": func(d *DTQLDocument) {
+			bad := Mask{Stages: []MaskStage{{Include: []string{"bad?name"}}}}
+			d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionStoredProcedure, Namespace: "public", Mask: &bad}}}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			d, _ := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+			mutate(&d)
+			if _, err := NormalizeDTQLPolicy(d); err == nil {
+				t.Fatal("invalid nested extension accepted")
+			}
+		})
+	}
+}

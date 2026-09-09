@@ -152,12 +152,12 @@ func loadPolicyFile(root policyRoot, name, database string) (Policy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("access: inspect open policy file %q: %w", name, err)
 	}
+	if !opened.Mode().IsRegular() {
+		return nil, fmt.Errorf("access: policy file %q is not a regular file", name)
+	}
 	after, err := root.Lstat(name)
 	if err != nil || after.Mode()&os.ModeSymlink != 0 || !os.SameFile(before, opened) || !os.SameFile(opened, after) {
 		return nil, fmt.Errorf("access: policy file %q changed while opening", name)
-	}
-	if !opened.Mode().IsRegular() {
-		return nil, fmt.Errorf("access: policy file %q is not a regular file", name)
 	}
 	data, err := io.ReadAll(io.LimitReader(file, maxPolicyFileBytes+1))
 	if err != nil {

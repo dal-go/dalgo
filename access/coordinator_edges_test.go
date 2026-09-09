@@ -10,6 +10,34 @@ import (
 	"github.com/dal-go/record/update"
 )
 
+type stagedCancelContext struct {
+	context.Context
+	calls, cancelAt int
+}
+
+type mutatingInspectionPolicy struct{ mutate func() }
+
+func (p mutatingInspectionPolicy) Name() string         { return "mutating" }
+func (p mutatingInspectionPolicy) InspectionPure() bool { return true }
+func (p mutatingInspectionPolicy) Decide(_ context.Context, request Request) Decision {
+	p.mutate()
+	return Decision{Allowed: true, Operation: request.Operation, Effect: "allow"}
+}
+func (p mutatingInspectionPolicy) Authorize(ctx context.Context, request Request) error {
+	if p.Decide(ctx, request).Allowed {
+		return nil
+	}
+	return ErrAccessDenied
+}
+
+func (c *stagedCancelContext) Err() error {
+	c.calls++
+	if c.calls >= c.cancelAt {
+		return context.Canceled
+	}
+	return nil
+}
+
 func TestProtectedOperationConstructorBoundaries(t *testing.T) {
 	key := record.NewKeyWithID("docs", "one")
 	if _, err := NewProtectedRead("x", Update, key); err == nil {
@@ -274,15 +302,80 @@ func TestCoordinatorPropagatesBoundaryFailures(t *testing.T) {
 }
 
 func TestCoordinatorCancellationDuringLeaseAcquisition(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
 	key := record.NewKeyWithID("docs", "one")
 	op, _ := NewProtectedRead("one", Get, key)
-	events := []string{}
-	storage := &coordinatorStorage{events: &events}
+	for _, execution := range []bool{false, true} {
+		ctx, cancel := context.WithCancel(context.Background())
+		events := []string{}
+		storage := &coordinatorStorage{events: &events}
+		lease, _ := NewStaticPolicyLease(MustPolicy("p", Root(Allow(Get))))
+		coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { cancel(); return lease, nil }})
+		var err error
+		if execution {
+			err = coordinator.WithinExecution(ctx, []ProtectedOperation{op}, func(ExecutionSession) error { return nil })
+		} else {
+			err = coordinator.WithinInspection(ctx, []ProtectedOperation{op}, func(InspectionSession) error { return nil })
+		}
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("execution=%v err=%v", execution, err)
+		}
+	}
+}
+
+func TestReadVisibilityForPropagatesRequesterEvaluationCancellation(t *testing.T) {
+	key := record.NewKeyWithID("docs", "one")
+	op, _ := NewProtectedRead("one", Get, key)
+	var s *inspectionSession
+	policy := mutatingInspectionPolicy{mutate: func() { s.evidence = nil }}
+	lease, _ := NewStaticPolicyLease(policy)
+	s = &inspectionSession{
+		alive: true, ingress: context.Background(), operations: []ProtectedOperation{op},
+		evidence:     []ProtectedEvidence{{OperationID: "one", CanonicalTarget: key.String(), SnapshotToken: "s", Complete: true, Exists: true, PreImage: map[string]any{}}},
+		participants: []MandatoryParticipant{{LayerID: "owner"}}, leases: []PolicyLease{lease},
+	}
+	if _, err := s.ReadVisibilityFor(context.Background(), Principal{}); err == nil {
+		t.Fatal("requester evaluation accepted evidence corrupted by custom policy")
+	}
+}
+
+func TestCoordinatorCancellationAfterLeaseAcquisition(t *testing.T) {
+	key := record.NewKeyWithID("docs", "one")
+	op, _ := NewProtectedRead("one", Get, key)
 	lease, _ := NewStaticPolicyLease(MustPolicy("p", Root(Allow(Get))))
-	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { cancel(); return lease, nil }})
-	if err := coordinator.WithinInspection(ctx, []ProtectedOperation{op}, func(InspectionSession) error { return nil }); !errors.Is(err, context.Canceled) {
-		t.Fatalf("err=%v", err)
+	participant := MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }}
+	for _, execution := range []bool{false, true} {
+		events := []string{}
+		coordinator, _ := NewEnforcementCoordinator(&coordinatorStorage{events: &events}, participant)
+		ctx := &stagedCancelContext{Context: context.Background(), cancelAt: 2}
+		var err error
+		if execution {
+			err = coordinator.WithinExecution(ctx, []ProtectedOperation{op}, func(ExecutionSession) error { return nil })
+		} else {
+			err = coordinator.WithinInspection(ctx, []ProtectedOperation{op}, func(InspectionSession) error { return nil })
+		}
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("execution=%v err=%v calls=%d", execution, err, ctx.calls)
+		}
+	}
+}
+
+func TestCoordinatorRejectsMalformedStorageEvidenceInBothModes(t *testing.T) {
+	key := record.NewKeyWithID("docs", "one")
+	op, _ := NewProtectedRead("one", Get, key)
+	lease, _ := NewStaticPolicyLease(MustPolicy("p", Root(Allow(Get))))
+	participant := MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }}
+	for _, execution := range []bool{false, true} {
+		events := []string{}
+		coordinator, _ := NewEnforcementCoordinator(&coordinatorStorage{events: &events, evidence: nil}, participant)
+		var err error
+		if execution {
+			err = coordinator.WithinExecution(context.Background(), []ProtectedOperation{op}, func(ExecutionSession) error { return nil })
+		} else {
+			err = coordinator.WithinInspection(context.Background(), []ProtectedOperation{op}, func(InspectionSession) error { return nil })
+		}
+		if err == nil {
+			t.Fatalf("execution=%v malformed evidence accepted", execution)
+		}
 	}
 }
 

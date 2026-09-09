@@ -84,10 +84,8 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 	if err != nil {
 		return DTQLDocument{}, err
 	}
-	var result DTQLDocument
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	if err = decoder.Decode(&result); err != nil {
+	result, err := decodeNormalizedDTQLPolicy(data)
+	if err != nil {
 		return DTQLDocument{}, err
 	}
 	// Preserve integer precision in untyped predicate constants.
@@ -303,6 +301,13 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 		return DTQLDocument{}, err
 	}
 	return result, nil
+}
+
+func decodeNormalizedDTQLPolicy(data []byte) (result DTQLDocument, err error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	err = decoder.Decode(&result)
+	return
 }
 
 // MarshalDTQLPolicyYAML emits normalized policy text. Formatting and comments

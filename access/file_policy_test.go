@@ -43,12 +43,15 @@ func TestLoadPolicyFileIOFailures(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte("x"), 0o600))
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
+	directoryInfo, err := os.Lstat(dir)
+	require.NoError(t, err)
 	boom := errors.New("boom")
 	for name, root := range map[string]policyRoot{
-		"open":    fakePolicyRoot{info: info, openErr: boom},
-		"stat":    fakePolicyRoot{info: info, file: fakePolicyFile{Reader: strings.NewReader("x"), statErr: boom}},
-		"changed": fakePolicyRoot{info: info, file: fakePolicyFile{Reader: strings.NewReader("x"), info: fakeFileInfo{FileInfo: info}}},
-		"read":    fakePolicyRoot{info: info, file: fakePolicyFile{Reader: errReader{}, info: info}},
+		"open":             fakePolicyRoot{info: info, openErr: boom},
+		"stat":             fakePolicyRoot{info: info, file: fakePolicyFile{Reader: strings.NewReader("x"), statErr: boom}},
+		"opened directory": fakePolicyRoot{info: info, file: fakePolicyFile{Reader: strings.NewReader("x"), info: directoryInfo}},
+		"changed":          fakePolicyRoot{info: info, file: fakePolicyFile{Reader: strings.NewReader("x"), info: fakeFileInfo{FileInfo: info}}},
+		"read":             fakePolicyRoot{info: info, file: fakePolicyFile{Reader: errReader{}, info: info}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := loadPolicyFile(root, "p.yaml", "db"); err == nil {
@@ -257,6 +260,22 @@ func TestPolicyFromDTQLDocumentRejectsUnsupportedEnvelope(t *testing.T) {
 		"opaque":      func(d DTQLDocument) DTQLDocument { d.Scopes[0].OpaqueQuery = true; return d },
 		"group":       func(d DTQLDocument) DTQLDocument { d.Scopes[0].CollectionGroup = "g"; return d },
 		"scope mask":  func(d DTQLDocument) DTQLDocument { d.Scopes[0].CollectionMask = &Mask{}; return d },
+		"execution": func(d DTQLDocument) DTQLDocument {
+			d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionStoredProcedure, Namespace: "public", Mask: &Mask{}}}}
+			return d
+		},
+		"collection mask": func(d DTQLDocument) DTQLDocument { d.CollectionMask = &Mask{}; return d },
+		"ruleset scope": func(d DTQLDocument) DTQLDocument {
+			d.RuleSets = map[string][]DTQLScope{"r": {{OpaqueQuery: true}}}
+			d.Scopes = nil
+			d.Bindings = &DocumentBindings{Everyone: []string{"r"}}
+			return d
+		},
+		"nested scope": func(d DTQLDocument) DTQLDocument { d.Scopes[0].Scopes = []DTQLScope{{OpaqueQuery: true}}; return d },
+		"canonical": func(d DTQLDocument) DTQLDocument {
+			d.Scopes[0].Rules[0].Where = &DocumentCondition{Op: "==", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Value: make(chan int)}}
+			return d
+		},
 	}
 	for name, mutate := range tests {
 		t.Run(name, func(t *testing.T) {
