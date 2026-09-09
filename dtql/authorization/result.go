@@ -240,9 +240,6 @@ func parseResult(data []byte, allowUnknownReasonCodes bool) (Result, error) {
 	if err := decoder.Decode(&result); err != nil {
 		return Result{}, fmt.Errorf("authorization result: %w", err)
 	}
-	if err := ensureEOF(decoder); err != nil {
-		return Result{}, err
-	}
 	if err := result.validate(allowUnknownReasonCodes); err != nil {
 		return Result{}, err
 	}

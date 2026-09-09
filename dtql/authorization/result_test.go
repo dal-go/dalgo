@@ -154,10 +154,12 @@ func TestResultValidationRejectsMalformedContractStates(t *testing.T) {
 		"allowed blockers": func(r *Result) {
 			r.Blockers = []Blocker{{OperationID: "u1", Code: "ACCESS_DENIED", Scope: "operation"}}
 		},
-		"sample missing":             func(r *Result) { r.Mode, r.Scope = ModeSample, ScopeSample },
-		"sample forbidden":           func(r *Result) { r.Sample = &Sample{} },
-		"nil operations":             func(r *Result) { r.Operations = nil },
-		"coverage evaluation":        func(r *Result) { r.Coverage.Evaluation = "future" },
+		"sample missing":   func(r *Result) { r.Mode, r.Scope = ModeSample, ScopeSample },
+		"sample forbidden": func(r *Result) { r.Sample = &Sample{} },
+		"nil operations":   func(r *Result) { r.Operations = nil },
+		"coverage evaluation": func(r *Result) {
+			r.Result, r.Allowed, r.Coverage.Evaluation = OutcomeIndeterminate, false, "future"
+		},
 		"coverage disclosure":        func(r *Result) { r.Coverage.Disclosure = "future" },
 		"duplicate operation":        func(r *Result) { r.Operations = append(r.Operations, r.Operations[0]) },
 		"nil operation restrictions": func(r *Result) { r.Operations[0].RestrictionIDs = nil },
@@ -217,9 +219,11 @@ func TestRestrictionRepresentationsValidate(t *testing.T) {
 		{},
 		{ID: "r1", OperationID: "u1", Representation: "future", Kind: "opaque"},
 		{ID: "r1", OperationID: "u1", Representation: "expression", Kind: "opaque", Expression: &structuralCondition},
+		{ID: "r1", OperationID: "u1", Representation: "expression", Kind: "row_filter", Expression: &structuralCondition},
 		{ID: "r1", OperationID: "u1", Representation: "fields", Kind: "field_allowlist"},
 		{ID: "r1", OperationID: "u1", Representation: "reference", Kind: "opaque", OmissionReason: "future"},
 		{ID: "r1", OperationID: "u1", Representation: "mask", Kind: "field_mask", Mask: &access.Mask{}},
+		{ID: "r1", OperationID: "u1", Representation: "mask", Kind: "opaque", Mask: &access.Mask{Stages: []access.MaskStage{{Include: []string{"*"}}}}},
 	}
 	for _, restriction := range invalid {
 		result := base()
@@ -296,16 +300,36 @@ func TestResultDecoderRejectsMalformedAndMissingNestedFields(t *testing.T) {
 		"missing root":         strings.Replace(inspectResultFixture, `"requestId":"req-1",`, "", 1),
 		"missing operation":    strings.Replace(inspectResultFixture, `"requestOperationId":"u1",`, "", 1),
 		"missing layer source": strings.Replace(inspectResultFixture, `"ownerId":"ingit-local",`, "", 1),
+		"missing layer":        strings.Replace(inspectResultFixture, `"layerId":"ingit-crm",`, "", 1),
 		"missing decision":     strings.Replace(inspectResultFixture, `"scope":"operation","restrictionIds":[]`, `"restrictionIds":[]`, 1),
 		"missing coverage":     strings.Replace(inspectResultFixture, `"truncated":false,`, "", 1),
+		"bad field part":       strings.Replace(inspectResultFixture, `["name"]`, `[""]`, 1),
 		"nested duplicate":     strings.Replace(inspectResultFixture, `"databaseId":"crm","path"`, `"databaseId":"crm","databaseId":"other","path"`, 1),
 	}
+	denied := strings.Replace(inspectResultFixture, `"result":"allow","allowed":true`, `"result":"deny","allowed":false`, 1)
+	denied = strings.Replace(denied, `"blockers":[]`, `"blockers":[{"operationId":"u1","code":"ACCESS_DENIED","scope":"operation"}]`, 1)
+	tests["missing blocker"] = strings.Replace(denied, `"code":"ACCESS_DENIED",`, "", 1)
+	conditional := strings.Replace(inspectResultFixture, `"result":"allow","allowed":true`, `"result":"conditional","allowed":false`, 1)
+	conditional = strings.Replace(conditional, `"restrictions":[]`, `"restrictions":[{"id":"r1","operationId":"u1","enforced":true,"representation":"reference","kind":"opaque","omissionReason":"private"}]`, 1)
+	tests["missing restriction"] = strings.Replace(conditional, `"enforced":true,`, "", 1)
 	for name, source := range tests {
 		t.Run(name, func(t *testing.T) {
 			if _, err := ParseResult([]byte(source)); err == nil {
 				t.Fatal("malformed result accepted")
 			}
 		})
+	}
+	decoder := json.NewDecoder(strings.NewReader("{} {}"))
+	var first any
+	_ = decoder.Decode(&first)
+	if err := ensureEOF(decoder); err == nil {
+		t.Fatal("ensureEOF accepted trailing document")
+	}
+	if err := rejectDuplicateKeys([]byte(`{"x":`)); err == nil {
+		t.Fatal("truncated nested value accepted")
+	}
+	if err := validateRequiredResultFields([]byte("{")); err == nil {
+		t.Fatal("required-field validation accepted malformed JSON")
 	}
 }
 
