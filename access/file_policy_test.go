@@ -135,6 +135,89 @@ bindings:
 	require.ErrorContains(t, err, "not a regular file")
 }
 
+func TestLoadPolicyFilesRejectsInvalidConfigurationAndFiles(t *testing.T) {
+	root := t.TempDir()
+	writePolicyFile(t, root, "policy.txt", portablePolicy("p", "public", validPortableScopes))
+	writePolicyFile(t, root, "bad.json", "{")
+	require.NoError(t, os.WriteFile(filepath.Join(root, "large.yaml"), make([]byte, maxPolicyFileBytes+1), 0o600))
+	tests := []struct {
+		name   string
+		root   string
+		config FilePolicyConfig
+		want   string
+	}{
+		{"database", root, FilePolicyConfig{Enabled: true, Policies: []string{"policy.txt"}}, "require a database"},
+		{"root", filepath.Join(root, "missing"), FilePolicyConfig{Enabled: true, Database: "db1", Policies: []string{"policy.yaml"}}, "open policy root"},
+		{"empty name", root, FilePolicyConfig{Enabled: true, Database: "db1", Policies: []string{""}}, "invalid policy file"},
+		{"absolute", root, FilePolicyConfig{Enabled: true, Database: "db1", Policies: []string{filepath.Join(root, "policy.txt")}}, "invalid policy file"},
+		{"extension", root, FilePolicyConfig{Enabled: true, Database: "db1", Policies: []string{"policy.txt"}}, "must use"},
+		{"json", root, FilePolicyConfig{Enabled: true, Database: "db1", Policies: []string{"bad.json"}}, "invalid JSON"},
+		{"size", root, FilePolicyConfig{Enabled: true, Database: "db1", Policies: []string{"large.yaml"}}, "exceeds"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := LoadPolicyFiles(tc.root, tc.config); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err=%v want=%q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestPortablePolicySyntaxAndEnvelopeValidation(t *testing.T) {
+	for name, body := range map[string]string{
+		"syntax delegated": "bad: [",
+		"empty":            "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := validatePortablePolicyYAML([]byte(body)); err != nil {
+				t.Fatalf("syntax precheck must defer decoder errors: %v", err)
+			}
+		})
+	}
+	for name, body := range map[string]string{
+		"execution":       "execution: {}",
+		"collection mask": "collectionMask: {}",
+		"scope mask":      "scopes: [{path: /x/*, collectionMask: {}}]",
+		"rule mask":       "scopes: [{path: /x/*, rules: [{fieldMask: {}}]}]",
+		"nested mask":     "scopes: [{path: /x/*, scopes: [{path: /y/*, collectionMask: {}}]}]",
+		"ruleset mask":    "ruleSets: {r: [{path: /x/*, rules: [{fieldMask: {}}]}]}",
+		"duplicate":       "metadata: {name: a, name: b}",
+		"alias":           "x: &x {name: a}\nmetadata: *x",
+		"merge":           "x: &x {name: a}\nmetadata: {<<: *x}",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := validatePortablePolicyYAML([]byte(body)); err == nil {
+				t.Fatal("unsupported or ambiguous syntax accepted")
+			}
+		})
+	}
+	if got := mappingFeature(nil, "x"); got != "" {
+		t.Fatalf("nil mapping feature=%q", got)
+	}
+}
+
+func TestPolicyFromDTQLDocumentRejectsUnsupportedEnvelope(t *testing.T) {
+	source := []byte(portablePolicy("p", "public", validPortableScopes))
+	tests := map[string]func(DTQLDocument) DTQLDocument{
+		"api":         func(d DTQLDocument) DTQLDocument { d.APIVersion = "future"; return d },
+		"visibility":  func(d DTQLDocument) DTQLDocument { d.Metadata.Visibility = "secret"; return d },
+		"target":      func(d DTQLDocument) DTQLDocument { d.Target.Database = "other"; return d },
+		"composition": func(d DTQLDocument) DTQLDocument { d.Composition = "future"; return d },
+		"opaque":      func(d DTQLDocument) DTQLDocument { d.Scopes[0].OpaqueQuery = true; return d },
+		"group":       func(d DTQLDocument) DTQLDocument { d.Scopes[0].CollectionGroup = "g"; return d },
+		"scope mask":  func(d DTQLDocument) DTQLDocument { d.Scopes[0].CollectionMask = &Mask{}; return d },
+	}
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			base, err := ParseDTQLPolicy(source)
+			require.NoError(t, err)
+			if _, err := policyFromDTQLDocument(mutate(base), "db1", "policy.yaml"); err == nil {
+				t.Fatal("unsupported envelope accepted")
+			}
+		})
+	}
+}
+
 const validPortableScopes = `scopes:
   - path: /cities/*
     rules: [{id: read, effect: allow, operations: [get]}]
