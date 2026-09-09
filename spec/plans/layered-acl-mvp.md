@@ -420,7 +420,8 @@ Integrate authenticated OpenVaultDB query/write transport and render structured 
 **Id:** acl-22
 **Depends-On:** 6, 9, 11, 20, 21
 **Status:** in_progress
-**Note:** Real browser/daemon/OVDB E2E passes both engines; completing operational docs, full acceptance evidence and required coverage gates.
+**Note:** HTTP and browser E2E pass both engines. InGitDB full coverage84.7% and OVDB60.6% pass existing gates; SQL90%, DALgo100%, CLI CGO gates still active. Durable acceptance matrix in OVDB docs.
+**Evidence:** openvaultdb/openvaultdb-go@3d1b055:docs/layered-acl-acceptance.md, ingitdb/dalgo2ingitdb@3229699, datatug/datatug-apps@7e3e548
 
 **Repositories:** all participating repos
 
@@ -430,12 +431,14 @@ Run the reviewed full acceptance matrix with masks, principal kinds, independent
 
 **Validation:** Integration/security fixtures, direct lower access, restart/activation failures, SQL injection, replay and resource-budget tests.
 
+**Annotation Amendment:** actor=codex; at=2026-09-09T11:33:59Z; reason=Record full-suite evidence and remaining coverage gates; before_sha256=0ccbbff9b929712c287f7be5efb75b125fa83fd8b02a0f65df7c35e7001bbe72
 ### Task 23: Independent implementation security review and resolution
 
 **Id:** acl-23
 **Depends-On:** 22
 **Status:** in_progress
-**Note:** Preparing identical immutable implementation snapshots and rubric for blind Astra B and Opus reviews while coverage delivery checks continue.
+**Note:** Astra B submitted four high and two medium findings; all provisionally accepted and fixed with regressions. Opus restarted after its11:30UTC session reset on the identical immutable packet. Separate reconciliation pending.
+**Evidence:** openvaultdb/openvaultdb-go@3d1b055:docs/layered-acl-review/report.md, dal-go/dalgo@6ef1e00, dal-go/dalgo2sql@27e1c00, ingitdb/dalgo2ingitdb@3229699, datatug/datatug-apps@7e3e548
 
 **Repositories:** all participating repos
 
@@ -445,6 +448,7 @@ Review the final implementation against the approved packet using independent re
 
 **Validation:** Review reports tied to exact local commits and post-fix regression evidence.
 
+**Annotation Amendment:** actor=codex; at=2026-09-09T11:33:59Z; reason=Record submitted blind Astra review and tested remediation while Opus runs; before_sha256=a41724362e6c324c03bb5625bb54da9e59c0f09264c1cf43758a78b26fd1b57e
 ### Task 24: Coordinated publication and dependency integration
 
 **Id:** acl-24
