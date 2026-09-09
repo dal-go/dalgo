@@ -166,6 +166,50 @@ func TestExecutionAdmissionErrorsAndReuse(t *testing.T) {
 	}
 }
 
+func TestCoordinatorPropagatesBoundaryFailures(t *testing.T) {
+	key := record.NewKeyWithID("docs", "one")
+	op, _ := NewProtectedRead("one", Get, key)
+	allow := MustPolicy("p", Scope("docs", AnyID, Allow(Get)))
+	lease, _ := NewStaticPolicyLease(allow)
+	participant := MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }}
+	boom := errors.New("boom")
+	for _, execution := range []bool{false, true} {
+		events := []string{}
+		coordinator, _ := NewEnforcementCoordinator(&coordinatorStorage{events: &events, evidenceErr: boom}, participant)
+		var err error
+		if execution {
+			err = coordinator.WithinExecution(context.Background(), []ProtectedOperation{op}, func(ExecutionSession) error { return nil })
+		} else {
+			err = coordinator.WithinInspection(context.Background(), []ProtectedOperation{op}, func(InspectionSession) error { return nil })
+		}
+		if !errors.Is(err, boom) {
+			t.Fatalf("execution=%v err=%v", execution, err)
+		}
+	}
+	events := []string{}
+	storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{{OperationID: "one", CanonicalTarget: key.String(), SnapshotToken: "s", Complete: true, Exists: true, PreImage: map[string]any{}}}}
+	coordinator, _ := NewEnforcementCoordinator(storage, participant)
+	if err := coordinator.WithinInspection(context.Background(), []ProtectedOperation{op}, func(InspectionSession) error { return boom }); !errors.Is(err, boom) {
+		t.Fatalf("callback err=%v", err)
+	}
+	if err := coordinator.WithinExecution(context.Background(), []ProtectedOperation{op}, func(ExecutionSession) error { return nil }); err == nil {
+		t.Fatal("execution without Execute accepted")
+	}
+}
+
+func TestCoordinatorCancellationDuringLeaseAcquisition(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	key := record.NewKeyWithID("docs", "one")
+	op, _ := NewProtectedRead("one", Get, key)
+	events := []string{}
+	storage := &coordinatorStorage{events: &events}
+	lease, _ := NewStaticPolicyLease(MustPolicy("p", Root(Allow(Get))))
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { cancel(); return lease, nil }})
+	if err := coordinator.WithinInspection(ctx, []ProtectedOperation{op}, func(InspectionSession) error { return nil }); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
 func TestProtectedEvidenceValidationRejectsIncompleteOrMismatchedFacts(t *testing.T) {
 	key := record.NewKeyWithID("docs", "one")
 	op, _ := NewProtectedRead("one", Get, key)

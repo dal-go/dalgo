@@ -76,7 +76,7 @@ func TestPortableNormalizationTraversesNestedRuleSetsAndConstants(t *testing.T) 
 	doc, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
 	require.NoError(t, err)
 	rule := doc.Scopes[0].Rules[0]
-	rule.Where = &DocumentCondition{And: []DocumentCondition{{Op: "in", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Values: []any{uint64(1), map[string]any{"n": float64(1.5)}}}}}}
+	rule.Where = &DocumentCondition{And: []DocumentCondition{{Op: "In", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Values: []any{uint64(1), map[string]any{"n": float64(1.5)}}}}}}
 	doc.Scopes = nil
 	doc.RuleSets = map[string][]DTQLScope{"reader": {{Path: "/users", Rules: []DTQLRule{rule}, Scopes: []DTQLScope{{Path: "/*", Rules: []DTQLRule{{ID: "nested", Effect: "allow", Operations: []string{"get"}}}}}}}}
 	doc.Bindings = &DocumentBindings{Everyone: []string{"reader"}}
@@ -89,6 +89,18 @@ func TestPortableNormalizationTraversesNestedRuleSetsAndConstants(t *testing.T) 
 	doc.Scopes[0].Rules[0].FieldMask = &bad
 	_, err = NormalizeDTQLPolicy(doc)
 	require.Error(t, err)
+}
+
+func TestPortableNormalizationRestoresNestedNumericArrays(t *testing.T) {
+	doc, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	require.NoError(t, err)
+	doc.Scopes[0].Rules[0].Where = &DocumentCondition{Or: []DocumentCondition{{Op: "In", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Values: []any{int64(9007199254740993), uint64(9007199254740994)}}}}}
+	doc.Scopes[0].Scopes = []DTQLScope{{Path: "/children/*", Rules: []DTQLRule{{ID: "child", Effect: "allow", Operations: []string{"set"}, Check: &DocumentCondition{Op: "==", Left: &DocumentExpression{Field: "score"}, Right: &DocumentExpression{Value: float64(1.5)}}}}}}
+	normalized, err := NormalizeDTQLPolicy(doc)
+	require.NoError(t, err)
+	values := normalized.Scopes[0].Rules[0].Where.Or[0].Right.Values.([]any)
+	require.IsType(t, int64(0), values[0])
+	require.IsType(t, int64(0), values[1])
 }
 
 func TestPortableNormalizationRejectsUnsafeExtensions(t *testing.T) {
