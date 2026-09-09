@@ -114,7 +114,7 @@ func TestNormalizePortablePolicyRecursiveFailures(t *testing.T) {
 	}
 }
 
-func TestNormalizePortablePolicyRejectsDecoderDepthOverflow(t *testing.T) {
+func TestNormalizePortablePolicyRejectsDeepConstant(t *testing.T) {
 	doc, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
 	if err != nil {
 		t.Fatal(err)
