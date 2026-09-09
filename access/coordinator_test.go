@@ -449,3 +449,110 @@ func TestUnavailableProviderStillCollectsDefinitiveDenial(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCoordinatorRejectsInvalidRegistrationAndOperationBatches(t *testing.T) {
+	events := []string{}
+	storage := &coordinatorStorage{events: &events}
+	allow := MustPolicy("allow", Root(Allow(ReadWrite)))
+	lease, _ := NewStaticPolicyLease(allow)
+	provider := func(context.Context) (PolicyLease, error) { return lease, nil }
+	for name, participants := range map[string][]MandatoryParticipant{
+		"none":              nil,
+		"empty layer":       {{Provider: provider}},
+		"empty participant": {{LayerID: "owner"}},
+		"duplicate layer":   {{LayerID: "owner", Provider: provider}, {LayerID: "owner", Validator: func(context.Context, ProtectedOperation, map[string]any) error { return nil }}},
+		"validation only":   {{LayerID: "schema", Validator: func(context.Context, ProtectedOperation, map[string]any) error { return nil }}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := NewEnforcementCoordinator(storage, participants...); err == nil {
+				t.Fatal("invalid registration accepted")
+			}
+		})
+	}
+	if _, err := NewEnforcementCoordinator(nil, MandatoryParticipant{LayerID: "owner", Provider: provider}); err == nil {
+		t.Fatal("nil storage accepted")
+	}
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: provider})
+	key := record.NewKeyWithID("docs", "d1")
+	op, _ := NewProtectedRead("same", Get, key)
+	if err := coordinator.WithinInspection(context.Background(), nil, func(InspectionSession) error { return nil }); err == nil {
+		t.Fatal("empty inspection batch accepted")
+	}
+	if err := coordinator.WithinInspection(context.Background(), []ProtectedOperation{op}, nil); err == nil {
+		t.Fatal("nil inspection callback accepted")
+	}
+	if err := coordinator.WithinInspection(context.Background(), []ProtectedOperation{op, op}, func(InspectionSession) error { return nil }); err == nil {
+		t.Fatal("duplicate operation id accepted")
+	}
+	other, _ := NewProtectedRead("other", Get, key)
+	if err := coordinator.WithinExecution(context.Background(), []ProtectedOperation{op, other}, func(ExecutionSession) error { return nil }); err == nil {
+		t.Fatal("duplicate execution target accepted")
+	}
+	if err := coordinator.WithinExecution(context.Background(), []ProtectedOperation{op}, nil); err == nil {
+		t.Fatal("nil execution callback accepted")
+	}
+}
+
+func TestCoordinatorDefersAdmissionFailuresUntilAfterAuthorization(t *testing.T) {
+	key := record.NewKeyWithID("docs", "d1")
+	allow := MustPolicy("allow", Scope("docs", AnyID, Allow(Insert|Set|Update|Delete|Get)))
+	lease, _ := NewStaticPolicyLease(allow)
+	provider := func(context.Context) (PolicyLease, error) { return lease, nil }
+	tests := []struct {
+		name     string
+		op       ProtectedOperation
+		evidence ProtectedEvidence
+		want     error
+	}{
+		{"missing update", mustProtectedUpdate(t, "op", key, "r1"), ProtectedEvidence{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", DataRevision: "r1", CandidateRevision: "r2", CandidateImage: map[string]any{"name": "n"}, Complete: true}, ErrProtectedResourceUnavailable},
+		{"existing insert", mustProtectedInsert(t, "op", key), ProtectedEvidence{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{"name": "old"}, CandidateImage: map[string]any{"name": "new"}, CandidateRevision: "r2", Complete: true}, ErrProtectedRecordExists},
+		{"stale revision", mustProtectedSet(t, "op", key, "wanted"), ProtectedEvidence{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{"name": "old"}, DataRevision: "actual", CandidateImage: map[string]any{"name": "new"}, CandidateRevision: "r2", Complete: true}, ErrDataRevisionConflict},
+		{"missing candidate revision", mustProtectedSet(t, "op", key, ""), ProtectedEvidence{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{"name": "old"}, CandidateImage: map[string]any{"name": "new"}, Complete: true}, ErrAccessDenied},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			events := []string{}
+			storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{tc.evidence}}
+			coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: provider})
+			err := coordinator.WithinInspection(context.Background(), []ProtectedOperation{tc.op}, func(session InspectionSession) error {
+				assessment, err := session.Assess(context.Background())
+				if assessment.Outcome != AssessmentAllow {
+					t.Fatalf("authorization was not completed: %+v", assessment)
+				}
+				return err
+			})
+			if tc.name == "missing candidate revision" {
+				if err == nil || errors.Is(err, ErrAccessDenied) {
+					t.Fatalf("validation error=%v", err)
+				}
+			} else if !errors.Is(err, tc.want) {
+				t.Fatalf("err=%v want=%v", err, tc.want)
+			}
+		})
+	}
+}
+
+func mustProtectedUpdate(t *testing.T, id string, key *record.Key, revision string) ProtectedOperation {
+	t.Helper()
+	op, err := NewProtectedUpdate(id, key, []update.Update{update.ByFieldName("name", "n")}, revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return op
+}
+func mustProtectedInsert(t *testing.T, id string, key *record.Key) ProtectedOperation {
+	t.Helper()
+	op, err := NewProtectedInsert(id, key, map[string]any{"name": "new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return op
+}
+func mustProtectedSet(t *testing.T, id string, key *record.Key, revision string) ProtectedOperation {
+	t.Helper()
+	op, err := NewProtectedSet(id, key, map[string]any{"name": "new"}, revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return op
+}
