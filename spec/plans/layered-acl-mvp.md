@@ -232,7 +232,10 @@ Implement realm/kind/id principal references, stable internal user IDs with prov
 
 **Id:** acl-11
 **Depends-On:** 3, 5, 7, 10
-**Status:** queued
+**Status:** complete
+**Implemented-by:** ingitdb/dalgo2ingitdb@4d09c3b (layered-acl-query)
+**Note:** Filesystem and Git owner generations, CAS activation, fail-closed live reload, no-corruption repair and real process-crash recovery verified. Storage admission pin race remains task 17.
+**Evidence:** openvaultdb/openvaultdb-go@ed14e96, ingitdb/dalgo2ingitdb@4d09c3b, pkg/policystore/store_test.go, access_generation_crash_test.go, full Go suites and vet
 
 **Repositories:** ingitdb/dalgo2ingitdb; openvaultdb/openvaultdb-go
 
@@ -246,7 +249,10 @@ Evolve the initial file snapshots into the approved owner generation/revision co
 
 **Id:** acl-12
 **Depends-On:** 1, 2
-**Status:** queued
+**Status:** complete
+**Implemented-by:** dal-go/dalgo@cc54080 (layered-acl-query)
+**Note:** Frozen wire fixtures, strict and compatible decoding, complete independent policy decisions and immutable provider snapshots verified.
+**Evidence:** dtql/authorization/result_test.go, access/provider_test.go, go test ./..., go vet ./access ./dtql/authorization
 
 **Repositories:** datatug/dtql; dal-go/dalgo
 
@@ -260,7 +266,10 @@ Implement the reviewed C2 wire contract and equivalent reusable internal decisio
 
 **Id:** acl-13
 **Depends-On:** 10, 12
-**Status:** queued
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@fd26beb (layered-acl-query)
+**Note:** Owner-authorized references and protected inspection remain separate from data visibility; missing/hidden/malformed point evidence coalesces without false per-owner denials or private metadata.
+**Evidence:** fd26beb, 7375c6b, TestAccessPlanLayersAndPrivateDisclosure, TestProtectedHTTPReadInspectUpdate
 
 **Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go; ingitdb/dalgo2ingitdb
 
@@ -274,7 +283,10 @@ Enforce public-default/private-admin-only policy visibility, safe ordinary diagn
 
 **Id:** acl-14
 **Depends-On:** 10, 11, 12, 13
-**Status:** queued
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@f7b19fa (layered-acl-query)
+**Note:** Authorized owner discovery and metadata endpoints retain source identity and private/public document separation; policy UI and HTTP CRUD remain excluded.
+**Evidence:** pkg/server/access_discovery.go, TestAccessPlanLayersAndPrivateDisclosure
 
 **Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go; ingitdb/dalgo2ingitdb
 
@@ -288,7 +300,10 @@ Expose privileged provider/layer discovery and metadata needed by Explain Access
 
 **Id:** acl-15
 **Depends-On:** 9, 10, 12, 13
-**Status:** queued
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@fd26beb (layered-acl-query)
+**Note:** Strict normalized plan and explicit-key inspect share DALgo policy evaluation; impure custom callbacks are not replayed, and CAS/visibility admission uses pinned evidence.
+**Evidence:** f7b19fa, fd26beb, DALgo eeff916, TestProtectedHTTPReadInspectUpdate
 
 **Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go; ingitdb/dalgo2ingitdb
 
@@ -302,7 +317,10 @@ Implement metadata-only plan and bounded explicit-key inspection with the same e
 
 **Id:** acl-16
 **Depends-On:** 15
-**Status:** queued
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@fd26beb (layered-acl-query)
+**Note:** Bounded sample selects readable requester/target intersection before pagination, appends adapter canonical key ordering, rechecks visibility and never authorizes a general request.
+**Evidence:** pkg/core/access_sample.go, pkg/server/access_sample.go, TestProtectedHTTPReadInspectUpdate
 
 **Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go
 
@@ -316,7 +334,10 @@ Select bounded samples from the permitted candidate intersection with explicit b
 
 **Id:** acl-17
 **Depends-On:** 8, 9, 10, 12, 15
-**Status:** queued
+**Status:** complete
+**Implemented-by:** dal-go/dalgo@7375c6b (layered-acl-query)
+**Note:** Sealed inspection/execution coordinator pins mandatory owner leases through commit, validates immutable final candidates, exposes authorized field evidence and whole-image revisions, and composes safe provider/preparation failures.
+**Evidence:** ea9dad3, af6bd86, 7375c6b, access/coordinator_test.go, OVDB f7b19fa
 
 **Repositories:** dal-go/dalgo
 
@@ -330,7 +351,10 @@ Complete the reusable write path for insert/update/delete, private pre-images, f
 
 **Id:** acl-18
 **Depends-On:** 11, 17
-**Status:** queued
+**Status:** complete
+**Implemented-by:** dal-go/dalgo2sql@d6d95e0 (layered-acl-query)
+**Note:** Both adapters enforce lock-bound protected point writes, denied batch rollback and whole-image CAS; SQLite profile rejects ambiguous key collation and handles malformed images without disclosure.
+**Evidence:** dalgo2sql d6d95e0, dalgo2ingitdb f95561c, c0590b3, TestSQLiteProtected, TestProtectedHTTPReadInspectUpdate
 
 **Repositories:** ingitdb/dalgo2ingitdb; dal-go/dalgo2sql; openvaultdb/openvaultdb-go
 
@@ -344,7 +368,10 @@ Integrate owner write assessment with adapter transactions and per-row revisions
 
 **Id:** acl-19
 **Depends-On:** 18
-**Status:** queued
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@fd26beb (layered-acl-query)
+**Note:** Normalized one-row HTTP UPDATE validates URL/body identity, actor capability, final candidate and revision within the same mandatory-owner execution boundary; responses reflect committed writes.
+**Evidence:** f7b19fa, fd26beb, TestProtectedHTTPReadInspectUpdate
 
 **Repositories:** openvaultdb/openvaultdb-go
 
@@ -358,7 +385,10 @@ Propagate principal, operation and revision preconditions into protected writes;
 
 **Id:** acl-20
 **Depends-On:** 13, 15, 16, 19
-**Status:** queued
+**Status:** complete
+**Implemented-by:** openvaultdb/openvaultdb-go@fd26beb (layered-acl-query)
+**Note:** One inspect and real UPDATE response retain independent upper/lower policy references and exact column blockers; unavailable/private evidence is separately incomplete and safely redacted.
+**Evidence:** fd26beb, DALgo af6bd86, 7375c6b, TestProtectedHTTPReadInspectUpdate
 
 **Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go; ingitdb/dalgo2ingitdb
 
@@ -372,7 +402,8 @@ After an upper-layer denial collect safely evaluable lower blockers through insp
 
 **Id:** acl-21
 **Depends-On:** 14, 16, 19, 20
-**Status:** queued
+**Status:** in_progress
+**Note:** Implementing daemon-authenticated OVDB transport; client UI and live acceptance follow endpoint completion.
 
 **Repositories:** datatug/datatug-cli; datatug/datatug-apps
 
@@ -386,7 +417,8 @@ Integrate authenticated OpenVaultDB query/write transport and render structured 
 
 **Id:** acl-22
 **Depends-On:** 6, 9, 11, 20, 21
-**Status:** queued
+**Status:** in_progress
+**Note:** Real browser/daemon/OVDB E2E passes both engines; completing operational docs, full acceptance evidence and required coverage gates.
 
 **Repositories:** all participating repos
 
