@@ -138,6 +138,98 @@ func TestReferenceAndMaskRestrictionDiscriminators(t *testing.T) {
 	}
 }
 
+func TestResultValidationRejectsMalformedContractStates(t *testing.T) {
+	valid := func(t *testing.T) Result {
+		t.Helper()
+		result, err := ParseResult([]byte(inspectResultFixture))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	tests := map[string]func(*Result){
+		"api":     func(r *Result) { r.APIVersion = "future" },
+		"request": func(r *Result) { r.RequestID = "" },
+		"mode":    func(r *Result) { r.Mode = "future" },
+		"allowed blockers": func(r *Result) {
+			r.Blockers = []Blocker{{OperationID: "u1", Code: "ACCESS_DENIED", Scope: "operation"}}
+		},
+		"sample missing":             func(r *Result) { r.Mode, r.Scope = ModeSample, ScopeSample },
+		"sample forbidden":           func(r *Result) { r.Sample = &Sample{} },
+		"nil operations":             func(r *Result) { r.Operations = nil },
+		"coverage evaluation":        func(r *Result) { r.Coverage.Evaluation = "future" },
+		"coverage disclosure":        func(r *Result) { r.Coverage.Disclosure = "future" },
+		"duplicate operation":        func(r *Result) { r.Operations = append(r.Operations, r.Operations[0]) },
+		"nil operation restrictions": func(r *Result) { r.Operations[0].RestrictionIDs = nil },
+		"bad operation":              func(r *Result) { r.Operations[0].Action = "future" },
+		"callable mismatch":          func(r *Result) { r.Operations[0].Callable = &Callable{} },
+		"unknown operation restriction": func(r *Result) {
+			r.Operations[0].RestrictionIDs, r.Operations[0].AllOf = []string{"missing"}, []string{"missing"}
+		},
+		"bad layer":                    func(r *Result) { r.Layers[0].ACLState = "future" },
+		"nil decisions":                func(r *Result) { r.Layers[0].Decisions = nil },
+		"nil decision restrictions":    func(r *Result) { r.Layers[0].Decisions[0].RestrictionIDs = nil },
+		"bad decision":                 func(r *Result) { r.Layers[0].Decisions[0].Scope = "future" },
+		"unknown decision restriction": func(r *Result) { r.Layers[0].Decisions[0].RestrictionIDs = []string{"missing"} },
+		"bad blocker": func(r *Result) {
+			r.Result, r.Allowed, r.Operations[0].Result, r.Layers[0].Result = OutcomeDeny, false, OutcomeDeny, OutcomeDeny
+			r.Blockers = []Blocker{{OperationID: "", Code: "ACCESS_DENIED", Scope: "operation"}}
+		},
+		"bad blocker slot": func(r *Result) {
+			r.Result, r.Allowed, r.Operations[0].Result, r.Layers[0].Result = OutcomeDeny, false, OutcomeDeny, OutcomeDeny
+			r.Blockers = []Blocker{{OperationID: "u1", Code: "ACCESS_DENIED", Scope: "operation", Slot: "future"}}
+		},
+		"bad unevaluated": func(r *Result) { r.Coverage.Unevaluated = []Unevaluated{{OperationID: "u1", Reason: "future"}} },
+	}
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			result := valid(t)
+			mutate(&result)
+			if err := result.Validate(); err == nil {
+				t.Fatal("malformed result accepted")
+			}
+		})
+	}
+}
+
+func TestRestrictionRepresentationsValidate(t *testing.T) {
+	base := func() Result {
+		r, _ := ParseResult([]byte(inspectResultFixture))
+		r.Result, r.Allowed, r.Operations[0].Result, r.Layers[0].Result, r.Layers[0].Decisions[0].Result = OutcomeConditional, false, OutcomeConditional, OutcomeConditional, OutcomeConditional
+		r.Operations[0].RestrictionIDs, r.Operations[0].AllOf = []string{"r1"}, []string{"r1"}
+		r.Layers[0].Decisions[0].RestrictionIDs = []string{"r1"}
+		return r
+	}
+	valid := []Restriction{
+		{ID: "r1", OperationID: "u1", Enforced: true, Representation: "expression", Kind: "row_filter", Expression: &access.DocumentCondition{Op: "==", Left: &access.DocumentExpression{Field: "id"}, Right: &access.DocumentExpression{Value: "1"}}},
+		{ID: "r1", OperationID: "u1", Enforced: true, Representation: "fields", Kind: "field_allowlist", Fields: []string{"name"}},
+		{ID: "r1", OperationID: "u1", Enforced: true, Representation: "reference", Kind: "opaque", OmissionReason: "private"},
+		{ID: "r1", OperationID: "u1", Enforced: true, Representation: "mask", Kind: "field_mask", Mask: &access.Mask{Stages: []access.MaskStage{{Include: []string{"*"}}}}},
+	}
+	for _, restriction := range valid {
+		result := base()
+		result.Restrictions = []Restriction{restriction}
+		if err := result.Validate(); err != nil {
+			t.Fatalf("valid restriction %+v: %v", restriction, err)
+		}
+	}
+	invalid := []Restriction{
+		{},
+		{ID: "r1", OperationID: "u1", Representation: "future", Kind: "opaque"},
+		{ID: "r1", OperationID: "u1", Representation: "expression", Kind: "opaque", Expression: &structuralCondition},
+		{ID: "r1", OperationID: "u1", Representation: "fields", Kind: "field_allowlist"},
+		{ID: "r1", OperationID: "u1", Representation: "reference", Kind: "opaque", OmissionReason: "future"},
+		{ID: "r1", OperationID: "u1", Representation: "mask", Kind: "field_mask", Mask: &access.Mask{}},
+	}
+	for _, restriction := range invalid {
+		result := base()
+		result.Restrictions = []Restriction{restriction}
+		if err := result.Validate(); err == nil {
+			t.Fatalf("invalid restriction accepted: %+v", restriction)
+		}
+	}
+}
+
 var structuralCondition = func() (condition access.DocumentCondition) { return }()
 
 func jsonEqual(a, b any) bool { return string(mustJSON(a)) == string(mustJSON(b)) }
