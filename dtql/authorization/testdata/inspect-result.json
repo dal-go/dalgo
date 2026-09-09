@@ -1,0 +1,59 @@
+{
+  "apiVersion": "dtql.org/authorization/v1",
+  "requestId": "req-1",
+  "mode": "inspect",
+  "scope": "request",
+  "result": "allow",
+  "allowed": true,
+  "hypothetical": false,
+  "operations": [
+    {
+      "id": "u1",
+      "requestOperationId": "u1",
+      "action": "update",
+      "resource": {
+        "databaseId": "crm",
+        "path": "/customers/101",
+        "rowId": "101",
+        "columns": [
+          [
+            "name"
+          ]
+        ]
+      },
+      "result": "allow",
+      "restrictionIds": [],
+      "allOf": [],
+      "executionClass": "dtql"
+    }
+  ],
+  "layers": [
+    {
+      "layerId": "ingit-crm",
+      "source": {
+        "ownerId": "ingit-local",
+        "provider": "ingitdb",
+        "databaseId": "crm",
+        "kind": "ingitdb"
+      },
+      "aclState": "enabled",
+      "result": "allow",
+      "decisions": [
+        {
+          "operationId": "u1",
+          "result": "allow",
+          "scope": "operation",
+          "restrictionIds": []
+        }
+      ]
+    }
+  ],
+  "blockers": [],
+  "coverage": {
+    "evaluation": "complete",
+    "disclosure": "full",
+    "truncated": false,
+    "unevaluated": []
+  },
+  "restrictions": []
+}

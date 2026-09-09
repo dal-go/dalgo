@@ -1,0 +1,78 @@
+{
+  "apiVersion": "dtql.org/authorization/v1",
+  "requestId": "req-1",
+  "mode": "sample",
+  "scope": "sample",
+  "result": "conditional",
+  "allowed": false,
+  "hypothetical": false,
+  "operations": [
+    {
+      "id": "s1",
+      "requestOperationId": "template",
+      "action": "update",
+      "resource": {
+        "databaseId": "crm",
+        "path": "/customers/101",
+        "rowId": "101",
+        "columns": [
+          [
+            "name"
+          ]
+        ]
+      },
+      "result": "allow",
+      "restrictionIds": [],
+      "allOf": [],
+      "executionClass": "dtql"
+    }
+  ],
+  "layers": [
+    {
+      "layerId": "ingit-crm",
+      "source": {
+        "ownerId": "ingit-local",
+        "provider": "ingitdb",
+        "databaseId": "crm",
+        "kind": "ingitdb"
+      },
+      "aclState": "enabled",
+      "result": "allow",
+      "decisions": [
+        {
+          "operationId": "s1",
+          "result": "allow",
+          "scope": "operation",
+          "restrictionIds": []
+        }
+      ]
+    }
+  ],
+  "blockers": [],
+  "coverage": {
+    "evaluation": "complete",
+    "disclosure": "full",
+    "truncated": false,
+    "unevaluated": []
+  },
+  "restrictions": [],
+  "sample": {
+    "requestedLimit": 1,
+    "evaluatedCount": 1,
+    "selection": "readable_candidates",
+    "order": [
+      {
+        "field": [
+          "id"
+        ],
+        "direction": "asc"
+      }
+    ],
+    "exhaustive": false,
+    "templateOperationId": "template",
+    "selectionResource": {
+      "databaseId": "crm",
+      "path": "/customers"
+    }
+  }
+}

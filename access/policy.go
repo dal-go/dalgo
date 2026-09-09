@@ -86,6 +86,9 @@ type WriteResidual struct {
 // DeniedError is returned when a policy rejects an operation.
 type DeniedError struct {
 	Decision Decision
+	// Decisions contains every independently evaluated mandatory policy in
+	// configured order. Decision remains the first denial for legacy callers.
+	Decisions []Decision
 }
 
 func (e *DeniedError) Error() string {
@@ -102,6 +105,19 @@ func (e *DeniedError) Error() string {
 }
 
 func (e *DeniedError) Unwrap() error { return ErrAccessDenied }
+
+// DecisionsFromError returns an immutable copy of the policy decisions
+// collected for a denied request. Legacy DeniedErrors yield Decision alone.
+func DecisionsFromError(err error) []Decision {
+	var denied *DeniedError
+	if !errors.As(err, &denied) {
+		return nil
+	}
+	if len(denied.Decisions) == 0 {
+		return []Decision{denied.Decision}
+	}
+	return append([]Decision(nil), denied.Decisions...)
+}
 
 // Policy is a named access capability. Every Policy applied to a secured
 // request must allow every target resource.

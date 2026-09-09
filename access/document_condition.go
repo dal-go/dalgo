@@ -26,6 +26,13 @@ type DocumentExpression struct {
 	Param  string `json:"param,omitempty" yaml:"param,omitempty"`
 }
 
+// ValidateDocumentCondition validates the portable condition shape without
+// compiling or evaluating a policy.
+func ValidateDocumentCondition(condition DocumentCondition) error {
+	_, err := conditionFromDocument(condition)
+	return err
+}
+
 var documentOperators = map[string]dal.Operator{
 	string(dal.Equal):          dal.Equal,
 	string(dal.In):             dal.In,

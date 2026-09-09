@@ -11,7 +11,25 @@ import (
 
 type secureDBOptions struct {
 	databasePolicies []Policy
+	policyProvider   PolicyProvider
 	requireContext   bool
+}
+
+// PolicyProvider returns one immutable owner policy snapshot for an operation.
+type PolicyProvider func(context.Context) ([]Policy, error)
+
+// WithDatabasePolicyProvider configures a required dynamic owner snapshot.
+func WithDatabasePolicyProvider(provider PolicyProvider) DBOption {
+	return func(options *secureDBOptions) error {
+		if provider == nil {
+			return fmt.Errorf("access: database policy provider is required")
+		}
+		if options.policyProvider != nil {
+			return fmt.Errorf("access: database policy provider is already configured")
+		}
+		options.policyProvider = provider
+		return nil
+	}
 }
 
 // DBOption configures SecureDB.
@@ -57,6 +75,7 @@ func SecureDB(db dal.DB, options ...DBOption) (dal.DB, error) {
 		DB: db,
 		guard: guard{
 			databasePolicies: append([]Policy(nil), settings.databasePolicies...),
+			policyProvider:   settings.policyProvider,
 			requireContext:   settings.requireContext,
 		},
 	}, nil
@@ -127,6 +146,11 @@ func (db *securedDB) RunReadonlyTransaction(ctx context.Context, worker dal.ROTx
 		return err
 	}
 	captured := db.guard.bind(ctx)
+	var err error
+	captured, err = captured.pinDatabasePolicies(ctx)
+	if err != nil {
+		return err
+	}
 	return db.DB.RunReadonlyTransaction(ctx, func(workerCtx context.Context, tx dal.ReadTransaction) error {
 		securedTx := &securedReadTransaction{
 			securedReadSession: securedReadSession{session: tx, guard: captured},
@@ -142,6 +166,11 @@ func (db *securedDB) RunReadwriteTransaction(ctx context.Context, worker dal.RWT
 		return err
 	}
 	captured := db.guard.bind(ctx)
+	var err error
+	captured, err = captured.pinDatabasePolicies(ctx)
+	if err != nil {
+		return err
+	}
 	return db.DB.RunReadwriteTransaction(ctx, func(workerCtx context.Context, tx dal.ReadwriteTransaction) error {
 		securedTx := &securedReadwriteTransaction{
 			securedReadwriteSession: securedReadwriteSession{
