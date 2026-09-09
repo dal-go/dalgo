@@ -134,6 +134,38 @@ func TestReadVisibilityForRejectsInvalidRequester(t *testing.T) {
 	}
 }
 
+func TestInspectionAdmissionErrorsRemainDistinct(t *testing.T) {
+	for name, session := range map[string]*inspectionSession{
+		"denied":    {alive: true, ingress: context.Background(), assessment: Assessment{Outcome: AssessmentDeny}},
+		"admission": {alive: true, ingress: context.Background(), assessment: Assessment{Outcome: AssessmentAllow}, admissionErr: ErrProtectedResourceUnavailable},
+		"revision":  {alive: true, ingress: context.Background(), assessment: Assessment{Outcome: AssessmentAllow}, revisionConflict: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := session.Evidence(context.Background()); err == nil {
+				t.Fatal("evidence unexpectedly available")
+			}
+			if _, err := session.Assess(context.Background()); name != "denied" && err == nil {
+				t.Fatal("assessment omitted admission error")
+			}
+		})
+	}
+}
+
+func TestExecutionAdmissionErrorsAndReuse(t *testing.T) {
+	for name, session := range map[string]*executionSession{
+		"denied":    {inspectionSession: &inspectionSession{alive: true, ingress: context.Background(), assessment: Assessment{Outcome: AssessmentDeny}}},
+		"admission": {inspectionSession: &inspectionSession{alive: true, ingress: context.Background(), assessment: Assessment{Outcome: AssessmentAllow}, admissionErr: ErrProtectedRecordExists}},
+		"revision":  {inspectionSession: &inspectionSession{alive: true, ingress: context.Background(), assessment: Assessment{Outcome: AssessmentAllow}, revisionConflict: true}},
+		"reused":    {inspectionSession: &inspectionSession{alive: true, ingress: context.Background(), assessment: Assessment{Outcome: AssessmentAllow}}, executed: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := session.Execute(context.Background()); err == nil {
+				t.Fatal("invalid execution accepted")
+			}
+		})
+	}
+}
+
 func TestProtectedEvidenceValidationRejectsIncompleteOrMismatchedFacts(t *testing.T) {
 	key := record.NewKeyWithID("docs", "one")
 	op, _ := NewProtectedRead("one", Get, key)
