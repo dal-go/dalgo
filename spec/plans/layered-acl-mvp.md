@@ -438,8 +438,8 @@ Run the reviewed full acceptance matrix with masks, principal kinds, independent
 **Id:** acl-23
 **Depends-On:** 22
 **Status:** in_progress
-**Note:** Astra B and Opus submitted on identical immutable packet; separate Sonnet reconciliation and corrective verification complete. All11 numbered findings plus C2 A1 accepted and fixed. Two later root findings fixed; independent delta review of InGitDB query evaluator active. Durable metrics disclose unavailable Astra telemetry and actual Opus/reconciliation usage.
-**Evidence:** openvaultdb/openvaultdb-go@1a03797:docs/layered-acl-review/report.md, dal-go/dalgo@cb67d4f, dal-go/dalgo@ce68a45, ingitdb/dalgo2ingitdb@ffb1f12, datatug/datatug-apps@5ebb264
+**Note:** Both blind reviews and separate reconciliation complete; all11 numbered findings plus A1 fixed. Astra B independently found and verified closure of later synthetic-ID predicate edge in InGitDB3b86e58. Final browser2/2, client26units, lint/build pass. Review reports and actual available cost metrics durable; waiting task22 coverage gate before delivery closure.
+**Evidence:** openvaultdb/openvaultdb-go@877dcdd:docs/layered-acl-review/report.md, ingitdb/dalgo2ingitdb@3b86e58, datatug/datatug-apps@5ebb264, dal-go/dalgo@ce68a45
 
 **Repositories:** all participating repos
 
@@ -451,11 +451,14 @@ Review the final implementation against the approved packet using independent re
 
 **Annotation Amendment:** actor=codex; at=2026-09-09T11:33:59Z; reason=Record submitted blind Astra review and tested remediation while Opus runs; before_sha256=a41724362e6c324c03bb5625bb54da9e59c0f09264c1cf43758a78b26fd1b57e
 **Annotation Amendment:** actor=codex; at=2026-09-09T12:12:50Z; reason=Record both blind reviews and completed independent reconciliation; before_sha256=a25bb450a781f5e3c66249e17d5c4c47bb84758781da289234e7742b676a8d6f
+**Annotation Amendment:** actor=codex; at=2026-09-09T12:20:23Z; reason=Close independent predicate follow-up and final client regressions; before_sha256=1dd829efb1d1a24226d22fe65fbeb975545315c5222310ab6f752cc03b6c2943
 ### Task 24: Coordinated publication and dependency integration
 
 **Id:** acl-24
 **Depends-On:** 23
 **Status:** queued
+**Note:** DTQL approved packet landed and cleaned via WB at c2d0487. Independent HTTP adapter fix passes GOWORK=off and WB preparation; landing in progress. Main DALgo/provider/consumer publication wave remains gated by task22.
+**Evidence:** datatug/dtql@c2d0487, openvaultdb/openvaultdb-go@877dcdd:docs/layered-acl-delivery.md, dal-go/dalgo2openvaultdb@cacd422
 
 **Repositories:** all participating repos
 
@@ -465,6 +468,7 @@ Keep local Go workspace/import links during development. After acceptance, perfo
 
 **Validation:** Provider release receipts, consumer CI, unlinked build and final E2E. Local implementation completion does not claim publication.
 
+**Annotation Amendment:** actor=codex; at=2026-09-09T12:20:24Z; reason=Record independent documentation delivery while provider coverage gate remains active; before_sha256=28b2cb60f161ba61a5d5cfccbd39f337fd4c2ffec99e5b59e71d83dcc11debef
 ## Open Questions
 
 No blocking questions for the authorized implementation. Resolve routine details
