@@ -216,3 +216,27 @@ func TestDecisionsFromErrorDeepCopiesSlices(t *testing.T) {
 		t.Fatalf("nested slices alias source: %+v", again)
 	}
 }
+
+type emptyMetadataPolicy struct{ malformedAssessmentPolicy }
+
+func (emptyMetadataPolicy) PolicyMetadata() PolicyMetadata { return PolicyMetadata{} }
+
+func TestAssessmentDefensiveDefaults(t *testing.T) {
+	metadata := DescribePolicy(emptyMetadataPolicy{})
+	if metadata.ID != "bad" || metadata.Visibility != PolicyVisibilityPrivate {
+		t.Fatalf("metadata=%+v", metadata)
+	}
+	p, err := WithPolicyMetadata(malformedAssessmentPolicy{}, PolicyMetadata{ID: "bad"})
+	if err != nil || DescribePolicy(p).Visibility != PolicyVisibilityPrivate {
+		t.Fatalf("policy=%v err=%v", p, err)
+	}
+	if writeMayAllowField(nil, "secret") != true {
+		t.Fatal("nil residual restricted fields")
+	}
+	a := assessPolicies(context.Background(), Request{Operation: Get}, []Policy{nil})
+	if a.assessment.Complete || a.assessment.Outcome != AssessmentIndeterminate {
+		t.Fatalf("assessment=%+v", a.assessment)
+	}
+	_ = namedPolicy("x").Decide(context.Background(), Request{})
+	_ = namedPolicy("x").Authorize(context.Background(), Request{})
+}
