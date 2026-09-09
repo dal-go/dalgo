@@ -7,6 +7,10 @@ import (
 	"testing"
 )
 
+type mutatingJSONValue struct{ mutate func() }
+
+func (v mutatingJSONValue) MarshalJSON() ([]byte, error) { v.mutate(); return []byte(`"x"`), nil }
+
 func TestPortablePolicyRejectsMalformedSecurityShapes(t *testing.T) {
 	if _, err := ParseDTQLPolicy(make([]byte, maxPolicyFileBytes+1)); err == nil {
 		t.Fatal("oversized policy accepted")
@@ -113,5 +117,19 @@ func TestNormalizePortablePolicyRejectsDecoderDepthOverflow(t *testing.T) {
 	doc.Scopes[0].Rules[0].Where = &DocumentCondition{Op: "==", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Value: value}}
 	if _, err := NormalizeDTQLPolicy(doc); err == nil || !strings.Contains(err.Error(), "depth") {
 		t.Fatalf("depth overflow err=%v", err)
+	}
+}
+
+func TestNormalizePortablePolicyRechecksSelectorsAfterMarshal(t *testing.T) {
+	doc, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mask := Mask{Stages: []MaskStage{{Include: []string{"*"}}}}
+	doc.Scopes[0].Rules[0].FieldMask = &mask
+	doc.Scopes[0].Rules[0].Where = &DocumentCondition{Op: "==", Left: &DocumentExpression{Field: "id"}}
+	doc.Scopes[0].Rules[0].Where.Right = &DocumentExpression{Value: mutatingJSONValue{mutate: func() { doc.Scopes[0].Rules[0].Fields = []string{"name"} }}}
+	if _, err := NormalizeDTQLPolicy(doc); err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Fatalf("post-marshal mutation err=%v", err)
 	}
 }

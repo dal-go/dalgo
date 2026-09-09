@@ -103,6 +103,15 @@ func TestExecutionSessionLifetimeAndReceiptsBoundaries(t *testing.T) {
 	if _, err := s.Receipts(context.Background()); err == nil {
 		t.Fatal("premature receipts accepted")
 	}
+	ingress, stop := context.WithCancel(context.Background())
+	stop()
+	s = &executionSession{inspectionSession: &inspectionSession{alive: true, ingress: ingress}}
+	if _, err := s.Execute(context.Background()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("execute ingress err=%v", err)
+	}
+	if _, err := s.Receipts(context.Background()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("receipts ingress err=%v", err)
+	}
 }
 
 func TestCoordinatorEvidenceHelpers(t *testing.T) {
@@ -135,6 +144,18 @@ func TestCoordinatorEvidenceHelpers(t *testing.T) {
 	updates := operationUpdates(op)
 	if len(updates) != 2 || updates[0].Value() != update.DeleteField || updates[1].Value() != "new" {
 		t.Fatalf("updates=%v", updates)
+	}
+}
+
+func TestSessionConstructionAndVisibilityRejectIncompleteEvidence(t *testing.T) {
+	key := record.NewKeyWithID("docs", "one")
+	op, _ := NewProtectedRead("one", Get, key)
+	s := &inspectionSession{alive: true, ingress: context.Background(), operations: []ProtectedOperation{op}}
+	if _, err := s.ReadVisibility(context.Background()); err == nil {
+		t.Fatal("visibility accepted missing evidence")
+	}
+	if _, err := newExecutionSession(context.Background(), []ProtectedOperation{op}, nil, nil, nil, nil, nil); err == nil {
+		t.Fatal("execution session accepted missing evidence")
 	}
 }
 
