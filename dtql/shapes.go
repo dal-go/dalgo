@@ -1,6 +1,10 @@
 package dtql
 
-import "gopkg.in/yaml.v3"
+import (
+	"fmt"
+
+	"gopkg.in/yaml.v3"
+)
 
 // document is the YAML representation of an in-scope dal.StructuredQuery.
 // Field order here defines the canonical key order of a DTQL-YAML document.
@@ -81,36 +85,38 @@ func (order orderYAML) MarshalYAML() (any, error) {
 
 func encodeExpressionNode(expression exprYAML, extra []yaml.Node) (*yaml.Node, error) {
 	node := &yaml.Node{Kind: yaml.MappingNode}
-	appendValue := func(key string, value any) error {
-		var encoded yaml.Node
-		if err := encoded.Encode(value); err != nil {
-			return err
-		}
-		node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, &encoded)
-		return nil
-	}
+	var key string
+	var value any
 	switch {
 	case expression.Field != "":
-		if err := appendValue("field", expression.Field); err != nil {
-			return nil, err
-		}
+		key, value = "field", expression.Field
 	case expression.Value != nil:
-		if err := appendValue("value", *expression.Value); err != nil {
-			return nil, err
-		}
+		key, value = "value", *expression.Value
 	case expression.Values != nil:
-		if err := appendValue("values", expression.Values); err != nil {
-			return nil, err
-		}
+		key, value = "values", expression.Values
 	case expression.Param != "":
-		if err := appendValue("param", expression.Param); err != nil {
+		key, value = "param", expression.Param
+	}
+	if key != "" {
+		var encoded yaml.Node
+		if err := encodeYAMLNode(&encoded, value); err != nil {
 			return nil, err
 		}
+		node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, &encoded)
 	}
 	for i := range extra {
 		node.Content = append(node.Content, &extra[i])
 	}
 	return node, nil
+}
+
+func encodeYAMLNode(node *yaml.Node, value any) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("encode expression: %v", recovered)
+		}
+	}()
+	return node.Encode(value)
 }
 
 func decodeExpressionNode(node *yaml.Node, expression *exprYAML, extra map[string]func(*yaml.Node) error) error {
