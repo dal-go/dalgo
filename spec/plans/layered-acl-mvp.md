@@ -1,6 +1,6 @@
 ---
 format: https://specscore.md/plan-specification
-status: Approved
+status: Executing
 ---
 # Plan: Layered ACL MVP across DTQL, DALgo, OpenVaultDB, InGitDB and DataTug
 
