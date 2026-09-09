@@ -295,6 +295,30 @@ func TestQueryFieldRestrictionsCoverCallerExpressions(t *testing.T) {
 	}
 }
 
+func TestQueryFieldValidationHandlesPointerExpressionsAndConditions(t *testing.T) {
+	set, err := parseFieldPatterns([]string{"name"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sets := fieldSets{set}
+	from := dal.From(dal.NewRootCollectionRef("users", ""))
+	field := dal.Field("name")
+	comparison := dal.NewComparison(&field, dal.Equal, dal.Constant{Value: "Ann"})
+	group := dal.NewGroupCondition(dal.And, &comparison)
+	query := dal.NewQueryBuilder(from).Where(&group).SelectColumns(dal.Column{Expression: &field})
+	if err := validateRequestedQueryFields(query, sets); err != nil {
+		t.Fatal(err)
+	}
+	var nilComparison *dal.Comparison
+	var nilGroup *dal.GroupCondition
+	for _, condition := range []dal.Condition{nilComparison, nilGroup} {
+		query = dal.NewQueryBuilder(from).Where(condition).SelectColumns(dal.Column{Expression: dal.Field("name")})
+		if err := validateRequestedQueryFields(query, sets); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestNestedQueryPoliciesPreserveCallerAndEffectiveQueries(t *testing.T) {
 	ctx := WithCurrentUser(context.Background(), "u1")
 	fieldPolicy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name")))
