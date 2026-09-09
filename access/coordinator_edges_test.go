@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
 	"github.com/dal-go/record/update"
 )
@@ -177,6 +178,28 @@ func TestExecutionAdmissionErrorsAndReuse(t *testing.T) {
 				t.Fatal("invalid execution accepted")
 			}
 		})
+	}
+}
+
+func TestEvaluateEvidenceClassifiesResidualFailures(t *testing.T) {
+	key := record.NewKeyWithID("docs", "one")
+	resource := RecordResourceForKey(key)
+	base := func(decision Decision) Assessment {
+		return Assessment{Outcome: AssessmentAllow, Complete: true, Policies: []PolicyAssessment{{Decision: decision}}}
+	}
+	op, _ := NewProtectedRead("one", Get, key)
+	evidence := ProtectedEvidence{Exists: true, PreImage: map[string]any{"owner": "other"}}
+	decision := Decision{Allowed: true, Effect: "allow", Operation: Get, Resource: resource, Residuals: []dal.Condition{dal.WhereField("owner", dal.Equal, "mine")}}
+	if got := evaluateEvidence(op, evidence, base(decision)); got.Outcome != AssessmentDeny || got.Policies[0].Decision.Code != CodeRowPredicateFailed {
+		t.Fatalf("row=%+v", got)
+	}
+	set, _ := parseFieldPatterns([]string{"name"})
+	write := &WriteResidual{Terminal: &WriteAlternative{Rule: "limited", fields: set}}
+	setOp, _ := NewProtectedSet("one", key, map[string]any{"secret": "x"}, "")
+	decision = Decision{Allowed: true, Effect: "allow", Operation: Set, Resource: resource, Writes: []*WriteResidual{write}}
+	evidence.CandidateImage = map[string]any{"secret": "x"}
+	if got := evaluateEvidence(setOp, evidence, base(decision)); got.Outcome != AssessmentDeny || got.Policies[0].Decision.Code != CodeColumnDenied {
+		t.Fatalf("write=%+v", got)
 	}
 }
 

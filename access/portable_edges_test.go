@@ -100,3 +100,18 @@ func TestNormalizePortablePolicyRecursiveFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizePortablePolicyRejectsDecoderDepthOverflow(t *testing.T) {
+	doc, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", validPortableScopes)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value any = "leaf"
+	for range 10001 {
+		value = []any{value}
+	}
+	doc.Scopes[0].Rules[0].Where = &DocumentCondition{Op: "==", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Value: value}}
+	if _, err := NormalizeDTQLPolicy(doc); err == nil || !strings.Contains(err.Error(), "depth") {
+		t.Fatalf("depth overflow err=%v", err)
+	}
+}

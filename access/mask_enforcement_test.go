@@ -126,3 +126,13 @@ func TestMaskMutationDistinguishesOpaqueCoverageFromDefiniteExclusion(t *testing
 		})
 	}
 }
+
+func TestMaskedNestedUpdateHandlesMissingAndScalarParents(t *testing.T) {
+	c, err := CompileMask(Mask{Stages: []MaskStage{{Include: []string{"*"}}}}, FieldMask)
+	require.NoError(t, err)
+	sets := fieldSets{&fieldSet{mask: c}}
+	images := writeImages{pre: map[string]any{"address": "opaque"}, post: map[string]any{}, updates: []update.Update{update.ByFieldPath(update.FieldPath{"address", "city"}, "x")}}
+	refused, unsupported := sets.disallowedMaskedMutation(images, Update)
+	require.Empty(t, refused)
+	require.False(t, unsupported)
+}

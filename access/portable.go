@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -307,20 +308,23 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 // MarshalDTQLPolicyYAML emits normalized policy text. Formatting and comments
 // from the original document are deliberately not preserved in this version.
 func MarshalDTQLPolicyYAML(document DTQLDocument) ([]byte, error) {
-	normalized, err := NormalizeDTQLPolicy(document)
-	if err != nil {
-		return nil, err
-	}
 	var output bytes.Buffer
-	encoder := yaml.NewEncoder(&output)
-	encoder.SetIndent(2)
-	if err = encoder.Encode(normalized); err != nil {
-		return nil, err
-	}
-	if err = encoder.Close(); err != nil {
+	if err := writeDTQLPolicyYAML(&output, document); err != nil {
 		return nil, err
 	}
 	return output.Bytes(), nil
+}
+func writeDTQLPolicyYAML(writer io.Writer, document DTQLDocument) error {
+	normalized, err := NormalizeDTQLPolicy(document)
+	if err != nil {
+		return err
+	}
+	encoder := yaml.NewEncoder(writer)
+	encoder.SetIndent(2)
+	if err = encoder.Encode(normalized); err != nil {
+		return err
+	}
+	return encoder.Close()
 }
 func MarshalDTQLPolicyJSON(document DTQLDocument) ([]byte, error) {
 	normalized, err := NormalizeDTQLPolicy(document)

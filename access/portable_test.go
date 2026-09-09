@@ -26,6 +26,7 @@ func TestPortablePolicyRoundTrip(t *testing.T) {
 	require.Equal(t, int64(9007199254740993), normalized.Scopes[0].Rules[0].Where.Right.Value)
 	normalized.CollectionMask.Stages[0].Include[0] = "changed"
 	require.Equal(t, "a*", doc.CollectionMask.Stages[0].Include[0])
+	require.Error(t, writeDTQLPolicyYAML(badWriter{}, doc))
 }
 
 func TestPortablePolicyInvalidExtensions(t *testing.T) {
