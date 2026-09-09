@@ -152,12 +152,16 @@ func cloneKey(key *record.Key) *record.Key {
 	return clone
 }
 
-// ProtectedEvidence is a complete private image supplied only inside the
-// trusted storage callback. It must never be copied into Assessment.
+// ProtectedEvidence is private storage evidence supplied only inside the
+// trusted storage callback. PreparationError represents a row-dependent
+// failure to construct complete evidence. Its cause remains private and the
+// item must carry no images, revisions, or existence fact. ProtectedEvidence
+// must never be copied into Assessment.
 type ProtectedEvidence struct {
 	OperationID, CanonicalTarget, SnapshotToken, DataRevision, CandidateRevision string
 	Exists, Complete                                                             bool
 	PreImage, CandidateImage                                                     map[string]any
+	PreparationError                                                             error
 }
 
 type ProtectedInspectionStorage interface {
@@ -378,6 +382,9 @@ func (c *EnforcementCoordinator) validateCandidates(ctx context.Context, operati
 			continue
 		}
 		item, ok := byID[op.id]
+		if ok && item.PreparationError != nil {
+			continue
+		}
 		if !ok || (op.action != Delete && item.CandidateImage == nil) || (op.action == Delete && item.CandidateImage != nil) {
 			return fmt.Errorf("access: candidate validation lacks complete image for %q", op.id)
 		}
@@ -710,6 +717,9 @@ func newInspectionSession(ctx context.Context, ops []ProtectedOperation, evidenc
 			if item.OperationID != op.id {
 				continue
 			}
+			if item.PreparationError != nil {
+				continue
+			}
 			if op.revision != "" && item.DataRevision != op.revision {
 				conflict = true
 			}
@@ -737,7 +747,15 @@ func assessProtected(ctx context.Context, ops []ProtectedOperation, evidence []P
 	}
 	byID := map[string]ProtectedEvidence{}
 	for _, item := range evidence {
-		if !item.Complete || item.SnapshotToken == "" || byID[item.OperationID].OperationID != "" {
+		if byID[item.OperationID].OperationID != "" || item.OperationID == "" {
+			return Assessment{}, fmt.Errorf("access: invalid protected evidence")
+		}
+		failed := item.PreparationError != nil
+		if failed {
+			if item.Complete || item.SnapshotToken != "" || item.DataRevision != "" || item.CandidateRevision != "" || item.Exists || item.PreImage != nil || item.CandidateImage != nil {
+				return Assessment{}, fmt.Errorf("access: invalid failed protected evidence")
+			}
+		} else if !item.Complete || item.SnapshotToken == "" {
 			return Assessment{}, fmt.Errorf("access: invalid protected evidence")
 		}
 		byID[item.OperationID] = item
@@ -763,7 +781,10 @@ func assessProtected(ctx context.Context, ops []ProtectedOperation, evidence []P
 				planned.Policies[j].LayerID = participants[i].LayerID
 				planned.Policies[j].OperationID = op.id
 			}
-			evaluated := evaluateEvidence(op, item, planned)
+			evaluated := planned
+			if item.PreparationError == nil {
+				evaluated = evaluateEvidence(op, item, planned)
+			}
 			for j := range evaluated.Restrictions {
 				evaluated.Restrictions[j].OperationID = op.id
 			}
@@ -771,6 +792,23 @@ func assessProtected(ctx context.Context, ops []ProtectedOperation, evidence []P
 			aggregate.Restrictions = append(aggregate.Restrictions, evaluated.Restrictions...)
 			aggregate.Outcome = reduceOutcome(aggregate.Outcome, evaluated.Outcome)
 			aggregate.Complete = aggregate.Complete && evaluated.Complete
+		}
+		if item.PreparationError != nil {
+			aggregate.Policies = append(aggregate.Policies, PolicyAssessment{
+				OperationID: op.id,
+				Policy:      PolicyMetadata{ID: "protected-evidence", Visibility: PolicyVisibilityPrivate},
+				Decision: Decision{
+					Operation:   op.action,
+					Resource:    RecordResourceForKey(op.key),
+					Policy:      "protected-evidence",
+					Effect:      effectDeny.String(),
+					Code:        CodeEvaluationFailed,
+					Scope:       DecisionScopeOperation,
+					Explanation: "complete protected evidence could not be prepared",
+				},
+			})
+			aggregate.Outcome = reduceOutcome(aggregate.Outcome, AssessmentIndeterminate)
+			aggregate.Complete = false
 		}
 	}
 	return aggregate, nil

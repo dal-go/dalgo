@@ -4,12 +4,99 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
 	"github.com/dal-go/record/update"
 )
+
+func TestPreparationFailureIsAssessedWithoutDisclosureOrExecution(t *testing.T) {
+	events := []string{}
+	key := record.NewKeyWithID("docs", "d1")
+	storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{{
+		OperationID: "op1", CanonicalTarget: key.String(),
+		PreparationError: errors.New("secret malformed stored scalar"),
+	}}}
+	allow := MustPolicy("writer", Scope("docs", AnyID, Allow(Update)))
+	lease, _ := NewStaticPolicyLease(allow)
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+	op, _ := NewProtectedUpdate("op1", key, []update.Update{update.ByFieldName("title", "new")}, "")
+	err := coordinator.WithinExecution(context.Background(), []ProtectedOperation{op}, func(session ExecutionSession) error {
+		assessment, err := session.Assess(context.Background())
+		if err != nil || assessment.Outcome != AssessmentIndeterminate || assessment.Complete || len(assessment.Policies) != 2 {
+			t.Fatalf("assessment=%+v err=%v", assessment, err)
+		}
+		if assessment.Policies[0].Decision.Allowed != true || assessment.Policies[1].Decision.Code != CodeEvaluationFailed {
+			t.Fatalf("policies=%+v", assessment.Policies)
+		}
+		if strings.Contains(assessment.Policies[1].Decision.Explanation, "secret") {
+			t.Fatalf("preparation cause leaked: %+v", assessment.Policies[1])
+		}
+		visible, err := session.ReadVisibility(context.Background())
+		if err != nil || visible["op1"] {
+			t.Fatalf("visibility=%v err=%v", visible, err)
+		}
+		_, err = session.Execute(context.Background())
+		return err
+	})
+	if !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("err=%v", err)
+	}
+	if strings.Join(events, ",") != "storage-enter,evidence,storage-abort" {
+		t.Fatalf("events=%v", events)
+	}
+}
+
+func TestPreparationFailurePreservesStaticDenialAndOtherOperations(t *testing.T) {
+	events := []string{}
+	badKey := record.NewKeyWithID("docs", "bad")
+	goodKey := record.NewKeyWithID("docs", "good")
+	storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{
+		{OperationID: "bad", CanonicalTarget: badKey.String(), PreparationError: errors.New("private")},
+		{OperationID: "good", CanonicalTarget: goodKey.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{}, Complete: true},
+	}}
+	deny := MustPolicy("deny", Scope("docs", "bad", Deny(Get)), Scope("docs", "good", Allow(Get)))
+	lease, _ := NewStaticPolicyLease(deny)
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+	bad, _ := NewProtectedRead("bad", Get, badKey)
+	good, _ := NewProtectedRead("good", Get, goodKey)
+	err := coordinator.WithinInspection(context.Background(), []ProtectedOperation{bad, good}, func(session InspectionSession) error {
+		assessment, err := session.Assess(context.Background())
+		if err != nil || assessment.Outcome != AssessmentDeny || assessment.Complete {
+			t.Fatalf("assessment=%+v err=%v", assessment, err)
+		}
+		seen := map[string]bool{}
+		for _, policy := range assessment.Policies {
+			seen[policy.OperationID] = true
+		}
+		if !seen["bad"] || !seen["good"] {
+			t.Fatalf("missing operation assessments: %+v", assessment.Policies)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPreparationFailureCannotCarryPrivateEvidence(t *testing.T) {
+	events := []string{}
+	key := record.NewKeyWithID("docs", "d1")
+	storage := &coordinatorStorage{events: &events, evidence: []ProtectedEvidence{{
+		OperationID: "read", CanonicalTarget: key.String(), PreparationError: errors.New("bad"), PreImage: map[string]any{"secret": "value"},
+	}}}
+	allow := MustPolicy("reader", Scope("docs", AnyID, Allow(Get)))
+	lease, _ := NewStaticPolicyLease(allow)
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+	op, _ := NewProtectedRead("read", Get, key)
+	called := false
+	err := coordinator.WithinInspection(context.Background(), []ProtectedOperation{op}, func(InspectionSession) error { called = true; return nil })
+	if err == nil || called {
+		t.Fatalf("err=%v called=%v", err, called)
+	}
+}
 
 type coordinatorStorage struct {
 	events      *[]string
