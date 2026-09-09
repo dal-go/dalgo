@@ -402,8 +402,10 @@ After an upper-layer denial collect safely evaluable lower blockers through insp
 
 **Id:** acl-21
 **Depends-On:** 14, 16, 19, 20
-**Status:** in_progress
-**Note:** Implementing daemon-authenticated OVDB transport; client UI and live acceptance follow endpoint completion.
+**Status:** complete
+**Implemented-by:** datatug/datatug-apps@0bf58fc (feat/layered-acl-query)
+**Note:** Real DataTug browser→daemon→OpenVaultDB flows pass for SQLite and InGitDB, including plan/row/top-N Explain, evidence/CAS update, reread, key normalization and credential isolation; explicit temporary config avoids modifying HOME.
+**Evidence:** datatug-cli a7e1f62, datatug-apps 0bf58fc, Playwright 2/2, Nx 19/19
 
 **Repositories:** datatug/datatug-cli; datatug/datatug-apps
 
@@ -432,7 +434,8 @@ Run the reviewed full acceptance matrix with masks, principal kinds, independent
 
 **Id:** acl-23
 **Depends-On:** 22
-**Status:** queued
+**Status:** in_progress
+**Note:** Preparing identical immutable implementation snapshots and rubric for blind Astra B and Opus reviews while coverage delivery checks continue.
 
 **Repositories:** all participating repos
 
