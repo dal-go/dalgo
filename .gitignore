@@ -25,4 +25,5 @@
 
 # SpecStudio local event journal
 .specscore/events.jsonl
+/.specscore-lifecycle.lock
 .worktrees

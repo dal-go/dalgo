@@ -2,6 +2,8 @@ package dtql
 
 import (
 	"fmt"
+	"math"
+	"reflect"
 
 	"github.com/dal-go/dalgo/dal"
 	"gopkg.in/yaml.v3"
@@ -56,8 +58,17 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 	if len(q.GroupBy()) > 0 {
 		return document{}, fmt.Errorf("GroupBy is not supported by DTQL")
 	}
+	if q.Having() != nil {
+		return document{}, fmt.Errorf("Having is not supported by DTQL")
+	}
 	if q.StartFrom() != "" {
 		return document{}, fmt.Errorf("cursor (StartFrom) is not supported by DTQL")
+	}
+	if q.StartAfter() != "" {
+		return document{}, fmt.Errorf("cursor (StartAfter) is not supported by DTQL")
+	}
+	if q.Limit() < 0 || q.Offset() < 0 {
+		return document{}, fmt.Errorf("limit and offset must be non-negative")
 	}
 	fromDoc, err := fromToYAML(from)
 	if err != nil {
@@ -106,16 +117,66 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 func exprToYAML(expr dal.Expression) (exprYAML, error) {
 	switch e := expr.(type) {
 	case dal.FieldRef:
+		if e.Source() != "" {
+			return exprYAML{}, fmt.Errorf("qualified field references are not supported by DTQL")
+		}
 		return exprYAML{Field: e.Name()}, nil
 	case dal.Constant:
-		return exprYAML{Value: e.Value}, nil
+		if !portableScalar(e.Value) {
+			return exprYAML{}, fmt.Errorf("unsupported constant value %T", e.Value)
+		}
+		value := e.Value
+		return exprYAML{Value: &value}, nil
 	case dal.Array:
+		if !portableScalarArray(e.Value) {
+			return exprYAML{}, fmt.Errorf("unsupported array value %T", e.Value)
+		}
 		return exprYAML{Values: e.Value}, nil
 	case dal.Param:
 		return exprYAML{Param: e.Name}, nil
 	default:
 		return exprYAML{}, fmt.Errorf("unsupported expression %T (only field references, constants, arrays and parameters are supported)", expr)
 	}
+}
+
+func portableScalar(value any) bool {
+	if value == nil {
+		return true
+	}
+	switch value := value.(type) {
+	case string, bool:
+		return true
+	case float32:
+		return !math.IsNaN(float64(value)) && !math.IsInf(float64(value), 0)
+	case float64:
+		return !math.IsNaN(value) && !math.IsInf(value, 0)
+	}
+	rv := reflect.ValueOf(value)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		v := rv.Int()
+		return v >= -(1<<53)+1 && v <= (1<<53)-1
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return rv.Uint() <= (1<<53)-1
+	default:
+		return false
+	}
+}
+
+func portableScalarArray(value any) bool {
+	if value == nil {
+		return false
+	}
+	rv := reflect.ValueOf(value)
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return false
+	}
+	for i := 0; i < rv.Len(); i++ {
+		if !portableScalar(rv.Index(i).Interface()) {
+			return false
+		}
+	}
+	return true
 }
 
 func condToYAML(cond dal.Condition) (*condYAML, error) {

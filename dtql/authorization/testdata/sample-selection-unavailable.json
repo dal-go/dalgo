@@ -1,0 +1,57 @@
+{
+  "apiVersion": "dtql.org/authorization/v1",
+  "requestId": "req-1",
+  "mode": "sample",
+  "scope": "sample",
+  "result": "indeterminate",
+  "allowed": false,
+  "hypothetical": false,
+  "operations": [],
+  "layers": [
+    {
+      "layerId": "ingit-crm",
+      "source": {
+        "ownerId": "ingit-local",
+        "provider": "ingitdb",
+        "databaseId": "crm",
+        "kind": "ingitdb"
+      },
+      "aclState": "enabled",
+      "result": "indeterminate",
+      "decisions": []
+    }
+  ],
+  "blockers": [],
+  "coverage": {
+    "evaluation": "partial",
+    "disclosure": "full",
+    "truncated": false,
+    "unevaluated": [
+      {
+        "operationId": "s1",
+        "layerId": "ingit-crm",
+        "reason": "source_unavailable"
+      }
+    ]
+  },
+  "restrictions": [],
+  "sample": {
+    "requestedLimit": 1,
+    "evaluatedCount": 0,
+    "selection": "readable_candidates",
+    "order": [
+      {
+        "field": [
+          "id"
+        ],
+        "direction": "asc"
+      }
+    ],
+    "exhaustive": false,
+    "templateOperationId": "s1",
+    "selectionResource": {
+      "databaseId": "crm",
+      "path": "/customers"
+    }
+  }
+}

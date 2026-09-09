@@ -195,14 +195,14 @@ func TestFieldsThroughStub(t *testing.T) {
 	if len(columns) != 2 || columns[0].Expression.(dal.FieldRef).Name() != "id" || columns[1].Expression.(dal.FieldRef).Name() != "name" {
 		t.Errorf("projected columns = %v", columns)
 	}
-	// Caller columns are intersected with the allow-list.
+	// A caller cannot use an explicit denied column as a disclosure probe.
 	stub.queries = nil
 	selected := dal.NewQueryBuilder(dal.From(dal.NewRootCollectionRef("users", ""))).SelectColumns(dal.Column{Expression: dal.Field("name")}, dal.Column{Expression: dal.Field("passwordHash")})
-	if _, err := session.ExecuteQueryToRecordsetReader(ctx, selected); err != nil {
-		t.Fatalf("selected query: %v", err)
+	if _, err := session.ExecuteQueryToRecordsetReader(ctx, selected); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("selected query = %v", err)
 	}
-	if columns := stub.queries[0].(dal.StructuredQuery).Columns(); len(columns) != 1 || columns[0].Expression.(dal.FieldRef).Name() != "name" {
-		t.Errorf("intersected columns = %v", columns)
+	if len(stub.queries) != 0 {
+		t.Errorf("denied selected query reached adapter: %v", stub.queries)
 	}
 	// A wildcard allow-list cannot be projected: records are redacted, recordsets refused.
 	wild := SecureReadwriteSession(stub, MustPolicy("wild", Collection("users", Allow(Query, "list").Fields("public_*", "name"))))
@@ -261,6 +261,100 @@ func TestFieldsThroughStub(t *testing.T) {
 	}
 	if err := mixed.Insert(ctx, record.NewRecordWithData(key("u9"), map[string]any{"ownerID": "u2", "email": "e"})); !errors.Is(err, ErrAccessDenied) {
 		t.Errorf("new other's row falls to terminal fields: %v", err)
+	}
+}
+
+func TestQueryFieldRestrictionsCoverCallerExpressions(t *testing.T) {
+	ctx := context.Background()
+	stub := &stubReadwriteSession{rows: map[string]map[string]any{}}
+	session := SecureReadwriteSession(stub, MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name"))))
+	from := dal.From(dal.NewRootCollectionRef("users", ""))
+	tests := map[string]dal.StructuredQuery{
+		"where":           dal.NewQueryBuilder(from).WhereField("secret", dal.Equal, "guess").SelectKeysOnly(reflect.String),
+		"order":           dal.NewQueryBuilder(from).OrderBy(dal.AscendingField("secret")).SelectKeysOnly(reflect.String),
+		"select":          dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Field("secret")}),
+		"aliased select":  dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Field("secret"), Alias: "value"}),
+		"group":           dal.NewQueryBuilder(from).GroupBy(dal.Field("secret")).SelectKeysOnly(reflect.String),
+		"having":          dal.NewQueryBuilder(from).Having(dal.WhereField("secret", dal.Equal, "guess")).SelectKeysOnly(reflect.String),
+		"constant select": dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Constant{Value: "x"}}),
+		"nil select":      dal.NewQueryBuilder(from).SelectColumns(dal.Column{}),
+		"nil order":       dal.NewQueryBuilder(from).OrderBy(nil).SelectKeysOnly(reflect.String),
+	}
+	for name, query := range tests {
+		t.Run(name, func(t *testing.T) {
+			stub.queries = nil
+			_, err := session.ExecuteQueryToRecordsetReader(ctx, query)
+			if !errors.Is(err, ErrAccessDenied) || len(stub.queries) != 0 {
+				t.Fatalf("err=%v adapter queries=%d", err, len(stub.queries))
+			}
+		})
+	}
+	allowed := dal.NewQueryBuilder(from).WhereField("name", dal.Equal, "Ann").OrderBy(dal.AscendingField("name")).SelectColumns(dal.Column{Expression: dal.Field("name")})
+	if _, err := session.ExecuteQueryToRecordsetReader(ctx, allowed); err != nil {
+		t.Fatalf("allowed query: %v", err)
+	}
+}
+
+func TestQueryFieldValidationHandlesPointerExpressionsAndConditions(t *testing.T) {
+	set, err := parseFieldPatterns([]string{"name"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sets := fieldSets{set}
+	from := dal.From(dal.NewRootCollectionRef("users", ""))
+	field := dal.Field("name")
+	comparison := dal.NewComparison(&field, dal.Equal, dal.Constant{Value: "Ann"})
+	group := dal.NewGroupCondition(dal.And, &comparison)
+	query := dal.NewQueryBuilder(from).Where(&group).SelectColumns(dal.Column{Expression: &field})
+	if err := validateRequestedQueryFields(query, sets); err != nil {
+		t.Fatal(err)
+	}
+	var nilComparison *dal.Comparison
+	var nilGroup *dal.GroupCondition
+	for _, condition := range []dal.Condition{nilComparison, nilGroup} {
+		query = dal.NewQueryBuilder(from).Where(condition).SelectColumns(dal.Column{Expression: dal.Field("name")})
+		if err := validateRequestedQueryFields(query, sets); err != nil {
+			t.Fatal(err)
+		}
+	}
+	grouped := dal.NewGroupCondition(dal.And, dal.WhereField("name", dal.Equal, "ok"), dal.WhereField("secret", dal.Equal, "x"))
+	query = dal.NewQueryBuilder(from).Where(grouped).SelectColumns(dal.Column{Expression: dal.Field("name")})
+	if err := validateRequestedQueryFields(query, sets); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("grouped err=%v", err)
+	}
+	computed := dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Constant{Value: 1}})
+	if _, ok := projectQuery(computed, sets); ok {
+		t.Fatal("computed projection accepted")
+	}
+}
+
+func TestNestedQueryPoliciesPreserveCallerAndEffectiveQueries(t *testing.T) {
+	ctx := WithCurrentUser(context.Background(), "u1")
+	fieldPolicy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name")))
+	rowPolicy := MustPolicy("rows", Collection("users", Allow(Query, "own").Where(dal.WhereField("ownerID", dal.Equal, dal.NewParam("currentUser")))))
+	base := dal.NewQueryBuilder(dal.From(dal.NewRootCollectionRef("users", ""))).Limit(1).SelectKeysOnly(reflect.String)
+	for _, reverse := range []bool{false, true} {
+		stub := &stubReadwriteSession{rows: map[string]map[string]any{}}
+		var session dal.ReadSession = stub
+		if reverse {
+			session = SecureReadSession(SecureReadSession(session, fieldPolicy), rowPolicy)
+		} else {
+			session = SecureReadSession(SecureReadSession(session, rowPolicy), fieldPolicy)
+		}
+		if _, err := session.ExecuteQueryToRecordsReader(ctx, base); err != nil {
+			t.Fatalf("reverse=%v: %v", reverse, err)
+		}
+		effective := stub.queries[0].(dal.StructuredQuery)
+		if effective.Limit() != 1 || len(effective.Columns()) != 1 || effective.Columns()[0].Expression.(dal.FieldRef).Name() != "name" || !strings.Contains(effective.Where().String(), "ownerID") {
+			t.Errorf("reverse=%v effective=%s", reverse, effective.String())
+		}
+	}
+
+	stub := &stubReadwriteSession{rows: map[string]map[string]any{}}
+	session := SecureReadSession(SecureReadSession(stub, rowPolicy), fieldPolicy)
+	probe := dal.NewQueryBuilder(dal.From(dal.NewRootCollectionRef("users", ""))).WhereField("ownerID", dal.Equal, "u1").SelectKeysOnly(reflect.String)
+	if _, err := session.ExecuteQueryToRecordsReader(ctx, probe); !errors.Is(err, ErrAccessDenied) || len(stub.queries) != 0 {
+		t.Fatalf("caller probe err=%v adapter queries=%d", err, len(stub.queries))
 	}
 }
 

@@ -66,8 +66,25 @@ type variableResolver struct {
 	now       time.Time
 }
 
-func newVariableResolver(ctx context.Context) variableResolver {
-	return variableResolver{variables: variablesFromContext(ctx), now: time.Now().UTC()}
+func newVariableResolver(ctx context.Context, policyRealms ...string) variableResolver {
+	variables := variablesFromContext(ctx)
+	if principal, ok := PrincipalFrom(ctx); ok && principal.Subject != nil {
+		delete(variables, "currentUser")
+		variables["principal.roles"] = []string{}
+		variables["principal.groups"] = []string{}
+		realm := ""
+		if len(policyRealms) > 0 {
+			realm = policyRealms[0]
+		}
+		if realm != "" && principal.Subject.Realm == realm {
+			variables["principal.roles"] = append([]string(nil), principal.Roles...)
+			variables["principal.groups"] = append([]string(nil), principal.Groups...)
+			if principal.Subject.Kind == PrincipalKindUser {
+				variables["currentUser"] = principal.Subject.ID
+			}
+		}
+	}
+	return variableResolver{variables: variables, now: time.Now().UTC()}
 }
 
 // withCaptures returns a resolver that also knows the values a matched path
@@ -122,6 +139,7 @@ func policiesFromContext(ctx context.Context) []Policy {
 
 type guard struct {
 	databasePolicies []Policy
+	policyProvider   PolicyProvider
 	boundPolicies    []Policy
 	requireContext   bool
 }
@@ -149,8 +167,14 @@ func (g guard) authorizeWrite(ctx context.Context, operation Operations, resourc
 
 // authorizeRequest evaluates every applicable policy and returns, per request
 // resource, the read residuals and the write residuals the caller must still
-// enforce. A denial by any policy is returned immediately.
+// enforce. Every mandatory policy is evaluated independently before a denial
+// is returned so trusted callers can reduce complete internal diagnostics.
 func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]residual, [][]writeResidual, error) {
+	var err error
+	g, err = g.pinDatabasePolicies(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
 	dynamicPolicies := policiesFromContext(ctx)
 	contextPolicyCount := len(g.boundPolicies) + len(dynamicPolicies)
 	if err := g.requireContextPolicy(request.Operation, contextPolicyCount); err != nil {
@@ -160,46 +184,55 @@ func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]resid
 	policies = append(policies, g.databasePolicies...)
 	policies = append(policies, g.boundPolicies...)
 	policies = append(policies, dynamicPolicies...)
-	var residuals [][]residual
-	var writes [][]writeResidual
-	for _, policy := range policies {
-		decision := policy.Decide(ctx, request)
-		if !decision.Allowed {
-			return nil, nil, &DeniedError{Decision: decision}
+	assessment := assessPolicies(ctx, request, policies)
+	if assessment.firstDenial != nil {
+		decisions := make([]Decision, len(assessment.assessment.Policies))
+		for i := range assessment.assessment.Policies {
+			decisions[i] = cloneDecision(assessment.assessment.Policies[i].Decision)
 		}
-		for i, condition := range decision.Residuals {
-			if condition == nil || i >= len(request.Resources) {
-				continue
-			}
-			if residuals == nil {
-				residuals = make([][]residual, len(request.Resources))
-			}
-			residuals[i] = append(residuals[i], residual{
-				policy:       decision.Policy,
-				policySource: decision.PolicySource,
-				rule:         decision.Rule,
-				text:         decision.Condition,
-				resource:     request.Resources[i],
-				condition:    condition,
-			})
+		return nil, nil, &DeniedError{Decision: *assessment.firstDenial, Decisions: decisions}
+	}
+	if !assessment.assessment.Complete {
+		decisions := make([]Decision, len(assessment.assessment.Policies))
+		for i := range assessment.assessment.Policies {
+			decisions[i] = cloneDecision(assessment.assessment.Policies[i].Decision)
 		}
-		for i, write := range decision.Writes {
-			if write == nil || i >= len(request.Resources) {
-				continue
-			}
-			if writes == nil {
-				writes = make([][]writeResidual, len(request.Resources))
-			}
-			writes[i] = append(writes[i], writeResidual{
-				policy:       decision.Policy,
-				policySource: decision.PolicySource,
-				resource:     request.Resources[i],
-				residual:     write,
-			})
+		if assessment.firstIndeterminate != nil {
+			return nil, nil, &DeniedError{Decision: *assessment.firstIndeterminate, Decisions: decisions}
 		}
 	}
-	return residuals, writes, nil
+	return assessment.residuals, assessment.writes, nil
 }
+
+func (g guard) pinDatabasePolicies(ctx context.Context) (guard, error) {
+	if g.policyProvider == nil {
+		return g, nil
+	}
+	policies, err := g.policyProvider(ctx)
+	if err != nil {
+		return guard{}, &PolicyProviderError{Err: err}
+	}
+	if len(policies) == 0 {
+		return guard{}, &PolicyProviderError{Err: fmt.Errorf("enabled provider returned no policies")}
+	}
+	for i, policy := range policies {
+		if policy == nil {
+			return guard{}, &PolicyProviderError{Err: fmt.Errorf("nil policy at index %d", i)}
+		}
+	}
+	g.databasePolicies = append(append([]Policy(nil), g.databasePolicies...), policies...)
+	g.policyProvider = nil
+	return g, nil
+}
+
+// PolicyProviderError is a fail-closed dynamic policy snapshot failure.
+type PolicyProviderError struct{ Err error }
+
+func (e *PolicyProviderError) Error() string {
+	return "dalgo access denied: database policy snapshot unavailable"
+}
+func (e *PolicyProviderError) Unwrap() error        { return e.Err }
+func (e *PolicyProviderError) Is(target error) bool { return target == ErrAccessDenied }
 
 func (g guard) checkContext(ctx context.Context) error {
 	return g.requireContextPolicy(0, len(g.boundPolicies)+len(policiesFromContext(ctx)))

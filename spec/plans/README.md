@@ -11,6 +11,7 @@ verifiable tasks with clear acceptance criteria and dependency ordering.
 
 | Plan | Feature | Status |
 |------|---------|--------|
+| [layered-acl-mvp](layered-acl-mvp.md) | Cross-repository approved layered ACL design | Executing |
 | [2026-05-12-concurrency-capability](2026-05-12-concurrency-capability.md) | concurrency-capability | Done |
 | [2026-05-13-dbschema-ddl](2026-05-13-dbschema-ddl.md) | dbschema + ddl | Done |
 | [2026-05-15-recordops-diff](2026-05-15-recordops-diff.md) | recordops + recordops/diff | Done |

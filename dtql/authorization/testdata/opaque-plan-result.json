@@ -1,0 +1,75 @@
+{
+  "apiVersion": "dtql.org/authorization/v1",
+  "requestId": "req-1",
+  "mode": "plan",
+  "scope": "request",
+  "result": "conditional",
+  "allowed": false,
+  "hypothetical": false,
+  "operations": [
+    {
+      "id": "u1",
+      "requestOperationId": "u1",
+      "action": "update",
+      "resource": {
+        "databaseId": "crm",
+        "path": "/customers/101",
+        "rowId": "101",
+        "columns": [
+          [
+            "name"
+          ]
+        ]
+      },
+      "result": "conditional",
+      "restrictionIds": [
+        "r1"
+      ],
+      "allOf": [
+        "r1"
+      ],
+      "executionClass": "dtql"
+    }
+  ],
+  "layers": [
+    {
+      "layerId": "ingit-crm",
+      "source": {
+        "ownerId": "ingit-local",
+        "provider": "ingitdb",
+        "databaseId": "crm",
+        "kind": "ingitdb"
+      },
+      "aclState": "enabled",
+      "result": "conditional",
+      "decisions": [
+        {
+          "operationId": "u1",
+          "result": "conditional",
+          "scope": "operation",
+          "restrictionIds": [
+            "r1"
+          ]
+        }
+      ]
+    }
+  ],
+  "blockers": [],
+  "coverage": {
+    "evaluation": "complete",
+    "disclosure": "redacted",
+    "truncated": false,
+    "unevaluated": []
+  },
+  "restrictions": [
+    {
+      "id": "r1",
+      "operationId": "u1",
+      "kind": "row_filter",
+      "representation": "reference",
+      "omissionReason": "not_authorized",
+      "enforced": false,
+      "layerId": "ingit-crm"
+    }
+  ]
+}

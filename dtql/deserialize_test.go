@@ -36,6 +36,30 @@ func TestSerializeAndBack(t *testing.T) {
 	}
 }
 
+func TestNullConstantRoundTripAndDirectDecode(t *testing.T) {
+	serialized, err := Serialize(fakeQuery{from: rootFrom(), columns: []dal.Column{{Expression: dal.Constant{Value: nil}}}})
+	if err != nil {
+		t.Fatalf("serialize null: %v", err)
+	}
+	query, err := Deserialize(serialized)
+	if err != nil {
+		t.Fatalf("deserialize serialized null: %v\n%s", err, serialized)
+	}
+	if got := query.Columns()[0].Expression.(dal.Constant).Value; got != nil {
+		t.Fatalf("round-trip null = %#v", got)
+	}
+
+	direct := []byte("from: {name: users}\nwhere:\n  op: ==\n  left: {field: deletedAt}\n  right: {value: null}\n")
+	query, err = Deserialize(direct)
+	if err != nil {
+		t.Fatalf("direct null: %v", err)
+	}
+	comparison := query.Where().(dal.Comparison)
+	if got := comparison.Right.(dal.Constant).Value; got != nil {
+		t.Fatalf("direct null = %#v", got)
+	}
+}
+
 func TestDeserialize_invalidInputRejected(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -77,6 +101,12 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 			yaml:    "from:\n  name: users\ncolumns:\n  - as: x\n",
 			wantErr: "exactly one of field, value, values or param",
 		},
+		{name: "negative limit", yaml: "from: {name: users}\nlimit: -1\n", wantErr: "non-negative"},
+		{name: "negative offset", yaml: "from: {name: users}\noffset: -1\n", wantErr: "non-negative"},
+		{name: "map value", yaml: "from: {name: users}\ncolumns: [{value: {secret: x}}]\n", wantErr: "value must be a scalar"},
+		{name: "scalar values", yaml: "from: {name: users}\ncolumns: [{values: x}]\n", wantErr: "values must be an array"},
+		{name: "nested values", yaml: "from: {name: users}\ncolumns: [{values: [[x]]}]\n", wantErr: "values must be an array of scalars"},
+		{name: "trailing document", yaml: "from: {name: users}\n---\nfrom: {name: orders}\n", wantErr: "multiple documents"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

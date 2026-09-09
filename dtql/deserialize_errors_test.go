@@ -75,3 +75,10 @@ func TestDeserialize_errorBranches(t *testing.T) {
 		})
 	}
 }
+
+func TestDeserializeRejectsMalformedTrailingDocument(t *testing.T) {
+	source := "from:\n  name: users\n---\n["
+	if _, err := Deserialize([]byte(source)); err == nil {
+		t.Fatal("malformed trailing document accepted")
+	}
+}

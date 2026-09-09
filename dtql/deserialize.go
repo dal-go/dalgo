@@ -3,6 +3,7 @@ package dtql
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/dal-go/dalgo/dal"
 	"gopkg.in/yaml.v3"
@@ -19,12 +20,22 @@ func Deserialize(data []byte) (dal.StructuredQuery, error) {
 	if err := dec.Decode(&doc); err != nil {
 		return nil, fmt.Errorf("invalid DTQL-YAML: %w", err)
 	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return nil, fmt.Errorf("invalid DTQL-YAML: multiple documents are not allowed")
+		}
+		return nil, fmt.Errorf("invalid DTQL-YAML: %w", err)
+	}
 	return documentToQuery(doc)
 }
 
 func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	if doc.From.Name == "" {
 		return nil, fmt.Errorf("invalid DTQL: from.name is required")
+	}
+	if doc.Limit < 0 || doc.Offset < 0 {
+		return nil, fmt.Errorf("invalid DTQL: limit and offset must be non-negative")
 	}
 	source := dal.NewRootCollectionRef(doc.From.Name, doc.From.Alias)
 	qb := dal.From(source).NewQuery()
@@ -114,13 +125,19 @@ func exprFromYAML(e exprYAML) (dal.Expression, error) {
 	case e.Field != "":
 		return dal.NewFieldRef("", e.Field), nil
 	case e.Value != nil:
-		return dal.Constant{Value: e.Value}, nil
+		if !portableScalar(*e.Value) {
+			return nil, fmt.Errorf("value must be a scalar")
+		}
+		return dal.Constant{Value: *e.Value}, nil
 	case e.Param != "":
 		if !dal.ValidParamName(e.Param) {
 			return nil, fmt.Errorf("invalid parameter name %q", e.Param)
 		}
 		return dal.Param{Name: e.Param}, nil
 	default: // e.Values != nil
+		if !portableScalarArray(e.Values) {
+			return nil, fmt.Errorf("values must be an array of scalars")
+		}
 		return dal.Array{Value: e.Values}, nil
 	}
 }
