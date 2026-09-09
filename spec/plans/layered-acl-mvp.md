@@ -420,8 +420,8 @@ Integrate authenticated OpenVaultDB query/write transport and render structured 
 **Id:** acl-22
 **Depends-On:** 6, 9, 11, 20, 21
 **Status:** in_progress
-**Note:** HTTP and browser E2E pass both engines. InGitDB full coverage84.7% and OVDB60.6% pass existing gates; SQL90%, DALgo100%, CLI CGO gates still active. Durable acceptance matrix in OVDB docs.
-**Evidence:** openvaultdb/openvaultdb-go@3d1b055:docs/layered-acl-acceptance.md, ingitdb/dalgo2ingitdb@3229699, datatug/datatug-apps@7e3e548
+**Note:** HTTP/conformance and browser E2E pass both engines. InGitDB84.7%, OVDB60.6%, SQL90.1%, CLI59.1% pass unchanged gates. DALgo access97.2% remains below100%; final browser rerun active after C2 client fix.
+**Evidence:** openvaultdb/openvaultdb-go@1a03797:docs/layered-acl-acceptance.md, ingitdb/dalgo2ingitdb@ffb1f12, dal-go/dalgo2sql@4bb140a, datatug/datatug-apps@5ebb264
 
 **Repositories:** all participating repos
 
@@ -432,13 +432,14 @@ Run the reviewed full acceptance matrix with masks, principal kinds, independent
 **Validation:** Integration/security fixtures, direct lower access, restart/activation failures, SQL injection, replay and resource-budget tests.
 
 **Annotation Amendment:** actor=codex; at=2026-09-09T11:33:59Z; reason=Record full-suite evidence and remaining coverage gates; before_sha256=0ccbbff9b929712c287f7be5efb75b125fa83fd8b02a0f65df7c35e7001bbe72
+**Annotation Amendment:** actor=codex; at=2026-09-09T12:12:50Z; reason=Record passed SQL and CLI gates and InGitDB predicate conformance fix; before_sha256=58ff199dfb585b2f91a06db5c7e87bddcd67e5848b5e7973a4feb57eb8d63061
 ### Task 23: Independent implementation security review and resolution
 
 **Id:** acl-23
 **Depends-On:** 22
 **Status:** in_progress
-**Note:** Astra B submitted four high and two medium findings; all provisionally accepted and fixed with regressions. Opus restarted after its11:30UTC session reset on the identical immutable packet. Separate reconciliation pending.
-**Evidence:** openvaultdb/openvaultdb-go@3d1b055:docs/layered-acl-review/report.md, dal-go/dalgo@6ef1e00, dal-go/dalgo2sql@27e1c00, ingitdb/dalgo2ingitdb@3229699, datatug/datatug-apps@7e3e548
+**Note:** Astra B and Opus submitted on identical immutable packet; separate Sonnet reconciliation and corrective verification complete. All11 numbered findings plus C2 A1 accepted and fixed. Two later root findings fixed; independent delta review of InGitDB query evaluator active. Durable metrics disclose unavailable Astra telemetry and actual Opus/reconciliation usage.
+**Evidence:** openvaultdb/openvaultdb-go@1a03797:docs/layered-acl-review/report.md, dal-go/dalgo@cb67d4f, dal-go/dalgo@ce68a45, ingitdb/dalgo2ingitdb@ffb1f12, datatug/datatug-apps@5ebb264
 
 **Repositories:** all participating repos
 
@@ -449,6 +450,7 @@ Review the final implementation against the approved packet using independent re
 **Validation:** Review reports tied to exact local commits and post-fix regression evidence.
 
 **Annotation Amendment:** actor=codex; at=2026-09-09T11:33:59Z; reason=Record submitted blind Astra review and tested remediation while Opus runs; before_sha256=a41724362e6c324c03bb5625bb54da9e59c0f09264c1cf43758a78b26fd1b57e
+**Annotation Amendment:** actor=codex; at=2026-09-09T12:12:50Z; reason=Record both blind reviews and completed independent reconciliation; before_sha256=a25bb450a781f5e3c66249e17d5c4c47bb84758781da289234e7742b676a8d6f
 ### Task 24: Coordinated publication and dependency integration
 
 **Id:** acl-24
@@ -467,8 +469,9 @@ Keep local Go workspace/import links during development. After acceptance, perfo
 
 No blocking questions for the authorized implementation. Resolve routine details
 against the approved contracts; record any genuine contract conflict before dependent
-work proceeds. Publication timing and any expansion into native execution or policy
-administration UI remain outside this implementation authorization's immediate scope.
+work proceeds. The user's subsequent delivery/merge instructions authorize coordinated publication
+after the existing gates pass. Native execution and policy administration UI remain
+outside the approved MVP scope.
 
 ---
 *This document follows the https://specscore.md/plan-specification*
