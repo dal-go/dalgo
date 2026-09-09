@@ -654,3 +654,119 @@ func TestCoordinatorStorageAndExecutionFailuresAbort(t *testing.T) {
 		})
 	}
 }
+
+func TestProtectedEvidenceBoundaryRejectsMalformedAdapterOutput(t *testing.T) {
+	key := record.NewKeyWithID("docs", "d1")
+	op, _ := NewProtectedRead("op", Get, key)
+	allow := MustPolicy("allow", Scope("docs", AnyID, Allow(Get)))
+	lease, _ := NewStaticPolicyLease(allow)
+	participants := []MandatoryParticipant{{LayerID: "owner"}}
+	valid := ProtectedEvidence{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{}, Complete: true}
+	tests := map[string][]ProtectedEvidence{
+		"missing":          nil,
+		"empty id":         {{CanonicalTarget: key.String(), SnapshotToken: "s", Complete: true}},
+		"duplicate":        {valid, valid},
+		"incomplete":       {{OperationID: "op", CanonicalTarget: key.String()}},
+		"failed complete":  {{OperationID: "op", CanonicalTarget: key.String(), PreparationError: errors.New("private"), Complete: true}},
+		"failed snapshot":  {{OperationID: "op", CanonicalTarget: key.String(), PreparationError: errors.New("private"), SnapshotToken: "secret"}},
+		"wrong target":     {{OperationID: "op", CanonicalTarget: "wrong", SnapshotToken: "s", Complete: true}},
+		"present no image": {{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, Complete: true}},
+		"absent image":     {{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", PreImage: map[string]any{}, Complete: true}},
+	}
+	for name, evidence := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := assessProtected(context.Background(), []ProtectedOperation{op}, evidence, participants, []PolicyLease{lease}, true); err == nil {
+				t.Fatal("malformed evidence accepted")
+			}
+		})
+	}
+}
+
+func TestCandidateValidatorsFailClosedWithoutMutatingEvidence(t *testing.T) {
+	key := record.NewKeyWithID("docs", "d1")
+	set, _ := NewProtectedSet("op", key, map[string]any{"name": "new"}, "")
+	del, _ := NewProtectedDelete("op", key, "")
+	base := ProtectedEvidence{OperationID: "op", CanonicalTarget: key.String(), SnapshotToken: "s", Exists: true, PreImage: map[string]any{}, CandidateImage: map[string]any{"name": "new"}, CandidateRevision: "r2", Complete: true}
+	events := []string{}
+	storage := &coordinatorStorage{events: &events}
+	allow := MustPolicy("allow", Root(Allow(Set|Delete)))
+	lease, _ := NewStaticPolicyLease(allow)
+	provider := func(context.Context) (PolicyLease, error) { return lease, nil }
+	coordinator, _ := NewValidatedEnforcementCoordinator(storage, func(_ context.Context, _ ProtectedOperation, image map[string]any) error {
+		image["name"] = "mutated"
+		return errors.New("invalid candidate")
+	}, MandatoryParticipant{LayerID: "schema", Validator: func(context.Context, ProtectedOperation, map[string]any) error { return nil }}, MandatoryParticipant{LayerID: "owner", Provider: provider})
+	if err := coordinator.validateCandidates(context.Background(), []ProtectedOperation{set}, []ProtectedEvidence{base}); err == nil || base.CandidateImage["name"] != "new" {
+		t.Fatalf("err=%v evidence=%v", err, base.CandidateImage)
+	}
+	for name, opAndEvidence := range map[string]struct {
+		op ProtectedOperation
+		ev []ProtectedEvidence
+	}{
+		"missing":      {set, nil},
+		"candidate":    {set, []ProtectedEvidence{{OperationID: "op"}}},
+		"revision":     {set, []ProtectedEvidence{{OperationID: "op", CandidateImage: map[string]any{}}}},
+		"delete image": {del, []ProtectedEvidence{{OperationID: "op", CandidateImage: map[string]any{}, CandidateRevision: "r"}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := coordinator.validateCandidates(context.Background(), []ProtectedOperation{opAndEvidence.op}, opAndEvidence.ev); err == nil {
+				t.Fatal("invalid candidate evidence accepted")
+			}
+		})
+	}
+	deleteEvidence := base
+	deleteEvidence.CandidateImage = nil
+	if err := coordinator.validateCandidates(context.Background(), []ProtectedOperation{del}, []ProtectedEvidence{deleteEvidence}); err != nil {
+		t.Fatalf("valid delete rejected: %v", err)
+	}
+}
+
+func TestPolicyLeaseSnapshotFailuresAndCancellation(t *testing.T) {
+	events := []string{}
+	policy := MustPolicy("allow", Root(Allow(Get)))
+	valid := &eventLease{policies: []Policy{policy}, events: &events}
+	tooMany := make([]Policy, 101)
+	for i := range tooMany {
+		tooMany[i] = policy
+	}
+	coordinator := &EnforcementCoordinator{participants: []MandatoryParticipant{
+		{LayerID: "nil", Provider: func(context.Context) (PolicyLease, error) { return nil, nil }},
+		{LayerID: "empty", Provider: func(context.Context) (PolicyLease, error) { return &eventLease{events: &events}, nil }},
+		{LayerID: "large", Provider: func(context.Context) (PolicyLease, error) {
+			return &eventLease{policies: tooMany, events: &events}, nil
+		}},
+	}}
+	leases, err := coordinator.acquire(context.Background())
+	if err != nil || len(leases) != 3 {
+		t.Fatalf("leases=%v err=%v", leases, err)
+	}
+	for _, lease := range leases {
+		if got := lease.Policies()[0].Decide(context.Background(), Request{Operation: Get}).Code; got != CodeConfigurationInvalid {
+			t.Fatalf("code=%s", got)
+		}
+	}
+	releaseLeases(leases)
+	ctx, cancel := context.WithCancel(context.Background())
+	canceled := &EnforcementCoordinator{participants: []MandatoryParticipant{{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { cancel(); return valid, nil }}}}
+	if _, err := canceled.acquire(ctx); !errors.Is(err, context.Canceled) || !reflect.DeepEqual(events[len(events)-1:], []string{"lease-release"}) {
+		t.Fatalf("err=%v events=%v", err, events)
+	}
+	if _, err := NewStaticPolicyLease(); err == nil {
+		t.Fatal("empty static lease accepted")
+	}
+	if _, err := NewStaticPolicyLease(nil); err == nil {
+		t.Fatal("nil static policy accepted")
+	}
+	participant, err := NewStaticParticipant("owner", policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	static, _ := participant.Provider(context.Background())
+	if static.Revision() != "static" || len(static.Policies()) != 1 {
+		t.Fatalf("static lease=%+v", static)
+	}
+	static.Release()
+	if _, err := NewStaticParticipant("", policy); err == nil {
+		t.Fatal("empty static participant layer accepted")
+	}
+}
