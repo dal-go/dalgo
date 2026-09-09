@@ -15,6 +15,10 @@ func TestValidatedTxForwardsTransactionIdentity(t *testing.T) {
 	}
 }
 
+func TestValidatedDBMarker(t *testing.T) {
+	validatedDB{}.dalgoDB()
+}
+
 // TestRecordDataToValidateHandlesANilRecord: BeforeSave is exported, so a caller
 // can reach it with a nil record. It must not panic there.
 func TestRecordDataToValidateHandlesANilRecord(t *testing.T) {
