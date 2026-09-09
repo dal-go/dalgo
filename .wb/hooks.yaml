@@ -1,0 +1,11 @@
+version: 1
+profiles:
+  include: [existing-coverage]
+  definitions:
+    existing-coverage:
+      order: 200
+      detect:
+        any_files: [go.mod]
+      hooks:
+        pre-push:
+          template: ../.githooks/pre-push

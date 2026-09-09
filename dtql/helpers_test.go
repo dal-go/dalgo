@@ -8,14 +8,16 @@ import "github.com/dal-go/dalgo/dal"
 // dal.StructuredQuery; only the accessors the dtql package reads are overridden.
 type fakeQuery struct {
 	dal.StructuredQuery
-	from      dal.FromSource
-	where     dal.Condition
-	groupBy   []dal.Expression
-	orderBy   []dal.OrderExpression
-	columns   []dal.Column
-	limit     int
-	offset    int
-	startFrom dal.Cursor
+	from       dal.FromSource
+	where      dal.Condition
+	groupBy    []dal.Expression
+	orderBy    []dal.OrderExpression
+	columns    []dal.Column
+	limit      int
+	offset     int
+	startFrom  dal.Cursor
+	startAfter dal.Cursor
+	having     dal.Condition
 }
 
 func (q fakeQuery) From() dal.FromSource           { return q.from }
@@ -26,6 +28,8 @@ func (q fakeQuery) Columns() []dal.Column          { return q.columns }
 func (q fakeQuery) Limit() int                     { return q.limit }
 func (q fakeQuery) Offset() int                    { return q.offset }
 func (q fakeQuery) StartFrom() dal.Cursor          { return q.startFrom }
+func (q fakeQuery) StartAfter() dal.Cursor         { return q.startAfter }
+func (q fakeQuery) Having() dal.Condition          { return q.having }
 
 // rootFrom builds a From with no joins over a root collection named users.
 func rootFrom() dal.FromSource {

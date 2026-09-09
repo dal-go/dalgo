@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -59,6 +60,125 @@ func TestPrincipalContext(t *testing.T) {
 	}
 }
 
+func TestTypedPrincipalIsolationAndImmutableContext(t *testing.T) {
+	subject := PrincipalRef{Realm: "people", Kind: PrincipalKindUser, ID: "same"}
+	actor := PrincipalRef{Realm: "clients", Kind: PrincipalKindApplication, ID: "app"}
+	roles, groups := []string{"reader"}, []string{"staff"}
+	principal, err := NewPrincipal(subject, roles, groups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal.Actor = &actor
+	principal.ID = "must-be-cleared"
+	ctx := WithPrincipal(context.Background(), principal)
+	roles[0], groups[0], subject.ID, actor.ID = "mutated", "mutated", "mutated", "mutated"
+	got, ok := PrincipalFrom(ctx)
+	if !ok || got.ID != nil || got.Subject.ID != "same" || got.Actor.ID != "app" || got.Roles[0] != "reader" || got.Groups[0] != "staff" {
+		t.Fatalf("immutable principal snapshot = %+v", got)
+	}
+	got.Roles[0], got.Subject.ID = "changed", "changed"
+	again, _ := PrincipalFrom(ctx)
+	if again.Roles[0] != "reader" || again.Subject.ID != "same" {
+		t.Fatalf("returned principal aliases context: %+v", again)
+	}
+
+	for _, invalid := range []PrincipalRef{{}, {Realm: " people", Kind: PrincipalKindUser, ID: "u"}, {Realm: "people", Kind: "robot", ID: "u"}, {Realm: "people\x00", Kind: PrincipalKindUser, ID: "u"}, {Realm: "people", Kind: PrincipalKindUser, ID: string([]byte{0xff})}} {
+		if invalid.Validate() == nil {
+			t.Errorf("invalid reference accepted: %+v", invalid)
+		}
+	}
+}
+
+func TestTypedPrincipalRealmKindAndVariableIsolation(t *testing.T) {
+	sets := map[string][]Rule{
+		"direct": {Scope("docs", AnyID, Allow(Get, "direct"))},
+		"role":   {Scope("docs", AnyID, Allow(Get, "role"))},
+	}
+	policy := MustPrincipalPolicySet("typed", sets, Bindings{Users: map[string][]string{"same": {"direct"}}, Roles: map[string][]string{"reader": {"role"}}})
+	policy.realm = "people"
+	request := Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("docs", "d1"))}}
+	as := func(realm string, kind PrincipalKind, roles ...string) context.Context {
+		principal, err := NewPrincipal(PrincipalRef{Realm: realm, Kind: kind, ID: "same"}, roles, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return WithPrincipal(context.Background(), principal)
+	}
+	mustDecideAllowed(t, policy.Decide(as("people", PrincipalKindUser), request))
+	if decision := policy.Decide(as("people", PrincipalKindService), request); decision.Allowed {
+		t.Fatalf("service ID collided with users binding: %+v", decision)
+	}
+	mustDecideAllowed(t, policy.Decide(as("people", PrincipalKindService, "reader"), request))
+	if decision := policy.Decide(as("other", PrincipalKindUser, "reader"), request); decision.Allowed {
+		t.Fatalf("cross-realm memberships applied: %+v", decision)
+	}
+	policy.realm = ""
+	if decision := policy.Decide(as("people", PrincipalKindUser, "reader"), request); decision.Allowed {
+		t.Fatalf("typed principal matched an unset owner realm: %+v", decision)
+	}
+	direct := MustPolicy("direct", Scope("docs", AnyID, Allow(Get, "read")))
+	direct.realm = "people"
+	mustDecideAllowed(t, direct.Decide(as("people", PrincipalKindService), request))
+	if decision := direct.Decide(as("other", PrincipalKindUser), request); decision.Allowed {
+		t.Fatalf("cross-realm typed principal passed direct scope: %+v", decision)
+	}
+
+	own := MustPolicy("own", Scope("docs", AnyID, Allow(Get, "own").Where(dal.WhereField("ownerID", dal.Equal, dal.NewParam("currentUser")))))
+	own.realm = "people"
+	spoofedService := WithVariables(as("people", PrincipalKindService), map[string]any{"currentUser": "same", "principal.roles": []string{"reader"}})
+	if decision := own.Decide(spoofedService, request); decision.Allowed {
+		t.Fatalf("service spoofed currentUser: %+v", decision)
+	}
+	spoofedOtherRealm := WithVariables(as("other", PrincipalKindUser), map[string]any{"currentUser": "same"})
+	if decision := own.Decide(spoofedOtherRealm, request); decision.Allowed {
+		t.Fatalf("cross-realm user spoofed currentUser: %+v", decision)
+	}
+	decision := own.Decide(as("people", PrincipalKindUser), request)
+	mustDecideAllowed(t, decision)
+	if got := decision.Residuals[0].String(); got != "ownerID = 'same'" {
+		t.Fatalf("typed currentUser residual = %s", got)
+	}
+}
+
+func TestLegacyRoleAndGroupOnlyPrincipalsRemainCompatible(t *testing.T) {
+	policy := MustPrincipalPolicySet("legacy", docsRuleSets(), docsBindings())
+	request := Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("docs", "d1"))}}
+	mustDecideAllowed(t, policy.Decide(WithPrincipal(context.Background(), Principal{Roles: []string{"reader"}}), request))
+	groupPolicy := MustPrincipalPolicySet("legacy-group", map[string][]Rule{"read": {Scope("docs", AnyID, Allow(Get, "read"))}}, Bindings{Groups: map[string][]string{"staff": {"read"}}})
+	mustDecideAllowed(t, groupPolicy.Decide(WithPrincipal(context.Background(), Principal{Groups: []string{"staff"}}), request))
+}
+
+func TestConfiguredRealmRejectsMissingAndLegacyPrincipals(t *testing.T) {
+	policy := MustPrincipalPolicySet("configured", map[string][]Rule{"read": {Scope("docs", AnyID, Allow(Get, "read"))}}, Bindings{
+		Users: map[string][]string{"u1": {"read"}}, Roles: map[string][]string{"reader": {"read"}}, Everyone: []string{"read"},
+	})
+	policy.realm = "people"
+	request := Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.NewKeyWithID("docs", "d1"))}}
+	contexts := []context.Context{
+		context.Background(),
+		WithPrincipal(context.Background(), Principal{ID: "u1"}),
+		WithPrincipal(context.Background(), Principal{Roles: []string{"reader"}}),
+	}
+	for i, ctx := range contexts {
+		if decision := policy.Decide(ctx, request); decision.Allowed || !strings.Contains(decision.Explanation, "policy realm") {
+			t.Errorf("case %d should fail configured realm: %+v", i, decision)
+		}
+	}
+
+	legacy := MustPrincipalPolicySet("legacy", map[string][]Rule{"read": {Scope("docs", AnyID, Allow(Get, "read"))}}, Bindings{Roles: map[string][]string{"reader": {"read"}}})
+	mustDecideAllowed(t, legacy.Decide(WithPrincipal(context.Background(), Principal{Roles: []string{"reader"}}), request))
+	direct := MustPolicy("direct", Scope("docs", AnyID, Allow(Get, "read")))
+	mustDecideAllowed(t, direct.Decide(context.Background(), request))
+	mustDecideAllowed(t, direct.Decide(WithPrincipal(context.Background(), Principal{ID: "u1"}), request))
+	typed, err := NewPrincipal(PrincipalRef{Realm: "people", Kind: PrincipalKindUser, ID: "u1"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decision := direct.Decide(WithPrincipal(context.Background(), typed), request); decision.Allowed {
+		t.Fatalf("typed principal passed policy with unset owner realm: %+v", decision)
+	}
+}
+
 func TestPrincipalPolicySetConstruction(t *testing.T) {
 	for name, tc := range map[string]struct {
 		name     string
@@ -87,7 +207,7 @@ func TestPrincipalPolicySetConstruction(t *testing.T) {
 		MustPrincipalPolicySet("", nil, Bindings{})
 	}()
 	set := MustPrincipalPolicySet("docs", docsRuleSets(), docsBindings())
-	if set.Name() != "docs" || set.Source() != "" {
+	if set.Name() != "docs" || set.Source() != "" || !CanInspectPolicy(set) {
 		t.Errorf("name/source = %q/%q", set.Name(), set.Source())
 	}
 }
@@ -315,5 +435,69 @@ func TestPrincipalPolicySetDocuments(t *testing.T) {
 	mustDecideAllowed(t, decision)
 	if decision.Rule != "r/rule-1" {
 		t.Errorf("generated rule id = %q", decision.Rule)
+	}
+}
+
+func TestApplicationPolicyTypedRealmConstructors(t *testing.T) {
+	p, err := NewPolicyForRealm("app", "custom", Collection("items", Allow(Query, "read")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := Request{Operation: Query, Resources: []Resource{CollectionResourceFor(nil, "items")}}
+	subject := PrincipalRef{Realm: "app", Kind: PrincipalKindUser, ID: "u"}
+	ctx := WithPrincipal(context.Background(), Principal{Subject: &subject, Roles: []string{"reader"}})
+	if !p.Decide(ctx, request).Allowed {
+		t.Fatal("typed application policy denied")
+	}
+	set, err := NewPrincipalPolicySetForRealm("app", "bound", map[string][]Rule{"reader": {Collection("items", Allow(Query, "read"))}}, Bindings{Roles: map[string][]string{"reader": {"reader"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !set.Decide(ctx, request).Allowed {
+		t.Fatal("typed application binding denied")
+	}
+	subject.Realm = "other"
+	if set.Decide(WithPrincipal(context.Background(), Principal{Subject: &subject, Roles: []string{"reader"}}), request).Allowed {
+		t.Fatal("wrong realm allowed")
+	}
+	if _, err := NewPolicyForRealm("", "bad"); err == nil {
+		t.Fatal("empty realm allowed")
+	}
+}
+
+func TestTypedPrincipalAndRealmConstructorFailures(t *testing.T) {
+	invalid := PrincipalRef{Realm: "", Kind: PrincipalKindUser, ID: "u"}
+	if _, err := NewPrincipal(invalid, nil, nil); err == nil {
+		t.Fatal("invalid subject accepted")
+	}
+	for name, principal := range map[string]Principal{
+		"subject": {Subject: &invalid},
+		"actor":   {Actor: &invalid},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("invalid principal did not panic")
+				}
+			}()
+			_ = WithPrincipal(context.Background(), principal)
+		})
+	}
+	if _, err := NewPolicyForRealm("app", "", Root(Allow(Get))); err == nil {
+		t.Fatal("invalid policy accepted")
+	}
+	if _, err := NewPrincipalPolicySetForRealm("", "x", nil, Bindings{}); err == nil {
+		t.Fatal("invalid set realm accepted")
+	}
+	if _, err := NewPrincipalPolicySetForRealm("app", "", nil, Bindings{}); err == nil {
+		t.Fatal("invalid set accepted")
+	}
+}
+
+func TestLegacyPrincipalEncodingRejectsPortableGates(t *testing.T) {
+	set := MustPrincipalPolicySet("p", map[string][]Rule{"r": {Root(Allow(Get, "g"))}}, Bindings{Everyone: []string{"r"}})
+	set.execution = &compiledExecutionGate{}
+	if err := EncodePrincipalPolicySet(io.Discard, YAMLCodec{}, set); !errors.Is(err, ErrNotSerializable) {
+		t.Fatalf("err=%v", err)
 	}
 }

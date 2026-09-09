@@ -3,6 +3,8 @@ package access
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/dal-go/dalgo/condeval"
 	"github.com/dal-go/dalgo/dal"
@@ -20,6 +22,9 @@ type writeResidual struct {
 }
 
 func (w writeResidual) deny(operation Operations, rule, condition, explanation string) *DeniedError {
+	return w.denyWith(operation, rule, condition, CodeEvaluationFailed, DecisionScopeOperation, "", explanation)
+}
+func (w writeResidual) denyWith(operation Operations, rule, condition string, code ReasonCode, scope DecisionScope, slot DecisionSlot, explanation string) *DeniedError {
 	return &DeniedError{Decision: Decision{
 		Operation:    operation,
 		Resource:     w.resource,
@@ -28,6 +33,9 @@ func (w writeResidual) deny(operation Operations, rule, condition, explanation s
 		Rule:         rule,
 		Effect:       effectDeny.String(),
 		Condition:    condition,
+		Code:         code,
+		Scope:        scope,
+		Slot:         slot,
 		Explanation:  explanation,
 	}}
 }
@@ -138,7 +146,7 @@ func evaluateWrite(operation Operations, images writeImages, w writeResidual) er
 		if r.Terminal != nil {
 			return nil
 		}
-		return w.deny(operation, "", "", "row does not exist or is outside every conditional rule")
+		return w.denyWith(operation, "", "", CodeRowPredicateFailed, DecisionScopeRow, DecisionSlotWhere, "row does not exist or is outside every conditional rule")
 	}
 	for _, alternative := range r.Alternatives {
 		ok, err := condeval.Match(images.pre, alternative.Where)
@@ -160,7 +168,7 @@ func evaluateWrite(operation Operations, images writeImages, w writeResidual) er
 			return w.deny(operation, alternative.Rule, checkText, fmt.Sprintf("post-image check could not be evaluated for rule %q: %v", alternative.Rule, err))
 		}
 		if !ok {
-			return w.deny(operation, alternative.Rule, checkText, fmt.Sprintf("post-image check not satisfied for rule %q (check: %s)", alternative.Rule, checkText))
+			return w.denyWith(operation, alternative.Rule, checkText, CodePostImageFailed, DecisionScopeRow, DecisionSlotCheck, fmt.Sprintf("post-image check not satisfied for rule %q (check: %s)", alternative.Rule, checkText))
 		}
 		return nil
 	}
@@ -182,7 +190,7 @@ func alternativeCheck(alternative WriteAlternative) (dal.Condition, string) {
 func terminalAdmits(operation Operations, images writeImages, w writeResidual, failure string) error {
 	terminal := w.residual.Terminal
 	if terminal == nil {
-		return w.deny(operation, alternativeNames(w.residual), alternativeTexts(w.residual), failure)
+		return w.denyWith(operation, alternativeNames(w.residual), alternativeTexts(w.residual), CodeRowPredicateFailed, DecisionScopeRow, DecisionSlotWhere, failure)
 	}
 	if operation == Delete {
 		return nil
@@ -198,7 +206,7 @@ func terminalAdmits(operation Operations, images writeImages, w writeResidual, f
 		return w.deny(operation, terminal.Rule, terminal.CheckText, fmt.Sprintf("post-image check could not be evaluated for rule %q: %v", terminal.Rule, err))
 	}
 	if !ok {
-		return w.deny(operation, terminal.Rule, terminal.CheckText, fmt.Sprintf("post-image check not satisfied for rule %q (check: %s)", terminal.Rule, terminal.CheckText))
+		return w.denyWith(operation, terminal.Rule, terminal.CheckText, CodePostImageFailed, DecisionScopeRow, DecisionSlotCheck, fmt.Sprintf("post-image check not satisfied for rule %q (check: %s)", terminal.Rule, terminal.CheckText))
 	}
 	return nil
 }
@@ -216,10 +224,27 @@ func checkFields(operation Operations, images writeImages, w writeResidual, alte
 	} else {
 		refused = sets.disallowedPaths(images.post)
 	}
+	maskedRefused, unsupported := sets.disallowedMaskedMutation(images, operation)
+	refused = append(refused, maskedRefused...)
 	if len(refused) == 0 {
 		return nil
 	}
-	return w.deny(operation, alternative.Rule, sets.sources(), fmt.Sprintf("field %q is outside the fields of rule %q (%s)", refused[0], alternative.Rule, sets.sources()))
+	if unsupported {
+		return w.denyWith(operation, alternative.Rule, sets.sources(), CodeEnforcementUnsupported, DecisionScopeColumn, DecisionSlotFields, "field-mask coverage of an opaque composite value cannot be proven")
+	}
+	sort.Strings(refused)
+	columns := make([][]string, 0, len(refused))
+	last := ""
+	for _, field := range refused {
+		if field == last {
+			continue
+		}
+		last = field
+		columns = append(columns, strings.Split(field, "."))
+	}
+	denied := w.denyWith(operation, alternative.Rule, sets.sources(), CodeColumnDenied, DecisionScopeColumn, DecisionSlotFields, fmt.Sprintf("field %q is outside the fields of rule %q (%s)", refused[0], alternative.Rule, sets.sources()))
+	denied.Decision.Columns = columns
+	return denied
 }
 
 func alternativeNames(r *WriteResidual) string {

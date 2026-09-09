@@ -27,6 +27,11 @@ type Request struct {
 	// future predicate, projection, index, and cost constraints. It is nil for
 	// non-query operations; v1 declarative policies authorize query sources.
 	Query dal.Query
+	// Execution is trusted assessment metadata, never a caller override of Query.
+	Execution *ExecutionTarget
+	// Columns is the normalized set of fields explicitly read or touched by a
+	// non-query operation. Paths use one string per segment.
+	Columns [][]string
 }
 
 // Decision explains an access-policy result.
@@ -39,6 +44,13 @@ type Decision struct {
 	Rule         string
 	Effect       string
 	Explanation  string
+	// Code, Scope, Slot, and Columns are stable machine-readable facts for
+	// authorization inspection. Explanation remains diagnostic text and must
+	// never be parsed to construct a public result.
+	Code    ReasonCode
+	Scope   DecisionScope
+	Slot    DecisionSlot
+	Columns [][]string
 	// Condition is the source text of the row condition behind a conditional
 	// decision, with parameter names rather than resolved values.
 	Condition string
@@ -48,6 +60,8 @@ type Decision struct {
 	// rewrite for Query. A nil entry means the resource is allowed outright.
 	// Residuals is nil for an unconditional decision.
 	Residuals []dal.Condition
+	// ResidualDocuments preserves source expressions with unresolved params.
+	ResidualDocuments []*DocumentCondition
 	// Writes holds, per request resource, the ordered alternatives that decide
 	// a write on that resource (see WriteResidual). A nil entry means the write
 	// is allowed outright, with no row or post-image constraint.
@@ -66,8 +80,10 @@ type WriteAlternative struct {
 	WhereText string
 	CheckText string
 	// Fields is the rule's allow-list of field patterns; nil means every field.
-	Fields []string
-	fields *fieldSet
+	Fields        []string
+	WhereDocument *DocumentCondition
+	CheckDocument *DocumentCondition
+	fields        *fieldSet
 }
 
 // WriteResidual is what the secured wrapper enforces on a write: the
@@ -84,6 +100,9 @@ type WriteResidual struct {
 // DeniedError is returned when a policy rejects an operation.
 type DeniedError struct {
 	Decision Decision
+	// Decisions contains every independently evaluated mandatory policy in
+	// configured order. Decision remains the first denial for legacy callers.
+	Decisions []Decision
 }
 
 func (e *DeniedError) Error() string {
@@ -101,6 +120,64 @@ func (e *DeniedError) Error() string {
 
 func (e *DeniedError) Unwrap() error { return ErrAccessDenied }
 
+// DecisionsFromError returns an immutable copy of the policy decisions
+// collected for a denied request. Legacy DeniedErrors yield Decision alone.
+func DecisionsFromError(err error) []Decision {
+	var denied *DeniedError
+	if !errors.As(err, &denied) {
+		return nil
+	}
+	if len(denied.Decisions) == 0 {
+		return []Decision{cloneDecision(denied.Decision)}
+	}
+	decisions := make([]Decision, len(denied.Decisions))
+	for i := range denied.Decisions {
+		decisions[i] = cloneDecision(denied.Decisions[i])
+	}
+	return decisions
+}
+
+func cloneDecision(decision Decision) Decision {
+	decision.Residuals = append([]dal.Condition(nil), decision.Residuals...)
+	decision.ResidualDocuments = cloneDocumentConditions(decision.ResidualDocuments)
+	writes := decision.Writes
+	decision.Writes = make([]*WriteResidual, len(writes))
+	for i, write := range writes {
+		decision.Writes[i] = cloneWriteResidual(write)
+	}
+	decision.Columns = clonePaths(decision.Columns)
+	return decision
+}
+
+func cloneWriteResidual(write *WriteResidual) *WriteResidual {
+	if write == nil {
+		return nil
+	}
+	clone := &WriteResidual{Alternatives: make([]WriteAlternative, len(write.Alternatives))}
+	for i, alternative := range write.Alternatives {
+		clone.Alternatives[i] = alternative
+		clone.Alternatives[i].Fields = append([]string(nil), alternative.Fields...)
+		clone.Alternatives[i].WhereDocument = cloneDocumentCondition(alternative.WhereDocument)
+		clone.Alternatives[i].CheckDocument = cloneDocumentCondition(alternative.CheckDocument)
+	}
+	if write.Terminal != nil {
+		terminal := *write.Terminal
+		terminal.Fields = append([]string(nil), write.Terminal.Fields...)
+		terminal.WhereDocument = cloneDocumentCondition(write.Terminal.WhereDocument)
+		terminal.CheckDocument = cloneDocumentCondition(write.Terminal.CheckDocument)
+		clone.Terminal = &terminal
+	}
+	return clone
+}
+
+func clonePaths(paths [][]string) [][]string {
+	cloned := make([][]string, len(paths))
+	for i := range paths {
+		cloned[i] = append([]string(nil), paths[i]...)
+	}
+	return cloned
+}
+
 // Policy is a named access capability. Every Policy applied to a secured
 // request must allow every target resource.
 type Policy interface {
@@ -109,12 +186,48 @@ type Policy interface {
 	Authorize(context.Context, Request) error
 }
 
+// InspectionPurePolicy declares that Decide is deterministic and free of
+// externally observable side effects, so it may be evaluated by plan and
+// inspection APIs without performing the represented operation.
+type InspectionPurePolicy interface {
+	Policy
+	InspectionPure() bool
+}
+
+type declaredInspectionPurePolicy struct{ Policy }
+
+func (declaredInspectionPurePolicy) InspectionPure() bool { return true }
+func (p declaredInspectionPurePolicy) PolicyMetadata() PolicyMetadata {
+	return DescribePolicy(p.Policy)
+}
+
+// DeclareInspectionPure explicitly opts a custom policy into plan and
+// inspection evaluation. The caller is responsible for the purity claim.
+func DeclareInspectionPure(policy Policy) (Policy, error) {
+	if policy == nil {
+		return nil, fmt.Errorf("access: inspection-pure policy is nil")
+	}
+	return declaredInspectionPurePolicy{Policy: policy}, nil
+}
+
+// CanInspectPolicy reports whether plan and inspection APIs may safely call
+// the policy's Decide method.
+func CanInspectPolicy(policy Policy) bool {
+	pure, ok := policy.(InspectionPurePolicy)
+	return ok && pure.InspectionPure()
+}
+
 // AccessPolicy is the declarative hierarchical Policy implementation.
 type AccessPolicy struct {
-	name     string
-	source   string
-	rules    []Rule
-	compiled []compiledRule
+	name           string
+	source         string
+	visibility     string
+	revision       string
+	realm          string
+	collectionMask *CompiledMask
+	execution      *compiledExecutionGate
+	rules          []Rule
+	compiled       []compiledRule
 }
 
 // NewPolicy constructs a default-deny access policy.
@@ -140,17 +253,35 @@ func MustPolicy(name string, rules ...Rule) *AccessPolicy {
 
 func (p *AccessPolicy) Name() string { return p.name }
 
+func (*AccessPolicy) InspectionPure() bool { return true }
+
 // Source returns an optional storage-neutral reference supplied while loading
 // a policy document, such as an object key, URL, database key, or file path.
 func (p *AccessPolicy) Source() string { return p.source }
 
+func (p *AccessPolicy) PolicyMetadata() PolicyMetadata {
+	visibility := PolicyVisibility(p.visibility)
+	if visibility == "" {
+		visibility = PolicyVisibilityPrivate
+	}
+	return PolicyMetadata{ID: p.name, Revision: p.revision, Visibility: visibility, Source: p.source}
+}
+
 func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
+	if !policyRealmAllows(ctx, p.realm) {
+		return principalRealmDenied(ctx, request, p.name, p.source)
+	}
+	if !p.execution.allows(request) {
+		return executionDenied(request, p.name, p.source, p.execution)
+	}
 	if !request.Operation.validLeaf() {
 		return Decision{
 			Operation:    request.Operation,
 			Policy:       p.name,
 			PolicySource: p.source,
 			Effect:       effectDeny.String(),
+			Code:         CodeEnforcementUnsupported,
+			Scope:        DecisionScopeOperation,
 			Explanation:  "operation is unknown or is not a single leaf operation",
 		}
 	}
@@ -160,13 +291,16 @@ func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 			Policy:       p.name,
 			PolicySource: p.source,
 			Effect:       effectDeny.String(),
+			Code:         CodeConfigurationInvalid,
+			Scope:        DecisionScopeRequest,
 			Explanation:  "request has no resources",
 		}
 	}
 	var last Decision
 	var residuals []dal.Condition
+	var residualDocuments []*DocumentCondition
 	var writes []*WriteResidual
-	resolver := newVariableResolver(ctx)
+	resolver := newVariableResolver(ctx, p.realm)
 	for i, resource := range request.Resources {
 		last = p.decideResource(resolver, request.Operation, resource)
 		if !last.Allowed {
@@ -177,6 +311,12 @@ func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 				residuals = make([]dal.Condition, len(request.Resources))
 			}
 			residuals[i] = last.Residuals[0]
+			if len(last.ResidualDocuments) > 0 {
+				if residualDocuments == nil {
+					residualDocuments = make([]*DocumentCondition, len(request.Resources))
+				}
+				residualDocuments[i] = cloneDocumentCondition(last.ResidualDocuments[0])
+			}
 		}
 		if last.Writes != nil {
 			if writes == nil {
@@ -186,11 +326,16 @@ func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 		}
 	}
 	last.Residuals = residuals
+	last.ResidualDocuments = residualDocuments
 	last.Writes = writes
 	return last
 }
 
 func (p *AccessPolicy) decideResource(resolver variableResolver, operation Operations, resource Resource) Decision {
+	if !collectionMaskAllows(p.collectionMask, resource) {
+		return Decision{Operation: operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectDeny.String(), Code: CodeCollectionDenied, Scope: DecisionScopeTable, Explanation: "collection mask denies resource"}
+	}
+
 	matching := matchingRules(p.compiled, operation, resource)
 	if len(matching) == 0 {
 		return Decision{
@@ -199,6 +344,8 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 			Policy:       p.name,
 			PolicySource: p.source,
 			Effect:       effectDeny.String(),
+			Code:         CodeNoMatch,
+			Scope:        DecisionScopeOperation,
 			Explanation:  "no matching allow rule",
 		}
 	}
@@ -226,7 +373,14 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 			PolicySource: p.source,
 			Rule:         terminal.name,
 			Effect:       terminal.effect.String(),
-			Explanation:  fmt.Sprintf("matched rule %q (%s)", terminal.name, terminal.effect),
+			Code: func() ReasonCode {
+				if allowed {
+					return ""
+				}
+				return CodeRuleDenied
+			}(),
+			Scope:       DecisionScopeRequest,
+			Explanation: fmt.Sprintf("matched rule %q (%s)", terminal.name, terminal.effect),
 		}
 	}
 	// Resolve every alternative once; an unresolved parameter denies.
@@ -288,7 +442,21 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 	decision.Condition = text
 	decision.Explanation = fmt.Sprintf("matched conditional rule(s) %s (where: %s)", quoteAll(names), text)
 	decision.Residuals = []dal.Condition{residual}
+	if document, err := documentFromCondition(ruleSourceCondition(conditional)); err == nil {
+		decision.ResidualDocuments = []*DocumentCondition{document}
+	}
 	return decision
+}
+
+func ruleSourceCondition(rules []compiledRule) dal.Condition {
+	conditions := make([]dal.Condition, 0, len(rules))
+	for _, rule := range rules {
+		conditions = append(conditions, rule.where)
+	}
+	if len(conditions) == 1 {
+		return conditions[0]
+	}
+	return dal.NewGroupCondition(dal.Or, conditions...)
 }
 
 func (p *AccessPolicy) resolveAlternative(resolver variableResolver, rule compiledRule) (WriteAlternative, error) {
@@ -297,6 +465,7 @@ func (p *AccessPolicy) resolveAlternative(resolver variableResolver, rule compil
 		alternative.Fields = append([]string(nil), rule.fields.sources...)
 	}
 	if rule.where != nil {
+		alternative.WhereDocument, _ = documentFromCondition(rule.where)
 		resolved, err := condeval.Substitute(rule.where, resolver.resolve)
 		if err != nil {
 			return WriteAlternative{}, err
@@ -305,6 +474,7 @@ func (p *AccessPolicy) resolveAlternative(resolver variableResolver, rule compil
 		alternative.WhereText = rule.where.String()
 	}
 	if rule.check != nil {
+		alternative.CheckDocument, _ = documentFromCondition(rule.check)
 		resolved, err := condeval.Substitute(rule.check, resolver.resolve)
 		if err != nil {
 			return WriteAlternative{}, err
@@ -329,6 +499,8 @@ func (p *AccessPolicy) denyUnresolved(operation Operations, resource Resource, r
 		PolicySource: p.source,
 		Rule:         rule.name,
 		Effect:       effectDeny.String(),
+		Code:         CodeEvaluationFailed,
+		Scope:        DecisionScopeOperation,
 		Condition:    condition,
 		Explanation:  fmt.Sprintf("cannot evaluate rule %q: %v", rule.name, err),
 	}

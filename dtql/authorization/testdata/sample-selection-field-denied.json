@@ -1,0 +1,71 @@
+{
+  "apiVersion": "dtql.org/authorization/v1",
+  "requestId": "req-1",
+  "mode": "sample",
+  "scope": "sample",
+  "result": "deny",
+  "allowed": false,
+  "hypothetical": false,
+  "operations": [],
+  "layers": [
+    {
+      "layerId": "ingit-crm",
+      "source": {
+        "ownerId": "ingit-local",
+        "provider": "ingitdb",
+        "databaseId": "crm",
+        "kind": "ingitdb"
+      },
+      "aclState": "enabled",
+      "result": "deny",
+      "decisions": [
+        {
+          "operationId": "s1",
+          "result": "deny",
+          "scope": "operation",
+          "restrictionIds": []
+        }
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "operationId": "s1",
+      "code": "ACL_COLUMN_DENIED",
+      "scope": "column",
+      "executionClass": "dtql",
+      "layerId": "ingit-crm",
+      "columns": [
+        [
+          "secret"
+        ]
+      ]
+    }
+  ],
+  "coverage": {
+    "evaluation": "complete",
+    "disclosure": "full",
+    "truncated": false,
+    "unevaluated": []
+  },
+  "restrictions": [],
+  "sample": {
+    "requestedLimit": 1,
+    "evaluatedCount": 0,
+    "selection": "readable_candidates",
+    "order": [
+      {
+        "field": [
+          "id"
+        ],
+        "direction": "asc"
+      }
+    ],
+    "exhaustive": false,
+    "templateOperationId": "s1",
+    "selectionResource": {
+      "databaseId": "crm",
+      "path": "/customers"
+    }
+  }
+}
