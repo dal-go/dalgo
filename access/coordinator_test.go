@@ -180,6 +180,43 @@ func (s *coordinatorStorage) WithinProtectedExecution(_ context.Context, _ []Pro
 	return nil
 }
 
+type automaticCoordinatorStorage struct{ operations []ProtectedOperation }
+
+func (s *automaticCoordinatorStorage) WithinProtectedInspection(_ context.Context, operations []ProtectedOperation, fn func(ProtectedInspectionStorage) error) error {
+	s.operations = operations
+	return fn(automaticInspectionStorage{s})
+}
+func (s *automaticCoordinatorStorage) WithinProtectedExecution(_ context.Context, operations []ProtectedOperation, fn func(ProtectedExecutionStorage) error) error {
+	s.operations = operations
+	return fn(automaticExecutionStorage{automaticInspectionStorage{s}})
+}
+
+type automaticInspectionStorage struct{ storage *automaticCoordinatorStorage }
+
+func (s automaticInspectionStorage) Evidence(context.Context) ([]ProtectedEvidence, error) {
+	result := make([]ProtectedEvidence, len(s.storage.operations))
+	for i, op := range s.storage.operations {
+		exists := op.Action() != Insert
+		var pre map[string]any
+		if exists {
+			pre = map[string]any{"name": "old"}
+		}
+		var candidate map[string]any
+		switch op.Action() {
+		case Insert, Set:
+			candidate = op.Data()
+		case Update:
+			candidate = map[string]any{"name": "new"}
+		}
+		result[i] = ProtectedEvidence{OperationID: op.ID(), CanonicalTarget: op.CanonicalTarget(), SnapshotToken: "s", DataRevision: "r1", CandidateRevision: "r2", Exists: exists, Complete: true, PreImage: pre, CandidateImage: candidate}
+	}
+	return result, nil
+}
+
+type automaticExecutionStorage struct{ automaticInspectionStorage }
+
+func (automaticExecutionStorage) Execute(context.Context) error { return nil }
+
 func TestProtectedOperationConstructionIsDefensive(t *testing.T) {
 	parent := record.NewKeyWithID("accounts", "a1")
 	key, err := record.NewKeyWithOptions("docs", record.WithKeyID("d1"), record.WithParentKey(parent))
@@ -401,6 +438,56 @@ func TestProtectedProfileRejectsDynamicWorkerBeforeInvocation(t *testing.T) {
 	err = secured.RunReadwriteTransaction(context.Background(), func(context.Context, dal.ReadwriteTransaction) error { called = true; return nil })
 	if !errors.Is(err, ErrAccessDenied) || called {
 		t.Fatalf("err=%v called=%v", err, called)
+	}
+}
+
+func TestProtectedDatabaseRoutesEveryWriteThroughCoordinator(t *testing.T) {
+	fs := &fakeSession{}
+	tx := &fakeTx{fakeSession: &fakeSession{}, opts: dal.NewTransactionOptions()}
+	raw := &fakeDB{fakeSession: fs, adapter: dal.NewAdapter("a", "1"), schema: dal.NewSchema(nil, nil), ro: tx, rw: tx}
+	storage := &automaticCoordinatorStorage{}
+	policy := MustPolicy("writer", Root(Allow(Set|Insert|Update|Delete)))
+	lease, _ := NewStaticPolicyLease(policy)
+	coordinator, _ := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
+	secured, err := SecureDB(dal.NewDB(raw), WithEnforcementCoordinator(coordinator))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := secured.(dal.WriteSession)
+	key1, key2 := record.NewKeyWithID("docs", "d1"), record.NewKeyWithID("docs", "d2")
+	rec1, rec2 := record.NewRecordWithData(key1, map[string]any{"name": "one"}), record.NewRecordWithData(key2, map[string]any{"name": "two"})
+	change := []update.Update{update.ByFieldName("name", "new")}
+	for name, call := range map[string]func() error{
+		"set":           func() error { return writer.Set(context.Background(), rec1) },
+		"set multi":     func() error { return writer.SetMulti(context.Background(), []record.Record{rec1, rec2}) },
+		"insert":        func() error { return writer.Insert(context.Background(), rec1) },
+		"insert multi":  func() error { return writer.InsertMulti(context.Background(), []record.Record{rec1, rec2}) },
+		"update":        func() error { return writer.Update(context.Background(), key1, change) },
+		"update record": func() error { return writer.UpdateRecord(context.Background(), rec1, change) },
+		"update multi":  func() error { return writer.UpdateMulti(context.Background(), []*record.Key{key1, key2}, change) },
+		"delete":        func() error { return writer.Delete(context.Background(), key1) },
+		"delete multi":  func() error { return writer.DeleteMulti(context.Background(), []*record.Key{key1, key2}) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := call(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	if len(fs.calls) != 0 {
+		t.Fatalf("raw write session was used: %v", fs.calls)
+	}
+	if err := writer.Insert(context.Background(), rec1, nil); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("insert option err=%v", err)
+	}
+	if err := writer.InsertMulti(context.Background(), []record.Record{rec1}, nil); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("insert multi option err=%v", err)
+	}
+	if err := writer.Update(context.Background(), key1, change, nil); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("update precondition err=%v", err)
+	}
+	if err := writer.UpdateMulti(context.Background(), []*record.Key{key1}, change, nil); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("update multi precondition err=%v", err)
 	}
 }
 
