@@ -16,6 +16,18 @@ type fixedDecisionPolicy struct {
 	calls    *int
 }
 
+func TestPolicyProviderRejectsNilMembersAndWrapsCause(t *testing.T) {
+	g := guard{policyProvider: func(context.Context) ([]Policy, error) { return []Policy{nil}, nil }}
+	if _, err := g.pinDatabasePolicies(context.Background()); err == nil {
+		t.Fatal("nil policy accepted")
+	}
+	cause := errors.New("source")
+	err := &PolicyProviderError{Err: cause}
+	if err.Error() == "" || !errors.Is(err, cause) || !errors.Is(err, ErrAccessDenied) {
+		t.Fatal("provider error contract changed")
+	}
+}
+
 func (p fixedDecisionPolicy) Name() string { return p.name }
 func (p fixedDecisionPolicy) Decide(context.Context, Request) Decision {
 	*p.calls++

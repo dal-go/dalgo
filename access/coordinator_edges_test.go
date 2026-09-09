@@ -121,6 +121,14 @@ func TestCoordinatorEvidenceHelpers(t *testing.T) {
 		t.Fatalf("reduced deny to %s", got)
 	}
 	(&unavailablePolicyLease{}).Release()
+	u := unavailablePolicy{name: "owner", code: CodeSourceUnavailable}
+	if u.Name() != "owner" || u.Authorize(context.Background(), Request{Operation: Get}) == nil {
+		t.Fatal("unavailable policy did not deny")
+	}
+	l := &unavailablePolicyLease{policy: u}
+	if l.Revision() != "" || len(l.Policies()) != 1 {
+		t.Fatal("unavailable lease changed")
+	}
 }
 
 func TestReadVisibilityForRejectsInvalidRequester(t *testing.T) {
