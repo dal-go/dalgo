@@ -459,8 +459,8 @@ Review the final implementation against the approved packet using independent re
 **Id:** acl-24
 **Depends-On:** 23
 **Status:** in_progress
-**Note:** DALgo PR 158 landed at 8dece8b and released v0.80.0. Tasks 1-23 remain complete. Task 24 resumes with refreshed local ownership, published source branches, rebase against current origin/main, repository gates and one review PR per repository. Lead Claude reviews every PR; agent lands dal-go, ingitdb and openvaultdb only after review approval via wb pr land --approved-by; lead owns DataTug landing. Policy viewer/editor remains excluded. Former DataTug worktrees were discarded by WB on 2026-09-11; retained commits were recovered to origin and replacement worktrees. Remote claim renewal is unavailable in the configured HTTP hub. Published dependency convergence, unlinked E2E and landing receipts remain required before completion.
 **Evidence:** https://github.com/dal-go/dalgo/pull/158, dal-go/dalgo@v0.80.0, dal-go/dalgo2sql@3390fca, ingitdb/dalgo2ingitdb@394d3ce
+**Note:** Task 24 remains in progress. DALgo PR158 released v0.80.0; tasks 1-23 retain their recorded status. Review wave: dalgo#159, dalgo2sql#181, dalgo2ingitdb#9, openvaultdb-go#18, datatug-cli#237 and app companion. Current DataTug catalog/session/query contracts now integrate real OVDB SQLite/InGitDB reads and structured owner denials; old task21 heads are preserved at recovery/acl-task21-original. SQL nested CGO E2E passes. CLI changed packages/lint pass; two full-suite failures reproduce on main. App semantic/page tests, lint and build pass; full app suite remains unverified after failed combined runs. Browser write/Explain convergence with lead-owned APIs is explicitly outstanding; SDK methods are not browser E2E proof. Lead reviews all PRs and lands DataTug; agent lands lower layers only with approved review URL through wb pr land. Release-tag convergence and final landing/E2E receipts remain required. Policy viewer/editor excluded. Remote WB claim hub lacks claim support; local logs refreshed.
 
 **Repositories:** all participating repos
 
@@ -474,6 +474,7 @@ Keep local Go workspace/import links during development. After acceptance, perfo
 **Annotation Amendment:** actor=codex; at=2026-09-09T13:55:26Z; reason=Record exact DALgo publication recovery and server policy blocker without advancing execution status; before_sha256=700db61f09d7f66615939579898b30aafdcb37de38d5f6386cefe905988afe37
 **Annotation Amendment:** actor=codex; at=2026-09-09T13:57:00Z; reason=Record completion of the reusable lint repair before handing the publication lane back; before_sha256=12c1889651d4c19ccd7fd8d32817ecec39ba316a8f699907d19a15855555c8c1
 **Annotation Amendment:** actor=codex; at=2026-09-11T17:18:44Z; reason=Resume task 24 publication against current main with lead review ownership; before_sha256=2c2fb202e85b0d21851c7f34e69a6cea98ac99f68fbd1415a1f3404f89a0de43
+**Annotation Amendment:** actor=codex; at=2026-09-11T17:55:55Z; reason=Record current DataTug reconciliation and review publication without claiming landing; before_sha256=5decaee0b1607fa148db0fa22281c961f3064d1d9e140ff04bd21121253b1dac
 ## Open Questions
 
 No blocking questions for the authorized implementation. Resolve routine details
