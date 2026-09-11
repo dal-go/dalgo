@@ -459,8 +459,8 @@ Review the final implementation against the approved packet using independent re
 **Id:** acl-24
 **Depends-On:** 23
 **Status:** in_progress
-**Evidence:** datatug/dtql@c2d0487, dal-go/dalgo2openvaultdb@cacd422, openvaultdb/openvaultdb-go@3b482ff:docs/layered-acl-delivery.md
-**Note:** DTQL packet and independent HTTP adapter landed through WB. WB 0.121.1 recovered the DALgo delivery lane and opened PR 158 at 2e3a58c. The reusable lint job exposed six narrow findings; the originating worktree now repairs all six and passes golangci-lint, focused access tests and SpecScore lint. GitHub main has required checks but strict up-to-date enforcement is false, so WB correctly refuses automatic landing; human permission to override that fence has not been requested. Provider-first publication, published-version consumer convergence and final unlinked E2E remain underway.
+**Note:** DALgo PR 158 landed at 8dece8b and released v0.80.0. Tasks 1-23 remain complete. Task 24 resumes with refreshed local ownership, published source branches, rebase against current origin/main, repository gates and one review PR per repository. Lead Claude reviews every PR; agent lands dal-go, ingitdb and openvaultdb only after review approval via wb pr land --approved-by; lead owns DataTug landing. Policy viewer/editor remains excluded. Former DataTug worktrees were discarded by WB on 2026-09-11; retained commits were recovered to origin and replacement worktrees. Remote claim renewal is unavailable in the configured HTTP hub. Published dependency convergence, unlinked E2E and landing receipts remain required before completion.
+**Evidence:** https://github.com/dal-go/dalgo/pull/158, dal-go/dalgo@v0.80.0, dal-go/dalgo2sql@3390fca, ingitdb/dalgo2ingitdb@394d3ce
 
 **Repositories:** all participating repos
 
@@ -473,6 +473,7 @@ Keep local Go workspace/import links during development. After acceptance, perfo
 **Annotation Amendment:** actor=codex; at=2026-09-09T12:20:24Z; reason=Record independent documentation delivery while provider coverage gate remains active; before_sha256=28b2cb60f161ba61a5d5cfccbd39f337fd4c2ffec99e5b59e71d83dcc11debef
 **Annotation Amendment:** actor=codex; at=2026-09-09T13:55:26Z; reason=Record exact DALgo publication recovery and server policy blocker without advancing execution status; before_sha256=700db61f09d7f66615939579898b30aafdcb37de38d5f6386cefe905988afe37
 **Annotation Amendment:** actor=codex; at=2026-09-09T13:57:00Z; reason=Record completion of the reusable lint repair before handing the publication lane back; before_sha256=12c1889651d4c19ccd7fd8d32817ecec39ba316a8f699907d19a15855555c8c1
+**Annotation Amendment:** actor=codex; at=2026-09-11T17:18:44Z; reason=Resume task 24 publication against current main with lead review ownership; before_sha256=2c2fb202e85b0d21851c7f34e69a6cea98ac99f68fbd1415a1f3404f89a0de43
 ## Open Questions
 
 No blocking questions for the authorized implementation. Resolve routine details
