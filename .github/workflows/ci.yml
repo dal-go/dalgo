@@ -21,6 +21,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
     with:
+      require_conventional_pr_title: true
       code_coverage: true
       cgo_enabled: true
       min_test_coverage_percent: 100
