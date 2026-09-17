@@ -1,11 +1,8 @@
 name: Qodana
 on:
+  # Qodana is disabled (job `if: false`). Running it on push/pull_request only produced a
+  # startup_failure on every run, which blocked PR landing. Manual dispatch only until re-enabled.
   workflow_dispatch:
-  pull_request:
-  push:
-    branches: # Specify your branches here
-      - main # The 'main' branch
-      - 'releases/*' # The release branches
 
 jobs:
   qodana:
