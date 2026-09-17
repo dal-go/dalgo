@@ -35,6 +35,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [dalgo2namecheap: NameCheap API Adapter](dalgo2namecheap-namecheap-api-adapter/README.md) | Approved | — |
 | [Hierarchical access and audit policies](access-policies/README.md) | Stable | — |
 | [Triggers and webhooks: change events, transactional outbox, dispatcher](triggers/README.md) | Draft | — |
+| [Schema API: subcollection declaration and driver extensions for CreateCollection](schema-subcollections-extensions/README.md) | Draft | Nested collections as `SchemaPath` (structured `Parent` steps or odd-segment strings like `ext/datatug/projects/{projectID}/queries`, concrete id = scoped, `{placeholder}` = every parent) in DALgo's key-path grammar; path-addressed Drop/Alter; strict driver extensions via `ddl.WithExtension`; drops refuse data loss unless `DeleteRecords`/`DeleteNested` are given. |
 
 ## Open Questions
 
