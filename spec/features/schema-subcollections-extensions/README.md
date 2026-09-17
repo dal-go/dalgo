@@ -15,7 +15,7 @@ status: Draft
 
 ## Summary
 
-Two changes to the schema API, so that a consumer can create nested collections,
+Three changes to the schema API, so that a consumer can create nested collections,
 and pass driver-specific storage options for them, through DALgo:
 
 1. **Subcollection declaration.** A nested collection is addressed by a
@@ -47,6 +47,12 @@ and pass driver-specific storage options for them, through DALgo:
    when the driver's `SupportsExtension(op, ext)` returns `true`, and is
    otherwise refused with `*dbschema.NotSupportedError`. There is no mode that
    ignores an extension.
+
+3. **Safe drops.** A drop, root or nested, removes only the definition by
+   default and refuses with `ddl.ErrCollectionNotEmpty` when records,
+   descendant definitions or referencing records would go too. Explicit
+   `ddl.DeleteRecords()` and `ddl.DeleteNested()` authorise those losses;
+   `ddl.DeleteDependents()` is reserved.
 
 The `ddl` helpers guard every call before dispatch, and every in-org driver
 implementing `SchemaModifier` MUST enforce the same rules on direct calls
@@ -169,8 +175,9 @@ fixed at source with no bootstrap workaround
 
 #### REQ: path-grammar
 
-A DALgo path string MUST follow this grammar, which is the grammar
-`record.Key.String()` already emits, extended only as stated here:
+A DALgo path string MUST follow this grammar. It is the grammar
+`record.Key.String()` already emits for keys with scalar ids, extended only as
+stated here:
 
 ```
 path          = [ "/" ] segment *( "/" segment )   ; no trailing "/", no empty segment
@@ -180,7 +187,7 @@ collection    = name
 id            = composite-key / placeholder / concrete-id
 composite-key = "{" <any text containing "="> "}"  ; reserved, not supported yet
 placeholder   = "{" identifier "}"                 ; schema paths only
-identifier    = ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" )
+identifier    = ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" )  ; = dalgo/access capture name
 concrete-id   = <record.EscapeID output>           ; never begins with "{"
 ```
 
@@ -213,19 +220,53 @@ concrete-id   = <record.EscapeID output>           ; never begins with "{"
   under a concrete parent) MUST contain concrete ids only; any data-path parser
   added later MUST reject a placeholder with a typed error. Keys built with the
   `record` constructors cannot contain one, because `record.EscapeID` escapes
-  `{`.
+  `{` (see REQ:key-constructors-validate for why this holds for every key).
 - **Placeholder names within one path MUST be unique**
   (`projects/{id}/environments/{id}/servers` is malformed).
+- **One definition shared with `dalgo/access`.** The placeholder is the same
+  construct as an access-policy capture: `access.Capture(name)`
+  (`access/resource.go:134`) renders as `{name}` (`:63`), requires the identifier
+  regular expression `^[A-Za-z_][A-Za-z0-9_]*$` (`:227`) and unique names within
+  a pattern. The identifier rule MUST move to `github.com/dal-go/record`
+  (e.g. `record.ValidPlaceholderName`), and both `access` and `dbschema` MUST use
+  it, so `ext/datatug/projects/{projectID}/queries` means the same text in a
+  schema path and in an access pattern. The access `*` (`access.AnyID`) has no
+  schema-path equivalent; a schema path always names its placeholders.
 - **Escaping.** `record.EscapeID` MUST be extended so that, besides its current
-  characters, `{` `}` `,` `=` become `%7B` `%7D` `%2C` `%3D`. Because
-  `record.ValidateStringID` already reserves a literal `%` in string ids, every
-  escaped id stays unambiguous, and no concrete id can look like a placeholder
-  or a composite key.
+  characters, `{` `}` `,` `=` become `%7B` `%7D` `%2C` `%3D`. Every escaped id
+  is unambiguous, and no concrete id can look like a placeholder or a composite
+  key, **provided** its raw value passed `record.ValidateStringID`, which
+  reserves a literal `%` (REQ:key-constructors-validate). Ids containing
+  `{ } , =`, such as base64 values ending in `=`, MUST round-trip through
+  `EscapeID` and `UnescapeID`.
+- **Composite `record.FieldVal` ids are outside this grammar.** Today
+  `record.Key.String()` prints them with `%v` (`key.go:54-70`), which is not the
+  reserved `{field=value,…}` form. Until the multi-field keys Feature defines
+  that form, their string output is unspecified and MUST NOT be parsed.
 
-The grammar, the segment classification and the escape table MUST be defined
-once, in `github.com/dal-go/record` next to `EscapeID`. `dbschema` MUST
-implement schema-path parsing on top of it rather than with its own splitting
-or escaping rules.
+The grammar, the segment classification, the placeholder identifier rule and
+the escape table MUST be defined once, in `github.com/dal-go/record` next to
+`EscapeID`. `dbschema` MUST implement schema-path parsing on top of it rather
+than with its own splitting or escaping rules.
+
+#### REQ: key-constructors-validate
+
+Today `record.NewKeyWithID` and `record.NewKeyWithParentAndID`
+(`key.go:151-163`) accept any string id without calling
+`record.ValidateStringID`, so ids `a/b` and `a%2Fb` both print as `a%2Fb`. In
+line with the private-beta direction, the `record` constructors MUST validate:
+
+- `NewKeyWithID`, `NewKeyWithParentAndID` and `WithKeyID` (`key.go:174`) MUST
+  reject a string id that fails `ValidateStringID`. The two panicking
+  constructors panic, as they already do for an empty collection name
+  (`key.go:159-161`). `WithKeyID` returns an error satisfying
+  `errors.Is(err, record.ErrInvalidStringID)` through `NewKeyWithOptions`.
+- `Key.Validate()` (`key.go:130`) MUST also apply `ValidateStringID` to string
+  ids, so keys assembled any other way are caught before `String()`.
+
+Recommendation over limiting the claims to schema paths: one grammar for keys
+and schema paths is only true if every key string is unambiguous, and
+validating at construction is the cheapest place to guarantee that.
 
 #### REQ: schema-path-type
 
@@ -272,6 +313,9 @@ var (
   valid under `record.ValidateStringID`; `Placeholder` an identifier, unique in
   the path) and return an error satisfying `errors.Is(err, ErrInvalidCollectionPath)`
   on the first violation. `Name` MUST be non-empty.
+- A nil and an empty `Parent` MUST mean the same (root). `ParseSchemaPath` and
+  `CollectionDef.Normalize` MUST return `Parent == nil` for a root collection,
+  so a root path round-trips to an equal value whichever way it was built.
 - `String()` MUST interleave collection names and ids, escaping concrete ids with
   `record.EscapeID` and writing placeholders as `{name}`:
   `SchemaPath{Parent: []ParentStep{{"ext", ID("datatug")}, {"projects", Placeholder("projectID")}}, Name: "queries"}`
@@ -308,7 +352,8 @@ Rules for drivers whose `SupportsSubCollections()` is `true`:
 - A driver MUST keep the scope: a definition created at
   `ext/datatug/projects` MUST be found by `SameCollection` at that path, and
   MUST NOT apply to records under `ext/other/projects`. Where and how the driver
-  stores the scope is the driver's choice (for `dalgo2ingitdb`, ingitdb/dalgo2ingitdb#16).
+  stores the scope is the driver's choice (for `dalgo2ingitdb`,
+  ingitdb/dalgo2ingitdb#16, which depends on REQ:ingitdb-format-dependency).
 - Scoped definitions under different concrete ids are independent:
   `ext/datatug/projects` and `ext/sneat/projects` MAY both exist, with
   different fields and extensions.
@@ -332,6 +377,43 @@ stored one. Addressing ignores names (`SameCollection`). Rationale: typed-key
 and code generation tooling maps `{projectID}` to one key field, so one name per
 collection keeps generated code stable. How drivers without storage for names
 enforce this is under Open Questions.
+
+#### REQ: ingitdb-format-dependency
+
+`dalgo2ingitdb` cannot meet REQ:schema-path-scopes with today's inGitDB definition
+format:
+
+- `ingitdb-go` `CollectionDef.SubCollections` is `map[string]*CollectionDef`
+  keyed by collection name (`ingitdb/collection_def.go:42`), so
+  `ext/datatug/projects` and `ext/sneat/projects` collide;
+- `dalgo2ingitdb`'s `resolveScopedCollection` (`scoped_collection.go:39`) looks
+  subcollections up by name only;
+- there is no field for a placeholder name, and the strict `KnownFields` reader
+  rejects unknown keys.
+
+This Feature therefore has an explicit dependency on an `ingitdb-go`
+definition-format change for id-scoped subcollection definitions and
+placeholder names: [ingitdb/ingitdb-go#26](https://github.com/ingitdb/ingitdb-go/issues/26).
+
+Alternative evaluated, which needs no format change: register a **root**
+collection whose `DirPath` is `ext/datatug/projects`, with nested definitions
+under it. The `ingitdb-go` validator accepts it: `RootConfig.Validate`
+(`ingitdb/config/root_config.go:112-160`) rejects only empty ids, `*` and
+duplicate paths, not a path inside another collection's directory, and
+`readRootCollections` (`ingitdb/validator/def_validator.go:240-256`) reads each
+entry independently. It is **not recommended**:
+
+- the root id must pass `ValidateCollectionID` (`ingitdb/collection_id.go:11`),
+  which forbids `/`, so `dalgo2ingitdb` would need a second mapping from key
+  prefixes (`ext/datatug/projects`) to invented ids;
+- it cannot express a placeholder scope above the scoped level
+  (`ext/{extID}/projects`), cannot persist placeholder names, and cannot detect
+  overlaps;
+- an `ext` collection with `records_dir: '.'` would see `ext/datatug/` as a
+  record directory.
+
+Recommendation: the `ingitdb-go` format change, which models scopes directly
+and fits the founder's fix-at-source rule.
 
 ### Subcollection declaration
 
@@ -407,6 +489,7 @@ path:
 type SchemaModifier interface {
     SubCollectionsAware
     ExtensionAware
+    DropCapable
     CreateCollection(ctx context.Context, c dbschema.CollectionDef, opts ...Option) error
     DropCollection(ctx context.Context, path dbschema.SchemaPath, opts ...Option) error
     AlterCollection(ctx context.Context, path dbschema.SchemaPath, ops ...AlterOp) error
@@ -431,10 +514,100 @@ rejected.
 A driver whose `SupportsSubCollections()` is `true` MUST resolve `path` with
 `SameCollection` to the definition that `CreateCollection` created, and MUST
 treat a scoped path and a placeholder path as different definitions. Dropping a
-collection that has subcollections MUST either remove their definitions too or
-return an error; it MUST NOT leave orphaned subcollection definitions. What a
-nested drop does with the dropped collection's **record data** under each
-parent record is not decided by this Feature (see Open Questions).
+collection that has subcollections is governed by REQ:drop-refuses-data-loss-by-default.
+
+#### REQ: drop-refuses-data-loss-by-default
+
+Founder decision, 2026-09-17: "1-A. We probably should have explicit flags like
+delete nested and delete recursive dependents?"
+
+A drop (`DropCollection`, root or nested, through any helper or directly) MUST
+by default remove **only** the addressed definition. If anything else would be
+deleted, it MUST remove nothing and return `*ddl.CollectionNotEmptyError`:
+
+```go
+var ErrCollectionNotEmpty = errors.New("ddl: collection is not empty")
+
+type CollectionNotEmptyError struct {
+    Path           dbschema.SchemaPath   // the collection asked to drop
+    Records        int                   // records of Path found, under every matching parent
+    MoreRecords    bool                  // true if the driver stopped counting early
+    SubCollections []dbschema.SchemaPath // descendant definitions that would be dropped
+    Referrers      []dbschema.Referrer   // collections whose records reference records of Path
+}
+
+func (e *CollectionNotEmptyError) Error() string
+func (e *CollectionNotEmptyError) Is(target error) bool // true for ErrCollectionNotEmpty
+```
+
+Blockers are, and a non-empty field MUST be reported for each one present:
+
+1. records of the addressed collection, under every parent record the path's
+   scope matches (a placeholder matches every parent record, a concrete id only
+   that one), unless `DeleteRecords()` is given;
+2. descendant subcollection definitions, unless `DeleteNested()` is given;
+3. records of descendant subcollections, unless both `DeleteNested()` and
+   `DeleteRecords()` are given;
+4. records in other collections that reference records to be deleted, where
+   the driver knows such references (for example `dalgo2ingitdb`'s foreign keys,
+   `foreign_keys.go:102`, or an SQL foreign key). `DeleteDependents()` is
+   reserved (REQ:drop-flags), so this blocker cannot be lifted today.
+
+A driver MAY stop counting records after finding one and set `MoreRecords`.
+
+This supersedes the current root `DropCollection` in `dalgo2ingitdb`, which
+removes the whole collection directory, records included (`os.RemoveAll`,
+`schema_modifier.go:122`). That becomes the behaviour of
+`DropCollection(…, DeleteRecords(), DeleteNested())` only, in the scope of
+ingitdb/dalgo2ingitdb#16.
+
+#### REQ: drop-flags
+
+`ddl.Options` MUST gain `DeleteRecords`, `DeleteNested` and `DeleteDependents`
+booleans, set by these options:
+
+```go
+func DeleteRecords() Option    // also delete the dropped collections' records
+func DeleteNested() Option     // also drop descendant subcollection definitions
+func DeleteDependents() Option // reserved: cascade to referencing records
+```
+
+- `DeleteRecords()` allows deleting the records of every collection the drop
+  removes: the addressed collection's records under every parent record its
+  scope matches, and, with `DeleteNested()`, the descendants' records.
+- `DeleteNested()` allows dropping descendant definitions. It is
+  **independent** of `DeleteRecords()`: on its own it drops empty descendants
+  and still refuses if any of them has records. Recommendation for
+  independence: each flag authorises exactly one kind of loss, so an empty tree
+  can be dropped without also authorising record deletion, and the error names
+  precisely which flag is missing.
+- `DeleteDependents()` is **reserved**. DALgo has no driver-agnostic
+  foreign-key declaration or cascade model today: `dbschema.ConstraintDef`
+  carries only `Name` and `Type` and defers "foreign-key target + cascade
+  actions" (`dbschema/constraint.go:3-9`), and `dbschema.Referrer`
+  (`dbschema/referrer.go`) is read-side introspection through the optional
+  `SchemaReader.ListReferrers`. Every helper MUST refuse `DeleteDependents()`
+  with `*dbschema.NotSupportedError{Reason: "DeleteDependents is reserved"}`.
+  A drop that would orphan referencing records refuses with blocker 4.
+- The flags are meaningful on drops only. On `CreateCollection` and on
+  `AlterOp`s they are mismatched options and are silently ignored, per
+  `ddl/options.go:10-16`.
+
+Drivers declare which flags they can execute through `SupportsDrop` (embedded
+in `SchemaModifier`):
+
+```go
+type DropCapable interface {
+    // SupportsDrop reports whether the driver can execute a drop with every
+    // flag set in flags. It is constant for the lifetime of a DB value.
+    SupportsDrop(flags DropFlags) bool
+}
+
+type DropFlags struct{ DeleteRecords, DeleteNested bool }
+```
+
+A driver whose `SupportsSubCollections()` is `false` MUST return `false` for
+`DeleteNested`.
 
 #### REQ: sub-collections-capability
 
@@ -582,14 +755,19 @@ Every `ddl` helper MUST check in this order and return the first failure:
 1. **Path validity.** `CreateCollection`: `c.Normalize()`. String helpers:
    `ParseSchemaPath`. `*At` helpers: `path.Validate()`. Failures are the
    path errors of REQ:path-grammar and REQ:schema-path-type.
-2. **Extension validity.** Row 1 of REQ:extension-addressing
+2. **Option validity.** Row 1 of REQ:extension-addressing
    (`ErrInvalidExtension`), for `opts` or, for Alter, for every `AlterOp` in op
-   order.
+   order. Then, on drops, a reserved `DeleteDependents()` (REQ:drop-flags).
 3. **Capability.** The DB implements `SchemaModifier`, otherwise the existing
    `*dbschema.NotSupportedError` ("driver does not implement
    ddl.SchemaModifier", `ddl/operations.go:25-31`). Then nesting, per
-   REQ:nesting-refused-without-capability. Then rows 2-3 of
+   REQ:nesting-refused-without-capability. Then, on drops with `DeleteRecords()`
+   or `DeleteNested()`, `SupportsDrop` with those flags, otherwise
+   `*dbschema.NotSupportedError` naming the flag. Then rows 2-3 of
    REQ:extension-addressing, which need the driver's `SupportsExtension`.
+
+Data-dependent refusals (`CollectionNotEmptyError`, missing ancestors,
+overlaps) come from the driver after dispatch.
 
 ### Driver obligations
 
@@ -604,9 +782,10 @@ skipped silently.
 
 #### REQ: in-org-drivers-comply
 
-Every driver in the `dal-go` and `ingitdb` organisations that implements
-`SchemaModifier` MUST implement the changed interface and enforce, on direct
-calls, the driver-side MUSTs of REQ:string-and-structured-forms-round-trip,
+Every driver in the founder's organisations (`dal-go`, `ingitdb`, `openvaultdb`,
+`datatug`, `sneat-dev`, `synchestra-io`) that implements `SchemaModifier` MUST
+implement the changed interface and enforce, on direct calls, the driver-side
+MUSTs of REQ:string-and-structured-forms-round-trip, REQ:drop-refuses-data-loss-by-default, REQ:drop-flags,
 REQ:schema-path-scopes,
 REQ:one-collection-per-create, REQ:path-addressed-drop-and-alter,
 REQ:nesting-refused-without-capability and REQ:extension-addressing. There is no
@@ -621,8 +800,31 @@ legacy exemption. As of 2026-09-17 these are:
 | `dal-go/dalgo` `mocks/mock_ddl` | generated by MockGen | regenerated with this change |
 
 `dal-go/record` is not a driver, but it carries the grammar change
-(`EscapeID` extension, new `UnescapeID`) of REQ:path-grammar. The per-module
-work is tracked on dal-go/dalgo#163.
+(`EscapeID` extension, new `UnescapeID`, placeholder identifier rule) of
+REQ:path-grammar and REQ:key-constructors-validate. The per-module work is
+tracked on dal-go/dalgo#163.
+
+#### REQ: in-org-callers-comply
+
+Every in-org **caller** of `SchemaModifier`, the `ddl` helpers or the path
+grammar MUST conform in the same release wave: nested collections are addressed
+by schema paths (odd segment count, `{placeholder}` or concrete ids), and ids are
+unescaped with `record.UnescapeID` or a standard percent-decoder, never a
+hard-coded table of the current six escapes. Found by searching every repository
+under `/home/ai/projects` (local checkouts, 2026-09-17):
+
+| Caller | Today | Required change |
+|---|---|---|
+| `openvaultdb/openvaultdb-go` | `collectionChains` (`pkg/core/key.go:110`) builds names-only chains like `spaces/ext`; `core.go:358` passes them to `modifier.CreateCollection` (`core.go:555`). Even count, so it breaks. | Derive `spaces/{spaceID}/ext` (or concrete ids for a scoped definition) from the key, or pass `CollectionDef.Parent`. Tracked in [openvaultdb/openvaultdb-go#28](https://github.com/openvaultdb/openvaultdb-go/issues/28). |
+| `dal-go/dalgo2openvaultdb` | `unescapeSegment` (`query.go:293`) decodes only the six current `EscapeID` codes. | Use `record.UnescapeID`; ids with `{ } , =` must round-trip. |
+| `openvaultdb/ovdb` | `internal/datapath/datapath.go:41` hard-codes the six codes and treats any other `%` as invalid. | Use `record.UnescapeID`; ids with `{ } , =` must round-trip. |
+| `datatug/datatug-cli` | `pkg/dbcopy/engine.go:150` `ddl.DropCollection(…, ref.Name(), ddl.IfExists())`, `:259` `ddl.CreateCollection`. Root names only. | Compatible. Its drop now refuses non-empty targets; it must pass `DeleteRecords()` where it intends to replace data. |
+| `sneat-dev/wb` | `internal/hubstore/hubstore.go:98` `CreateCollection` with a root name. | None. |
+| `synchestra-io/synchestra` | `pkg/state/replication/dal_journal.go:128` `ddl.CreateCollection` with a root definition. | None. |
+
+Already safe, because they use `url.PathUnescape` or their own escaper:
+`openvaultdb-go` `ParseKeyPath` (`pkg/core/key.go:93-97`) and `dalgo2ingitdb`
+`record_io.go:27`.
 
 ## Acceptance Criteria
 
@@ -793,17 +995,57 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 
 **Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries with `ext/datatug/projects/{projectID}/dbdrivers` also created (record file `'{key}/{key}.dbdriver.json'`), and no `dbservers` records
 **When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers"}, ddl.WithExtension(<record file '{key}/{key}.dbserver.json', json, map[string]any, '.'>))` is called, followed by `ddl.AlterCollection(ctx, db, "ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers", ddl.AddField(fd))` and `ddl.DropCollection(ctx, db, "/ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers")`
-**Then** the create returns `nil` and persists the `dbservers` definition with that `record_file`; the alter returns `nil` and adds the field to that same definition; the drop returns `nil` and removes that definition while the `dbdrivers` definition remains. This AC deliberately has no `dbservers` records and makes no claim about record data, which waits on the nested-drop Open Question.
+**Then** the create returns `nil` and persists the `dbservers` definition with that `record_file`; the alter returns `nil` and adds the field to that same definition; the drop, given no flags, returns `nil` because `dbservers` has no records and no descendants, and removes that definition while the `dbdrivers` definition remains.
+
+### AC: drop-flags-guarded-by-helpers (verifies REQ:drop-flags, REQ:guard-precedence)
+
+**Given** a stub driver implementing `SchemaModifier` whose `SupportsDrop` returns `false` for `DropFlags{DeleteRecords: true}` and for `DropFlags{DeleteNested: true}`, which records every call
+**When** `ddl.DropCollection(ctx, db, "users", ddl.DeleteRecords())`, `ddl.DropCollection(ctx, db, "users", ddl.DeleteNested())`, `ddl.DropCollection(ctx, db, "users", ddl.DeleteDependents())` and `ddl.DropCollection(ctx, db, "ext/data,tug/projects", ddl.DeleteDependents())` are called
+**Then** the first two return `*dbschema.NotSupportedError` naming the flag; the third returns `*dbschema.NotSupportedError` with `Reason` `"DeleteDependents is reserved"`, even though the stub supports nothing else either; the fourth returns `dbschema.ErrInvalidCollectionPath` (path first); and the stub's `DropCollection` is never invoked. `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "users"}, ddl.DeleteRecords())` dispatches normally.
+
+### AC: collection-not-empty-error-shape (verifies REQ:drop-refuses-data-loss-by-default)
+
+**Given** `err := &ddl.CollectionNotEmptyError{Path: p, Records: 3, SubCollections: []dbschema.SchemaPath{q}}`
+**When** it is checked with `errors.Is(err, ddl.ErrCollectionNotEmpty)` and `err.Error()` is read
+**Then** `errors.Is` is `true`, and the message contains `p.String()`, `3` and `q.String()`.
+
+### AC: dalgo2ingitdb-drop-empty-without-flags (verifies REQ:drop-refuses-data-loss-by-default)
+
+Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16, as are the three ACs below.
+
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with no records
+**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/{projectID}/queries")` is called with no flags, and then `ddl.DropCollection(ctx, db, "users")` for an empty root collection `users` created beforehand
+**Then** both return `nil` and remove only those definitions.
+
+### AC: dalgo2ingitdb-drop-non-empty-refused (verifies REQ:drop-refuses-data-loss-by-default)
+
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with records `ext/datatug/projects/p1` and `ext/datatug/projects/p1/queries/q1`
+**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects")` is called with no flags
+**Then** it returns an error satisfying `errors.Is(err, ddl.ErrCollectionNotEmpty)` whose `*ddl.CollectionNotEmptyError` has `Records >= 1` (or `MoreRecords`) and `SubCollections` containing `ext/datatug/projects/{projectID}/queries`; and every definition and record is still present.
+
+### AC: dalgo2ingitdb-delete-records-across-parents (verifies REQ:drop-flags, REQ:drop-refuses-data-loss-by-default)
+
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with records `ext/datatug/projects/p1/queries/q1`, `ext/datatug/projects/p2/queries/q2` and the two project records
+**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/{projectID}/queries")` is called first with no flags and then with `ddl.DeleteRecords()`
+**Then** the first returns `ErrCollectionNotEmpty` with `Records == 2` (or `MoreRecords`) and deletes nothing; the second returns `nil`, removes the `queries` definition and both `q1` and `q2`, and leaves the `p1` and `p2` project records untouched.
+
+### AC: dalgo2ingitdb-delete-nested-removes-descendants (verifies REQ:drop-flags)
+
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with `ext/datatug/projects/{projectID}/environments` and `ext/datatug/projects/{projectID}/environments/{envID}/servers` also created, and no records anywhere
+**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/{projectID}/environments")` is called first with no flags and then with `ddl.DeleteNested()`
+**Then** the first returns `ErrCollectionNotEmpty` with `Records == 0` and `SubCollections` containing the `servers` path, and deletes nothing; the second returns `nil` and removes both the `environments` and `servers` definitions, while `queries` and `projects` remain.
 
 ## Architecture
 
 | File | Change |
 |---|---|
-| `github.com/dal-go/record` `key.go` | `EscapeID` also escapes `{` `}` `,` `=`; new `UnescapeID`; the path grammar (segment splitting, parity, id-segment classification) is defined here once. |
+| `github.com/dal-go/record` `key.go` | `EscapeID` also escapes `{` `}` `,` `=`; new `UnescapeID`; constructors and `Key.Validate` apply `ValidateStringID`; the path grammar (segment splitting, parity, id-segment classification, placeholder identifier) is defined here once. |
+| `access/resource.go` | Capture names use the `record` placeholder identifier rule. |
 | `dbschema/schema_path.go` | New: `PathID`, `ID`, `Placeholder`, `ParentStep`, `SchemaPath` with `String`, `Validate`, `SameCollection`, `Overlaps`; `ParseSchemaPath` (built on the `record` grammar); the three path errors. |
 | `dbschema/collection_def.go` | Add `Parent []ParentStep`, `SchemaPath()`, `Normalize()`; godoc for nesting, scopes and the two forms. |
-| `ddl/modifier.go` | `SchemaModifier` embeds `SubCollectionsAware` and `ExtensionAware`; `DropCollection` and `AlterCollection` take `dbschema.SchemaPath`. |
-| `ddl/options.go` | Add `Options.Extensions` and `WithExtension`; godoc states the strict rule next to the mismatched-option rule. |
+| `ddl/modifier.go` | `SchemaModifier` embeds `SubCollectionsAware` and `ExtensionAware`; `DropCapable`; `DropCollection` and `AlterCollection` take `dbschema.SchemaPath`. |
+| `ddl/options.go` | Add `Options.Extensions`, `WithExtension`, the drop flags and their options; godoc states the strict rule next to the mismatched-option rule. |
+| `ddl/drop.go` | New: `DropCapable`, `DropFlags`, `ErrCollectionNotEmpty`, `CollectionNotEmptyError`. |
 | `ddl/extension.go` | New: `Extension`, `ExtensionAware`, `ErrInvalidExtension`, and the internal addressing check. |
 | `ddl/subcollections.go` | New: `SubCollectionsAware`, `SupportsSubCollections`. |
 | `ddl/alter_op.go` | Sealed `AlterOp` gains unexported `opts() Options`; each of the six op types returns its stored field. |
@@ -825,6 +1067,9 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 | Extension the driver does not honour, on any operation or `AlterOp`, whatever its target | `*dbschema.NotSupportedError` naming type and target; no operation performed |
 | DB does not implement `SchemaModifier` (for example a store whose schema is defined elsewhere) | existing `*dbschema.NotSupportedError`; no dispatch |
 | Nested path or `Parent`, driver lacks nesting | `*dbschema.NotSupportedError`; no dispatch |
+| Drop would delete records, descendant definitions or orphan referencing records without the matching flag | `*ddl.CollectionNotEmptyError` (`errors.Is(err, ddl.ErrCollectionNotEmpty)`) listing counts and paths; nothing removed |
+| `DeleteDependents()` on any drop | `*dbschema.NotSupportedError` (reserved); no dispatch |
+| `DeleteRecords()` / `DeleteNested()` on a driver whose `SupportsDrop` is `false` for it | `*dbschema.NotSupportedError` naming the flag; no dispatch |
 | An ancestor collection definition does not exist (nesting driver) | driver-specific non-nil error; nothing created. A missing scoping parent **record** is not an error. |
 | Honoured extension with an invalid value (e.g. an inGitDB `RecordFileDef` failing `Validate`) | driver-specific error; the surface is supported, the value is not |
 
@@ -860,6 +1105,9 @@ direct Go test surface.
   extension type, target constant, nesting, depth-N ancestor check, path-based
   Drop/Alter and conforming its slash parsing to the grammar are
   ingitdb/dalgo2ingitdb#16.
+- **A foreign-key and cascade model.** A driver-agnostic declaration of
+  references with cascade actions, which `DeleteDependents()` needs, is a later
+  Feature. Until then the flag is reserved and refused.
 - **An ignore-foreign-extensions mode.** Rejected in REQ:extension-addressing.
 - **OpenVaultDB-backed stores.** DataTug's remote path does not create its
   schema through DALgo DDL. An OpenVaultDB store's schema, including
@@ -899,27 +1147,6 @@ direct Go test surface.
   Recommendation: **A**, because code generation and typed keys depend on the
   names being stable per collection. For inGitDB this is one extra field in
   `definition.yaml`. Needs a founder decision.
-- **Record data on a nested drop.** For a nesting driver, what does
-  `ddl.DropCollection(ctx, db, "ext/datatug/projects/{projectID}/queries")` do with existing `queries`
-  records under the `projects` records?
-  - **A.** Delete the definition and the subcollection's records under every
-    parent record (for inGitDB, every `ext/datatug/projects/<id>/queries/` tree), the same
-    as a root drop.
-  - **B.** Refuse with an error while any record of that subcollection exists
-    under any parent record, unless the caller passes an explicit force option
-    (e.g. `ddl.DeleteRecords()`), which deletes them as in A.
-
-  Recommendations:
-  - **Author: A.** It matches the root `DropCollection` in dalgo2ingitdb, which
-    removes the whole collection directory, records included
-    (`schema_modifier.go:122-124`), and SQL `DROP TABLE`, so "drop" means the
-    same at every depth.
-  - **Coordinator: B.** A nested drop fans out across every parent record, so
-    its blast radius is much larger than it looks at the call site. An explicit
-    force option makes that deletion deliberate.
-
-  Needs a founder decision. AC:dalgo2ingitdb-depth-two-created-and-dropped
-  stays neutral until it is made.
 
 ---
 *This document follows the https://specscore.md/feature-specification*
