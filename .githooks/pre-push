@@ -9,7 +9,23 @@ echo "pre-push: running tests with coverage (CI requires 100%)..."
 profile="$(mktemp)"
 trap 'rm -f "$profile"' EXIT
 
-go test ./... -coverprofile="$profile" -count=1
+# Routed through `wb run --` when WB is installed, so a full suite is admitted
+# against the machine-wide CPU budget instead of competing blindly: three
+# agents running `go test` concurrently on a 4-core host were once recorded
+# queueing invisibly for 10-25 minutes. It also records a per-command receipt
+# (duration, CPU, queue wait, exit code). `wb run --` preserves the command's
+# standard streams and exit code, so `set -e` still aborts the push on failure.
+#
+# No `-count=1`: `-coverprofile` is one of Go's cacheable test flags (see
+# `go help test`), so cached packages still report their coverage and the
+# computed total is unchanged. `-count=1` was the only thing defeating the
+# cache, and removing it measured ~30x faster here (8.86s -> 0.29s) with an
+# identical 100.0% total.
+if command -v wb >/dev/null 2>&1; then
+  wb run -- go test ./... -coverprofile="$profile"
+else
+  go test ./... -coverprofile="$profile"
+fi
 
 total=$(go tool cover -func="$profile" | grep total | awk '{print $3}' | sed 's/%//')
 echo "pre-push: total coverage: ${total}%"
