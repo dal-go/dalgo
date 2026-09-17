@@ -15,3 +15,10 @@ exported API is a breaking change for someone.
 - If no such reason exists, prefer an additive change (new optional function or
   functional option) — and still ask before adding exported API.
 - A spec that implies an interface change is not approval of the change; ask.
+
+## Storage-format concerns belong to the storage module, not DALgo
+
+DALgo carries only what is generic across drivers. Storage-specific concepts — for
+example the inGitDB schema (collection definition files, `record_file`, subcollection
+definitions) — belong to that storage's own modules (`ingitdb-go`, `dalgo2ingitdb`),
+never to DALgo's interfaces, types or options.
