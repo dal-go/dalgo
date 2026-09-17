@@ -3,11 +3,11 @@ format: https://specscore.md/feature-specification
 status: Draft
 ---
 
-# Feature: Schema API: subcollection declaration and driver extensions for CreateCollection
+# Feature: Schema API: subcollection declaration and driver options for CreateCollection
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/schema-subcollections-extensions?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/schema-subcollections-extensions?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/schema-subcollections-extensions?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/schema-subcollections-extensions?op=request-change) |
 **Status:** Draft
-**Date:** 2026-09-17
+**Date:** 2026-09-17 (reworked 2026-09-17: minimal interface, functional options)
 **Owner:** alex
 **Source Ideas:** —
 **Tracking:** [dal-go/dalgo#163](https://github.com/dal-go/dalgo/issues/163)
@@ -38,25 +38,36 @@ and pass driver-specific storage options for them, through DALgo:
    `CreateCollection` call per collection, after its ancestor collection
    definitions exist; a scoping parent record need not exist.
    `SchemaModifier.DropCollection` and `AlterCollection` take a `SchemaPath`.
-   Every driver states whether it supports nesting through
-   `SupportsSubCollections()`, which becomes part of `SchemaModifier`.
-2. **Driver extensions.** `ddl.Options` gains `Extensions []ddl.Extension`, set
-   through `ddl.WithExtension(ext)`. Each extension carries a stable target ID,
-   a constant exported by the driver module that defines it (for example
-   `dalgo2ingitdb.ExtensionTarget`). Extensions are strict: one is honoured only
-   when the driver's `SupportsExtension(op, ext)` returns `true`, and is
-   otherwise refused with `*dbschema.NotSupportedError`. There is no mode that
-   ignores an extension.
+   A driver that cannot nest refuses a nested path itself with an error
+   matching `dal.ErrNotSupported`; there is no capability method.
+2. **Driver-specific settings as functional options.** `ddl.Options` gains a
+   generic, vocabulary-free value carrier, so a driver package defines its own
+   options without dalgo knowing them: `dalgo2ingitdb.WithRecordFile(…)` returns
+   a `ddl.Option` built with `ddl.WithValue(key, value, required)`, and
+   dalgo2ingitdb reads the value back with `Options.Value(key)`. Each option
+   declares whether it is **required** (a driver that does not support it
+   refuses the call with an error matching `dal.ErrNotSupported`) or a **hint**
+   (ignored by a driver that does not support it).
 
-3. **Safe drops.** A drop, root or nested, removes only the definition by
-   default and refuses with `ddl.ErrCollectionNotEmpty` when records,
-   descendant definitions or referencing records would go too. Explicit
-   `ddl.DeleteRecords()` and `ddl.DeleteNested()` authorise those losses;
-   `ddl.DeleteDependents()` is reserved.
+3. **Safe drops.** A drop through a path with a `{placeholder}` is a schema
+   drop: it removes only the definition, and refuses with
+   `ddl.ErrCollectionNotEmpty` while any instance under any parent record holds
+   data; no option makes it delete data across parents. A drop through a fully
+   concrete path such as `ext/datatug/projects/p1/queries` is an instance
+   operation on that one parent's data and never touches the definition.
+   `ddl.DeleteRecords()` and `ddl.DeleteNested()`, ordinary required options,
+   authorise data loss only for a single instance. `ddl.DeleteDependents()` is
+   reserved.
 
-The `ddl` helpers guard every call before dispatch, and every in-org driver
-implementing `SchemaModifier` MUST enforce the same rules on direct calls
-(REQ:in-org-drivers-comply).
+`SchemaModifier` stays minimal: `CreateCollection`, `DropCollection` and
+`AlterCollection`, nothing else. The `ddl` helpers validate paths; every other
+refusal is the driver's, and a shared conformance suite (`ddl/ddltest`) proves
+each in-org driver implements it (REQ:in-org-drivers-comply).
+
+Founder direction for this shape (2026-09-17): "Drop it. We should have minimal
+generic interface and if we need to pass additional options we should use
+functional args and they should be either ignored or returning not supported
+error if not supported."
 
 DALgo is in private beta, so this Feature changes the `SchemaModifier` interface
 and `record.EscapeID` rather than working around them (founder direction,
@@ -68,9 +79,9 @@ collection schema on the local inGitDB path (see REQ:collection-def-parent for
 the list). It does not cover nested database roots or OpenVaultDB-backed stores
 (see Not Doing).
 
-DALgo core stays driver-agnostic: it defines only the path grammar, the slot,
-the addressing rule and the refusals. Concrete extension types, such as an
-inGitDB `record_file`, live in driver modules.
+DALgo core stays driver-agnostic: it defines only the path grammar, the option
+carrier and the refusal rule. Concrete options, such as an inGitDB
+`record_file`, live in driver modules.
 
 ## Problem
 
@@ -141,11 +152,10 @@ also has these defects:
 The end user is DataTug's project store (`datatug/datatug` Feature
 `dalgo-project-store`, REQ `canonical-project-layout` and REQ
 `driver-prerequisites-are-recorded`). It needs `projects/{id}` with nested
-collections, namespaced under the DataTug extension record as in Firestore
-(`ext/datatug/projects/<id>/…`; founder, 2026-09-17: "That's how we keep them in
-Firestore and we should do the same in git storage for consistency. This would
-also allow us to store data from multiple extensions without conflicts -
-namespacing."), each with `record_file` `name: '{key}/{key}.<suffix>.json'`,
+collections, namespaced under `ext/datatug` as DataTug already keeps them in
+Firestore (`ext/datatug/projects/<id>/…`; founder direction, 2026-09-17: the same
+layout in git storage, for consistency and so several apps' data can share one
+store without conflicts), each with `record_file` `name: '{key}/{key}.<suffix>.json'`,
 `format: json`, `type: map[string]any`, `records_dir: '.'`. The founder's rule
 is that DataTug writes, schema creation included, go through DALgo and are
 fixed at source with no bootstrap workaround
@@ -160,14 +170,14 @@ fixed at source with no bootstrap workaround
   `record.Key.String()`. Segment parity tells a collection from a record.
 - **Two spellings, one representation.** The structured and string forms of a
   schema path normalise to the same `SchemaPath` before any driver sees them.
-- **No silent loss.** A declaration that the target driver cannot honour
-  (a parent on a flat driver, an extension the driver does not honour) is an
-  error, never a quiet default. That silent default is the exact defect behind
-  dalgo2ingitdb#16.
-- **Addressing by compiled constant, not by display name.** Extension targets
-  are constants exported by the defining module, never `dal.Adapter.Name()`.
-- **Guard in the helper and in the driver.** The `ddl` helpers refuse before
-  dispatch, and every in-org driver enforces the same rules on direct calls.
+- **Minimal interface.** `SchemaModifier` has three methods and no capability
+  methods. Anything extra travels as a functional option.
+- **No silent loss of what matters.** A nested path on a flat driver, or a
+  required option the driver does not support, is an error matching
+  `dal.ErrNotSupported`, never a quiet default. That silent default is the exact
+  defect behind dalgo2ingitdb#16. Only options declared as hints may be ignored.
+- **Proven by one shared suite.** Driver obligations are verified by the same
+  conformance tests in every in-org driver, not advertised by the driver.
 
 ## Behavior
 
@@ -370,11 +380,11 @@ its path is one of:
 - a **placeholder** (`projects/{projectID}/queries`): the definition applies to
   the subcollection under **every** record of the parent collection;
 - a **concrete id** (`ext/datatug/projects`): the definition is **scoped** to
-  the subcollection under that **one** parent record. This is how extensions
+  the subcollection under that **one** parent record. This is how apps
   namespace their data (`ext/datatug/…`, `ext/<other>/…`) without conflicts,
   matching DataTug's Firestore layout.
 
-Rules for drivers whose `SupportsSubCollections()` is `true`:
+Rules for drivers that support nesting:
 
 - A driver MUST keep the scope: a definition created at
   `ext/datatug/projects` MUST be found by `SameCollection` at that path, and
@@ -383,7 +393,7 @@ Rules for drivers whose `SupportsSubCollections()` is `true`:
   ingitdb/dalgo2ingitdb#16, which depends on REQ:ingitdb-format-dependency).
 - Scoped definitions under different concrete ids are independent:
   `ext/datatug/projects` and `ext/sneat/projects` MAY both exist, with
-  different fields and extensions.
+  different fields and options.
 - A driver MUST refuse to create a definition that `Overlaps` an existing one
   (for example `ext/{extID}/projects` when `ext/datatug/projects` exists, or the
   reverse), with a driver-specific non-nil error, because a record under
@@ -401,7 +411,7 @@ collection definition appears: every path through `ext/datatug/projects` uses
 uniqueness within one path. Founder decision, 2026-09-17 ("A"): enforcement is
 mandatory, with no optional path:
 
-- Every driver whose `SupportsSubCollections()` is `true` MUST persist the
+- Every driver that supports nesting MUST persist the
   placeholder name of every placeholder id position of every definition it
   creates. A driver with no storage for names MUST add it; it MUST NOT skip the
   check.
@@ -504,8 +514,8 @@ called directly MUST call `Normalize` itself.
 #### REQ: one-collection-per-create
 
 Each `CreateCollection` call MUST create exactly one collection definition, the
-one addressed by the normalised `c.SchemaPath()`. A driver whose
-`SupportsSubCollections()` is `true` MUST return a non-nil error, and MUST NOT
+one addressed by the normalised `c.SchemaPath()`. A driver that supports
+nesting MUST return a non-nil error, and MUST NOT
 create anything, when the definition of **any** ancestor (the path truncated
 after each `Parent` collection, keeping its ids) does not exist, matched with
 `SameCollection` or, for a placeholder ancestor definition, one it covers. It
@@ -528,9 +538,6 @@ path:
 
 ```go
 type SchemaModifier interface {
-    SubCollectionsAware
-    ExtensionAware
-    DropCapable
     CreateCollection(ctx context.Context, c dbschema.CollectionDef, opts ...Option) error
     DropCollection(ctx context.Context, path dbschema.SchemaPath, opts ...Option) error
     AlterCollection(ctx context.Context, path dbschema.SchemaPath, ops ...AlterOp) error
@@ -552,243 +559,213 @@ the `*At` helper. `"users"`, `"ext/datatug/projects/{projectID}/queries"` and
 the same definition; `"ext/datatug"` is an even-count record path and is
 rejected.
 
-A driver whose `SupportsSubCollections()` is `true` MUST resolve `path` with
+`SchemaModifier` MUST have exactly these three methods: no capability methods
+are embedded or required. A driver that supports nesting MUST resolve `path` with
 `SameCollection` to the definition that `CreateCollection` created, and MUST
 treat a scoped path and a placeholder path as different definitions. Dropping a
 collection that has subcollections is governed by REQ:drop-refuses-data-loss-by-default.
 
 #### REQ: drop-refuses-data-loss-by-default
 
-Founder decision, 2026-09-17: "1-A. We probably should have explicit flags like
-delete nested and delete recursive dependents?"
+Founder decisions, 2026-09-17: "1-A. We probably should have explicit flags like
+delete nested and delete recursive dependents?", and, correcting an earlier
+draft that deleted records under every parent record, "Yes. You got it I
+think." to the rule below.
 
-A drop (`DropCollection`, root or nested, through any helper or directly) MUST
-by default remove **only** the addressed definition. If anything else would be
-deleted, it MUST remove nothing and return `*ddl.CollectionNotEmptyError`:
+A drop (`DropCollection`, through any helper or directly) is one of three kinds,
+decided from its `SchemaPath`:
+
+| Kind | Path | Removes | Data flags |
+|---|---|---|---|
+| **Schema drop** | has at least one `{placeholder}` (e.g. `ext/datatug/projects/{projectID}/queries`) | the definition only | refused: an error satisfying `errors.Is(err, ddl.ErrInvalidOption)` |
+| **Single-instance definition drop** | no placeholder, and a definition exists at exactly this path: a root collection (`users`) or a concrete-scoped definition (`ext/datatug/projects`) | the definition, plus its one instance's data if the flags allow | allowed |
+| **Instance drop** | no placeholder, no definition at exactly this path, and a placeholder definition covers it (e.g. `ext/datatug/projects/p1/queries` under `ext/datatug/projects/{projectID}/queries`) | data of that one instance only; the definition MUST stay | allowed |
+
+The three kinds cannot be confused: REQ:schema-path-scopes forbids overlapping
+definitions, so a fully concrete path matches either a definition at exactly
+that path or a covering placeholder definition, never both. A fully concrete
+path that matches neither is not found (a no-op under `IfExists()`).
+
+By default a drop MUST delete no data. If the drop would delete anything beyond
+what its kind removes without flags, it MUST remove nothing and return
+`*ddl.CollectionNotEmptyError`:
 
 ```go
-var ErrCollectionNotEmpty = errors.New("ddl: collection is not empty")
+var (
+    ErrCollectionNotEmpty = errors.New("ddl: collection is not empty")
+    ErrInvalidOption      = errors.New("ddl: option is not valid for this call")
+)
 
 type CollectionNotEmptyError struct {
-    Path           dbschema.SchemaPath   // the collection asked to drop
-    Records        int                   // records of Path found, under every matching parent
+    Path           dbschema.SchemaPath   // the path asked to drop
+    Records        int                   // records of the addressed collection found
     MoreRecords    bool                  // true if the driver stopped counting early
-    SubCollections []dbschema.SchemaPath // descendant definitions that would be dropped
-    Referrers      []dbschema.Referrer   // collections whose records reference records of Path
+    NestedRecords  int                   // records of descendant subcollections found
+    SubCollections []dbschema.SchemaPath // descendant definitions (definition drops only)
+    Referrers      []dbschema.Referrer   // collections whose records reference records to be deleted
 }
 
 func (e *CollectionNotEmptyError) Error() string
 func (e *CollectionNotEmptyError) Is(target error) bool // true for ErrCollectionNotEmpty
 ```
 
-Blockers are, and a non-empty field MUST be reported for each one present:
+Blockers, each reported in its field when present:
 
-1. records of the addressed collection, under every parent record the path's
-   scope matches (a placeholder matches every parent record, a concrete id only
-   that one), unless `DeleteRecords()` is given;
-2. descendant subcollection definitions, unless `DeleteNested()` is given;
-3. records of descendant subcollections, unless both `DeleteNested()` and
-   `DeleteRecords()` are given;
-4. records in other collections that reference records to be deleted, where
-   the driver knows such references (for example `dalgo2ingitdb`'s foreign keys,
-   `foreign_keys.go:102`, or an SQL foreign key). `DeleteDependents()` is
-   reserved (REQ:drop-flags), so this blocker cannot be lifted today.
+1. **records** of the addressed collection: for a schema drop, in any instance
+   under any parent record (always blocks); for the other two kinds, in the one
+   instance, unless `DeleteRecords()` is given;
+2. **nested data** (records of descendant subcollections): for a schema drop,
+   under any parent record (always blocks); for the other two kinds, under the
+   one instance's records, unless `DeleteNested()` is given;
+3. **descendant definitions**, for the two definition-drop kinds (always block:
+   drop descendants first, deepest first);
+4. **referencing records** in other collections that reference records to be
+   deleted, where the driver knows such references (for example
+   `dalgo2ingitdb`'s foreign keys, `foreign_keys.go:102`, or an SQL foreign
+   key). `DeleteDependents()` is reserved (REQ:drop-flags), so this blocker
+   cannot be lifted today.
 
 A driver MAY stop counting records after finding one and set `MoreRecords`.
 
 This supersedes the current root `DropCollection` in `dalgo2ingitdb`, which
 removes the whole collection directory, records included (`os.RemoveAll`,
-`schema_modifier.go:122`). That becomes the behaviour of
-`DropCollection(…, DeleteRecords(), DeleteNested())` only, in the scope of
-ingitdb/dalgo2ingitdb#16.
+`schema_modifier.go:122`). A root drop becomes a single-instance definition
+drop, which deletes records only with `DeleteRecords()` and nested data only
+with `DeleteNested()`, and refuses while descendant definitions exist, in the
+scope of ingitdb/dalgo2ingitdb#16.
 
 #### REQ: drop-flags
 
-`ddl.Options` MUST gain `DeleteRecords`, `DeleteNested` and `DeleteDependents`
-booleans, set by these options:
+The `ddl` package MUST export the drop flags as ordinary **required** options on
+the generic carrier of REQ:option-values:
 
 ```go
-func DeleteRecords() Option    // also delete the dropped collections' records
-func DeleteNested() Option     // also drop descendant subcollection definitions
+func DeleteRecords() Option    // delete the single instance's records
+func DeleteNested() Option     // delete the single instance's nested subcollection data
 func DeleteDependents() Option // reserved: cascade to referencing records
+
+var (
+    DeleteRecordsKey    = deleteRecordsKey{}    // keys, so drivers can list them as supported
+    DeleteNestedKey     = deleteNestedKey{}
+    DeleteDependentsKey = deleteDependentsKey{}
+)
 ```
 
-- `DeleteRecords()` allows deleting the records of every collection the drop
-  removes: the addressed collection's records under every parent record its
-  scope matches, and, with `DeleteNested()`, the descendants' records.
-- `DeleteNested()` allows dropping descendant definitions. It is
-  **independent** of `DeleteRecords()`: on its own it drops empty descendants
-  and still refuses if any of them has records. Recommendation for
-  independence: each flag authorises exactly one kind of loss, so an empty tree
-  can be dropped without also authorising record deletion, and the error names
-  precisely which flag is missing.
+- `DeleteRecords()` allows deleting the records of the addressed collection in
+  its **one** instance: the root collection, the concrete-scoped definition, or
+  the concrete instance path. It never deletes records under other parents.
+- `DeleteNested()` allows deleting records of descendant subcollections under
+  that one instance's records. It never removes a definition. It is
+  **independent** of `DeleteRecords()`, so each flag authorises exactly one
+  kind of loss and the error names precisely which one is missing.
+- Either flag with a path containing a `{placeholder}` MUST be refused with an
+  error satisfying `errors.Is(err, ddl.ErrInvalidOption)`, by the drop helpers
+  before dispatch and by drivers on direct calls: no option makes a schema drop
+  delete data across parents.
+- A driver that cannot execute a flag (for example `DeleteNested()` on a driver
+  without nesting) does not list its key as supported, so the flag is refused
+  with an error matching `dal.ErrNotSupported` under REQ:unsupported-options.
+  Being required, a flag passed to `CreateCollection` or an `AlterOp` is refused
+  the same way.
 - `DeleteDependents()` is **reserved**. DALgo has no driver-agnostic
   foreign-key declaration or cascade model today: `dbschema.ConstraintDef`
   carries only `Name` and `Type` and defers "foreign-key target + cascade
   actions" (`dbschema/constraint.go:3-9`), and `dbschema.Referrer`
   (`dbschema/referrer.go`) is read-side introspection through the optional
-  `SchemaReader.ListReferrers`. Every drop helper (`ddl.DropCollection` and
-  `ddl.DropCollectionAt`) MUST refuse `DeleteDependents()`
-  with `*dbschema.NotSupportedError{Reason: "DeleteDependents is reserved"}`.
+  `SchemaReader.ListReferrers`. No driver may list `DeleteDependentsKey` as
+  supported, and every drop helper (`ddl.DropCollection` and
+  `ddl.DropCollectionAt`) MUST refuse it with
+  `*dbschema.NotSupportedError{Reason: "DeleteDependents is reserved"}`.
   A drop that would orphan referencing records refuses with blocker 4.
-- The flags are meaningful on drops only. On `CreateCollection` and on
-  `AlterOp`s they are mismatched options and are silently ignored, per
-  `ddl/options.go:10-16`.
 
-Drivers declare which flags they can execute through `SupportsDrop` (embedded
-in `SchemaModifier`):
+#### REQ: nesting-refused-by-flat-drivers
+
+A driver that does not support nesting MUST itself refuse, on `CreateCollection`
+with a non-empty `Parent` (after `Normalize`) and on `DropCollection` /
+`AlterCollection` with a non-empty `path.Parent`, with
+`*dbschema.NotSupportedError{Op, Backend, Reason: "subcollections are not supported"}`,
+which matches `dal.ErrNotSupported`. It MUST NOT create, drop or alter anything.
+There is no capability method; the `ddl` helpers dispatch valid nested paths to
+every driver, and AC:flat-in-org-drivers-conformance proves each flat driver
+refuses.
+
+### Driver options
+
+#### REQ: option-values
+
+`ddl.Options` MUST gain a generic value carrier with no domain vocabulary. The
+existing `IfNotExists` and `IfExists` fields and the `Option func(*Options)`
+type stay:
 
 ```go
-type DropCapable interface {
-    // SupportsDrop reports whether the driver can execute a drop with every
-    // flag set in flags. It is constant for the lifetime of a DB value.
-    SupportsDrop(flags DropFlags) bool
-}
+// WithValue returns an Option that stores value under key. key MUST be
+// comparable; like a context key, it SHOULD be a value of an unexported type
+// of the package that defines the option. required declares what a driver
+// that does not support the option does: refuse the call (true) or ignore
+// the option (false).
+func WithValue(key, value any, required bool) Option
 
-type DropFlags struct{ DeleteRecords, DeleteNested bool }
+// Value returns the value stored under key by the last WithValue for it.
+func (o Options) Value(key any) (value any, ok bool)
+
+// Unsupported returns the keys of required options that are not in
+// supported, in the order they were first set.
+func (o Options) Unsupported(supported ...any) []any
+
+// RefuseUnsupported returns nil when Unsupported(supported...) is empty, and
+// otherwise *dbschema.NotSupportedError{Op: op, Reason: <the key types>}.
+func RefuseUnsupported(op string, o Options, supported ...any) error
 ```
 
-A driver whose `SupportsSubCollections()` is `false` MUST return `false` for
-`DeleteNested`.
+- `WithValue` MUST panic on a non-comparable key, as `context.WithValue` does.
+- Setting the same key again replaces its value and its `required` flag; the
+  key keeps its first position.
+- The carrier is unexported state of `Options`, so existing keyed literals of
+  `Options` keep compiling.
 
-#### REQ: sub-collections-capability
-
-The `ddl` package MUST export:
-
-```go
-type SubCollectionsAware interface {
-    SupportsSubCollections() bool
-}
-
-func SupportsSubCollections(db dal.DB) bool
-```
-
-`SubCollectionsAware` is embedded in `SchemaModifier`, so every driver answers
-it. The helper MUST resolve `SchemaModifier` with `dal.As` and MUST return
-`false` when the DB does not implement it. The value MUST stay constant for the
-lifetime of a DB value, mirroring `TransactionalDDL` (`ddl/transactional.go:28-42`).
-
-#### REQ: nesting-refused-without-capability
-
-When a `ddl` helper receives, after normalisation, a path with a non-empty
-`Parent`, and `SupportsSubCollections()` is `false`, the helper MUST return
-`*dbschema.NotSupportedError{Op, Backend: <adapter name>, Reason: "driver does not support subcollections"}`
-and MUST NOT invoke the driver. `Op` is `"CreateCollection"`,
-`"DropCollection"` or `"AlterCollection"`.
-
-A driver whose `SupportsSubCollections()` is `false` MUST return the same error
-when it receives a nested definition or path directly.
-
-### Driver extensions
-
-#### REQ: extension-type
-
-The `ddl` package MUST export:
+A driver package defines an option with a key type only it can construct, for
+example:
 
 ```go
-// Extension is a driver-defined creation or modification option.
-// Concrete types live in driver modules, never in dalgo core.
-type Extension interface {
-    // ExtensionTarget returns the stable target ID of the module that
-    // defines the extension type (e.g. dalgo2ingitdb.ExtensionTarget).
-    ExtensionTarget() string
-}
+package dalgo2ingitdb
 
-var ErrInvalidExtension = errors.New("ddl: invalid extension")
-```
+type recordFileKey struct{}
 
-`Extension` is an interface rather than `any`, so an arbitrary value cannot be
-passed by mistake. The target ID identifies the extension's origin in error
-messages and gives drivers a stable key for recognising types.
-
-A target ID is an opaque string that the defining module fixes. It MUST NOT be
-derived from `dal.Adapter.Name()`, and it MUST NOT change across the module's
-major versions: a `/vN` import-path suffix MUST NOT appear in it. The
-recommended value is the module's import path **without** any major-version
-suffix, documented next to the constant as never changing. For example
-`dalgo2ingitdb.ExtensionTarget = "github.com/ingitdb/dalgo2ingitdb"`, which stays
-the same in a future `github.com/ingitdb/dalgo2ingitdb/v2`.
-
-#### REQ: extension-aware-capability
-
-The `ddl` package MUST export:
-
-```go
-type ExtensionAware interface {
-    // SupportsExtension reports whether the driver honours ext for op.
-    // It is consulted for every extension, whatever its target, so a
-    // driver can honour extension types defined by other modules.
-    SupportsExtension(op string, ext Extension) bool
+// WithRecordFile sets the inGitDB record_file of the created collection.
+// Required: a driver that does not support it refuses the call.
+func WithRecordFile(def ingitdb.RecordFileDef) ddl.Option {
+    return ddl.WithValue(recordFileKey{}, def, true)
 }
 ```
 
-`ExtensionAware` is embedded in `SchemaModifier`. `op` is `"CreateCollection"`,
-`"DropCollection"` or `"AlterCollection"`. The result for a given `op` and
-extension type MUST stay constant for the lifetime of a DB value. A driver that
-honours no extensions returns `false` for every call.
+and reads it with `opts.Value(recordFileKey{})`.
 
-A driver MAY honour another module's extension type (for example, a future
-OpenVaultDB driver honouring the inGitDB `record_file` extension) by returning
-`true` for it.
+#### REQ: unsupported-options
 
-#### REQ: with-extension-option
+Every driver method that receives options (`CreateCollection`, `DropCollection`,
+and each `Applier` method for an `AlterOp`) MUST, before changing anything:
 
-`ddl.Options` MUST gain the field `Extensions []Extension`, and the package MUST
-export `func WithExtension(ext Extension) Option`.
+- call `ddl.RefuseUnsupported(op, opts, <the keys it supports for this op>...)`,
+  or perform the equivalent check, and return its error. A required option it
+  does not support, including one from another package, is refused with an
+  error matching `dal.ErrNotSupported`;
+- ignore a hint (non-required) option it does not support.
 
-- Each `WithExtension` MUST append `ext` to `Options.Extensions`, preserving
-  call order across all options passed to `ResolveOptions`. A `nil` `ext` MUST
-  be ignored, the same as a `nil` `Option` in `ResolveOptions`
-  (`ddl/options.go:46-54`).
-- `WithExtension` does not change `IfNotExists` or `IfExists`.
-- When several extensions of one concrete type reach a driver, the driver
-  documents which one wins.
+Each option's documentation MUST state whether it is required or a hint and why.
+A correctness-critical option, such as `dalgo2ingitdb.WithRecordFile`, MUST be
+required; an option whose absence changes only performance or presentation MAY
+be a hint.
 
-#### REQ: extension-addressing
+`IfNotExists` and `IfExists` remain hints under their existing mismatched-option
+rule (`ddl/options.go:10-16`).
 
-For each extension `ext` in the resolved options, the first matching row
-applies:
-
-| # | Case | Result |
-|---|---|---|
-| 1 | `ext.ExtensionTarget() == ""` | refused: `errors.Is(err, ddl.ErrInvalidExtension)` |
-| 2 | `SupportsExtension(op, ext)` is `true` | honoured |
-| 3 | otherwise (unrecognised, whatever its target) | refused: `*dbschema.NotSupportedError` |
-
-Every `*dbschema.NotSupportedError` for an extension MUST have `Reason` naming
-the extension's Go type and its target ID. A refused call MUST NOT perform the
-operation.
-
-Every helper (`ddl.CreateCollection`, `ddl.DropCollection`,
-`ddl.DropCollectionAt`, `ddl.AlterCollection` and `ddl.AlterCollectionAt`) MUST
-apply this table before dispatch. For the two alter helpers, the options are
-the resolved `Options` of each `AlterOp` (REQ:alter-op-options-visible) with
-`op = "AlterCollection"`, and a refused extension on any one op refuses the
-whole call before any op is applied. Every driver MUST apply the same table on
-direct calls, including to the `Options` its `Applier` receives for each
-`AlterOp`.
-
-Justification for having no ignore mode: the existing ignore rule
-(`ddl/options.go:10-16`) covers hints whose meaning is unambiguous, where there
-is nothing to do. An extension the driver does not honour is the opposite: the
-caller asked for a storage property it will not get, and ignoring it produces a
-wrong on-disk layout that is found only later. A consumer that runs one schema
-routine against several kinds of backend already knows which driver it opened,
-so it attaches only the extensions that driver honours. It can check with
-`SupportsExtension` first. An `IgnoreForeignExtensions()` opt-out would buy
-that convenience at the price of reintroducing silent loss, so this Feature
-does not add one.
-
-#### REQ: alter-op-options-visible
-
-The sealed `AlterOp` interface (`ddl/alter_op.go:24-33`) MUST gain an
-unexported method `opts() Options` that returns the op's resolved options.
-Every concrete op already stores them in its `options` field
-(`ddl/alter_op.go:37-40`, `:55-58`, and the four other op types), so each
-implementation returns that field. The method is named `opts`, not `options`,
-because Go forbids a field and a method with the same name on one type.
-`AlterOp` is already sealed by the unexported `alterOp()` marker, so no code
-outside `ddl` implements it.
+Recommendation, over "a driver refuses options it recognises but cannot apply
+and ignores options from other packages": under that rule a driver that has
+never heard of `dalgo2ingitdb.WithRecordFile` ignores it, so a SQL or
+OpenVaultDB driver would silently drop a record layout, which is the defect this
+Feature exists to remove. With the declaration carried by the option, every
+driver, including one written before the option existed, reaches the right
+decision with one generic check and no knowledge of other packages.
 
 #### REQ: guard-precedence
 
@@ -797,35 +774,54 @@ Every `ddl` helper MUST check in this order and return the first failure:
 1. **Path validity.** `CreateCollection`: `c.Normalize()`. String helpers:
    `ParseSchemaPath`. `*At` helpers: `path.Validate()`. Failures are the
    path errors of REQ:path-grammar and REQ:schema-path-type.
-2. **Option validity.** Row 1 of REQ:extension-addressing
-   (`ErrInvalidExtension`), for `opts` or, for Alter, for every `AlterOp` in op
-   order. Then, on drops, a reserved `DeleteDependents()` (REQ:drop-flags).
-3. **Capability.** The DB implements `SchemaModifier`, otherwise the existing
+2. **Reserved and invalid options.** On drops, `DeleteDependents()`, then
+   `DeleteRecords()` or `DeleteNested()` with a path containing a placeholder
+   (`ddl.ErrInvalidOption`) (REQ:drop-flags).
+3. **Interface.** The DB implements `SchemaModifier`, otherwise the existing
    `*dbschema.NotSupportedError` ("driver does not implement
-   ddl.SchemaModifier", `ddl/operations.go:25-31`). Then nesting, per
-   REQ:nesting-refused-without-capability. Then, on drops with `DeleteRecords()`
-   or `DeleteNested()`, `SupportsDrop` with those flags, otherwise
-   `*dbschema.NotSupportedError` naming the flag. Then rows 2-3 of
-   REQ:extension-addressing, which need the driver's `SupportsExtension`.
+   ddl.SchemaModifier", `ddl/operations.go:25-31`).
 
-Data-dependent refusals (`CollectionNotEmptyError`, missing ancestors,
+The helpers perform no other checks: they do not inspect options, nesting
+support or `AlterOp` contents. Unsupported options, nesting refusals and
+data-dependent refusals (`CollectionNotEmptyError`, missing ancestors,
 overlaps) come from the driver after dispatch.
 
 ### Driver obligations
 
 #### REQ: helpers-are-the-guarantee
 
-The `ddl` helpers are the designed entry point. Every **declaration and
-capability** refusal in this Feature (path validity, extensions, reserved or
-unsupported flags, nesting) is enforced by them before dispatch, independent of
-driver quality, so a consumer that calls through them never loses a nesting
-declaration or an extension silently. **Data-dependent** refusals
-(`CollectionNotEmptyError`, a missing ancestor definition, an overlapping
-definition) can only be decided by the driver after dispatch; they bind drivers
-through REQ:in-org-drivers-comply and are verified by each driver's
-conformance ACs. A DB that does not implement `SchemaModifier` gets the
-existing typed `*dbschema.NotSupportedError` from every helper, so nothing is
-skipped silently.
+The `ddl` helpers are the designed entry point for path handling: they refuse
+malformed and record paths, the reserved `DeleteDependents()`, data flags on a
+schema drop, and a DB without
+`SchemaModifier` before dispatch, so nothing is skipped silently at that level.
+Every other refusal (a nested path on a flat driver, an unsupported required
+option, data-dependent refusals) is decided by the driver and verified by the
+shared conformance suite of REQ:shared-conformance-suite.
+
+#### REQ: shared-conformance-suite
+
+`dalgo` MUST ship a test-only package `ddl/ddltest` with
+
+```go
+type Config struct {
+    Nesting       bool // the driver supports subcollections
+    DeleteRecords bool // the driver supports DeleteRecords()
+    DeleteNested  bool // the driver supports DeleteNested(); requires Nesting
+}
+
+func RunConformance(t *testing.T, newDB func(t *testing.T) dal.DB, cfg Config)
+```
+
+`Config` describes what the test expects of the driver under test; it is not an
+API the driver exposes. `RunConformance` MUST cover, by calling the driver's
+methods directly: REQ:nesting-refused-by-flat-drivers when `Nesting` is false;
+REQ:unsupported-options for an unknown required option (refused) and an unknown
+hint (ignored) on `CreateCollection`, `DropCollection` and an `AlterOp`;
+REQ:drop-refuses-data-loss-by-default for an empty and a non-empty collection;
+each drop flag according to `Config`, including an instance drop that leaves
+the definition in place when `Nesting` is true; a data flag on a placeholder
+path refused with `ErrInvalidOption`; and a refused `DeleteDependents()`. Every
+in-org driver MUST run it in CI.
 
 #### REQ: in-org-drivers-comply
 
@@ -833,21 +829,21 @@ Every driver in the founder's organisations (`dal-go`, `ingitdb`, `openvaultdb`,
 `datatug`, `sneat-dev`, `synchestra-io`) that implements `SchemaModifier` MUST
 implement the changed interface and enforce, on direct calls, the driver-side
 MUSTs of REQ:string-and-structured-forms-round-trip, REQ:drop-refuses-data-loss-by-default, REQ:drop-flags,
-REQ:schema-path-scopes,
-REQ:one-collection-per-create, REQ:path-addressed-drop-and-alter,
-REQ:nesting-refused-without-capability and REQ:extension-addressing. There is no
+REQ:schema-path-scopes, REQ:one-collection-per-create,
+REQ:path-addressed-drop-and-alter, REQ:nesting-refused-by-flat-drivers and
+REQ:unsupported-options, and run REQ:shared-conformance-suite. There is no
 legacy exemption. As of 2026-09-17 these are:
 
-| Module | `SchemaModifier` today (origin/main) | Nesting |
-|---|---|---|
-| `dal-go/dalgo2sqlite` | `schema_modifier.go:16`, `:89`, `:106` | `SupportsSubCollections() == false` |
-| `dal-go/dalgo2postgres` | `schema_modifier.go:15`, `:62`, `:75` | `false` |
-| `dal-go/dalgo2mysql` | `schema_modifier.go:27`, `:58`, `:69` | `false` |
-| `ingitdb/dalgo2ingitdb` | `schema_modifier.go:42`, `:102`, `:137` | `true`; its slash parsing is kept but conformed to REQ:path-grammar via `Normalize` (ingitdb/dalgo2ingitdb#16) |
-| `dal-go/dalgo` `mocks/mock_ddl` | generated by MockGen | regenerated with this change |
+| Module | `SchemaModifier` today (origin/main) | Required change | `ddltest.Config` |
+|---|---|---|---|
+| `dal-go/dalgo2sqlite` | `schema_modifier.go:16`, `:89`, `:106` | Adopt the `SchemaPath` signatures; refuse `Parent`; refuse unsupported required options; refuse non-empty drops without `DeleteRecords()` | `{DeleteRecords: true}` |
+| `dal-go/dalgo2postgres` | `schema_modifier.go:15`, `:62`, `:75` | Same as dalgo2sqlite | `{DeleteRecords: true}` |
+| `dal-go/dalgo2mysql` | `schema_modifier.go:27`, `:58`, `:69` | Same as dalgo2sqlite | `{DeleteRecords: true}` |
+| `ingitdb/dalgo2ingitdb` | `schema_modifier.go:42`, `:102`, `:137` | Nesting, scopes, placeholder names, `WithRecordFile`, safe drops of all three kinds; its slash parsing is kept but conformed to REQ:path-grammar via `Normalize` (ingitdb/dalgo2ingitdb#16) | `{Nesting: true, DeleteRecords: true, DeleteNested: true}` |
+| `dal-go/dalgo` `mocks/mock_ddl` | generated by MockGen | Regenerated for the three-method interface | n/a |
 
 `dal-go/record` is not a driver, but it carries the grammar change
-(`EscapeID` extension, new `UnescapeID`, placeholder identifier rule) of
+(`EscapeID` change, new `UnescapeID`, placeholder identifier rule) of
 REQ:path-grammar and REQ:key-constructors-validate. The per-module work is
 tracked on dal-go/dalgo#163.
 
@@ -901,7 +897,7 @@ Already safe, because they use `url.PathUnescape` or their own escaper:
 
 ### AC: malformed-and-record-paths-rejected (verifies REQ:path-grammar, REQ:schema-path-type, REQ:path-addressed-drop-and-alter)
 
-**Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == true` that records every call
+**Given** a stub driver implementing the three `SchemaModifier` methods that records every call
 **When** `ddl.DropCollection(ctx, db, s)` and `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: s})` are called for each `s` in: `"ext/datatug"` and `"projects/{projectID}"` (even count); `""`, `"/"`, `"ext/datatug/"`, `"ext//projects"`, `"ext/{}/projects"`, `"ext/{ext-id}/projects"`, `"ext/{extID/projects"`, `"ext/{id}/projects/{id}/queries"`, `"ext/datatug/proj{ects"`, `"ext/data,tug/projects"` and `"ext/data%tug/projects"` (malformed)
 **Then** every call fails with `errors.Is(err, dbschema.ErrInvalidCollectionPath)`; the even-count cases also satisfy `errors.Is(err, dbschema.ErrRecordPathNotCollection)`; and the stub records no call.
 
@@ -929,88 +925,67 @@ Already safe, because they use `url.PathUnescape` or their own escaper:
 **When** `ddl.CreateCollection` is called with `Parent: []ParentStep{{"..", ID("x")}}, Name: "queries"`, and `ddl.DropCollectionAt` and `ddl.AlterCollectionAt` are called with `SchemaPath{Parent: []ParentStep{{"projects", PathID{}}}, Name: "queries"}` and with the zero `SchemaPath{}`
 **Then** each call returns an error satisfying `errors.Is(err, dbschema.ErrInvalidCollectionPath)` and the stub records no call.
 
-### AC: parent-refused-by-flat-driver (verifies REQ:nesting-refused-without-capability, REQ:sub-collections-capability)
+### AC: helpers-dispatch-nested-paths (verifies REQ:guard-precedence, REQ:string-and-structured-forms-round-trip)
 
-**Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == false`
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "queries", Parent: []dbschema.ParentStep{{"projects", dbschema.Placeholder("projectID")}}})`, `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects"})`, `ddl.DropCollection(ctx, db, "projects/{projectID}/queries")` and `ddl.AlterCollectionAt(ctx, db, dbschema.SchemaPath{Parent: []dbschema.ParentStep{{"ext", dbschema.ID("datatug")}}, Name: "projects"})` are called
-**Then** each returns `*dbschema.NotSupportedError` with `Op` equal to `"CreateCollection"`, `"CreateCollection"`, `"DropCollection"` or `"AlterCollection"` respectively and `errors.Is(err, dal.ErrNotSupported)` true; the stub's `CreateCollection`, `DropCollection` and `AlterCollection` are not invoked; and `ddl.SupportsSubCollections(db)` is `false`.
-
-### AC: parent-dispatched-to-nesting-driver (verifies REQ:nesting-refused-without-capability, REQ:string-and-structured-forms-round-trip)
-
-**Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == true`
-**When** `ddl.CreateCollection` is called with `CollectionDef{Name: "/ext/datatug/projects/{projectID}/queries"}`
-**Then** it returns the stub's result, and the stub receives a `CollectionDef` with `Name == "queries"` and `Parent == []ParentStep{{"ext", ID("datatug")}, {"projects", Placeholder("projectID")}}`.
+**Given** a stub driver implementing only the three `SchemaModifier` methods, which records every call
+**When** `ddl.CreateCollection` is called with `CollectionDef{Name: "/ext/datatug/projects/{projectID}/queries"}` and an option `o := ddl.WithValue(k, 1, true)` for a key `k` the stub does not know
+**Then** the helper returns the stub's result without any check of its own, and the stub receives a `CollectionDef` with `Name == "queries"` and `Parent == []ParentStep{{"ext", ID("datatug")}, {"projects", Placeholder("projectID")}}`, and options whose `Value(k)` is `1`.
 
 ### AC: drop-and-alter-dispatch-paths (verifies REQ:path-addressed-drop-and-alter)
 
-**Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == true`, which records the `path` each method receives
+**Given** the recording stub of AC:helpers-dispatch-nested-paths
 **When** `ddl.DropCollection(ctx, db, "/ext/datatug/projects/{projectID}/environments/{envID}/servers", ddl.IfExists())`, `ddl.AlterCollection(ctx, db, "ext/datatug/projects/{pid}/queries", op)` and `ddl.DropCollection(ctx, db, "users")` are called
 **Then** the stub's `DropCollection` receives `SchemaPath{Parent: [{ext, ID("datatug")}, {projects, Placeholder("projectID")}, {environments, Placeholder("envID")}], Name: "servers"}` with `IfExists` set, then `SchemaPath{Name: "users"}`; and its `AlterCollection` receives a path for which `SameCollection` with `ParseSchemaPath("ext/datatug/projects/{projectID}/queries")` is `true`, with `op`.
 
-### AC: schema-modifier-shape (verifies REQ:path-addressed-drop-and-alter, REQ:sub-collections-capability, REQ:extension-aware-capability)
+### AC: schema-modifier-shape (verifies REQ:path-addressed-drop-and-alter)
 
 **Given** a Go test file declaring `var _ ddl.SchemaModifier = (*stub)(nil)`
-**When** `stub` omits `SupportsSubCollections`, or omits `SupportsExtension`, or declares `DropCollection(ctx, name string, ...)` instead of taking a `dbschema.SchemaPath`
-**Then** the file does not compile; with all methods in the shape of REQ:path-addressed-drop-and-alter it compiles.
+**When** `stub` has exactly `CreateCollection`, `DropCollection` and `AlterCollection` in the shape of REQ:path-addressed-drop-and-alter, and, separately, when `stub` declares `DropCollection(ctx, name string, ...)` instead
+**Then** the first compiles with no further methods, and the second does not compile.
 
 ### AC: no-schema-modifier-is-typed-error (verifies REQ:helpers-are-the-guarantee, REQ:guard-precedence)
 
-**Given** a stub `dal.DB` that does not implement `SchemaModifier` (as for a store whose schema is defined elsewhere), and an extension `ext` with a non-empty target
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/queries"}, ddl.WithExtension(ext))` is called
+**Given** a stub `dal.DB` that does not implement `SchemaModifier` (as for a store whose schema is defined elsewhere)
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/queries"}, ddl.WithValue(k, 1, true))` is called
 **Then** it returns `*dbschema.NotSupportedError` with `Reason` `"driver does not implement ddl.SchemaModifier"`.
 
-### AC: with-extension-accumulates (verifies REQ:with-extension-option, REQ:extension-type)
+### AC: option-values-carried (verifies REQ:option-values)
 
-**Given** two values `e1`, `e2` of test types implementing `ddl.Extension`
-**When** `ddl.ResolveOptions(ddl.WithExtension(e1), ddl.IfNotExists(), ddl.WithExtension(nil), ddl.WithExtension(e2))` is called
-**Then** the result has `Extensions == []ddl.Extension{e1, e2}` in that order, `IfNotExists == true` and `IfExists == false`; and `ddl.ResolveOptions()` has `Extensions == nil`.
+**Given** two key types `k1`, `k2` defined in a test package
+**When** `o := ddl.ResolveOptions(ddl.WithValue(k1{}, "a", true), ddl.IfNotExists(), ddl.WithValue(k2{}, 2, false), ddl.WithValue(k1{}, "b", false))` is evaluated, and `ddl.WithValue([]int{1}, 1, true)` is called
+**Then** `o.Value(k1{})` is `("b", true)`, `o.Value(k2{})` is `(2, true)`, a third key gives `(nil, false)`, `o.IfNotExists` is `true`, `o.Unsupported()` is empty because `k1` was re-set as a hint, and the non-comparable key panics.
 
-### AC: unhonoured-extension-refused (verifies REQ:extension-addressing, REQ:extension-aware-capability)
+### AC: unsupported-required-options-listed (verifies REQ:option-values, REQ:unsupported-options)
 
-**Given** a stub driver implementing `SchemaModifier` whose `SupportsExtension` returns `false` for every extension, an extension `own` with target `"example.com/stubdb"` (the stub module's own constant), and an extension `foreign` with target `"github.com/ingitdb/dalgo2ingitdb"`
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "users"}, ddl.WithExtension(x))` and `ddl.DropCollection(ctx, db, "users", ddl.WithExtension(x))` are called for `x` = `own` and for `x` = `foreign`
-**Then** every call returns `*dbschema.NotSupportedError` whose `Op` is the helper's operation and whose `Reason` names `x`'s Go type and target, and the stub's `CreateCollection` and `DropCollection` are never invoked.
+**Given** `o := ddl.ResolveOptions(ddl.WithValue(k1{}, 1, true), ddl.WithValue(k2{}, 2, true), ddl.WithValue(k3{}, 3, false))`
+**When** `o.Unsupported(k2{})` and `ddl.RefuseUnsupported("CreateCollection", o, k2{})` and `ddl.RefuseUnsupported("CreateCollection", o, k1{}, k2{})` are called
+**Then** the first returns `[]any{k1{}}` (the hint `k3` is not listed); the second returns `*dbschema.NotSupportedError` with `Op == "CreateCollection"`, a `Reason` naming the type of `k1`, and `errors.Is(err, dal.ErrNotSupported)` true; the third returns `nil`.
 
-### AC: honoured-extension-dispatched (verifies REQ:extension-addressing, REQ:extension-aware-capability)
+### AC: guard-order (verifies REQ:guard-precedence, REQ:drop-flags)
 
-**Given** a stub driver whose `SupportsExtension("CreateCollection", ext)` returns `true` for `ext` with target `"example.com/stubdb"`
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "users"}, ddl.WithExtension(ext))` is called
-**Then** the stub's `CreateCollection` is invoked once, and `ddl.ResolveOptions` over the options it receives yields `Extensions == []ddl.Extension{ext}`.
+**Given** a stub `dal.DB` that does not implement `SchemaModifier`
+**When** `ddl.DropCollection` is called with `"ext/datatug"` and `ddl.DeleteDependents()`; then with `"ext/datatug/projects"` and `ddl.DeleteDependents()`; then with `"ext/datatug/projects/{projectID}/queries"` and `ddl.DeleteRecords()`; then with `"ext/datatug/projects/{projectID}/queries"` and `ddl.DeleteNested()`; then with `"ext/datatug/projects/p1/queries"` and `ddl.DeleteRecords()`
+**Then** the calls fail, in order, with `dbschema.ErrRecordPathNotCollection`; `*dbschema.NotSupportedError` with `Reason` `"DeleteDependents is reserved"`; an error satisfying `errors.Is(err, ddl.ErrInvalidOption)` twice; and `*dbschema.NotSupportedError` (driver does not implement `ddl.SchemaModifier`), because a data flag on a fully concrete path is valid.
 
-### AC: cross-module-extension-honoured (verifies REQ:extension-aware-capability, REQ:extension-addressing)
+### AC: flat-in-org-drivers-conformance (verifies REQ:in-org-drivers-comply, REQ:nesting-refused-by-flat-drivers, REQ:unsupported-options, REQ:shared-conformance-suite)
 
-**Given** a stub driver from module `"example.com/vaultstub"` whose `SupportsExtension("CreateCollection", ext)` returns `true` for an extension `ext` with target `"github.com/ingitdb/dalgo2ingitdb"`
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "users"}, ddl.WithExtension(ext))` is called
-**Then** it dispatches to the stub's `CreateCollection`, which receives `ext` in its resolved `Options.Extensions`, and the helper returns no error of its own.
+Driver conformance statement, verified by `ddltest.RunConformance` with the
+`Config` of REQ:in-org-drivers-comply in each SQL driver's suite (`dalgo2sqlite`,
+`dalgo2postgres`, `dalgo2mysql`) once it adopts this Feature.
 
-### AC: extension-without-target-rejected (verifies REQ:extension-addressing)
+**Given** a database value from the driver, with no collections, a required option `req := ddl.WithValue(unknownKey{}, 1, true)` and a hint `hint := ddl.WithValue(hintKey{}, 1, false)`, both from a package the driver does not know
+**When** its methods are called directly (not through `ddl`): `CreateCollection` with `CollectionDef{Name: "ext/datatug/projects"}`; `CreateCollection` with `CollectionDef{Name: "users"}` plus `req`; `CreateCollection` with `CollectionDef{Name: "users"}` plus `hint`; `AlterCollection(ctx, SchemaPath{Name: "users"}, ddl.AddField(f, req))`; `DropCollection(ctx, SchemaPath{Parent: []ParentStep{{"ext", ID("datatug")}}, Name: "projects"})`; and `DropCollection(ctx, SchemaPath{Name: "users"}, ddl.DeleteNested())`
+**Then** the nested create, the nested drop, the create with `req`, the alter with `req` and the drop with `DeleteNested()` each return an error matching `dal.ErrNotSupported` and change nothing; the create with `hint` returns `nil` and creates `users`; and no `projects` or `ext` table exists afterwards.
 
-**Given** an extension whose `ExtensionTarget()` returns `""`, and a stub driver implementing `SchemaModifier` whose `SupportsExtension` returns `true` for everything
-**When** `ddl.CreateCollection` or `ddl.DropCollection` is called with it
-**Then** the helper returns an error satisfying `errors.Is(err, ddl.ErrInvalidExtension)`, and neither `SupportsExtension` nor the stub's operation is invoked.
+### AC: required-option-refused-hint-ignored (verifies REQ:unsupported-options, REQ:shared-conformance-suite)
 
-### AC: alter-op-unhonoured-extension-refused (verifies REQ:alter-op-options-visible, REQ:extension-addressing, REQ:helpers-are-the-guarantee)
+Driver conformance statement for every in-org driver, through `ddltest.RunConformance`.
 
-**Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == true` and `SupportsExtension` returning `false` for every extension, which records every call, and an extension `ext` with target `"github.com/ingitdb/dalgo2ingitdb"`
-**When** `ddl.AlterCollection(ctx, db, "ext/datatug/projects/{projectID}/queries", ddl.AddField(f1), ddl.AddField(f2, ddl.WithExtension(ext)))` and `ddl.AlterCollection(ctx, db, "users", ddl.AddField(f2, ddl.WithExtension(ext)))` are called
-**Then** each returns `*dbschema.NotSupportedError` with `Op == "AlterCollection"` and a `Reason` naming `ext`'s Go type and target, and the stub's `AlterCollection` is never invoked, so `f1` is not applied either.
+**Given** any in-org driver and an empty store
+**When** `DropCollection` is called on an existing empty collection with an unknown required option, and again with an unknown hint
+**Then** the first returns an error matching `dal.ErrNotSupported` and the collection still exists; the second returns `nil` and the collection is dropped.
 
-### AC: guard-order (verifies REQ:guard-precedence)
-
-**Given** a stub `dal.DB` that does not implement `SchemaModifier`, and an extension with target `""`
-**When** `ddl.CreateCollection` is called with `Name: "ext/datatug"` and that extension; then with `Name: "ext/datatug/projects"` and that extension; then with `Name: "ext/datatug/projects"` and no extension
-**Then** the calls fail, in order, with `dbschema.ErrRecordPathNotCollection`, then `ddl.ErrInvalidExtension`, then `*dbschema.NotSupportedError` (driver does not implement `ddl.SchemaModifier`).
-
-### AC: flat-in-org-drivers-refuse-directly (verifies REQ:in-org-drivers-comply, REQ:nesting-refused-without-capability, REQ:extension-addressing)
-
-Driver conformance statement, verified in each driver's own suite
-(`dalgo2sqlite`, `dalgo2postgres`, `dalgo2mysql`) once it adopts this Feature.
-
-**Given** a database value from the driver, with no collections
-**When** its `CreateCollection` method is called directly (not through `ddl`) with `dbschema.CollectionDef{Name: "ext/datatug/projects"}`, with `dbschema.CollectionDef{Name: "ext/datatug"}`, and with `dbschema.CollectionDef{Name: "users"}` plus `ddl.WithExtension(ext)` for an extension `ext` the driver does not honour
-**Then** `SupportsSubCollections()` is `false`; the first and third calls return `*dbschema.NotSupportedError`; the second returns an error satisfying `errors.Is(err, dbschema.ErrRecordPathNotCollection)`; and no `projects`, `ext/datatug` or `users` table exists afterwards.
-
-### AC: dalgo2ingitdb-creates-datatug-queries (verifies REQ:collection-def-parent, REQ:one-collection-per-create, REQ:schema-path-scopes, REQ:string-and-structured-forms-round-trip, REQ:extension-addressing, REQ:in-org-drivers-comply)
+### AC: dalgo2ingitdb-creates-datatug-queries (verifies REQ:collection-def-parent, REQ:one-collection-per-create, REQ:schema-path-scopes, REQ:string-and-structured-forms-round-trip, REQ:unsupported-options, REQ:in-org-drivers-comply)
 
 Consumer conformance statement. The implementation, and the tests that run
 this AC and the three below, belong to
@@ -1018,13 +993,13 @@ this AC and the three below, belong to
 including where the driver stores a scoped definition. This Feature only
 guarantees that the API makes them expressible.
 
-**Given** a `dalgo2ingitdb` database on an empty project directory, which reports `ddl.SupportsSubCollections(db) == true`, and an extension type exported by `dalgo2ingitdb` that carries an `ingitdb.RecordFileDef`, returns `dalgo2ingitdb.ExtensionTarget`, and is honoured by the driver's `SupportsExtension("CreateCollection", ext)`
+**Given** a `dalgo2ingitdb` database on an empty project directory, and the required option `dalgo2ingitdb.WithRecordFile(ingitdb.RecordFileDef)`
 **When** the caller runs, in order,
 `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext", Fields: fx})`,
-`ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects", Fields: f}, ddl.WithExtension(<record file: name '{key}/{key}.datatug-project.json', format json, type map[string]any, records_dir '.'>))`
+`ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects", Fields: f}, dalgo2ingitdb.WithRecordFile(<name '{key}/{key}.datatug-project.json', format json, type map[string]any, records_dir '.'>))`
 and
-`ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/queries", Fields: f}, ddl.WithExtension(<record file: name '{key}/{key}.query.json', format json, type map[string]any, records_dir '.'>))`
-**Then** all three calls return `nil`; no `ext` record with id `datatug` is required or created; the `ext/datatug/projects` and `ext/datatug/projects/{projectID}/queries` definitions are persisted with exactly the `record_file` values of their extensions (`name`, `format: json`, `type: map[string]any`, `records_dir: '.'`) and with their scope `datatug`; no `{key}.yaml` default record file is written for either; a record written at key `ext/datatug/projects/p1/queries/q1` is stored under the `.query.json` layout; the same result is produced when the third call uses `Name: "queries", Parent: []dbschema.ParentStep{{"ext", dbschema.ID("datatug")}, {"projects", dbschema.Placeholder("projectID")}}` instead; and `db.CreateCollection(ctx, dbschema.CollectionDef{Name: "ext/datatug"})` called directly fails with `errors.Is(err, dbschema.ErrRecordPathNotCollection)`.
+`ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/queries", Fields: f}, dalgo2ingitdb.WithRecordFile(<name '{key}/{key}.query.json', format json, type map[string]any, records_dir '.'>))`
+**Then** all three calls return `nil`; no `ext` record with id `datatug` is required or created; the `ext/datatug/projects` and `ext/datatug/projects/{projectID}/queries` definitions are persisted with exactly the `record_file` values of their options (`name`, `format: json`, `type: map[string]any`, `records_dir: '.'`) and with their scope `datatug`; no `{key}.yaml` default record file is written for either; a record written at key `ext/datatug/projects/p1/queries/q1` is stored under the `.query.json` layout; the same result is produced when the third call uses `Name: "queries", Parent: []dbschema.ParentStep{{"ext", dbschema.ID("datatug")}, {"projects", dbschema.Placeholder("projectID")}}` instead; and `db.CreateCollection(ctx, dbschema.CollectionDef{Name: "ext/datatug"})` called directly fails with `errors.Is(err, dbschema.ErrRecordPathNotCollection)`.
 
 ### AC: dalgo2ingitdb-scopes-are-independent (verifies REQ:schema-path-scopes)
 
@@ -1047,7 +1022,7 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 
 **Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with no `ext/datatug/projects/{projectID}/environments` definition
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/environments/{envID}/servers"}, ddl.WithExtension(<record file '{key}/{key}.server.json', json, map[string]any, '.'>))` is called
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/environments/{envID}/servers"}, dalgo2ingitdb.WithRecordFile(<'{key}/{key}.server.json', json, map[string]any, '.'>))` is called
 **Then** it returns a non-nil error, and no `servers` definition is persisted.
 
 ### AC: dalgo2ingitdb-depth-two-created-and-dropped (verifies REQ:one-collection-per-create, REQ:path-addressed-drop-and-alter)
@@ -1055,14 +1030,8 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 
 **Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries with `ext/datatug/projects/{projectID}/dbdrivers` also created (record file `'{key}/{key}.dbdriver.json'`), and no `dbservers` records
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers"}, ddl.WithExtension(<record file '{key}/{key}.dbserver.json', json, map[string]any, '.'>))` is called, followed by `ddl.AlterCollection(ctx, db, "ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers", ddl.AddField(fd))` and `ddl.DropCollection(ctx, db, "/ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers")`
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers"}, dalgo2ingitdb.WithRecordFile(<'{key}/{key}.dbserver.json', json, map[string]any, '.'>))` is called, followed by `ddl.AlterCollection(ctx, db, "ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers", ddl.AddField(fd))` and `ddl.DropCollection(ctx, db, "/ext/datatug/projects/{projectID}/dbdrivers/{dbdriverID}/dbservers")`
 **Then** the create returns `nil` and persists the `dbservers` definition with that `record_file`; the alter returns `nil` and adds the field to that same definition; the drop, given no flags, returns `nil` because `dbservers` has no records and no descendants, and removes that definition while the `dbdrivers` definition remains.
-
-### AC: drop-flags-guarded-by-helpers (verifies REQ:drop-flags, REQ:guard-precedence)
-
-**Given** a stub driver implementing `SchemaModifier` whose `SupportsDrop` returns `false` for `DropFlags{DeleteRecords: true}` and for `DropFlags{DeleteNested: true}`, which records every call
-**When** `ddl.DropCollection(ctx, db, "users", ddl.DeleteRecords())`, `ddl.DropCollection(ctx, db, "users", ddl.DeleteNested())`, `ddl.DropCollection(ctx, db, "users", ddl.DeleteDependents())` and `ddl.DropCollection(ctx, db, "ext/data,tug/projects", ddl.DeleteDependents())` are called
-**Then** the first two return `*dbschema.NotSupportedError` naming the flag; the third returns `*dbschema.NotSupportedError` with `Reason` `"DeleteDependents is reserved"`, even though the stub supports nothing else either; the fourth returns `dbschema.ErrInvalidCollectionPath` (path first); and the stub's `DropCollection` is never invoked. `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "users"}, ddl.DeleteRecords())` dispatches normally.
 
 ### AC: collection-not-empty-error-shape (verifies REQ:drop-refuses-data-loss-by-default)
 
@@ -1078,39 +1047,37 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16, as are the th
 **When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/{projectID}/queries")` is called with no flags, and then `ddl.DropCollection(ctx, db, "users")` for an empty root collection `users` created beforehand
 **Then** both return `nil` and remove only those definitions.
 
-### AC: dalgo2ingitdb-drop-non-empty-refused (verifies REQ:drop-refuses-data-loss-by-default)
+### AC: dalgo2ingitdb-schema-drop-refused-while-any-instance-has-data (verifies REQ:drop-refuses-data-loss-by-default, REQ:drop-flags)
 
-**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with records `ext/datatug/projects/p1` and `ext/datatug/projects/p1/queries/q1`
-**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects")` is called with no flags
-**Then** it returns an error satisfying `errors.Is(err, ddl.ErrCollectionNotEmpty)` whose `*ddl.CollectionNotEmptyError` has `Records >= 1` (or `MoreRecords`) and `SubCollections` containing `ext/datatug/projects/{projectID}/queries`; and every definition and record is still present.
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with records `ext/datatug/projects/p1`, `ext/datatug/projects/p2` and `ext/datatug/projects/p2/queries/q2`
+**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/{projectID}/queries")` is called with no flags, then with `ddl.DeleteRecords()`, and `ddl.DropCollection(ctx, db, "ext/datatug/projects")` is called with no flags
+**Then** the first returns an error satisfying `errors.Is(err, ddl.ErrCollectionNotEmpty)` with `Records >= 1` (or `MoreRecords`), because `p2` still holds a query; the second returns an error satisfying `errors.Is(err, ddl.ErrInvalidOption)`; the third returns `ErrCollectionNotEmpty` with `Records >= 1` (or `MoreRecords`), `NestedRecords >= 1` and `SubCollections` containing `ext/datatug/projects/{projectID}/queries`; and every definition and record is still present.
 
-### AC: dalgo2ingitdb-delete-records-across-parents (verifies REQ:drop-flags, REQ:drop-refuses-data-loss-by-default)
+### AC: dalgo2ingitdb-instance-drop-deletes-one-parents-records (verifies REQ:drop-flags, REQ:drop-refuses-data-loss-by-default)
 
 **Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with records `ext/datatug/projects/p1/queries/q1`, `ext/datatug/projects/p2/queries/q2` and the two project records
-**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/{projectID}/queries")` is called first with no flags and then with `ddl.DeleteRecords()`
-**Then** the first returns `ErrCollectionNotEmpty` with `Records == 2` (or `MoreRecords`) and deletes nothing; the second returns `nil`, removes the `queries` definition and both `q1` and `q2`, and leaves the `p1` and `p2` project records untouched.
+**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/p1/queries")` is called first with no flags and then with `ddl.DeleteRecords()`
+**Then** the first returns `ErrCollectionNotEmpty` with `Records == 1` (or `MoreRecords`) and deletes nothing; the second returns `nil` and deletes `q1` only; `q2`, the `p1` and `p2` project records and the `ext/datatug/projects/{projectID}/queries` definition all remain.
 
-### AC: dalgo2ingitdb-delete-nested-removes-descendants (verifies REQ:drop-flags)
+### AC: dalgo2ingitdb-instance-drop-deletes-one-parents-nested-data (verifies REQ:drop-flags)
 
-**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with `ext/datatug/projects/{projectID}/environments` and `ext/datatug/projects/{projectID}/environments/{envID}/servers` also created, and no records anywhere
-**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/{projectID}/environments")` is called first with no flags and then with `ddl.DeleteNested()`
-**Then** the first returns `ErrCollectionNotEmpty` with `Records == 0` and `SubCollections` containing the `servers` path, and deletes nothing; the second returns `nil` and removes both the `environments` and `servers` definitions, while `queries` and `projects` remain.
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, with `ext/datatug/projects/{projectID}/environments` and `ext/datatug/projects/{projectID}/environments/{envID}/servers` also created, and records `ext/datatug/projects/p1/environments/e1`, `ext/datatug/projects/p1/environments/e1/servers/s1` and `ext/datatug/projects/p2/environments/e2/servers/s2`
+**When** `ddl.DropCollection(ctx, db, "ext/datatug/projects/p1/environments", …)` is called three times: with `ddl.DeleteNested()`, with `ddl.DeleteRecords()`, and with both
+**Then** the first returns `ErrCollectionNotEmpty` with `Records == 1` (or `MoreRecords`), because `e1` would be deleted without `DeleteRecords()`, and deletes nothing; the second returns `ErrCollectionNotEmpty` with `NestedRecords == 1` (or `MoreRecords`), because `s1` would be deleted without `DeleteNested()`, and deletes nothing; the third returns `nil` and deletes `e1` and `s1` only; `e2`, `s2` and both the `environments` and `servers` definitions remain.
 
 ## Architecture
 
 | File | Change |
 |---|---|
-| `github.com/dal-go/record` `key.go` | `EscapeID` also escapes `{` `}` `,` `=`; new `UnescapeID`; constructors and `Key.Validate` apply `ValidateStringID`; the path grammar (segment splitting, parity, id-segment classification, placeholder identifier) is defined here once. |
+| `github.com/dal-go/record` `key.go` | `EscapeID` also escapes `{` `}` `,` `=` `\`; new `UnescapeID`; constructors and `Key.Validate` reject `%` in non-empty ids; `String()` never panics; the path grammar (segment splitting, parity, id-segment classification, placeholder identifier) is defined here once. |
 | `access/resource.go` | Capture names use the `record` placeholder identifier rule. |
 | `dbschema/schema_path.go` | New: `PathID`, `ID`, `Placeholder`, `ParentStep`, `SchemaPath` with `String`, `Validate`, `SameCollection`, `Overlaps`; `ParseSchemaPath` (built on the `record` grammar); the three path errors. |
 | `dbschema/collection_def.go` | Add `Parent []ParentStep`, `SchemaPath()`, `Normalize()`; godoc for nesting, scopes and the two forms. |
-| `ddl/modifier.go` | `SchemaModifier` embeds `SubCollectionsAware` and `ExtensionAware`; `DropCapable`; `DropCollection` and `AlterCollection` take `dbschema.SchemaPath`. |
-| `ddl/options.go` | Add `Options.Extensions`, `WithExtension`, the drop flags and their options; godoc states the strict rule next to the mismatched-option rule. |
-| `ddl/drop.go` | New: `DropCapable`, `DropFlags`, `ErrCollectionNotEmpty`, `CollectionNotEmptyError`. |
-| `ddl/extension.go` | New: `Extension`, `ExtensionAware`, `ErrInvalidExtension`, and the internal addressing check. |
-| `ddl/subcollections.go` | New: `SubCollectionsAware`, `SupportsSubCollections`. |
-| `ddl/alter_op.go` | Sealed `AlterOp` gains unexported `opts() Options`; each of the six op types returns its stored field. |
-| `ddl/operations.go` | All helpers apply REQ:guard-precedence and normalise paths; new `DropCollectionAt` and `AlterCollectionAt`; `DropCollection` / `AlterCollection` parse a schema path string. |
+| `ddl/modifier.go` | `SchemaModifier` keeps three methods; `DropCollection` and `AlterCollection` take `dbschema.SchemaPath`. |
+| `ddl/options.go` | Add the generic value carrier (`WithValue`, `Options.Value`, `Options.Unsupported`, `RefuseUnsupported`) and the drop-flag options and keys; godoc states the required-or-hint rule next to the mismatched-option rule. |
+| `ddl/drop.go` | New: `ErrCollectionNotEmpty`, `ErrInvalidOption`, `CollectionNotEmptyError`. |
+| `ddl/operations.go` | Helpers apply REQ:guard-precedence and normalise paths; new `DropCollectionAt` and `AlterCollectionAt`; `DropCollection` / `AlterCollection` parse a schema path string. |
+| `ddl/ddltest/` | New test-only conformance suite (`Config`, `RunConformance`). |
 | `mocks/mock_ddl/schema_modifier.go` | Regenerated for the changed interface. |
 | `spec/features/ddl/`, `spec/features/ddl/schema-modifier/`, `spec/features/ddl/options/`, `spec/features/dbschema/collection-def/` | Updated to the changed interface once this Feature is Approved. |
 
@@ -1124,23 +1091,24 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16, as are the th
 | Both a slash-path `Name` and a non-empty `Parent` | `dbschema.ErrInvalidCollectionPath`; no dispatch |
 | New definition `Overlaps` an existing one (placeholder versus concrete id at the same position) | driver-specific non-nil error; nothing created |
 | Placeholder name for an existing collection differs from the one a nesting driver stored | `errors.Is(err, dbschema.ErrPlaceholderNameConflict)`; nothing created |
-| Extension with empty target | error, `errors.Is(err, ddl.ErrInvalidExtension)`; no dispatch |
-| Extension the driver does not honour, on any operation or `AlterOp`, whatever its target | `*dbschema.NotSupportedError` naming type and target; no operation performed |
+| Required option the driver does not support, on any operation or `AlterOp`, from any package | error matching `dal.ErrNotSupported` (`*dbschema.NotSupportedError` naming the key type); nothing changed |
+| Hint option the driver does not support | ignored |
 | DB does not implement `SchemaModifier` (for example a store whose schema is defined elsewhere) | existing `*dbschema.NotSupportedError`; no dispatch |
-| Nested path or `Parent`, driver lacks nesting | `*dbschema.NotSupportedError`; no dispatch |
-| Drop would delete records, descendant definitions or orphan referencing records without the matching flag | `*ddl.CollectionNotEmptyError` (`errors.Is(err, ddl.ErrCollectionNotEmpty)`) listing counts and paths; nothing removed |
+| Nested path or `Parent`, driver lacks nesting | driver returns `*dbschema.NotSupportedError` (matches `dal.ErrNotSupported`); nothing changed |
+| Drop would delete records or nested data without the matching flag, any schema drop while an instance holds data, a definition drop with descendant definitions, or a drop that would orphan referencing records | `*ddl.CollectionNotEmptyError` (`errors.Is(err, ddl.ErrCollectionNotEmpty)`) listing counts and paths; nothing removed |
+| `DeleteRecords()` / `DeleteNested()` with a path containing a `{placeholder}` | error satisfying `errors.Is(err, ddl.ErrInvalidOption)`; no dispatch through the helpers |
 | `DeleteDependents()` on any drop | `*dbschema.NotSupportedError` (reserved); no dispatch |
-| `DeleteRecords()` / `DeleteNested()` on a driver whose `SupportsDrop` is `false` for it | `*dbschema.NotSupportedError` naming the flag; no dispatch |
+| `DeleteRecords()` / `DeleteNested()` on a driver that does not support it, or on a non-drop operation | driver returns an error matching `dal.ErrNotSupported`; nothing changed |
 | An ancestor collection definition does not exist (nesting driver) | driver-specific non-nil error; nothing created. A missing scoping parent **record** is not an error. |
-| Honoured extension with an invalid value (e.g. an inGitDB `RecordFileDef` failing `Validate`) | driver-specific error; the surface is supported, the value is not |
+| Supported option with an invalid value (e.g. an inGitDB `RecordFileDef` failing `Validate`) | driver-specific error; the surface is supported, the value is not |
 
 ## Testing Strategy
 
 In-package Go tests in `record`, `dbschema` and `ddl` with stub `dal.DB` values,
 following the existing `ddl/operations_test.go` pattern, plus a compile-shape
 test for `SchemaModifier` and a round-trip test over `ParseSchemaPath` /
-`String`. AC:flat-in-org-drivers-refuse-directly runs in each SQL driver's
-suite, and the three `dalgo2ingitdb-*` ACs in `ingitdb/dalgo2ingitdb`'s suite,
+`String`. `ddl/ddltest.RunConformance` runs in every in-org driver's suite,
+and the `dalgo2ingitdb-*` ACs in `ingitdb/dalgo2ingitdb`'s suite,
 against releases carrying this Feature. No Rehearse stubs: every AC has a
 direct Go test surface.
 
@@ -1159,17 +1127,19 @@ direct Go test surface.
   joined by `/` for other callers. Schema paths use `SchemaPath.String()`.
 - **A `CollectionPath` names-only type.** Superseded by `SchemaPath`, because
   ids in a schema path can be concrete.
-- **Concrete extension types in core.** No `RecordFile`, table options,
+- **Concrete driver options in core.** No `RecordFile`, table options,
   Firestore settings or similar in `ddl` or `dbschema`.
+- **Capability interfaces.** No `SupportsSubCollections`, `SupportsExtension`,
+  `SupportsDrop` or similar; drivers refuse what they cannot do, and the shared
+  conformance suite proves it (founder direction, 2026-09-17).
 - **Implementing module changes in this repo.** The work in
   REQ:in-org-drivers-comply is tracked on dal-go/dalgo#163. dalgo2ingitdb's
-  extension type, target constant, nesting, depth-N ancestor check, path-based
+  `WithRecordFile` option, nesting, depth-N ancestor check, path-based
   Drop/Alter and conforming its slash parsing to the grammar are
   ingitdb/dalgo2ingitdb#16.
 - **A foreign-key and cascade model.** A driver-agnostic declaration of
   references with cascade actions, which `DeleteDependents()` needs, is a later
   Feature. Until then the flag is reserved and refused.
-- **An ignore-foreign-extensions mode.** Rejected in REQ:extension-addressing.
 - **OpenVaultDB-backed stores.** DataTug's remote path does not create its
   schema through DALgo DDL. An OpenVaultDB store's schema, including
   subcollections and per-collection `record_file`, comes from the OpenVaultDB
@@ -1184,13 +1154,12 @@ direct Go test surface.
   declare a database root inside a record. The consumer opens a separate DALgo
   database at that path and creates its collections there.
 - **Mapping nesting onto SQL** (parent-key columns, foreign keys, table naming).
-  SQL drivers report `SupportsSubCollections() == false` until a separate
-  Feature designs it.
+  SQL drivers refuse nested paths until a separate Feature designs it.
 - **Declaring a subcollection tree in one call** (`SubCollections []CollectionDef`),
   rejected in REQ:one-collection-per-create.
 - **Read-side round trip.** `dbschema.DescribeCollection` takes a
   `*dal.CollectionRef` (`dbschema/reader_helpers.go:44`) and does not report
-  `Parent` or extensions in this Feature.
+  `Parent` or driver options in this Feature.
 
 ## Open Questions
 
@@ -1199,11 +1168,16 @@ None. Resolved on 2026-09-17 by founder decision:
 - **Placeholder-name enforcement:** "A". Every nesting driver persists
   placeholder names and refuses a conflicting name (REQ:schema-path-scopes,
   AC:dalgo2ingitdb-placeholder-name-conflict-refused).
-- **Nested drop:** "1-A". Drops refuse data loss by default, with explicit
-  `DeleteRecords()` and `DeleteNested()` flags and a reserved
-  `DeleteDependents()` (REQ:drop-refuses-data-loss-by-default, REQ:drop-flags).
+- **Nested drop:** "1-A", refined: drops refuse data loss by default; a
+  placeholder-path drop is schema-only and never deletes data across parents;
+  `DeleteRecords()` and `DeleteNested()` apply to one instance only; a
+  reserved `DeleteDependents()` (REQ:drop-refuses-data-loss-by-default,
+  REQ:drop-flags).
 - **Schema-path ids:** `{placeholder}` names, with concrete ids for scoped
   definitions such as `ext/datatug/…` (REQ:schema-path-scopes).
+- **Minimal interface:** no capability interfaces; driver-specific settings are
+  functional options, ignored or refused per their declaration
+  (REQ:option-values, REQ:unsupported-options).
 
 ---
 *This document follows the https://specscore.md/feature-specification*
