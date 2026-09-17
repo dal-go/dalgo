@@ -213,13 +213,18 @@ A driver that advertises `SupportsSubCollections() == true` MUST resolve a
 `CollectionPath` to the nested collection that `CreateCollection` created for
 it. Dropping a collection that has subcollections MUST either remove their
 definitions too or return an error; it MUST NOT leave orphaned subcollection
-definitions. For `dalgo2ingitdb`, this resolution is part of the scope of
+definitions. What a nested drop does with the dropped collection's **record
+data** under each parent record is not decided by this Feature (see Open
+Questions). For `dalgo2ingitdb`, this resolution is part of the scope of
 ingitdb/dalgo2ingitdb#16.
 
-The existing `DropCollection` and `AlterCollection` helpers keep their current
-behavior. They perform no nesting guard, so a slash in their `name` stays
-driver-interpreted. Consumers addressing nested collections MUST use the `*At`
-helpers.
+The existing `DropCollection` and `AlterCollection` helpers keep their
+signatures and perform no nesting guard, so a slash in their `name` stays
+driver-interpreted. Their only new behavior is additive: the extension guard of
+REQ:guard-precedence, which runs only when extensions are present (in `opts`
+for `DropCollection`, inside the `AlterOp` values for `AlterCollection`).
+Without extensions they behave exactly as today. Consumers addressing nested
+collections MUST use the `*At` helpers.
 
 #### REQ: sub-collections-capability
 
@@ -277,8 +282,13 @@ var ErrInvalidExtension = errors.New("ddl: invalid extension")
 `Extension` is an interface rather than `any`, so an arbitrary value cannot be
 passed by mistake and every extension carries its addressee. A target ID is an
 opaque string that the defining module fixes. It MUST NOT be derived from
-`dal.Adapter.Name()`. The module's Go import path is the recommended value,
-for example `"github.com/ingitdb/dalgo2ingitdb"`.
+`dal.Adapter.Name()`, and it MUST NOT change across the module's major
+versions: a `/vN` import-path suffix MUST NOT appear in it, so extensions built
+against one major version are not silently turned foreign by the next. The
+recommended value is the module's import path **without** any major-version
+suffix, documented next to the constant as never changing. For example
+`dalgo2ingitdb.ExtensionTarget = "github.com/ingitdb/dalgo2ingitdb"`, which stays
+the same in a future `github.com/ingitdb/dalgo2ingitdb/v2`.
 
 #### REQ: extension-aware-capability
 
@@ -286,18 +296,26 @@ The `ddl` package MUST export:
 
 ```go
 type ExtensionAware interface {
-    // DDLExtensionTarget returns the driver's target ID, the same constant
-    // its own extension types return from ExtensionTarget.
+    // DDLExtensionTarget returns the driver's own target ID, the same
+    // constant its own extension types return from ExtensionTarget.
     DDLExtensionTarget() string
     // SupportsExtension reports whether the driver honours ext for op.
+    // It is consulted for every extension, whatever its target, so a
+    // driver can honour extension types defined by other modules.
     SupportsExtension(op string, ext Extension) bool
 }
 ```
 
 `op` is `"CreateCollection"`, `"DropCollection"` or `"AlterCollection"`. Both
-return values MUST stay constant for the lifetime of a DB value. A driver that
-does not implement `ExtensionAware` has no target ID, so every extension is
-foreign to it.
+return values MUST stay constant for the lifetime of a DB value.
+
+Recognition is decided by `SupportsExtension`, not by target equality. Target
+equality only decides what happens when `SupportsExtension` returns `false`:
+an extension addressed to the driver's own target is refused, and any other is
+foreign. So a driver MAY honour another module's extension type (for example, a
+future OpenVaultDB driver honouring the inGitDB `record_file` extension) by
+returning `true` for it. A driver that does not implement `ExtensionAware`
+recognises nothing and has no target ID, so every extension is foreign to it.
 
 #### REQ: with-extension-option
 
@@ -318,23 +336,38 @@ foreign to it.
 
 Let `T` be the driver's target ID (from `ExtensionAware`), or no target if the
 driver, resolved with `dal.As`, does not implement `ExtensionAware`. For each
-extension `ext` in the resolved options:
+extension `ext` in the resolved options, the first matching row applies:
 
-| Case | Default | Under `StrictExtensions()` |
-|---|---|---|
-| `ext.ExtensionTarget() == ""` | refused: `errors.Is(err, ddl.ErrInvalidExtension)` | same |
-| target differs from `T`, or the driver has no target (foreign) | ignored; passed to the driver unchanged, and the driver MUST ignore it | refused: `*dbschema.NotSupportedError` |
-| target equals `T` and `SupportsExtension(op, ext)` is `true` | honoured | honoured |
-| target equals `T` and `SupportsExtension(op, ext)` is `false` | refused: `*dbschema.NotSupportedError` | same |
+| # | Case | Default | Under `StrictExtensions()` |
+|---|---|---|---|
+| 1 | `ext.ExtensionTarget() == ""` | refused: `errors.Is(err, ddl.ErrInvalidExtension)` | same |
+| 2 | driver implements `ExtensionAware` and `SupportsExtension(op, ext)` is `true`, whatever the target | honoured | honoured |
+| 3 | target equals `T` (not recognised, per row 2) | refused: `*dbschema.NotSupportedError` | same |
+| 4 | any other target, or the driver has no target (foreign) | ignored; passed to the driver unchanged, and the driver MUST ignore it | refused: `*dbschema.NotSupportedError` |
 
 Every `*dbschema.NotSupportedError` for an extension MUST have `Reason` naming
 the extension's Go type and its target ID. A refused call MUST NOT invoke the
 driver's operation.
 
-The `ddl.CreateCollection`, `ddl.DropCollection` and `ddl.DropCollectionAt`
-helpers MUST apply this table before dispatch. A driver that implements
+Every helper (`ddl.CreateCollection`, `ddl.DropCollection`,
+`ddl.DropCollectionAt`, `ddl.AlterCollection` and `ddl.AlterCollectionAt`) MUST
+apply this table before dispatch. For the two alter helpers, `opts` are the
+resolved `Options` of each `AlterOp` (REQ:alter-op-options-visible), with
+`op = "AlterCollection"`, and a strict or refused extension on any one op
+refuses the whole call before any op is applied. A driver that implements
 `ExtensionAware` MUST apply the same table on direct calls, including to the
 `Options` its `Applier` receives for each `AlterOp`.
+
+#### REQ: alter-op-options-visible
+
+The sealed `AlterOp` interface (`ddl/alter_op.go:24-33`) MUST gain an
+unexported method `opts() Options` that returns the op's resolved options.
+Every concrete op already stores them in its `options` field
+(`ddl/alter_op.go:37-40`, `:55-58`, and the four other op types), so each
+implementation returns that field. The method is named `opts`, not `options`,
+because Go forbids a field and a method with the same name on one type. Because the method is unexported and
+`AlterOp` is already sealed by the unexported `alterOp()` marker, no code
+outside `ddl` can implement `AlterOp` today, so no external code breaks.
 
 Justification: the existing ignore rule (`ddl/options.go:10-16`) covers hints
 whose meaning is unambiguous, where there is nothing to do. An addressed
@@ -355,15 +388,15 @@ check in this order and return the first failure:
    `dbschema.ErrInvalidCollectionPath`. With a non-empty `Parent` this also
    rejects a `Name` containing `/`, so the two nesting forms cannot be mixed.
 2. **Extension validity**, per REQ:extension-addressing, including strict mode.
-   It does not apply to `AlterCollectionAt`, whose options live inside
-   `AlterOp` values.
+   For `AlterCollectionAt` it runs over the options of every `AlterOp`, in op
+   order.
 3. **Capability.** The driver implements `SchemaModifier`, otherwise the
    existing `*dbschema.NotSupportedError` ("driver does not implement
    ddl.SchemaModifier", `ddl/operations.go:25-31`). Then nesting, per
    REQ:nesting-refused-without-capability.
 
-`ddl.DropCollection` applies steps 2 and 3 (without nesting); `ddl.AlterCollection`
-applies step 3 only.
+`ddl.DropCollection` and `ddl.AlterCollection` apply steps 2 and 3, without
+the nesting check.
 
 ### Compatibility
 
@@ -383,15 +416,18 @@ REQ:nested-drop-and-alter and REQ:extension-addressing bind only drivers that
 implement the corresponding capability interface.
 
 A driver without `SchemaModifier` at all gets the existing typed error from
-every helper, so nothing is skipped silently. `AlterOp` extensions are the one
-gap the helpers cannot close (see Error Handling).
+every helper, so nothing is skipped silently. Because the helpers see the
+options of every `AlterOp` (REQ:alter-op-options-visible), this guarantee has
+no exception across the five helpers.
 
 #### REQ: additive-compatibility
 
 The change MUST be purely additive:
 
-- `SchemaModifier`, `Applier`, `AlterOp`, `Option`, `IfNotExists`, `IfExists`,
+- `SchemaModifier`, `Applier`, `Option`, `IfNotExists`, `IfExists`,
   `ResolveOptions` and the existing three helpers keep their signatures.
+  `AlterOp` gains only an unexported method, which cannot affect code outside
+  `ddl` because the interface is already sealed.
 - A driver that implements `SchemaModifier` today compiles unchanged and needs
   neither `SubCollectionsAware` nor `ExtensionAware` to compile.
 - A caller that passes no `Parent` and no extensions gets exactly the current
@@ -467,15 +503,27 @@ The change MUST be purely additive:
 
 ### AC: foreign-extension-ignored-by-default (verifies REQ:extension-addressing)
 
-**Given** a stub driver implementing `SchemaModifier` and `ExtensionAware` with target `"example.com/sqlstub"`, and an extension `ext` with target `"github.com/ingitdb/dalgo2ingitdb"`
+**Given** a stub driver implementing `SchemaModifier` and `ExtensionAware` with target `"example.com/sqlstub"` whose `SupportsExtension` returns `false` for every extension, and an extension `ext` with target `"github.com/ingitdb/dalgo2ingitdb"`
 **When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "users"}, ddl.WithExtension(ext))` and `ddl.DropCollection(ctx, db, "users", ddl.WithExtension(ext))` are called
-**Then** both dispatch to the stub, which receives `ext` unchanged in its resolved `Options.Extensions`, `SupportsExtension` is not called, and neither helper returns an error of its own. The same holds for a stub that does not implement `ExtensionAware`.
+**Then** both dispatch to the stub, which receives `ext` unchanged in its resolved `Options.Extensions`, and neither helper returns an error of its own. The same holds for a stub that does not implement `ExtensionAware`.
 
 ### AC: foreign-extension-refused-when-strict (verifies REQ:extension-addressing, REQ:with-extension-option)
 
 **Given** the stubs and `ext` of AC:foreign-extension-ignored-by-default
 **When** the same two helper calls are made with `ddl.StrictExtensions()` added
 **Then** each returns `*dbschema.NotSupportedError` whose `Reason` contains `"github.com/ingitdb/dalgo2ingitdb"` and `ext`'s Go type name, and the stubs' `CreateCollection` and `DropCollection` are not invoked.
+
+### AC: strict-alter-op-foreign-extension-refused (verifies REQ:alter-op-options-visible, REQ:extension-addressing, REQ:helpers-are-the-guarantee)
+
+**Given** a stub driver implementing `SchemaModifier` and `SubCollectionsAware` (returning `true`) but not `ExtensionAware`, which records every call, and an extension `ext` with target `"github.com/ingitdb/dalgo2ingitdb"`
+**When** `ddl.AlterCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "queries"}, ddl.AddField(f1), ddl.AddField(f2, ddl.WithExtension(ext), ddl.StrictExtensions()))` and `ddl.AlterCollection(ctx, db, "users", ddl.AddField(f2, ddl.WithExtension(ext), ddl.StrictExtensions()))` are called
+**Then** each returns `*dbschema.NotSupportedError` with `Op == "AlterCollection"` and a `Reason` naming `ext`'s Go type and target, and the stub's `AlterCollection` is never invoked, so `f1` is not applied either. Without `ddl.StrictExtensions()` on the op, both calls dispatch to the stub.
+
+### AC: cross-module-extension-honoured (verifies REQ:extension-aware-capability, REQ:extension-addressing)
+
+**Given** a stub driver implementing `SchemaModifier` and `ExtensionAware` with target `"example.com/vaultstub"`, whose `SupportsExtension("CreateCollection", ext)` returns `true` for an extension `ext` with target `"github.com/ingitdb/dalgo2ingitdb"`
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "users"}, ddl.WithExtension(ext), ddl.StrictExtensions())` is called
+**Then** it dispatches to the stub's `CreateCollection`, which receives `ext` in its resolved `Options.Extensions`, and the helper returns no error of its own, even though `ext`'s target is not the driver's own.
 
 ### AC: addressed-unrecognised-extension-refused (verifies REQ:extension-addressing, REQ:extension-aware-capability)
 
@@ -535,7 +583,7 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 
 **Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries with `projects` and `projects/dbdrivers` created (record file `'{key}/{key}.dbdriver.json'`)
 **When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "dbservers", Parent: dbschema.CollectionPath{"projects", "dbdrivers"}}, ddl.WithExtension(<record file '{key}/{key}.dbserver.json', json, map[string]any, '.'>), ddl.StrictExtensions())` is called, followed by `ddl.AlterCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "dbdrivers", "dbservers"}, ddl.AddField(fd))` and `ddl.DropCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "dbdrivers", "dbservers"})`
-**Then** the create returns `nil` and writes `projects/.collection/subcollections/dbdrivers/subcollections/dbservers/definition.yaml` with that `record_file`; the alter returns `nil` and adds the field to that same file; the drop returns `nil` and removes that definition while `projects/.collection/subcollections/dbdrivers/definition.yaml` remains.
+**Then** the create returns `nil` and writes `projects/.collection/subcollections/dbdrivers/subcollections/dbservers/definition.yaml` with that `record_file`; the alter returns `nil` and adds the field to that same file; the drop returns `nil` and removes that definition while `projects/.collection/subcollections/dbdrivers/definition.yaml` remains. This AC makes no claim about `dbservers` record data under existing `dbdrivers` records; that waits on the nested-drop Open Question.
 
 ## Architecture
 
@@ -546,7 +594,8 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 | `ddl/options.go` | Add `Options.Extensions`, `Options.StrictExtensions`, `WithExtension`, `StrictExtensions`; extend the godoc with the addressing rule next to the mismatched-option rule. |
 | `ddl/extension.go` | New: `Extension`, `ExtensionAware`, `ErrInvalidExtension`, and the internal addressing check. |
 | `ddl/subcollections.go` | New: `SubCollectionsAware`, `SupportsSubCollections`. |
-| `ddl/operations.go` | `CreateCollection` gains the precedence-ordered guards; `DropCollection` gains the extension guard; new `DropCollectionAt` and `AlterCollectionAt`. `AlterCollection` is unchanged. |
+| `ddl/alter_op.go` | Sealed `AlterOp` gains unexported `opts() Options`; each of the six op types returns its stored field. |
+| `ddl/operations.go` | `CreateCollection` gains the precedence-ordered guards; `DropCollection` and `AlterCollection` gain the extension guard (additive, only when extensions are present); new `DropCollectionAt` and `AlterCollectionAt`. |
 | `spec/features/ddl/options/`, `spec/features/dbschema/collection-def/` | Cross-link to this Feature once it is Approved. |
 
 ## Error Handling and Failure Modes
@@ -562,7 +611,7 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 | Nested path or `Parent`, driver lacks nesting | `*dbschema.NotSupportedError`; no dispatch |
 | An ancestor collection does not exist (nesting driver) | driver-specific non-nil error; nothing created |
 | Recognised extension with an invalid value (e.g. an inGitDB `RecordFileDef` failing `Validate`) | driver-specific error; the surface is supported, the value is not |
-| Extension set on an `AlterOp` (via its constructor's `opts`) | **not guarded by the helpers**, which cannot see `AlterOp` options. A driver implementing `ExtensionAware` applies REQ:extension-addressing. A legacy driver silently drops the extension, even under `StrictExtensions()`. |
+| Extension set on an `AlterOp` (via its constructor's `opts`) | same rows as any other extension; the alter helpers read each op's options and refuse the whole call before any op is applied |
 | Direct driver method call on a legacy driver with `Parent` or extensions | not guarded; the legacy driver may ignore them (REQ:helpers-are-the-guarantee) |
 
 ## Testing Strategy
@@ -602,7 +651,6 @@ AC has a direct Go test surface.
 - **Read-side round trip.** `dbschema.DescribeCollection` takes a
   `*dal.CollectionRef` (`dbschema/reader_helpers.go:44`) and does not report
   `Parent` or extensions in this Feature.
-- **Helper-level extension guard for `AlterOp`s** (see Error Handling).
 - **Changing or deprecating path-form names** (`Name: "spaces/ext"`).
 
 ## Open Questions
@@ -616,6 +664,20 @@ AC has a direct Go test surface.
   default in a future major version of DALgo (dal-go/dalgo v1 or later), with a
   `LenientExtensions()` opt-out for multi-backend schema code? Needs a founder
   decision; this Feature keeps lenient as the default so it stays additive.
+- **Record data on a nested drop.** For a nesting driver, what does
+  `ddl.DropCollectionAt(ctx, db, CollectionPath{"projects", "queries"})` do with
+  existing `queries` records under every `projects` record?
+  - **A.** Delete the definition and the subcollection's record data under every
+    parent record (for inGitDB, every `projects/<id>/queries/` tree).
+  - **B.** Delete only the definition, and refuse with an error while any
+    record of that subcollection exists under any parent record.
+
+  Recommendation: **A**. It matches the root `DropCollection` in dalgo2ingitdb,
+  which removes the whole collection directory, records included
+  (`schema_modifier.go:122-124`), and SQL `DROP TABLE`, so "drop" means the same
+  at every depth. B would make a nested drop the only one that fails on
+  existing data. Needs a founder decision; AC:dalgo2ingitdb-depth-two-created-and-dropped
+  stays neutral until it is made.
 
 ---
 *This document follows the https://specscore.md/feature-specification*
