@@ -11,49 +11,57 @@ status: Draft
 **Owner:** alex
 **Source Ideas:** —
 **Tracking:** [dal-go/dalgo#163](https://github.com/dal-go/dalgo/issues/163)
-**Related Features:** [`ddl`](../ddl/README.md), [`ddl/options`](../ddl/options/README.md), [`dbschema/collection-def`](../dbschema/collection-def/README.md)
+**Related Features:** [`ddl`](../ddl/README.md), [`ddl/options`](../ddl/options/README.md), [`dbschema/collection-def`](../dbschema/collection-def/README.md), [`typed-collection`](../typed-collection/README.md)
 
 ## Summary
 
 Two changes to the schema API, so that a consumer can create nested collections,
 and pass driver-specific storage options for them, through DALgo:
 
-1. **Subcollection declaration.** `dbschema.CollectionDef` gains a `Parent`
-   field of the new type `dbschema.CollectionPath` (ancestor collection names,
-   root first). `Parent` is the **only** nesting form: a collection name that
-   contains a path separator is invalid. A nested collection is created with
-   one `CreateCollection` call per collection, after every ancestor exists.
-   `SchemaModifier.DropCollection` and `AlterCollection` address a collection
-   by `CollectionPath`; new helpers `ddl.DropCollectionAt` and
-   `ddl.AlterCollectionAt` take a path, and the string helpers
-   `ddl.DropCollection` / `ddl.AlterCollection` address root collections only.
-   Every driver states whether it supports nesting through
+1. **Subcollection declaration.** A nested collection is written in either of
+   two equivalent forms that normalise to one internal, structured
+   representation (`Parent` collection names plus their id placeholder names):
+   - **structured:** `CollectionDef{Name: "queries", Parent: CollectionPath{"projects"}, ParentIDNames: []string{"projectID"}}`;
+   - **string:** `"projects/{projectID}/queries"` (or with a leading `/`), in the
+     Firestore-style alternating grammar `collection/id/collection/id/…` that
+     DALgo key paths already use (`record.Key.String()`). An **odd** segment
+     count addresses a collection; an **even** count addresses a record and is
+     rejected wherever a collection is expected.
+
+   Id segments are told apart by their shape: `{name}` is a **placeholder**,
+   valid only in schema paths (a schema declaration is about every parent
+   record); `{field=value,…}` is a **reserved multi-field key**, rejected today
+   with a typed not-supported error; a bare segment is a **concrete id**, valid
+   only in data paths. A nested collection is created with one
+   `CreateCollection` call per collection, after every ancestor exists.
+   `SchemaModifier.DropCollection` and `AlterCollection` take a
+   `CollectionPath`. Every driver states whether it supports nesting through
    `SupportsSubCollections()`, which becomes part of `SchemaModifier`.
 2. **Driver extensions.** `ddl.Options` gains `Extensions []ddl.Extension`, set
    through `ddl.WithExtension(ext)`. Each extension carries a stable target ID,
    a constant exported by the driver module that defines it (for example
-   `dalgo2ingitdb.ExtensionTarget`). Extensions are strict: an extension is
-   honoured only when the driver's `SupportsExtension(op, ext)` returns `true`,
-   and is otherwise refused with `*dbschema.NotSupportedError`. There is no
-   mode that ignores an extension.
+   `dalgo2ingitdb.ExtensionTarget`). Extensions are strict: one is honoured only
+   when the driver's `SupportsExtension(op, ext)` returns `true`, and is
+   otherwise refused with `*dbschema.NotSupportedError`. There is no mode that
+   ignores an extension.
 
 The `ddl` helpers guard every call before dispatch, and every in-org driver
 implementing `SchemaModifier` MUST enforce the same rules on direct calls
 (REQ:in-org-drivers-comply).
 
-DALgo is in private beta, so this Feature changes the `SchemaModifier`
-interface rather than working around it (founder direction, 2026-09-17: "Don't
-worry too much about what already exists, we are still in private beta stage
-and can do changes.").
+DALgo is in private beta, so this Feature changes the `SchemaModifier` interface
+and `record.EscapeID` rather than working around them (founder direction,
+2026-09-17: "Don't worry too much about what already exists, we are still in
+private beta stage and can do changes.").
 
 The concrete scope this Feature unblocks is the DataTug project store's
 collection schema on the local inGitDB path (see REQ:collection-def-parent for
 the list). It does not cover nested database roots or OpenVaultDB-backed stores
 (see Not Doing).
 
-DALgo core stays driver-agnostic: it defines only the slot, the addressing
-rule and the refusals. Concrete extension types, such as an inGitDB
-`record_file`, live in driver modules.
+DALgo core stays driver-agnostic: it defines only the path grammar, the slot,
+the addressing rule and the refusals. Concrete extension types, such as an
+inGitDB `record_file`, live in driver modules.
 
 ## Problem
 
@@ -77,13 +85,29 @@ storage options. In `dal-go/dalgo` v0.80.5:
 - `dbschema/collection_def.go:24-35` `CollectionDef{Name, Fields, PrimaryKey, Indexes}`
   has no parent collection and no subcollections.
 - `SchemaModifier.DropCollection` and `AlterCollection` take a bare
-  `name string` (`ddl/modifier.go`), so a nested collection has no typed
-  address.
+  `name string` (`ddl/modifier.go`), with no defined meaning for a nested
+  collection.
 - `ddl/options.go:10-16` fixes the rule that drivers "MUST silently ignore
   semantically-mismatched options"; nothing says what a driver does with an
   option it cannot honour at all.
 
-The consumer that needs both is `ingitdb/dalgo2ingitdb` (v0.6.1). Its
+DALgo already has a string grammar for **data** paths, but no parser and no
+schema-level form:
+
+- `record.Key.String()` (`github.com/dal-go/record` `key.go:54-70`, v0.1.3 and
+  origin/main) emits `collection/id/collection/id`, root first, with no leading
+  `/`, escaping each id with `record.EscapeID` (`key.go:25-37`: `.` `$` `#` `[`
+  `]` `/` become `%2E` `%24` `%23` `%5B` `%5D` `%2F`). `record.ValidateStringID`
+  (`key.go:43-52`) reserves a literal `%` in string ids.
+- `dal.CollectionRef.Path()` (`dal/q_collection_ref.go:85-90`) emits
+  `parent.String() + "/" + name`: a collection under a concrete parent record,
+  which has an odd segment count.
+- `record.Key.CollectionPath()` (`key.go:72-86`) emits collection names only
+  (`projects/queries`), a different shape that cannot be told apart from a
+  record path.
+- Neither module has a function that parses any of these strings.
+
+The consumer that needs this is `ingitdb/dalgo2ingitdb` (v0.6.1). Its
 `CreateCollection` (`schema_modifier.go:42`) always builds the definition through
 `buildIngitdbCollectionDef` (`schema_modifier.go:388-414`), which sets
 `RecordFile: defaultRecordFile()` (`schema_modifier.go:409`), and
@@ -92,19 +116,18 @@ The consumer that needs both is `ingitdb/dalgo2ingitdb` (v0.6.1). Its
 `format`, `type` or `records_dir` of inGitDB's `RecordFileDef`
 (`ingitdb-go/ingitdb@v0.6.1/record_file_def.go:22-52`).
 
-The driver improvises nesting with a slash in the name (`"spaces/ext"`,
-`schema_modifier.go:48-50`, `createSubCollection` at `:349`), which shows why a
-typed form is needed:
+The driver improvises nesting with names such as `"spaces/ext"`
+(`schema_modifier.go:48-50`, `createSubCollection` at `:349`). That form has an
+even segment count, so under DALgo's key grammar it reads as a record path. It
+also has these defects:
 
-- a driver without nesting cannot tell a nested request from a collection whose
-  name contains a slash;
 - `createSubCollection` checks that only the root exists
   (`schema_modifier.go:350-353`), not intermediate ancestors;
 - `DropCollection` (`schema_modifier.go:107-110`) and `AlterCollection`
   (`schema_modifier.go:141`) look for `<name>/.collection/definition.yaml`,
   while nested definitions live under
   `<root>/.collection/subcollections/<sub>/definition.yaml`, so a nested
-  collection cannot be dropped or altered by its slash name.
+  collection cannot be dropped or altered.
 
 The end user is DataTug's project store (`datatug/datatug` Feature
 `dalgo-project-store`, REQ `canonical-project-layout` and REQ
@@ -119,12 +142,16 @@ fixed at source with no bootstrap workaround
 
 - **Core names the slot, drivers own the vocabulary.** No inGitDB, SQL or
   Firestore term enters `ddl` or `dbschema`.
+- **One path grammar.** Schema paths, collection references and record keys
+  share the alternating `collection/id/…` grammar and escaping of
+  `record.Key.String()`. Segment parity tells a collection from a record.
+- **Two spellings, one representation.** The structured and string forms of a
+  schema path normalise to the same `CollectionPath` before any driver sees
+  them.
 - **No silent loss.** A declaration that the target driver cannot honour
   (a parent on a flat driver, an extension the driver does not honour) is an
   error, never a quiet default. That silent default is the exact defect behind
   dalgo2ingitdb#16.
-- **One way to say it.** Nesting is `Parent` / `CollectionPath` only; a name is
-  always a single segment.
 - **Addressing by compiled constant, not by display name.** Extension targets
   are constants exported by the defining module, never `dal.Adapter.Name()`.
 - **Guard in the helper and in the driver.** The `ddl` helpers refuse before
@@ -132,87 +159,207 @@ fixed at source with no bootstrap workaround
 
 ## Behavior
 
-### Subcollection declaration
+### Path grammar
+
+#### REQ: path-grammar
+
+A DALgo path string MUST follow this grammar, which is the grammar
+`record.Key.String()` already emits, extended only as stated here:
+
+```
+path          = [ "/" ] segment *( "/" segment )   ; no trailing "/", no empty segment
+                                                   ; odd positions (1st, 3rd, …) are collections,
+                                                   ; even positions are ids
+collection    = name
+id            = placeholder / composite-key / concrete-id
+placeholder   = "{" identifier "}"                 ; schema paths only
+identifier    = ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" )
+composite-key = "{" <any text containing "="> "}"  ; reserved, not supported yet
+concrete-id   = <record.EscapeID output>           ; data paths only; never begins with "{"
+```
+
+- **Leading `/`: optional on input, never emitted.** Parsers MUST accept both
+  `projects/{projectID}/queries` and `/projects/{projectID}/queries` as the same
+  path. Every `String()` in this Feature MUST emit the canonical form without
+  the leading `/`, matching `record.Key.String()` and `dal.CollectionRef.Path()`
+  today.
+- **Parity.** A path with an odd segment count addresses a collection; a path
+  with an even count addresses a record. Wherever a collection is expected, an
+  even count MUST fail with an error satisfying both
+  `errors.Is(err, dbschema.ErrInvalidCollectionPath)` and
+  `errors.Is(err, dbschema.ErrRecordPathNotCollection)`.
+- **Collection names** MUST be non-empty, MUST NOT be `.` or `..`, MUST NOT
+  have leading or trailing whitespace, and MUST NOT contain a control character
+  or any of `/` `\` `{` `}` `,` `=` `%`. Names are not escaped.
+- **Id segments are classified by shape, in this order:**
+  1. begins with `{`, ends with `}` and contains `=`: **composite key**. It MUST
+     fail with an error satisfying both
+     `errors.Is(err, dbschema.ErrReservedKeySegment)` and
+     `errors.Is(err, dal.ErrNotSupported)`. This reserves
+     `{field=value,field=value}` (e.g. `/countries/{country=us,state=ca}/cities`)
+     for a future Feature without accepting it today.
+  2. `{identifier}`: **placeholder**.
+  3. any other segment beginning with `{`: malformed, `ErrInvalidCollectionPath`.
+  4. otherwise: **concrete id**, unescaped with `record.UnescapeID` (new). A
+     concrete id containing a raw `{` `}` `,` or `=`, or a `%` not part of a
+     known escape, is malformed.
+- **No mixing.** A schema path MUST NOT contain a concrete id
+  (`dbschema.ErrConcreteIDInSchemaPath`). A data path MUST NOT contain a
+  placeholder; any data-path parser added later MUST reject one with a typed
+  error. Keys built with the `record` constructors cannot contain one, because
+  `record.EscapeID` escapes `{`.
+- **Placeholder names within one path MUST be unique**
+  (`projects/{id}/environments/{id}/servers` is malformed), so every placeholder
+  names exactly one id position.
+- **Escaping.** `record.EscapeID` MUST be extended so that, besides its current
+  characters, `{` `}` `,` `=` become `%7B` `%7D` `%2C` `%3D`. Because
+  `record.ValidateStringID` already reserves a literal `%` in string ids, every
+  escaped id stays unambiguous, and no concrete id can look like a placeholder
+  or a composite key.
+
+The grammar, the segment classification and the escape table MUST be defined
+once, in `github.com/dal-go/record` next to `EscapeID`. `dbschema` MUST
+implement schema-path parsing on top of it rather than with its own splitting
+or escaping rules.
 
 #### REQ: collection-path-type
 
 The `dbschema` package MUST export:
 
 ```go
-// CollectionPath is an ordered list of collection names, root first.
-// It names a collection in the schema, not a record: it carries no record IDs.
+// CollectionPath is the schema address of a collection: its collection names,
+// root first. It carries no record IDs and no placeholder names.
 type CollectionPath []string
 
-func (p CollectionPath) String() string // segments joined with "/", for messages only
 func (p CollectionPath) Validate() error
 
-var ErrInvalidCollectionPath = errors.New("dbschema: invalid collection path")
+// SchemaPath is a parsed schema path: collection names plus the placeholder
+// name of every id position. len(IDNames) == len(Collections)-1.
+type SchemaPath struct {
+    Collections CollectionPath
+    IDNames     []string
+}
+
+func ParseSchemaPath(s string) (SchemaPath, error)
+func (p SchemaPath) String() string // e.g. "projects/{projectID}/queries"
+func (p SchemaPath) Validate() error
+
+var (
+    ErrInvalidCollectionPath   = errors.New("dbschema: invalid collection path")
+    ErrRecordPathNotCollection = errors.New("dbschema: path addresses a record, not a collection")
+    ErrConcreteIDInSchemaPath  = errors.New("dbschema: schema path must use a {placeholder} for every id")
+    ErrReservedKeySegment      = errors.New("dbschema: multi-field key segments are not supported yet")
+)
 ```
 
-`Validate` MUST return an error that satisfies
-`errors.Is(err, dbschema.ErrInvalidCollectionPath)` when any segment is empty,
-is `.` or `..`, contains `/` or `\`, contains a control character, or has
-leading or trailing whitespace. It MUST return `nil` otherwise. An empty
-(`nil` or zero-length) path is valid only as a `Parent`, where it denotes the
-root level; as the address of a collection it is invalid.
+- `CollectionPath.Validate()` MUST check each name against REQ:path-grammar and
+  return an error satisfying `errors.Is(err, ErrInvalidCollectionPath)` on the
+  first violation. An empty path is invalid as a collection address and valid
+  only as a `CollectionDef.Parent`, where it means the root level.
+- `SchemaPath.Validate()` MUST also check `len(IDNames) == len(Collections)-1`,
+  that every id name is an identifier, and that id names are unique.
+- `SchemaPath.String()` MUST interleave names and `{idName}` placeholders:
+  `SchemaPath{Collections: {"projects", "queries"}, IDNames: {"projectID"}}`
+  gives `"projects/{projectID}/queries"`, and a one-collection path gives just
+  the name.
+- `ParseSchemaPath` MUST apply REQ:path-grammar and REQ:schema-paths-use-placeholders,
+  and `ParseSchemaPath(p.String())` MUST equal `p` for every valid `p`.
+- `ErrRecordPathNotCollection` and `ErrConcreteIDInSchemaPath` MUST be returned
+  wrapped so that `errors.Is(err, ErrInvalidCollectionPath)` is also `true`.
 
-`String()` is for display and error messages. It MUST NOT be used as an
-address: no API in `ddl` accepts a `/`-joined string as a nested collection.
+#### REQ: schema-paths-use-placeholders
+
+A schema declaration (`CreateCollection`, `DropCollection`, `AlterCollection`
+and their helpers) is about every parent record, not one. In a schema path
+string, every id segment MUST be a `{placeholder}`. A concrete id
+(`projects/p1/queries`) MUST be rejected with `ErrConcreteIDInSchemaPath`, and a
+composite key with `ErrReservedKeySegment`. A data-level path (a record key, or
+a `dal.CollectionRef` under a concrete parent) carries concrete ids.
+
+This follows the founder decision of 2026-09-17: "DataTug projects keys should
+prefixed by project parent key as we can have multiple projects per store. So
+yes, projects/{projectID}/…".
+
+**Placeholder names are part of the schema, not free-form.** A placeholder
+names the id of the collection it follows, so it MUST be the same wherever that
+collection appears: every path through `projects` uses `{projectID}`. The `ddl`
+helpers cannot see earlier calls, so they check only uniqueness within one
+path. A nesting driver that persists placeholder names MUST refuse a
+declaration whose name for an existing ancestor differs from the stored one.
+Addressing ignores names: `DropCollection` and `AlterCollection` resolve by
+collection names only. Recommendation and rationale: typed-key and code
+generation tooling maps `{projectID}` to one key field of `projects`, so one
+name per collection keeps generated code stable. How drivers without storage
+for names enforce this is under Open Questions.
+
+### Subcollection declaration
 
 #### REQ: collection-def-parent
 
-`dbschema.CollectionDef` MUST gain a field `Parent CollectionPath` and a method
-`Path() CollectionPath` returning a new slice equal to `Parent` followed by
-`Name`. A zero `Parent` means a root collection.
+`dbschema.CollectionDef` MUST gain the fields `Parent CollectionPath` and
+`ParentIDNames []string`, and the methods `Path() CollectionPath` (a new slice
+equal to `Parent` followed by `Name`) and `SchemaPath() SchemaPath`. A zero
+`Parent` means a root collection, with `ParentIDNames` empty. When `Parent` is
+non-empty, `len(ParentIDNames)` MUST equal `len(Parent)`; each entry names the
+id position under the `Parent` collection at the same index.
 
 A non-empty `Parent` declares that the collection is a subcollection nested
 under records of the collection at `Parent`. The declaration is per collection
 shape: every record of the parent collection has the same subcollection schema.
-`Parent` carries collection names only, never record IDs (`projects`, not
-`projects/{id}`).
 
-`CollectionDef{Name: "servers", Parent: CollectionPath{"projects", "environments"}}`
+`CollectionDef{Name: "servers", Parent: CollectionPath{"projects", "environments"}, ParentIDNames: []string{"projectID", "envID"}}`
 declares the collection whose records live at
-`projects/{id}/environments/{id}/servers/{id}`.
+`projects/<project id>/environments/<env id>/servers/<server id>`. Its schema
+path is `projects/{projectID}/environments/{envID}/servers`.
 
-The DataTug collections this makes expressible, all at most three segments
-deep, are: `projects`; `projects/credentials`, `projects/queries`,
-`projects/entities`, `projects/environments`, `projects/dbmodels`,
-`projects/boards`, `projects/recordsets`, `projects/folders`,
-`projects/dbdrivers`; and `projects/environments/servers`,
-`projects/environments/catalogs`, `projects/dbdrivers/dbservers`.
+The DataTug collections this makes expressible, all at most three collections
+deep, are: `projects`; `projects/{projectID}/credentials`,
+`projects/{projectID}/queries`, `projects/{projectID}/entities`,
+`projects/{projectID}/environments`, `projects/{projectID}/dbmodels`,
+`projects/{projectID}/boards`, `projects/{projectID}/recordsets`,
+`projects/{projectID}/folders`, `projects/{projectID}/dbdrivers`; and
+`projects/{projectID}/environments/{envID}/servers`,
+`projects/{projectID}/environments/{envID}/catalogs`,
+`projects/{projectID}/dbdrivers/{dbdriverID}/dbservers`.
 
-#### REQ: parent-is-the-only-nesting-form
+#### REQ: string-and-structured-forms-round-trip
 
-`Parent` MUST be the only way to declare or address a subcollection. A
-`CollectionDef.Name`, or a `name` passed to `ddl.DropCollection` /
-`ddl.AlterCollection`, that is not a single valid path segment (in particular,
-one containing `/`) MUST be rejected with an error satisfying
-`errors.Is(err, dbschema.ErrInvalidCollectionPath)`. This applies whether or
-not `Parent` is set.
+`CollectionDef.Name` MAY hold a schema path string instead of a single name.
+`dbschema.CollectionDef` MUST gain `Normalize() (CollectionDef, error)`:
 
-The slash-name handling in `dalgo2ingitdb` (`schema_modifier.go:48-50` and
-`createSubCollection`) is removed as part of ingitdb/dalgo2ingitdb#16, replaced
-by `Parent`.
+- If `Name` contains no `/` (after an optional leading `/`), `Normalize` returns
+  the definition unchanged, after validating `SchemaPath()`.
+- Otherwise, if `Parent` or `ParentIDNames` is non-empty, it MUST fail with
+  `ErrInvalidCollectionPath`: the two forms MUST NOT be mixed.
+- Otherwise it parses `Name` with `ParseSchemaPath` and returns a copy with
+  `Parent = Collections[:len-1]`, `ParentIDNames = IDNames` and
+  `Name = Collections[len-1]`.
+
+So `CollectionDef{Name: "/projects/{projectID}/queries"}`,
+`CollectionDef{Name: "projects/{projectID}/queries"}` and
+`CollectionDef{Name: "queries", Parent: CollectionPath{"projects"}, ParentIDNames: []string{"projectID"}}`
+all normalise to the last of these, and its `SchemaPath().String()` is
+`"projects/{projectID}/queries"`. The `ddl` helpers MUST normalise before
+dispatch, so a driver always receives the structured form. A driver called
+directly MUST call `Normalize` itself.
 
 #### REQ: one-collection-per-create
 
 Each `CreateCollection` call MUST create exactly one collection, the one named
-by `c.Path()`. A driver whose `SupportsSubCollections()` is `true` MUST return
-a non-nil error, and MUST NOT create anything, when **any** ancestor path
-(`c.Parent[:1]`, `c.Parent[:2]`, and so on up to `c.Parent`) does not exist. It
-MUST NOT create an ancestor implicitly. `IfNotExists` applies to the collection
-at `c.Path()` only.
+by the normalised `c.Path()`. A driver whose `SupportsSubCollections()` is
+`true` MUST return a non-nil error, and MUST NOT create anything, when **any**
+ancestor path (`c.Parent[:1]`, `c.Parent[:2]`, and so on up to `c.Parent`) does
+not exist. It MUST NOT create an ancestor implicitly. `IfNotExists` applies to
+the collection at `c.Path()` only.
 
-Rationale (why `Parent`, not `SubCollections []CollectionDef` or a key-path
-parent): a recursive `SubCollections` tree would force one options set on a
-whole tree, while DataTug needs a different `record_file` per subcollection
-(`.query.json`, `.entity.json`, `.server.json`). It would make `IfNotExists`
-ambiguous on a partly existing tree and make partial failure likely on
-non-transactional drivers. `DropCollection` and `AlterCollection` already
-address one collection at a time. A key-path parent such as `projects/{id}`
-confuses schema with instances: a schema is declared once per collection
-shape, not per parent record.
+Rationale (why a names-only `Parent`, not `SubCollections []CollectionDef` or a
+parent record key): a recursive `SubCollections` tree would force one options
+set on a whole tree, while DataTug needs a different `record_file` per
+subcollection (`.query.json`, `.entity.json`, `.server.json`). It would make
+`IfNotExists` ambiguous on a partly existing tree and make partial failure
+likely on non-transactional drivers. A parent record key confuses schema with
+instances: a schema is declared once per collection shape, not per parent
+record.
 
 #### REQ: path-addressed-drop-and-alter
 
@@ -235,16 +382,18 @@ func DropCollectionAt(ctx context.Context, db dal.DB, path dbschema.CollectionPa
 func AlterCollectionAt(ctx context.Context, db dal.DB, path dbschema.CollectionPath, ops ...AlterOp) error
 ```
 
-and keep `ddl.DropCollection(ctx, db, name string, opts...)` and
-`ddl.AlterCollection(ctx, db, name string, ops...)` for **root collections
-only**: each MUST be exactly `DropCollectionAt` / `AlterCollectionAt` with
-`CollectionPath{name}`, so a `name` that is not a single valid segment is
-rejected per REQ:parent-is-the-only-nesting-form. Nested collections are
-addressed only through the `*At` helpers.
+and keep `ddl.DropCollection(ctx, db, path string, opts...)` and
+`ddl.AlterCollection(ctx, db, path string, ops...)`. Each string helper MUST
+parse its argument with `dbschema.ParseSchemaPath` and then behave exactly as
+the `*At` helper with its `Collections`; placeholder names do not affect
+addressing. `"users"`, `"projects/{projectID}/queries"` and
+`"/projects/{projectID}/queries"` are all valid; `"projects/queries"` is an
+even-count record path and `"projects/p1/queries"` has a concrete id, and both
+are rejected.
 
-A driver whose `SupportsSubCollections()` is `true` MUST resolve a multi-segment
-`path` to the nested collection that `CreateCollection` created for it.
-Dropping a collection that has subcollections MUST either remove their
+A driver whose `SupportsSubCollections()` is `true` MUST resolve a
+multi-segment `path` to the nested collection that `CreateCollection` created
+for it. Dropping a collection that has subcollections MUST either remove their
 definitions too or return an error; it MUST NOT leave orphaned subcollection
 definitions. What a nested drop does with the dropped collection's **record
 data** under each parent record is not decided by this Feature (see Open
@@ -269,15 +418,15 @@ lifetime of a DB value, mirroring `TransactionalDDL` (`ddl/transactional.go:28-4
 
 #### REQ: nesting-refused-without-capability
 
-When `ddl.CreateCollection` receives a non-empty `c.Parent`, or
-`ddl.DropCollectionAt` / `ddl.AlterCollectionAt` receives a path with more than
-one segment, and `SupportsSubCollections()` is `false`, the helper MUST return
+When a `ddl` helper receives, after normalisation, a non-empty `Parent` or a
+path with more than one collection, and `SupportsSubCollections()` is `false`,
+the helper MUST return
 `*dbschema.NotSupportedError{Op, Backend: <adapter name>, Reason: "driver does not support subcollections"}`
 and MUST NOT invoke the driver. `Op` is `"CreateCollection"`,
 `"DropCollection"` or `"AlterCollection"`.
 
 A driver whose `SupportsSubCollections()` is `false` MUST return the same error
-when it receives a non-empty `Parent` or a multi-segment path directly.
+when it receives a nested definition or path directly.
 
 ### Driver extensions
 
@@ -394,10 +543,10 @@ outside `ddl` implements it.
 
 Every `ddl` helper MUST check in this order and return the first failure:
 
-1. **Path validity.** `c.Path().Validate()` for `CreateCollection`, and
-   `path.Validate()` plus a non-empty `path` for Drop and Alter (the string
-   helpers validate `CollectionPath{name}`). On failure:
-   `dbschema.ErrInvalidCollectionPath`.
+1. **Path validity.** `CreateCollection`: `c.Normalize()`. String helpers:
+   `ParseSchemaPath`. `*At` helpers: `path.Validate()`. Failures are the
+   path errors of REQ:path-grammar, REQ:collection-path-type and
+   REQ:schema-paths-use-placeholders.
 2. **Extension validity.** Row 1 of REQ:extension-addressing
    (`ErrInvalidExtension`), for `opts` or, for Alter, for every `AlterOp` in op
    order.
@@ -413,79 +562,99 @@ Every `ddl` helper MUST check in this order and return the first failure:
 
 The `ddl` helpers are the designed entry point. Every refusal in this Feature
 is enforced by them before dispatch, independent of driver quality, so a
-consumer that calls through them never loses a `Parent` or an extension
-silently. A DB that does not implement `SchemaModifier` gets the existing typed
-`*dbschema.NotSupportedError` from every helper, so nothing is skipped
-silently.
+consumer that calls through them never loses a nesting declaration or an
+extension silently. A DB that does not implement `SchemaModifier` gets the
+existing typed `*dbschema.NotSupportedError` from every helper, so nothing is
+skipped silently.
 
 #### REQ: in-org-drivers-comply
 
 Every driver in the `dal-go` and `ingitdb` organisations that implements
 `SchemaModifier` MUST implement the changed interface and enforce, on direct
-calls, the driver-side MUSTs of REQ:parent-is-the-only-nesting-form,
+calls, the driver-side MUSTs of REQ:string-and-structured-forms-round-trip,
 REQ:one-collection-per-create, REQ:path-addressed-drop-and-alter,
 REQ:nesting-refused-without-capability and REQ:extension-addressing. There is no
 legacy exemption. As of 2026-09-17 these are:
 
-| Driver | `SchemaModifier` today (origin/main) | Nesting |
+| Module | `SchemaModifier` today (origin/main) | Nesting |
 |---|---|---|
 | `dal-go/dalgo2sqlite` | `schema_modifier.go:16`, `:89`, `:106` | `SupportsSubCollections() == false` |
 | `dal-go/dalgo2postgres` | `schema_modifier.go:15`, `:62`, `:75` | `false` |
 | `dal-go/dalgo2mysql` | `schema_modifier.go:27`, `:58`, `:69` | `false` |
-| `ingitdb/dalgo2ingitdb` | `schema_modifier.go:42`, `:102`, `:137` | `true` (ingitdb/dalgo2ingitdb#16) |
+| `ingitdb/dalgo2ingitdb` | `schema_modifier.go:42`, `:102`, `:137` | `true`; its slash parsing is kept but conformed to REQ:path-grammar via `Normalize` (ingitdb/dalgo2ingitdb#16) |
 | `dal-go/dalgo` `mocks/mock_ddl` | generated by MockGen | regenerated with this change |
 
-The per-driver work is tracked in one comment on dal-go/dalgo#163.
+`dal-go/record` is not a driver, but it carries the grammar change
+(`EscapeID` extension, new `UnescapeID`) of REQ:path-grammar. The per-module
+work is tracked on dal-go/dalgo#163.
 
 ## Acceptance Criteria
 
 ### AC: root-def-path (verifies REQ:collection-def-parent, REQ:collection-path-type)
 
 **Given** `c := dbschema.CollectionDef{Name: "users"}` with no `Parent`
-**When** `c.Path()` is called
-**Then** `c.Path()` equals `CollectionPath{"users"}`, `c.Parent == nil`, and `c.Path().Validate()` returns `nil`.
+**When** `c.Path()` and `c.SchemaPath().String()` are called
+**Then** `c.Path()` equals `CollectionPath{"users"}`, the string is `"users"`, `c.Parent == nil`, and `c.SchemaPath().Validate()` returns `nil`.
 
 ### AC: nested-def-path (verifies REQ:collection-def-parent, REQ:collection-path-type)
 
-**Given** `c := dbschema.CollectionDef{Name: "servers", Parent: dbschema.CollectionPath{"projects", "environments"}}`
-**When** `c.Path()` is called and the returned slice is then modified
-**Then** `c.Path()` equals `CollectionPath{"projects", "environments", "servers"}`, and modifying the returned slice does not change `c.Parent`.
+**Given** `c := dbschema.CollectionDef{Name: "servers", Parent: dbschema.CollectionPath{"projects", "environments"}, ParentIDNames: []string{"projectID", "envID"}}`
+**When** `c.Path()` and `c.SchemaPath().String()` are called and the returned slice is then modified
+**Then** `c.Path()` equals `CollectionPath{"projects", "environments", "servers"}`, the string is `"projects/{projectID}/environments/{envID}/servers"`, and modifying the returned slice does not change `c.Parent`.
 
-### AC: invalid-path-segments (verifies REQ:collection-path-type)
+### AC: schema-path-round-trip (verifies REQ:collection-path-type, REQ:path-grammar)
 
-**Given** the paths `{"projects", ""}`, `{"projects", "."}`, `{"projects", ".."}`, `{"a/b"}`, `{"a\\b"}`, `{"a\tb"}` and `{" projects"}`
-**When** `Validate()` is called on each
-**Then** each returns an error satisfying `errors.Is(err, dbschema.ErrInvalidCollectionPath)`, and `CollectionPath{"projects", "queries"}.Validate()` returns `nil`.
+**Given** the strings `"users"`, `"/users"`, `"projects/{projectID}/queries"`, `"/projects/{projectID}/queries"` and `"projects/{projectID}/dbdrivers/{dbdriverID}/dbservers"`
+**When** each is passed to `dbschema.ParseSchemaPath`, and the result's `String()` is parsed again
+**Then** they yield `Collections` `{"users"}`, `{"users"}`, `{"projects","queries"}`, `{"projects","queries"}` and `{"projects","dbdrivers","dbservers"}` with `IDNames` `nil`, `nil`, `{"projectID"}`, `{"projectID"}` and `{"projectID","dbdriverID"}`; the canonical strings have no leading `/`; and parsing each canonical string returns an equal `SchemaPath`.
 
-### AC: slash-name-rejected (verifies REQ:parent-is-the-only-nesting-form)
+### AC: forms-normalise-identically (verifies REQ:string-and-structured-forms-round-trip, REQ:collection-def-parent)
+
+**Given** `a := CollectionDef{Name: "queries", Parent: CollectionPath{"projects"}, ParentIDNames: []string{"projectID"}}`, `b := CollectionDef{Name: "projects/{projectID}/queries"}` and `c := CollectionDef{Name: "/projects/{projectID}/queries"}`, each with the same `Fields`
+**When** `Normalize()` is called on each, and on `d := CollectionDef{Name: "{projectID}/queries", Parent: CollectionPath{"projects"}, ParentIDNames: []string{"projectID"}}`, `e := CollectionDef{Name: "projects/{projectID}/queries", Parent: CollectionPath{"x"}, ParentIDNames: []string{"xID"}}` and `f := CollectionDef{Name: "queries", Parent: CollectionPath{"projects"}}`
+**Then** `a`, `b` and `c` normalise to equal definitions with `Name == "queries"`, `Parent == CollectionPath{"projects"}` and `ParentIDNames == []string{"projectID"}`, whose `SchemaPath().String()` is `"projects/{projectID}/queries"`; `d`, `e` and `f` (missing id name) fail with `errors.Is(err, dbschema.ErrInvalidCollectionPath)`.
+
+### AC: malformed-and-record-paths-rejected (verifies REQ:path-grammar, REQ:schema-paths-use-placeholders, REQ:path-addressed-drop-and-alter)
 
 **Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == true` that records every call
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "projects/queries"})`, `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "a/b", Parent: dbschema.CollectionPath{"projects"}})`, `ddl.DropCollection(ctx, db, "projects/queries")` and `ddl.AlterCollection(ctx, db, "projects/queries", op)` are called
-**Then** each returns an error satisfying `errors.Is(err, dbschema.ErrInvalidCollectionPath)` and the stub records no call.
+**When** `ddl.DropCollection(ctx, db, s)` and `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: s})` are called for each `s` in: `"projects/queries"` and `"projects/{projectID}"` (even count); `"projects/p1/queries"` (concrete id); `""`, `"/"`, `"projects/{projectID}/"`, `"projects//queries"`, `"projects/{}/queries"`, `"projects/{project-id}/queries"`, `"projects/{projectID/queries"`, `"projects/{id}/environments/{id}/servers"`, `"projects/{projectID}/que{ries"` and `"proj%ects/{projectID}/queries"` (malformed)
+**Then** every call fails with `errors.Is(err, dbschema.ErrInvalidCollectionPath)`; the even-count cases also satisfy `errors.Is(err, dbschema.ErrRecordPathNotCollection)`; the concrete-id case also satisfies `errors.Is(err, dbschema.ErrConcreteIDInSchemaPath)`; and the stub records no call.
+
+### AC: multi-field-key-segment-reserved (verifies REQ:path-grammar)
+
+**Given** the strings `"countries/{country=us,state=ca}/cities"` and `"/countries/{country=us}/cities"`
+**When** each is passed to `dbschema.ParseSchemaPath`
+**Then** each fails with an error satisfying `errors.Is(err, dbschema.ErrReservedKeySegment)` and `errors.Is(err, dal.ErrNotSupported)`.
+
+### AC: id-escaping-extended (verifies REQ:path-grammar)
+
+**Given** `record.NewKeyWithID("projects", "{a=b,c}")` under the extended `record.EscapeID`
+**When** `String()` is called and its id segment is passed to `record.UnescapeID`
+**Then** the string is `"projects/%7Ba%3Db%2Cc%7D"`, so the id segment is neither a placeholder nor a composite key; `UnescapeID` returns `"{a=b,c}"`; and `record.NewKeyWithID("projects", "a.b").String()` is still `"projects/a%2Eb"`.
 
 ### AC: invalid-path-rejected-before-dispatch (verifies REQ:guard-precedence)
 
-**Given** the recording stub of AC:slash-name-rejected
+**Given** the recording stub of AC:malformed-and-record-paths-rejected
 **When** `ddl.CreateCollection` is called with `Parent{".."}, Name: "queries"`, and `ddl.DropCollectionAt` and `ddl.AlterCollectionAt` are called with `CollectionPath{"projects", ".."}` and with an empty path
 **Then** each call returns an error satisfying `errors.Is(err, dbschema.ErrInvalidCollectionPath)` and the stub records no call.
 
 ### AC: parent-refused-by-flat-driver (verifies REQ:nesting-refused-without-capability, REQ:sub-collections-capability)
 
 **Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == false`
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "queries", Parent: dbschema.CollectionPath{"projects"}})`, `ddl.DropCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "queries"})` and `ddl.AlterCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "queries"})` are called
-**Then** each returns `*dbschema.NotSupportedError` with `Op` equal to `"CreateCollection"`, `"DropCollection"` or `"AlterCollection"` respectively and `errors.Is(err, dal.ErrNotSupported)` true; the stub's `CreateCollection`, `DropCollection` and `AlterCollection` are not invoked; and `ddl.SupportsSubCollections(db)` is `false`.
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "queries", Parent: dbschema.CollectionPath{"projects"}, ParentIDNames: []string{"projectID"}})`, `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "projects/{projectID}/queries"})`, `ddl.DropCollection(ctx, db, "projects/{projectID}/queries")` and `ddl.AlterCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "queries"})` are called
+**Then** each returns `*dbschema.NotSupportedError` with `Op` equal to `"CreateCollection"`, `"CreateCollection"`, `"DropCollection"` or `"AlterCollection"` respectively and `errors.Is(err, dal.ErrNotSupported)` true; the stub's `CreateCollection`, `DropCollection` and `AlterCollection` are not invoked; and `ddl.SupportsSubCollections(db)` is `false`.
 
-### AC: parent-dispatched-to-nesting-driver (verifies REQ:nesting-refused-without-capability, REQ:sub-collections-capability)
+### AC: parent-dispatched-to-nesting-driver (verifies REQ:nesting-refused-without-capability, REQ:string-and-structured-forms-round-trip)
 
 **Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == true`
-**When** `ddl.CreateCollection` is called with `Name: "queries", Parent: CollectionPath{"projects"}`
-**Then** it returns the stub's result, the stub receives the `CollectionDef` with the same `Name` and `Parent`, and `ddl.SupportsSubCollections(db)` is `true`.
+**When** `ddl.CreateCollection` is called with `CollectionDef{Name: "/projects/{projectID}/queries"}`
+**Then** it returns the stub's result, and the stub receives a `CollectionDef` with `Name == "queries"`, `Parent == CollectionPath{"projects"}` and `ParentIDNames == []string{"projectID"}`.
 
 ### AC: drop-and-alter-dispatch-paths (verifies REQ:path-addressed-drop-and-alter)
 
 **Given** a stub driver implementing `SchemaModifier` with `SupportsSubCollections() == true`, which records the `path` each method receives
-**When** `ddl.DropCollectionAt(ctx, db, CollectionPath{"projects", "environments", "servers"}, ddl.IfExists())`, `ddl.AlterCollectionAt(ctx, db, CollectionPath{"projects", "queries"}, op)`, `ddl.DropCollection(ctx, db, "users")` and `ddl.AlterCollection(ctx, db, "users", op)` are called
-**Then** the stub's `DropCollection` receives `CollectionPath{"projects", "environments", "servers"}` with `IfExists` set and then `CollectionPath{"users"}`, and its `AlterCollection` receives `CollectionPath{"projects", "queries"}` and then `CollectionPath{"users"}`, each with `op`.
+**When** `ddl.DropCollectionAt(ctx, db, CollectionPath{"projects", "environments", "servers"}, ddl.IfExists())`, `ddl.DropCollection(ctx, db, "/projects/{projectID}/environments/{envID}/servers")`, `ddl.AlterCollection(ctx, db, "projects/{pid}/queries", op)` and `ddl.DropCollection(ctx, db, "users")` are called
+**Then** the stub's `DropCollection` receives `CollectionPath{"projects", "environments", "servers"}` twice (the first with `IfExists` set) and then `CollectionPath{"users"}`, and its `AlterCollection` receives `CollectionPath{"projects", "queries"}` with `op` (placeholder names do not affect addressing).
 
 ### AC: schema-modifier-shape (verifies REQ:path-addressed-drop-and-alter, REQ:sub-collections-capability, REQ:extension-aware-capability)
 
@@ -496,7 +665,7 @@ The per-driver work is tracked in one comment on dal-go/dalgo#163.
 ### AC: no-schema-modifier-is-typed-error (verifies REQ:helpers-are-the-guarantee, REQ:guard-precedence)
 
 **Given** a stub `dal.DB` that does not implement `SchemaModifier` (as for a store whose schema is defined elsewhere), and an extension `ext` with a non-empty target
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "queries", Parent: dbschema.CollectionPath{"projects"}}, ddl.WithExtension(ext))` is called
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "projects/{projectID}/queries"}, ddl.WithExtension(ext))` is called
 **Then** it returns `*dbschema.NotSupportedError` with `Reason` `"driver does not implement ddl.SchemaModifier"`.
 
 ### AC: with-extension-accumulates (verifies REQ:with-extension-option, REQ:extension-type)
@@ -538,8 +707,8 @@ The per-driver work is tracked in one comment on dal-go/dalgo#163.
 ### AC: guard-order (verifies REQ:guard-precedence)
 
 **Given** a stub `dal.DB` that does not implement `SchemaModifier`, and an extension with target `""`
-**When** `ddl.CreateCollection` is called with `Parent{".."}, Name: "q"` and that extension; then with `Parent{"projects"}, Name: "q"` and that extension; then with `Parent{"projects"}, Name: "q"` and no extension
-**Then** the calls fail, in order, with `dbschema.ErrInvalidCollectionPath`, then `ddl.ErrInvalidExtension`, then `*dbschema.NotSupportedError` (driver does not implement `ddl.SchemaModifier`).
+**When** `ddl.CreateCollection` is called with `Name: "projects/q"` and that extension; then with `Name: "projects/{projectID}/q"` and that extension; then with `Name: "projects/{projectID}/q"` and no extension
+**Then** the calls fail, in order, with `dbschema.ErrRecordPathNotCollection`, then `ddl.ErrInvalidExtension`, then `*dbschema.NotSupportedError` (driver does not implement `ddl.SchemaModifier`).
 
 ### AC: flat-in-org-drivers-refuse-directly (verifies REQ:in-org-drivers-comply, REQ:nesting-refused-without-capability, REQ:extension-addressing)
 
@@ -547,10 +716,10 @@ Driver conformance statement, verified in each driver's own suite
 (`dalgo2sqlite`, `dalgo2postgres`, `dalgo2mysql`) once it adopts this Feature.
 
 **Given** a database value from the driver, with no collections
-**When** its `CreateCollection` method is called directly (not through `ddl`) with `dbschema.CollectionDef{Name: "queries", Parent: dbschema.CollectionPath{"projects"}}`, and again with `dbschema.CollectionDef{Name: "users"}` plus `ddl.WithExtension(ext)` for an extension `ext` the driver does not honour
-**Then** `SupportsSubCollections()` is `false`; both calls return `*dbschema.NotSupportedError`; and no `queries` or `users` table exists afterwards.
+**When** its `CreateCollection` method is called directly (not through `ddl`) with `dbschema.CollectionDef{Name: "projects/{projectID}/queries"}`, with `dbschema.CollectionDef{Name: "projects/queries"}`, and with `dbschema.CollectionDef{Name: "users"}` plus `ddl.WithExtension(ext)` for an extension `ext` the driver does not honour
+**Then** `SupportsSubCollections()` is `false`; the first and third calls return `*dbschema.NotSupportedError`; the second returns an error satisfying `errors.Is(err, dbschema.ErrRecordPathNotCollection)`; and no `queries`, `projects/queries` or `users` table exists afterwards.
 
-### AC: dalgo2ingitdb-creates-datatug-queries (verifies REQ:collection-def-parent, REQ:one-collection-per-create, REQ:extension-addressing, REQ:in-org-drivers-comply)
+### AC: dalgo2ingitdb-creates-datatug-queries (verifies REQ:collection-def-parent, REQ:one-collection-per-create, REQ:string-and-structured-forms-round-trip, REQ:extension-addressing, REQ:in-org-drivers-comply)
 
 Consumer conformance statement. The implementation, and the test that runs
 this AC and the two below, belong to
@@ -561,37 +730,38 @@ This Feature only guarantees that the API makes them expressible.
 **When** the caller runs
 `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "projects", Fields: f}, ddl.WithExtension(<record file: name '{key}/{key}.datatug-project.json', format json, type map[string]any, records_dir '.'>))`
 and then
-`ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "queries", Parent: dbschema.CollectionPath{"projects"}, Fields: f}, ddl.WithExtension(<record file: name '{key}/{key}.query.json', format json, type map[string]any, records_dir '.'>))`
-**Then** both calls return `nil`; `projects/.collection/definition.yaml` has `record_file` equal to the first extension's values; `projects/.collection/subcollections/queries/definition.yaml` exists and its `record_file` is exactly `name: '{key}/{key}.query.json'`, `format: json`, `type: map[string]any`, `records_dir: '.'`; no `{key}.yaml` default record file is written for either collection; creating `queries` before `projects` exists returns a non-nil error and writes nothing; and `db.CreateCollection(ctx, dbschema.CollectionDef{Name: "projects/queries"})` called directly returns an error satisfying `errors.Is(err, dbschema.ErrInvalidCollectionPath)`.
+`ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "projects/{projectID}/queries", Fields: f}, ddl.WithExtension(<record file: name '{key}/{key}.query.json', format json, type map[string]any, records_dir '.'>))`
+**Then** both calls return `nil`; `projects/.collection/definition.yaml` has `record_file` equal to the first extension's values; `projects/.collection/subcollections/queries/definition.yaml` exists and its `record_file` is exactly `name: '{key}/{key}.query.json'`, `format: json`, `type: map[string]any`, `records_dir: '.'`; no `{key}.yaml` default record file is written for either collection; creating `queries` before `projects` exists returns a non-nil error and writes nothing; the same result is produced when the second call uses `Name: "/projects/{projectID}/queries"` or `Name: "queries", Parent: dbschema.CollectionPath{"projects"}, ParentIDNames: []string{"projectID"}` instead; and `db.CreateCollection(ctx, dbschema.CollectionDef{Name: "projects/queries"})` called directly fails with `errors.Is(err, dbschema.ErrRecordPathNotCollection)`.
 
 ### AC: dalgo2ingitdb-depth-two-ancestor-required (verifies REQ:one-collection-per-create)
 
 Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 
-**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries after `projects` is created, and no `projects/environments` collection
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "servers", Parent: dbschema.CollectionPath{"projects", "environments"}}, ddl.WithExtension(<record file '{key}/{key}.server.json', json, map[string]any, '.'>))` is called
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries after `projects` is created, and no `projects/{projectID}/environments` collection
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "projects/{projectID}/environments/{envID}/servers"}, ddl.WithExtension(<record file '{key}/{key}.server.json', json, map[string]any, '.'>))` is called
 **Then** it returns a non-nil error, and no `servers` definition exists anywhere under `projects/`.
 
 ### AC: dalgo2ingitdb-depth-two-created-and-dropped (verifies REQ:one-collection-per-create, REQ:path-addressed-drop-and-alter)
 
 Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 
-**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries with `projects` and `projects/dbdrivers` created (record file `'{key}/{key}.dbdriver.json'`), and no `dbservers` records
-**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "dbservers", Parent: dbschema.CollectionPath{"projects", "dbdrivers"}}, ddl.WithExtension(<record file '{key}/{key}.dbserver.json', json, map[string]any, '.'>))` is called, followed by `ddl.AlterCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "dbdrivers", "dbservers"}, ddl.AddField(fd))` and `ddl.DropCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "dbdrivers", "dbservers"})`
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries with `projects` and `projects/{projectID}/dbdrivers` created (record file `'{key}/{key}.dbdriver.json'`), and no `dbservers` records
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "projects/{projectID}/dbdrivers/{dbdriverID}/dbservers"}, ddl.WithExtension(<record file '{key}/{key}.dbserver.json', json, map[string]any, '.'>))` is called, followed by `ddl.AlterCollection(ctx, db, "projects/{projectID}/dbdrivers/{dbdriverID}/dbservers", ddl.AddField(fd))` and `ddl.DropCollectionAt(ctx, db, dbschema.CollectionPath{"projects", "dbdrivers", "dbservers"})`
 **Then** the create returns `nil` and writes `projects/.collection/subcollections/dbdrivers/subcollections/dbservers/definition.yaml` with that `record_file`; the alter returns `nil` and adds the field to that same file; the drop returns `nil` and removes that definition while `projects/.collection/subcollections/dbdrivers/definition.yaml` remains. This AC deliberately has no `dbservers` records and makes no claim about record data, which waits on the nested-drop Open Question.
 
 ## Architecture
 
 | File | Change |
 |---|---|
-| `dbschema/collection_path.go` | New: `CollectionPath`, `String`, `Validate`, `ErrInvalidCollectionPath`. |
-| `dbschema/collection_def.go` | Add `Parent CollectionPath` and `Path()`; godoc for the nesting meaning. |
+| `github.com/dal-go/record` `key.go` | `EscapeID` also escapes `{` `}` `,` `=`; new `UnescapeID`; the path grammar (segment splitting, parity, id-segment classification) is defined here once. |
+| `dbschema/collection_path.go` | New: `CollectionPath`, `SchemaPath`, `ParseSchemaPath` (built on the `record` grammar), and the four path errors. |
+| `dbschema/collection_def.go` | Add `Parent`, `ParentIDNames`, `Path()`, `SchemaPath()`, `Normalize()`; godoc for the nesting meaning and the two forms. |
 | `ddl/modifier.go` | `SchemaModifier` embeds `SubCollectionsAware` and `ExtensionAware`; `DropCollection` and `AlterCollection` take `dbschema.CollectionPath`. |
 | `ddl/options.go` | Add `Options.Extensions` and `WithExtension`; godoc states the strict rule next to the mismatched-option rule. |
 | `ddl/extension.go` | New: `Extension`, `ExtensionAware`, `ErrInvalidExtension`, and the internal addressing check. |
 | `ddl/subcollections.go` | New: `SubCollectionsAware`, `SupportsSubCollections`. |
 | `ddl/alter_op.go` | Sealed `AlterOp` gains unexported `opts() Options`; each of the six op types returns its stored field. |
-| `ddl/operations.go` | All helpers apply REQ:guard-precedence; new `DropCollectionAt` and `AlterCollectionAt`; `DropCollection` / `AlterCollection` become root-only wrappers over them. |
+| `ddl/operations.go` | All helpers apply REQ:guard-precedence and normalise paths; new `DropCollectionAt` and `AlterCollectionAt`; `DropCollection` / `AlterCollection` parse a schema path string. |
 | `mocks/mock_ddl/schema_modifier.go` | Regenerated for the changed interface. |
 | `spec/features/ddl/`, `spec/features/ddl/schema-modifier/`, `spec/features/ddl/options/`, `spec/features/dbschema/collection-def/` | Updated to the changed interface once this Feature is Approved. |
 
@@ -599,7 +769,12 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 
 | Failure mode | Result |
 |---|---|
-| Invalid path segment (empty, `.`, `..`, `/`, `\`, control character, whitespace), including a slash in `Name` | error, `errors.Is(err, dbschema.ErrInvalidCollectionPath)`; no dispatch |
+| Malformed path (empty segment, trailing `/`, forbidden character in a name, bad escape in an id, malformed or duplicate `{placeholder}`, missing id name in structured form) | error, `errors.Is(err, dbschema.ErrInvalidCollectionPath)`; no dispatch |
+| Even segment count where a collection is expected | also `errors.Is(err, dbschema.ErrRecordPathNotCollection)`; no dispatch |
+| Concrete id in a schema path | also `errors.Is(err, dbschema.ErrConcreteIDInSchemaPath)`; no dispatch |
+| Composite key segment `{field=value,…}` | `errors.Is(err, dbschema.ErrReservedKeySegment)` and `errors.Is(err, dal.ErrNotSupported)`; no dispatch |
+| Both a slash-path `Name` and a non-empty `Parent` / `ParentIDNames` | `dbschema.ErrInvalidCollectionPath`; no dispatch |
+| Placeholder name for an existing ancestor differs from the one a nesting driver stored | driver-specific non-nil error; nothing created |
 | Extension with empty target | error, `errors.Is(err, ddl.ErrInvalidExtension)`; no dispatch |
 | Extension the driver does not honour, on any operation or `AlterOp`, whatever its target | `*dbschema.NotSupportedError` naming type and target; no operation performed |
 | DB does not implement `SchemaModifier` (for example a store whose schema is defined elsewhere) | existing `*dbschema.NotSupportedError`; no dispatch |
@@ -609,21 +784,31 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 
 ## Testing Strategy
 
-In-package Go tests in `dbschema` and `ddl` with stub `dal.DB` values, following
-the existing `ddl/operations_test.go` pattern, plus a compile-shape test for
-`SchemaModifier`. AC:flat-in-org-drivers-refuse-directly runs in each SQL
-driver's suite, and the three `dalgo2ingitdb-*` ACs in `ingitdb/dalgo2ingitdb`'s
-suite, against a DALgo release carrying this Feature. No Rehearse stubs: every
-AC has a direct Go test surface.
+In-package Go tests in `record`, `dbschema` and `ddl` with stub `dal.DB` values,
+following the existing `ddl/operations_test.go` pattern, plus a compile-shape
+test for `SchemaModifier` and a round-trip test over `ParseSchemaPath` /
+`String`. AC:flat-in-org-drivers-refuse-directly runs in each SQL driver's
+suite, and the three `dalgo2ingitdb-*` ACs in `ingitdb/dalgo2ingitdb`'s suite,
+against releases carrying this Feature. No Rehearse stubs: every AC has a
+direct Go test surface.
 
 ## Not Doing / Out of Scope
 
+- **Multi-field keys (future work).** The id-segment syntax
+  `{field=value,field=value}` (e.g. `/countries/{country=us,state=ca}/…`) is
+  reserved by REQ:path-grammar and rejected as not supported. Parsing it into
+  `record.FieldVal` keys, and escaping inside braces, is a later Feature.
+- **Parsing record keys from strings.** This Feature parses schema paths only.
+  A `record.ParseKey` for data paths is a later addition. It MUST use the same
+  grammar from REQ:path-grammar and reject placeholders.
+- **Changing `record.Key.CollectionPath()`**, which emits collection names
+  joined by `/` for other callers. Schema paths use `SchemaPath.String()`.
 - **Concrete extension types in core.** No `RecordFile`, table options,
   Firestore settings or similar in `ddl` or `dbschema`.
-- **Implementing driver changes in this repo.** The driver work in
+- **Implementing module changes in this repo.** The work in
   REQ:in-org-drivers-comply is tracked on dal-go/dalgo#163. dalgo2ingitdb's
   extension type, target constant, nesting, depth-N ancestor check, path-based
-  Drop/Alter and removal of its slash-name handling are
+  Drop/Alter and conforming its slash parsing to the grammar are
   ingitdb/dalgo2ingitdb#16.
 - **An ignore-foreign-extensions mode.** Rejected in REQ:extension-addressing.
 - **OpenVaultDB-backed stores.** DataTug's remote path does not create its
@@ -636,7 +821,7 @@ AC has a direct Go test surface.
   nothing is skipped silently.
 - **Nested database roots.** DataTug keeps each project's user data as a
   separate inGitDB database root at `projects/<id>/data/ingitdb/`, with `.ingr`
-  datasets. `Parent` declares a subcollection inside one database; it cannot
+  datasets. A subcollection lives inside one database; a schema path cannot
   declare a database root inside a record. The consumer opens a separate DALgo
   database at that path and creates its collections there.
 - **Mapping nesting onto SQL** (parent-key columns, foreign keys, table naming).
@@ -650,9 +835,23 @@ AC has a direct Go test surface.
 
 ## Open Questions
 
+- **Enforcing one placeholder name per collection.** REQ:schema-paths-use-placeholders
+  requires the same name wherever a collection appears (e.g. always
+  `{projectID}` under `projects`). A nesting driver that persists names refuses
+  a conflict. Should a driver that has nowhere to store names (a future flat or
+  remote driver) be required to add storage for them, or may it skip the
+  cross-call check?
+  - **A.** Required: every nesting driver persists placeholder names and
+    refuses conflicts.
+  - **B.** Optional: drivers without name storage skip the cross-call check;
+    the `ddl` helpers still enforce uniqueness within one path.
+
+  Recommendation: **A**, because code generation and typed keys depend on the
+  names being stable per collection. For inGitDB this is one extra field in
+  `definition.yaml`. Needs a founder decision.
 - **Record data on a nested drop.** For a nesting driver, what does
-  `ddl.DropCollectionAt(ctx, db, CollectionPath{"projects", "queries"})` do with
-  existing `queries` records under the `projects` records?
+  `ddl.DropCollection(ctx, db, "projects/{projectID}/queries")` do with existing `queries`
+  records under the `projects` records?
   - **A.** Delete the definition and the subcollection's records under every
     parent record (for inGitDB, every `projects/<id>/queries/` tree), the same
     as a root drop.
