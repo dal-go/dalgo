@@ -35,7 +35,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [dalgo2namecheap: NameCheap API Adapter](dalgo2namecheap-namecheap-api-adapter/README.md) | Approved | — |
 | [Hierarchical access and audit policies](access-policies/README.md) | Stable | — |
 | [Triggers and webhooks: change events, transactional outbox, dispatcher](triggers/README.md) | Draft | — |
-| [Schema API: subcollection declaration and driver extensions for CreateCollection](schema-subcollections-extensions/README.md) | Draft | `CollectionDef.Parent` (`dbschema.CollectionPath`) with a `SubCollectionsAware` capability, and addressed driver extensions via `ddl.WithExtension` (foreign ignored, unrecognised refused). |
+| [Schema API: subcollection declaration and driver extensions for CreateCollection](schema-subcollections-extensions/README.md) | Draft | `CollectionDef.Parent` (`dbschema.CollectionPath`) with `SubCollectionsAware` and `DropCollectionAt`/`AlterCollectionAt`; driver extensions via `ddl.WithExtension`, addressed by driver-exported target ID, with `StrictExtensions()`. |
 
 ## Open Questions
 
