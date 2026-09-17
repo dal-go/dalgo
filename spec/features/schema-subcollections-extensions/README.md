@@ -269,13 +269,17 @@ the characters of an id, but MUST keep the empty-id incomplete-key pattern:
   `access/conditions_test.go:368` and `dalgo2ingitdb` `crud_test.go:293`), so no
   caller migration is needed.
 - `Key.String()` MUST NOT panic. It MUST stop calling `Key.Validate()`
-  (`key.go:54-58`), so logging any key, incomplete or invalid, is safe. For a
-  key with an empty id, `String()` emits an empty id segment (`users/`), which
+  (`key.go:54-58`), so logging any key, incomplete or invalid, is safe. An
+  incomplete key stringifies the same however it was built: for an id that is
+  `nil` (as `NewIncompleteKey` leaves it, which today prints `users/<nil>`) or an
+  empty string, `String()` MUST emit an empty id segment (`users/`). That output
   is not a valid path under REQ:path-grammar and MUST NOT be parsed.
-- Completeness and id validity are checked at **write time**: `Key.Validate()`
-  (`key.go:130`) MUST apply the `%` check to non-empty string ids at every
-  level, and the write path (driver or id generator) MUST reject a key that is
-  still incomplete when the record is persisted.
+- `Key.Validate()` (`key.go:130`) checks **structure and characters, not
+  completeness**: it MUST apply the `%` check to non-empty string ids at every
+  level, and MUST return `nil` for an otherwise valid incomplete key (`nil` or
+  empty id), so keys can be validated before an id is assigned. Completeness is
+  checked at **write time**: the write path (driver or id generator) MUST reject
+  a key that is still incomplete when the record is persisted.
 
 Recommendation, over both limiting the claims to schema paths and migrating
 every empty-id caller to `NewIncompleteKey`: one grammar for keys and schema
@@ -898,7 +902,7 @@ Already safe, because they use `url.PathUnescape` or their own escaper:
 
 **Given** the `record` package with this change
 **When** `k := record.NewKeyWithID("users", "")`, `record.NewKeyWithParentAndID(record.NewKeyWithID("spaces", "s1"), "ext", "")`, `record.NewKeyWithID("users", "a%2Fb")` and `record.NewKeyWithOptions("users", record.WithKeyID("a%b"))` are called, and `k.String()` and `k.Validate()` are called on the first key
-**Then** the two empty-id constructors return keys without panicking; `k.String()` returns `"users/"` without panicking; `NewKeyWithID("users", "a%2Fb")` panics with a message naming `record.ErrInvalidStringID`; `NewKeyWithOptions` returns an error satisfying `errors.Is(err, record.ErrInvalidStringID)`; and `String()` on a key assembled with an invalid id also returns without panicking.
+**Then** the two empty-id constructors return keys without panicking; `k.String()` returns `"users/"` without panicking; `k.Validate()` returns `nil`; `record.NewIncompleteKey("users", reflect.String, nil).String()` also returns `"users/"` and its `Validate()` returns `nil`; `NewKeyWithID("users", "a%2Fb")` panics with a message naming `record.ErrInvalidStringID`; `NewKeyWithOptions` returns an error satisfying `errors.Is(err, record.ErrInvalidStringID)`; and `String()` on a key assembled with an invalid id also returns without panicking.
 
 ### AC: invalid-path-rejected-before-dispatch (verifies REQ:guard-precedence)
 
