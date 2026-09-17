@@ -254,19 +254,36 @@ than with its own splitting or escaping rules.
 Today `record.NewKeyWithID` and `record.NewKeyWithParentAndID`
 (`key.go:151-163`) accept any string id without calling
 `record.ValidateStringID`, so ids `a/b` and `a%2Fb` both print as `a%2Fb`. In
-line with the private-beta direction, the `record` constructors MUST validate:
+line with the private-beta direction, the `record` constructors MUST validate
+the characters of an id, but MUST keep the empty-id incomplete-key pattern:
 
 - `NewKeyWithID`, `NewKeyWithParentAndID` and `WithKeyID` (`key.go:174`) MUST
-  reject a string id that fails `ValidateStringID`. The two panicking
-  constructors panic, as they already do for an empty collection name
+  reject a **non-empty** string id that contains the reserved `%`. The two
+  panicking constructors panic, as they already do for an empty collection name
   (`key.go:159-161`). `WithKeyID` returns an error satisfying
   `errors.Is(err, record.ErrInvalidStringID)` through `NewKeyWithOptions`.
-- `Key.Validate()` (`key.go:130`) MUST also apply `ValidateStringID` to string
-  ids, so keys assembled any other way are caught before `String()`.
+- An **empty** string id stays legal in every constructor. It denotes an
+  incomplete key whose id a driver or generator assigns before the write, the
+  same state `NewIncompleteKey` (`key.go:166`) produces. Record factories across
+  the fleet build keys this way (for example `dal/schema_test.go:184`,
+  `access/conditions_test.go:368` and `dalgo2ingitdb` `crud_test.go:293`), so no
+  caller migration is needed.
+- `Key.String()` MUST NOT panic. It MUST stop calling `Key.Validate()`
+  (`key.go:54-58`), so logging any key, incomplete or invalid, is safe. For a
+  key with an empty id, `String()` emits an empty id segment (`users/`), which
+  is not a valid path under REQ:path-grammar and MUST NOT be parsed.
+- Completeness and id validity are checked at **write time**: `Key.Validate()`
+  (`key.go:130`) MUST apply the `%` check to non-empty string ids at every
+  level, and the write path (driver or id generator) MUST reject a key that is
+  still incomplete when the record is persisted.
 
-Recommendation over limiting the claims to schema paths: one grammar for keys
-and schema paths is only true if every key string is unambiguous, and
-validating at construction is the cheapest place to guarantee that.
+Recommendation, over both limiting the claims to schema paths and migrating
+every empty-id caller to `NewIncompleteKey`: one grammar for keys and schema
+paths is only true if every key string is unambiguous, and rejecting `%` at
+construction is the cheapest place to guarantee that. Keeping empty ids legal
+avoids touching some 24 files in `dalgo`, `dalgo2ingitdb` and
+`dalgo2ingitdb4local` for no gain, because an empty id never reaches a written
+path.
 
 #### REQ: schema-path-type
 
@@ -586,7 +603,8 @@ func DeleteDependents() Option // reserved: cascade to referencing records
   carries only `Name` and `Type` and defers "foreign-key target + cascade
   actions" (`dbschema/constraint.go:3-9`), and `dbschema.Referrer`
   (`dbschema/referrer.go`) is read-side introspection through the optional
-  `SchemaReader.ListReferrers`. Every helper MUST refuse `DeleteDependents()`
+  `SchemaReader.ListReferrers`. Every drop helper (`ddl.DropCollection` and
+  `ddl.DropCollectionAt`) MUST refuse `DeleteDependents()`
   with `*dbschema.NotSupportedError{Reason: "DeleteDependents is reserved"}`.
   A drop that would orphan referencing records refuses with blocker 4.
 - The flags are meaningful on drops only. On `CreateCollection` and on
@@ -773,10 +791,15 @@ overlaps) come from the driver after dispatch.
 
 #### REQ: helpers-are-the-guarantee
 
-The `ddl` helpers are the designed entry point. Every refusal in this Feature
-is enforced by them before dispatch, independent of driver quality, so a
-consumer that calls through them never loses a nesting declaration or an
-extension silently. A DB that does not implement `SchemaModifier` gets the
+The `ddl` helpers are the designed entry point. Every **declaration and
+capability** refusal in this Feature (path validity, extensions, reserved or
+unsupported flags, nesting) is enforced by them before dispatch, independent of
+driver quality, so a consumer that calls through them never loses a nesting
+declaration or an extension silently. **Data-dependent** refusals
+(`CollectionNotEmptyError`, a missing ancestor definition, an overlapping
+definition) can only be decided by the driver after dispatch; they bind drivers
+through REQ:in-org-drivers-comply and are verified by each driver's
+conformance ACs. A DB that does not implement `SchemaModifier` gets the
 existing typed `*dbschema.NotSupportedError` from every helper, so nothing is
 skipped silently.
 
@@ -818,7 +841,7 @@ under `/home/ai/projects` (local checkouts, 2026-09-17):
 | `openvaultdb/openvaultdb-go` | `collectionChains` (`pkg/core/key.go:110`) builds names-only chains like `spaces/ext`; `core.go:358` passes them to `modifier.CreateCollection` (`core.go:555`). Even count, so it breaks. | Derive `spaces/{spaceID}/ext` (or concrete ids for a scoped definition) from the key, or pass `CollectionDef.Parent`. Tracked in [openvaultdb/openvaultdb-go#28](https://github.com/openvaultdb/openvaultdb-go/issues/28). |
 | `dal-go/dalgo2openvaultdb` | `unescapeSegment` (`query.go:293`) decodes only the six current `EscapeID` codes. | Use `record.UnescapeID`; ids with `{ } , =` must round-trip. |
 | `openvaultdb/ovdb` | `internal/datapath/datapath.go:41` hard-codes the six codes and treats any other `%` as invalid. | Use `record.UnescapeID`; ids with `{ } , =` must round-trip. |
-| `datatug/datatug-cli` | `pkg/dbcopy/engine.go:150` `ddl.DropCollection(…, ref.Name(), ddl.IfExists())`, `:259` `ddl.CreateCollection`. Root names only. | Compatible. Its drop now refuses non-empty targets; it must pass `DeleteRecords()` where it intends to replace data. |
+| `datatug/datatug-cli` | `pkg/dbcopy/engine.go:150` `ddl.DropCollection(…, ref.Name(), ddl.IfExists())`, `:259` `ddl.CreateCollection`. Root names only. | Compatible. Its drop now refuses non-empty targets; it must pass `DeleteRecords()` where it intends to replace data. Because `DeleteDependents()` is reserved, on relational targets it must drop referencing tables before the tables they reference (reverse foreign-key order), or the drop refuses with blocker 4. |
 | `sneat-dev/wb` | `internal/hubstore/hubstore.go:98` `CreateCollection` with a root name. | None. |
 | `synchestra-io/synchestra` | `pkg/state/replication/dal_journal.go:128` `ddl.CreateCollection` with a root definition. | None. |
 
@@ -869,6 +892,12 @@ Already safe, because they use `url.PathUnescape` or their own escaper:
 **Given** `record.NewKeyWithID("projects", "{a=b,c}")` under the extended `record.EscapeID`
 **When** `String()` is called and its id segment is passed to `record.UnescapeID`
 **Then** the string is `"projects/%7Ba%3Db%2Cc%7D"`, so the id segment is neither a placeholder nor a composite key; `UnescapeID` returns `"{a=b,c}"`; and `record.NewKeyWithID("projects", "a.b").String()` is still `"projects/a%2Eb"`.
+
+### AC: key-constructors-keep-incomplete-keys (verifies REQ:key-constructors-validate)
+
+**Given** the `record` package with this change
+**When** `k := record.NewKeyWithID("users", "")`, `record.NewKeyWithParentAndID(record.NewKeyWithID("spaces", "s1"), "ext", "")`, `record.NewKeyWithID("users", "a%2Fb")` and `record.NewKeyWithOptions("users", record.WithKeyID("a%b"))` are called, and `k.String()` and `k.Validate()` are called on the first key
+**Then** the two empty-id constructors return keys without panicking; `k.String()` returns `"users/"` without panicking; `NewKeyWithID("users", "a%2Fb")` panics with a message naming `record.ErrInvalidStringID`; `NewKeyWithOptions` returns an error satisfying `errors.Is(err, record.ErrInvalidStringID)`; and `String()` on a key assembled with an invalid id also returns without panicking.
 
 ### AC: invalid-path-rejected-before-dispatch (verifies REQ:guard-precedence)
 
