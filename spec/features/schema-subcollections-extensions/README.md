@@ -233,7 +233,9 @@ concrete-id   = <record.EscapeID output>           ; never begins with "{"
   schema path and in an access pattern. The access `*` (`access.AnyID`) has no
   schema-path equivalent; a schema path always names its placeholders.
 - **Escaping.** `record.EscapeID` MUST be extended so that, besides its current
-  characters, `{` `}` `,` `=` become `%7B` `%7D` `%2C` `%3D`. Every escaped id
+  characters, `{` `}` `,` `=` `\` become `%7B` `%7D` `%2C` `%3D` `%5C` (`\` so a
+  backslash can never be read as a path separator on Windows). The table is exact-case:
+  `UnescapeID` accepts upper-case codes only and rejects raw escapable characters. Every escaped id
   is unambiguous, and no concrete id can look like a placeholder or a composite
   key, **provided** its raw value passed `record.ValidateStringID`, which
   reserves a literal `%` (REQ:key-constructors-validate). Ids containing
@@ -247,7 +249,10 @@ concrete-id   = <record.EscapeID output>           ; never begins with "{"
 The grammar, the segment classification, the placeholder identifier rule and
 the escape table MUST be defined once, in `github.com/dal-go/record` next to
 `EscapeID`. `dbschema` MUST implement schema-path parsing on top of it rather
-than with its own splitting or escaping rules.
+than with its own splitting or escaping rules. `record` exports the primitives (`SplitPath`,
+`PathAddressesCollection`, `ValidateCollectionName`, `ClassifyIDSegment`, `ValidPlaceholderName`);
+whole-path composition, including placeholder-name uniqueness within one path, is owned by
+`dbschema.ParseSchemaPath` / `SchemaPath.Validate`.
 
 #### REQ: key-constructors-validate
 
