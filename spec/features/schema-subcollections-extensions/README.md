@@ -393,12 +393,26 @@ Rules for drivers whose `SupportsSubCollections()` is `true`:
 names the id of the collection it follows, so it MUST be the same wherever that
 collection definition appears: every path through `ext/datatug/projects` uses
 `{projectID}`. The `ddl` helpers cannot see earlier calls, so they check only
-uniqueness within one path. A nesting driver that persists placeholder names
-MUST refuse a declaration whose name for an existing ancestor differs from the
-stored one. Addressing ignores names (`SameCollection`). Rationale: typed-key
-and code generation tooling maps `{projectID}` to one key field, so one name per
-collection keeps generated code stable. How drivers without storage for names
-enforce this is under Open Questions.
+uniqueness within one path. Founder decision, 2026-09-17 ("A"): enforcement is
+mandatory, with no optional path:
+
+- Every driver whose `SupportsSubCollections()` is `true` MUST persist the
+  placeholder name of every placeholder id position of every definition it
+  creates. A driver with no storage for names MUST add it; it MUST NOT skip the
+  check.
+- On `CreateCollection` it MUST refuse, removing and creating nothing, a
+  declaration whose placeholder name for an existing collection definition
+  differs from the stored one, with an error satisfying
+  `errors.Is(err, dbschema.ErrPlaceholderNameConflict)`. The error message MUST
+  name the collection path, the stored name and the declared name.
+- Addressing ignores names (`SameCollection`), so Drop and Alter accept any
+  placeholder name.
+
+`dbschema` MUST export
+`ErrPlaceholderNameConflict = errors.New("dbschema: placeholder name conflicts with the stored name")`.
+
+Rationale: typed-key and code generation tooling maps `{projectID}` to one key
+field, so one name per collection keeps generated code stable.
 
 #### REQ: ingitdb-format-dependency
 
@@ -1015,6 +1029,14 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
 **When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/sneat/projects", Fields: g})` is called, and then `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/{extID}/projects", Fields: g})`
 **Then** the first returns `nil` and does not change the `ext/datatug/projects` definition; the second returns a non-nil error because it overlaps both scoped definitions, and creates nothing.
 
+### AC: dalgo2ingitdb-placeholder-name-conflict-refused (verifies REQ:schema-path-scopes)
+
+Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
+
+**Given** the `dalgo2ingitdb` database of AC:dalgo2ingitdb-creates-datatug-queries, where `ext/datatug/projects/{projectID}/queries` stored the placeholder name `projectID`
+**When** `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{pid}/entities"})` is called, then `ddl.CreateCollection(ctx, db, dbschema.CollectionDef{Name: "ext/datatug/projects/{projectID}/entities"})`, and then `ddl.DropCollection(ctx, db, "ext/datatug/projects/{pid}/entities")`
+**Then** the first fails with `errors.Is(err, dbschema.ErrPlaceholderNameConflict)`, its message names `ext/datatug/projects`, `projectID` and `pid`, and no `entities` definition is persisted; the second returns `nil` and persists `projectID` for the new definition; and the drop returns `nil`, because addressing ignores placeholder names.
+
 ### AC: dalgo2ingitdb-depth-two-ancestor-required (verifies REQ:one-collection-per-create)
 
 Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16.
@@ -1096,7 +1118,7 @@ Consumer conformance statement, owned by ingitdb/dalgo2ingitdb#16, as are the th
 | Composite key segment `{field=value,…}` | `errors.Is(err, dbschema.ErrReservedKeySegment)` and `errors.Is(err, dal.ErrNotSupported)`; no dispatch |
 | Both a slash-path `Name` and a non-empty `Parent` | `dbschema.ErrInvalidCollectionPath`; no dispatch |
 | New definition `Overlaps` an existing one (placeholder versus concrete id at the same position) | driver-specific non-nil error; nothing created |
-| Placeholder name for an existing ancestor differs from the one a nesting driver stored | driver-specific non-nil error; nothing created |
+| Placeholder name for an existing collection differs from the one a nesting driver stored | `errors.Is(err, dbschema.ErrPlaceholderNameConflict)`; nothing created |
 | Extension with empty target | error, `errors.Is(err, ddl.ErrInvalidExtension)`; no dispatch |
 | Extension the driver does not honour, on any operation or `AlterOp`, whatever its target | `*dbschema.NotSupportedError` naming type and target; no operation performed |
 | DB does not implement `SchemaModifier` (for example a store whose schema is defined elsewhere) | existing `*dbschema.NotSupportedError`; no dispatch |
@@ -1167,20 +1189,16 @@ direct Go test surface.
 
 ## Open Questions
 
-- **Enforcing one placeholder name per collection.** REQ:schema-path-scopes
-  requires the same name wherever a collection definition appears (e.g. always
-  `{projectID}` under `ext/datatug/projects`). A nesting driver that persists names refuses
-  a conflict. Should a driver that has nowhere to store names (a future flat or
-  remote driver) be required to add storage for them, or may it skip the
-  cross-call check?
-  - **A.** Required: every nesting driver persists placeholder names and
-    refuses conflicts.
-  - **B.** Optional: drivers without name storage skip the cross-call check;
-    the `ddl` helpers still enforce uniqueness within one path.
+None. Resolved on 2026-09-17 by founder decision:
 
-  Recommendation: **A**, because code generation and typed keys depend on the
-  names being stable per collection. For inGitDB this is one extra field in
-  `definition.yaml`. Needs a founder decision.
+- **Placeholder-name enforcement:** "A". Every nesting driver persists
+  placeholder names and refuses a conflicting name (REQ:schema-path-scopes,
+  AC:dalgo2ingitdb-placeholder-name-conflict-refused).
+- **Nested drop:** "1-A". Drops refuse data loss by default, with explicit
+  `DeleteRecords()` and `DeleteNested()` flags and a reserved
+  `DeleteDependents()` (REQ:drop-refuses-data-loss-by-default, REQ:drop-flags).
+- **Schema-path ids:** `{placeholder}` names, with concrete ids for scoped
+  definitions such as `ext/datatug/…` (REQ:schema-path-scopes).
 
 ---
 *This document follows the https://specscore.md/feature-specification*
