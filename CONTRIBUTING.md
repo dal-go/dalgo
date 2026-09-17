@@ -21,6 +21,12 @@ When creating the pull request please provide a use case and justification for
 the change if it is more than a minor change.
 Changes to the functionality need a good justification.
 
+## Public interface changes
+
+Changing an exported interface, signature or documented behaviour needs an explicit
+reason from a human on why the change is OK, quoted in the pull request. See
+[AGENTS.md](AGENTS.md).
+
 ## Developers Certificate of Origin
 
 All changes to this repository need sign-off for the [Developers Certificate of Origin](https://developercertificate.org/).
