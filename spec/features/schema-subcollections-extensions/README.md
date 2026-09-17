@@ -281,9 +281,10 @@ Recommendation, over both limiting the claims to schema paths and migrating
 every empty-id caller to `NewIncompleteKey`: one grammar for keys and schema
 paths is only true if every key string is unambiguous, and rejecting `%` at
 construction is the cheapest place to guarantee that. Keeping empty ids legal
-avoids touching some 24 files in `dalgo`, `dalgo2ingitdb` and
-`dalgo2ingitdb4local` for no gain, because an empty id never reaches a written
-path.
+avoids migrating 65 `NewKeyWithID(collection, "")` call sites (all in tests, in
+`dalgo`, `dalgo2ingitdb` and `dalgo2ingitdb4local`, found by searching
+`/home/ai/projects` on 2026-09-17) for no gain, because an empty id never
+reaches a written path.
 
 #### REQ: schema-path-type
 
