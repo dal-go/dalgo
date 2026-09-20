@@ -217,6 +217,39 @@ func TestSecuredSessionsAllMethods(t *testing.T) {
 	}
 }
 
+func TestQualifiedCollectionQueryUsesOpaqueAuthorization(t *testing.T) {
+	ctx := context.Background()
+	source := dal.NewQualifiedRootCollectionRef("private", "Customer", "c")
+	query := dal.From(source).NewQuery().SelectKeysOnly(reflect.String)
+
+	for _, src := range []dal.RecordsetSource{source, &source} {
+		resource := resourceForRecordsetSource(src)
+		if resource.Kind() != OpaqueQueryResource || resource.String() != "opaque-query:private.Customer" {
+			t.Fatalf("qualified source resource = %q (%s), want opaque-query:private.Customer", resource.String(), resource.Kind())
+		}
+	}
+
+	pathOnly := MustPolicy("path-only", Root(Allow(Query, "ordinary root collections")))
+	delegate := &fakeSession{}
+	secured := SecureReadSession(delegate, pathOnly)
+	if _, err := secured.ExecuteQueryToRecordsReader(ctx, query); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("records query error = %v, want ErrAccessDenied", err)
+	}
+	if _, err := secured.ExecuteQueryToRecordsetReader(ctx, query); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("recordset query error = %v, want ErrAccessDenied", err)
+	}
+	if len(delegate.calls) != 0 {
+		t.Fatalf("qualified query reached delegate without opaque authorization: %#v", delegate.calls)
+	}
+
+	from := dal.From(dal.NewRootCollectionRef("Customer", ""))
+	from.Join(dal.NewJoinedSource(source, dal.JoinInner))
+	resources := resourcesForQuery(from.NewQuery().SelectKeysOnly(reflect.String))
+	if len(resources) != 2 || resources[1].Kind() != OpaqueQueryResource {
+		t.Fatalf("joined qualified source resources = %#v", resources)
+	}
+}
+
 type fakeTx struct {
 	*fakeSession
 	opts dal.TransactionOptions

@@ -37,7 +37,15 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	if doc.Limit < 0 || doc.Offset < 0 {
 		return nil, fmt.Errorf("invalid DTQL: limit and offset must be non-negative")
 	}
-	source := dal.NewRootCollectionRef(doc.From.Name, doc.From.Alias)
+	var source dal.CollectionRef
+	if doc.From.Schema == nil {
+		source = dal.NewRootCollectionRef(doc.From.Name, doc.From.Alias)
+	} else {
+		if *doc.From.Schema == "" {
+			return nil, fmt.Errorf("invalid DTQL: from.schema must not be empty")
+		}
+		source = dal.NewQualifiedRootCollectionRef(*doc.From.Schema, doc.From.Name, doc.From.Alias)
+	}
 	qb := dal.From(source).NewQuery()
 
 	if doc.Where != nil {

@@ -36,6 +36,93 @@ func TestSerializeAndBack(t *testing.T) {
 	}
 }
 
+func TestQualifiedSourceRoundTrip(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema string
+		yaml   string
+	}{
+		{
+			name:   "SQLite main",
+			schema: "main",
+			yaml:   "from:\n  schema: main\n  name: Customer\nlimit: 50\n",
+		},
+		{
+			name:   "SQL Server dbo",
+			schema: "dbo",
+			yaml:   "from:\n  schema: dbo\n  name: Customer\n  alias: c\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q, err := Deserialize([]byte(tt.yaml))
+			if err != nil {
+				t.Fatalf("Deserialize: %v", err)
+			}
+			ref := q.From().Base().(dal.CollectionRef)
+			if ref.Schema() != tt.schema || ref.Name() != "Customer" {
+				t.Fatalf("source = schema %q, name %q; want schema %q, name Customer", ref.Schema(), ref.Name(), tt.schema)
+			}
+			got, err := Serialize(q)
+			if err != nil {
+				t.Fatalf("Serialize: %v", err)
+			}
+			if string(got) != tt.yaml {
+				t.Fatalf("canonical round-trip mismatch\n--- want ---\n%s--- got ---\n%s", tt.yaml, got)
+			}
+		})
+	}
+}
+
+func TestFromMergeAndAliasCompatibility(t *testing.T) {
+	tests := []struct {
+		name       string
+		yaml       string
+		wantSchema string
+		wantName   string
+	}{
+		{
+			name:     "unqualified merge",
+			yaml:     "from:\n  <<: {name: users}\n",
+			wantName: "users",
+		},
+		{
+			name:     "unqualified merge sequence",
+			yaml:     "from:\n  <<: [{name: users}]\n",
+			wantName: "users",
+		},
+		{
+			name:     "shared merge alias",
+			yaml:     "from:\n  <<: [&source {name: users}, *source]\n",
+			wantName: "users",
+		},
+		{
+			name:       "qualified merge",
+			yaml:       "from:\n  <<: {schema: main, name: Customer}\n",
+			wantSchema: "main",
+			wantName:   "Customer",
+		},
+		{
+			name:       "schema string alias",
+			yaml:       "from:\n  name: &identifier Customer\n  schema: *identifier\n",
+			wantSchema: "Customer",
+			wantName:   "Customer",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q, err := Deserialize([]byte(tt.yaml))
+			if err != nil {
+				t.Fatalf("Deserialize: %v", err)
+			}
+			ref := q.From().Base().(dal.CollectionRef)
+			if ref.Schema() != tt.wantSchema || ref.Name() != tt.wantName {
+				t.Fatalf("source = schema %q, name %q; want schema %q, name %q", ref.Schema(), ref.Name(), tt.wantSchema, tt.wantName)
+			}
+		})
+	}
+}
+
 func TestNullConstantRoundTripAndDirectDecode(t *testing.T) {
 	serialized, err := Serialize(fakeQuery{from: rootFrom(), columns: []dal.Column{{Expression: dal.Constant{Value: nil}}}})
 	if err != nil {
@@ -72,9 +159,79 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 			wantErr: "invalid DTQL-YAML",
 		},
 		{
+			name:    "unknown from key",
+			yaml:    "from:\n  namespace: main\n  name: users\n",
+			wantErr: "invalid DTQL-YAML",
+		},
+		{
+			name:    "quoted merge token is an unknown key",
+			yaml:    "from: {\"<<\": {name: ignored}, name: users}\n",
+			wantErr: "invalid DTQL-YAML",
+		},
+		{
+			name:    "unknown merged from key",
+			yaml:    "from:\n  <<: {name: users, namespace: main}\n",
+			wantErr: "invalid DTQL-YAML",
+		},
+		{
+			name:    "unknown key in merge sequence",
+			yaml:    "from:\n  <<: [{name: users}, {namespace: main}]\n",
+			wantErr: "invalid DTQL-YAML",
+		},
+		{
+			name:    "non-string merged schema",
+			yaml:    "from:\n  <<: {schema: 123, name: users}\n",
+			wantErr: "from.schema must be a string",
+		},
+		{
+			name:    "invalid merge value",
+			yaml:    "from:\n  <<: users\n",
+			wantErr: "from merge value must be a mapping",
+		},
+		{
+			name:    "recursive merge alias",
+			yaml:    "from: &source\n  <<: *source\n  name: users\n",
+			wantErr: "from merge contains a recursive alias",
+		},
+		{
+			name:    "recursive merge sequence alias",
+			yaml:    "from:\n  <<: &sources\n    - <<: *sources\n      name: users\n",
+			wantErr: "from merge contains a recursive alias",
+		},
+		{
 			name:    "missing from name",
 			yaml:    "limit: 5\n",
 			wantErr: "from.name is required",
+		},
+		{
+			name:    "from is not a mapping",
+			yaml:    "from: users\n",
+			wantErr: "from must be a mapping",
+		},
+		{
+			name:    "from name has wrong type",
+			yaml:    "from:\n  name: [users]\n",
+			wantErr: "invalid DTQL-YAML",
+		},
+		{
+			name:    "empty schema",
+			yaml:    "from:\n  schema: ''\n  name: users\n",
+			wantErr: "from.schema must not be empty",
+		},
+		{
+			name:    "null schema",
+			yaml:    "from:\n  schema: null\n  name: users\n",
+			wantErr: "from.schema must be a string",
+		},
+		{
+			name:    "numeric schema",
+			yaml:    "from:\n  schema: 123\n  name: users\n",
+			wantErr: "from.schema must be a string",
+		},
+		{
+			name:    "boolean schema",
+			yaml:    "from:\n  schema: true\n  name: users\n",
+			wantErr: "from.schema must be a string",
 		},
 		{
 			name:    "wrong value type for limit",

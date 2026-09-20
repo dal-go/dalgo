@@ -19,8 +19,92 @@ type document struct {
 
 // fromYAML is the YAML representation of the root dal.CollectionRef source.
 type fromYAML struct {
-	Name  string `yaml:"name"`
-	Alias string `yaml:"alias,omitempty"`
+	Schema *string `yaml:"schema,omitempty"`
+	Name   string  `yaml:"name"`
+	Alias  string  `yaml:"alias,omitempty"`
+}
+
+func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
+	if err := validateFromYAMLNode(node); err != nil {
+		return err
+	}
+	type plainFromYAML fromYAML
+	var decoded plainFromYAML
+	if err := node.Decode(&decoded); err != nil {
+		return err
+	}
+	*from = fromYAML(decoded)
+	return nil
+}
+
+func validateFromYAMLNode(node *yaml.Node) error {
+	return validateFromYAMLNodeWithState(node, map[*yaml.Node]bool{}, map[*yaml.Node]bool{})
+}
+
+func validateFromYAMLNodeWithState(node *yaml.Node, visiting, validated map[*yaml.Node]bool) error {
+	node = resolvedYAMLAlias(node)
+	if node.Kind != yaml.MappingNode {
+		return &yaml.TypeError{Errors: []string{"from must be a mapping"}}
+	}
+	if validated[node] {
+		return nil
+	}
+	if visiting[node] {
+		return &yaml.TypeError{Errors: []string{"from merge contains a recursive alias"}}
+	}
+	visiting[node] = true
+	defer delete(visiting, node)
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		key, value := node.Content[i].Value, node.Content[i+1]
+		switch key {
+		case "<<":
+			if node.Content[i].Tag != "!!merge" {
+				return &yaml.TypeError{Errors: []string{"field << not found in from"}}
+			}
+			if err := validateFromYAMLMerge(value, visiting, validated); err != nil {
+				return err
+			}
+		case "schema":
+			value = resolvedYAMLAlias(value)
+			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
+				return &yaml.TypeError{Errors: []string{"from.schema must be a string"}}
+			}
+		case "name", "alias":
+		default:
+			return &yaml.TypeError{Errors: []string{"field " + key + " not found in from"}}
+		}
+	}
+	validated[node] = true
+	return nil
+}
+
+func validateFromYAMLMerge(node *yaml.Node, visiting, validated map[*yaml.Node]bool) error {
+	node = resolvedYAMLAlias(node)
+	switch node.Kind {
+	case yaml.MappingNode:
+		return validateFromYAMLNodeWithState(node, visiting, validated)
+	case yaml.SequenceNode:
+		if visiting[node] {
+			return &yaml.TypeError{Errors: []string{"from merge contains a recursive alias"}}
+		}
+		visiting[node] = true
+		defer delete(visiting, node)
+		for _, merged := range node.Content {
+			if err := validateFromYAMLNodeWithState(merged, visiting, validated); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		return &yaml.TypeError{Errors: []string{"from merge value must be a mapping or sequence of mappings"}}
+	}
+}
+
+func resolvedYAMLAlias(node *yaml.Node) *yaml.Node {
+	for node.Kind == yaml.AliasNode && node.Alias != nil && node.Alias != node {
+		node = node.Alias
+	}
+	return node
 }
 
 // exprYAML is the YAML representation of an in-scope dal.Expression.

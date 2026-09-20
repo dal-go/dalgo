@@ -167,8 +167,9 @@ func CollectionGroupScope(name string, rules ...Rule) Rule {
 	return Rule{kind: collectionGroupRule, resource: name, children: append([]Rule(nil), rules...)}
 }
 
-// OpaqueQueryScope attaches rules to all non-structured queries. It is an
-// intentionally explicit and potentially broad capability.
+// OpaqueQueryScope attaches rules to queries that cannot safely match a
+// structural path, including non-structured and schema-qualified queries. It
+// is an intentionally explicit and potentially broad capability.
 func OpaqueQueryScope(rules ...Rule) Rule {
 	return Rule{kind: opaqueQueryRule, children: append([]Rule(nil), rules...)}
 }

@@ -1,0 +1,4 @@
+from:
+  schema: main
+  name: Customer
+limit: 50

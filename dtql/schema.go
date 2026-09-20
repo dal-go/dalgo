@@ -40,8 +40,9 @@ func schemaDocument() map[string]any {
 			"additionalProperties": false,
 			"required":             []any{"name"},
 			"properties": map[string]any{
-				"name":  map[string]any{"type": "string", "minLength": 1},
-				"alias": map[string]any{"type": "string"},
+				"schema": map[string]any{"type": "string", "minLength": 1},
+				"name":   map[string]any{"type": "string", "minLength": 1},
+				"alias":  map[string]any{"type": "string"},
 			},
 		},
 		"expression": map[string]any{

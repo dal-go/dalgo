@@ -111,7 +111,11 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 	if base.Parent() != nil {
 		return fromYAML{}, fmt.Errorf("parented collection reference %q is not supported by DTQL (only root collections)", base.Path())
 	}
-	return fromYAML{Name: base.Name(), Alias: base.Alias()}, nil
+	result := fromYAML{Name: base.Name(), Alias: base.Alias()}
+	if schema := base.Schema(); schema != "" {
+		result.Schema = &schema
+	}
+	return result, nil
 }
 
 func exprToYAML(expr dal.Expression) (exprYAML, error) {

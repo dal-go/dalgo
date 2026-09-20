@@ -95,7 +95,8 @@ func CollectionGroup(name string) Resource {
 	return Resource{kind: CollectionGroupResource, name: name}
 }
 
-// OpaqueQuery returns an explicit non-structured query resource.
+// OpaqueQuery returns a query resource that cannot safely match a structural path rule.
+// This includes non-structured queries and structured sources whose namespace is not represented by PathPattern.
 func OpaqueQuery(description string) Resource {
 	return Resource{kind: OpaqueQueryResource, name: description}
 }
