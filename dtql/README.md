@@ -29,7 +29,7 @@ by `Serialize` with a descriptive error rather than silently dropped.
 
 | `dal` node | YAML representation |
 |---|---|
-| `From` over root `CollectionRef` | `from: { name: <string>, alias?: <string> }` |
+| `From` over root `CollectionRef` | `from: { schema?: <string>, name: <string>, alias?: <string> }` |
 | `Column` | a sequence item under `columns:`, an expression plus optional `as: <alias>` |
 | `Comparison` | `{ op: <operator>, left: <expr>, right: <expr> }` |
 | `GroupCondition` (And) | `{ and: [ <condition>, ... ] }` |
@@ -84,6 +84,27 @@ orderBy:
 limit: 10
 offset: 20
 ```
+
+For a schema-qualified source, `schema` is a separate optional identifier:
+
+```yaml
+from:
+  schema: main
+  name: Customer
+limit: 50
+```
+
+The same shape represents SQL Server `dbo.Customer` by setting `schema: dbo`.
+Schema values are not special-cased. SQL adapters must quote the schema and
+relation as separate identifier segments, such as `"main"."Customer"` for
+SQLite or `[dbo].[Customer]` for SQL Server. Non-SQL adapters that cannot
+represent a schema-qualified source must reject it explicitly; they must not
+silently flatten the two segments into a dotted collection name.
+
+DALgo access policies likewise do not collapse a qualified source onto the
+ordinary root collection path. Secured sessions classify it as an opaque query,
+so execution requires an explicit `OpaqueQueryScope` rule until schema-aware
+path resources are defined.
 
 ## Round-trip guarantees
 

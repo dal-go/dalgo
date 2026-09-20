@@ -64,7 +64,7 @@
     <table>
       <thead><tr><th><code>dal</code> node</th><th>YAML representation</th></tr></thead>
       <tbody>
-        <tr><td>From over root <code>CollectionRef</code></td><td><code>from: { name, alias? }</code></td></tr>
+        <tr><td>From over root <code>CollectionRef</code></td><td><code>from: { schema?, name, alias? }</code></td></tr>
         <tr><td><code>Column</code></td><td>item under <code>columns:</code> — an expression plus optional <code>as:</code></td></tr>
         <tr><td><code>Comparison</code></td><td><code>{ op, left, right }</code></td></tr>
         <tr><td><code>GroupCondition</code> (And)</td><td><code>{ and: [ … ] }</code></td></tr>
@@ -77,6 +77,11 @@
         <tr><td><code>Limit</code> / <code>Offset</code></td><td><code>limit: &lt;int&gt;</code> / <code>offset: &lt;int&gt;</code></td></tr>
       </tbody>
     </table>
+    <p>A qualified source keeps <code>schema</code> separate from <code>name</code>. SQL adapters quote both
+      identifier segments independently (for example <code>"main"."Customer"</code> or
+      <code>[dbo].[Customer]</code>); non-SQL adapters may reject unsupported schemas but must not flatten them.</p>
+    <p>Secured DALgo sessions classify qualified sources as opaque query resources, requiring an explicit
+      <code>OpaqueQueryScope</code> policy rather than silently authorizing them as an unqualified collection.</p>
     <p>An expression sets <strong>exactly one</strong> of <code>field</code>, <code>value</code> or
       <code>values</code>, discriminating a <code>FieldRef</code>, a <code>Constant</code> or an <code>Array</code>.</p>
 

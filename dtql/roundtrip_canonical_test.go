@@ -5,6 +5,11 @@ import "testing"
 // canonicalDocs are valid in-scope DTQL-YAML documents already in canonical form
 // (stable key order and 2-space indentation, as emitted by Serialize).
 var canonicalDocs = map[string]string{
+	"qualified source": `from:
+  schema: main
+  name: Customer
+limit: 50
+`,
 	"comparison with in array": `from:
   name: users
 columns:

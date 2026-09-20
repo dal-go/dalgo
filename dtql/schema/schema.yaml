@@ -93,6 +93,9 @@ $defs:
       name:
         minLength: 1
         type: string
+      schema:
+        minLength: 1
+        type: string
     required:
       - name
     type: object

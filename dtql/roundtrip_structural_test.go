@@ -14,6 +14,9 @@ func roundTripCases() map[string]dal.StructuredQuery {
 		"from with alias": fakeQuery{
 			from: dal.From(dal.NewRootCollectionRef("users", "u")),
 		},
+		"from with schema": fakeQuery{
+			from: dal.From(dal.NewQualifiedRootCollectionRef("main", "Customer", "c")),
+		},
 		"single int comparison": fakeQuery{
 			from:  rootFrom(),
 			where: dal.WhereField("age", dal.GreaterOrEqual, 18),
@@ -93,6 +96,7 @@ func TestEqual_detectsDifferences(t *testing.T) {
 		fakeQuery{from: rootFrom(), where: dal.WhereField("age", dal.GreaterThen, 18)},     // operator
 		fakeQuery{from: rootFrom(), limit: 1, where: dal.WhereField("age", dal.Equal, 18)}, // limit
 		fakeQuery{from: dal.From(dal.NewRootCollectionRef("orders", ""))},                  // from
+		fakeQuery{from: dal.From(dal.NewQualifiedRootCollectionRef("main", "users", ""))},  // schema
 	}
 	for i, d := range diffs {
 		if Equal(base, d) {

@@ -51,6 +51,7 @@ func TestEqual_topLevelDifferences(t *testing.T) {
 func TestFromEqual(t *testing.T) {
 	root := rootFrom()
 	other := dal.From(dal.NewRootCollectionRef("orders", ""))
+	qualified := dal.From(dal.NewQualifiedRootCollectionRef("main", "users", ""))
 	groupRef := dal.From(dal.NewCollectionGroupRef("users", ""))
 	cases := []struct {
 		name string
@@ -63,6 +64,7 @@ func TestFromEqual(t *testing.T) {
 		{"a not root collection", groupRef, root, false},
 		{"b not root collection", root, groupRef, false},
 		{"different name", root, other, false},
+		{"different schema", root, qualified, false},
 		{"equal", root, rootFrom(), true},
 	}
 	for _, c := range cases {

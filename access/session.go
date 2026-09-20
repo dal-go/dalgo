@@ -422,8 +422,14 @@ func resourcesForQuery(query dal.Query) []Resource {
 func resourceForRecordsetSource(source dal.RecordsetSource) Resource {
 	switch source := source.(type) {
 	case dal.CollectionRef:
+		if source.Schema() != "" {
+			return OpaqueQuery(source.Path())
+		}
 		return CollectionResourceFor(source.Parent(), source.Name())
 	case *dal.CollectionRef:
+		if source.Schema() != "" {
+			return OpaqueQuery(source.Path())
+		}
 		return CollectionResourceFor(source.Parent(), source.Name())
 	case dal.CollectionGroupRef:
 		return CollectionGroup(source.Name())
