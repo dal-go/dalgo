@@ -321,9 +321,10 @@ q := dal.From(cities).NewQuery().
 ## 🔎 Queries
 
 DALgo includes a structured query builder for common database-style reads:
-filters, ordering, joins, column projection, and aggregation. Adapter support is
-capability-based, so tests can share the same query shape and skip a backend
-cleanly when it reports `dal.ErrNotSupported`.
+filters, ordering, joins, column projection, and aggregation. Aggregation uses
+granular provider capabilities: full native execution where possible, ordered
+streaming when a provider can sort raw rows by group keys, and a typed hash
+fallback otherwise.
 
 ```go
 q := dal.From(dal.NewRootCollectionRef("cities", "")).NewQuery().
@@ -341,7 +342,8 @@ records, err := dal.ExecuteQueryAndReadAllToRecords(ctx, q, db)
 Recent query capabilities include:
 
 - Column projection through `SelectColumns`.
-- `GROUP BY`, `HAVING`, and aggregate functions such as `COUNT(*)` and `SUM`.
+- `GROUP BY`, alias-aware `HAVING`, ungrouped aggregates, DISTINCT
+  `COUNT`/`SUM`/`AVG`, `MIN`/`MAX`, and deterministic `FIRST`/`LAST`.
 - Inner and left equi-joins in the structured query model.
 - Source-qualified field references for joins and `ORDER BY`.
 - Recordset readers with typed columns where the adapter supports columnar

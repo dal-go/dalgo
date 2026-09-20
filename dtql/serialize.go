@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strings"
 
 	"github.com/dal-go/dalgo/dal"
 	"gopkg.in/yaml.v3"
@@ -55,11 +56,8 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 	if len(from.Joins()) > 0 {
 		return document{}, fmt.Errorf("joins are not supported by DTQL")
 	}
-	if len(q.GroupBy()) > 0 {
-		return document{}, fmt.Errorf("GroupBy is not supported by DTQL")
-	}
-	if q.Having() != nil {
-		return document{}, fmt.Errorf("Having is not supported by DTQL")
+	if err := dal.ValidateAggregation(q); err != nil {
+		return document{}, fmt.Errorf("invalid aggregation: %w", err)
 	}
 	if q.StartFrom() != "" {
 		return document{}, fmt.Errorf("cursor (StartFrom) is not supported by DTQL")
@@ -107,6 +105,20 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 		}
 		doc.Where = c
 	}
+	for i, group := range q.GroupBy() {
+		expr, err := exprToYAML(group)
+		if err != nil {
+			return document{}, fmt.Errorf("groupBy #%d: %w", i, err)
+		}
+		doc.GroupBy = append(doc.GroupBy, expr)
+	}
+	if having := q.Having(); having != nil {
+		c, err := condToYAML(having)
+		if err != nil {
+			return document{}, fmt.Errorf("having: %w", err)
+		}
+		doc.Having = c
+	}
 	for i, o := range q.OrderBy() {
 		expr, err := exprToYAML(o.Expression())
 		if err != nil {
@@ -135,10 +147,7 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 func exprToYAML(expr dal.Expression) (exprYAML, error) {
 	switch e := expr.(type) {
 	case dal.FieldRef:
-		if e.Source() != "" {
-			return exprYAML{}, fmt.Errorf("qualified field references are not supported by DTQL")
-		}
-		return exprYAML{Field: e.Name()}, nil
+		return exprYAML{Field: e.Name(), Source: e.Source()}, nil
 	case dal.Constant:
 		if !portableScalar(e.Value) {
 			return exprYAML{}, fmt.Errorf("unsupported constant value %T", e.Value)
@@ -152,8 +161,34 @@ func exprToYAML(expr dal.Expression) (exprYAML, error) {
 		return exprYAML{Values: e.Value}, nil
 	case dal.Param:
 		return exprYAML{Param: e.Name}, nil
+	case dal.StarExpression:
+		return exprYAML{Star: true}, nil
+	case dal.AggregateFunc:
+		args := make([]exprYAML, len(e.FuncArgs()))
+		for i, arg := range e.FuncArgs() {
+			encoded, err := exprToYAML(arg)
+			if err != nil {
+				return exprYAML{}, fmt.Errorf("aggregate argument #%d: %w", i, err)
+			}
+			args[i] = encoded
+		}
+		distinct := false
+		if d, ok := e.(dal.DistinctAggregateFunc); ok {
+			distinct = d.IsDistinct()
+		}
+		return exprYAML{Aggregate: &aggregateYAML{Function: strings.ToLower(e.FuncName()), Distinct: distinct, Args: args}}, nil
+	case dal.BinaryExpression:
+		left, err := exprToYAML(e.Left)
+		if err != nil {
+			return exprYAML{}, fmt.Errorf("binary left: %w", err)
+		}
+		right, err := exprToYAML(e.Right)
+		if err != nil {
+			return exprYAML{}, fmt.Errorf("binary right: %w", err)
+		}
+		return exprYAML{Binary: &binaryYAML{Op: string(e.Operator), Left: &left, Right: &right}}, nil
 	default:
-		return exprYAML{}, fmt.Errorf("unsupported expression %T (only field references, constants, arrays and parameters are supported)", expr)
+		return exprYAML{}, fmt.Errorf("unsupported expression %T", expr)
 	}
 }
 

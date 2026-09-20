@@ -3,90 +3,111 @@ format: https://specscore.md/plan-specification
 status: Implemented
 ---
 
-# Plan: GROUP BY with aggregation in the query builder, executed by dalgo2memory
+# Plan: Provider-independent GROUP BY and aggregation
 
 **Status:** Implemented
 **Source Feature:** query-group-by-aggregation
-**Date:** 2026-06-05
+**Date:** 2026-09-20
 **Owner:** alex
 **Supersedes:** —
 
 ## Summary
 
-Decomposes the `query-group-by-aggregation` Feature into eight linear tasks: three `dal` builder additions (`GroupBy`, `Having`, `COUNT(*)`), then the `dalgo2memory` grouping engine built up incrementally — single-source aggregation, the SELECT-grouping hard-error, `HAVING` evaluation, grouped ordering, and finally the join path. All twelve acceptance criteria are covered by a task; none are deferred.
+Extend the existing DALgo grouping feature across the YAML codec, validation,
+capability planning, generic ordered/hash execution, SQLite native rendering,
+parity tests, and public reference documentation.
 
 ## Approach
 
-The Feature is a builder capability plus an executor that consumes it, so the order is build-the-input then consume-it, and the executor is grown one concern at a time to keep each task in one focused session. Tasks 1–3 add the `dal` surface (`GroupBy`, the new `Having` clause, and the `COUNT(*)` star expression) — pure builder/`String()` work with no execution semantics. Task 4 introduces the single-source grouping path in `dalgo2memory` (partition by group-key tuple, evaluate aggregates with SQL null-skipping) gated behind a non-empty `GroupBy()`, which also establishes the empty-`GroupBy()` passthrough. Task 5 adds the up-front hard-error validation the grouping path needs. Task 6 adds `HAVING` evaluation (alias and aggregate-expression operand forms, including an aggregate used only in `HAVING`). Task 7 applies `ORDER BY`/`LIMIT`/`OFFSET` to the grouped rows. Task 8 routes the join executor through the same grouping pass. Task 4 depends on Tasks 1+3; Task 6 depends on Tasks 2+4; Tasks 5, 7, and 8 each depend on Task 4's grouping path.
+Preserve the existing StructuredQuery surface and AggregateFunc interface.
+Add optional expression/capability extensions, central validation and an
+inspectable physical plan. Intercept only aggregate queries in `dal.NewDB`, so
+ordinary reads remain unchanged. Keep SQL as one provider implementation, not
+as the source of DTQL semantics.
 
 ## Tasks
 
-### Task 1: GroupBy builder method on dal.QueryBuilder
+### Task 1: Extend expression and validation model
 
-**Verifies:** query-group-by-aggregation#ac:group-by-recorded
+**Verifies:** query-group-by-aggregation#ac:all-functions, query-group-by-aggregation#ac:invalid-selection, query-group-by-aggregation#ac:aliases, query-group-by-aggregation#ac:deterministic-first-last
 **Status:** complete
 
-Add a chainable `GroupBy(expressions ...dal.Expression) dal.IQueryBuilder` to `QueryBuilder` and the `IQueryBuilder` interface, appending to `structuredQuery.groupBy` exactly as `OrderBy` appends to `orderBy`, so `GroupBy()` returns the expressions while a query on which `GroupBy` was never called reports an empty `GroupBy()`.
+Add DISTINCT, FIRST/LAST, star introspection, arithmetic expressions, grouping
+validation, aliases and deterministic-order validation without breaking the
+existing AggregateFunc interface.
 
-### Task 2: Having clause — getter, field, builder, and String() rendering
+### Task 2: Extend canonical DTQL YAML
 
-**Verifies:** query-group-by-aggregation#ac:having-recorded-and-rendered
+**Verifies:** query-group-by-aggregation#ac:yaml-round-trip, query-group-by-aggregation#ac:omitted-projection
+**Depends-On:** 1
 **Status:** complete
 
-Add `Having() dal.Condition` to `StructuredQuery`, a `having Condition` field on `structuredQuery`, and a `Having(conditions ...dal.Condition) dal.IQueryBuilder` builder method that AND-combines multiple conditions like `Where`; render the `HAVING` clause in `structuredQuery.String()` immediately after the `GROUP BY` block.
+Add recursive aggregate/binary shapes, `groupBy`, `having`, schema generation,
+structural equality, validation and canonical `columns`-last examples.
 
-### Task 3: COUNT(*) star expression and Count() builder
+### Task 3: Add granular planning
 
-**Verifies:** query-group-by-aggregation#ac:count-star-expressible
+**Verifies:** query-group-by-aggregation#ac:native-plan, query-group-by-aggregation#ac:streaming-plan, query-group-by-aggregation#ac:hash-plan
+**Depends-On:** 1
 **Status:** complete
 
-Add a star/row `Expression` to the `dal` query model and a `Count()` builder defined as an alias for `Count(*)`, rendering as `COUNT(*)` in `String()`, while the existing `CountAs(field, alias)` keeps its field-count semantics.
+Add provider capability structs and an inspectable native/ordered/hash physical
+strategy with conservative defaults.
 
-### Task 4: dalgo2memory single-source grouping and aggregate evaluation
+### Task 4: Implement generic local aggregation
 
-**Verifies:** query-group-by-aggregation#ac:single-source-grouping-with-aggregates, query-group-by-aggregation#ac:all-null-group-aggregates-null, query-group-by-aggregation#ac:empty-groupby-unchanged
+**Verifies:** query-group-by-aggregation#ac:all-functions, query-group-by-aggregation#ac:streaming-plan, query-group-by-aggregation#ac:hash-plan, query-group-by-aggregation#ac:unsafe-limit
+**Depends-On:** 3
+**Status:** complete
+
+Build per-aggregate states, typed composite group keys, ordered incremental
+finalization, hash fallback, DISTINCT limits, aliases, HAVING, final ordering,
+pagination, and implicit empty grouping for records and recordsets.
+
+### Task 5: Preserve logical stage order
+
+**Verifies:** query-group-by-aggregation#ac:stage-order, query-group-by-aggregation#ac:unsafe-limit, query-group-by-aggregation#ac:aliases
+**Depends-On:** 4
+**Status:** complete
+
+Rewrite local source queries to retain WHERE, clear result-stage operations,
+request grouping order only for streaming, and apply HAVING/order/offset/limit
+to finalized group rows.
+
+### Task 6: Implement SQLite native aggregation
+
+**Verifies:** query-group-by-aggregation#ac:native-plan, query-group-by-aggregation#ac:aliases
 **Depends-On:** 1, 3
 **Status:** complete
 
-When `q.GroupBy()` is non-empty, partition the WHERE-matched rows into groups keyed by the ordered group-key tuple (resolved via the shared per-source resolver) and emit one row per group, evaluating `SUM`/`COUNT`/`MIN`/`MAX`/`AVG`/`COUNT(*)` with standard SQL null handling (skip nulls; `AVG` divides by non-null count; all-null `SUM`/`AVG`/`MIN`/`MAX` yield `null`; `COUNT(*)` counts all rows) reusing the existing `number()` coercion; an empty `GroupBy()` bypasses the path entirely, leaving today's behavior unchanged.
+Render aggregate and arithmetic expressions, GROUP BY, HAVING, alias rewrites,
+DISTINCT and final ordering; suppress row-identity projection for aggregate
+results and advertise only the supported native subset.
 
-### Task 5: SELECT-grouping-rule hard-error validation
+### Task 7: Verify lifecycle and parity
 
-**Verifies:** query-group-by-aggregation#ac:non-grouped-select-column-errors
-**Depends-On:** 4
+**Verifies:** query-group-by-aggregation#ac:cancellation-errors, query-group-by-aggregation#ac:streaming-plan, query-group-by-aggregation#ac:hash-plan, query-group-by-aggregation#ac:native-plan, query-group-by-aggregation#ac:strategy-parity
+**Depends-On:** 4, 6
 **Status:** complete
 
-Before emitting any group row, reject a grouped query whose SELECT contains a column that is neither an aggregate function expression nor one of the group-by expressions, returning a descriptive error and no rows — consistent with the eager hard-reject `validateColumns` already applies.
+Test cancellation and mid-stream failures, one identical dataset/query across
+native SQLite, ordered streaming and hash execution, plus the
+requested-order-versus-group-order case.
 
-### Task 6: HAVING evaluation over aggregated group rows
+### Task 8: Publish semantics and limitations
 
-**Verifies:** query-group-by-aggregation#ac:having-filters-by-alias, query-group-by-aggregation#ac:having-filters-by-aggregate-expression, query-group-by-aggregation#ac:having-on-unselected-aggregate
-**Depends-On:** 2, 4
+**Verifies:** query-group-by-aggregation#ac:yaml-round-trip, query-group-by-aggregation#ac:all-functions, query-group-by-aggregation#ac:deterministic-first-last
+**Depends-On:** 2, 4, 6
 **Status:** complete
 
-When `q.Having()` is non-nil, evaluate it as a post-aggregation filter over each group's aggregated row and drop failing groups; resolve a `HAVING` operand by either the SELECT alias bound to an aggregate or the aggregate expression itself (both yielding the same per-group value), computing an aggregate referenced only in `HAVING` over the group without adding it to the output row.
-
-### Task 7: grouped ORDER BY / LIMIT / OFFSET
-
-**Verifies:** query-group-by-aggregation#ac:grouped-order-and-limit
-**Depends-On:** 4
-**Status:** complete
-
-For a grouped query, apply `ORDER BY`, `LIMIT`, and `OFFSET` to the post-`HAVING` group rows rather than to the pre-grouping input rows, so ordering and limiting operate on the aggregated result set.
-
-### Task 8: grouping over the join path
-
-**Verifies:** query-group-by-aggregation#ac:join-grouping-qualified
-**Depends-On:** 4
-**Status:** complete
-
-Route `executeJoinQuery` through the same grouping/aggregation pass so group keys and aggregate inputs can reference qualified sources (e.g. `u.country`), reusing the join's existing source-aware resolver, emitting one aggregated row per distinct group across the joined rows.
+Document YAML examples, null/empty/type semantics, execution strategies,
+resource safeguards, collation caveats, and deferred aggregate-local ordering.
 
 ## Open Questions
 
-- Exact name/shape of the star expression and the `Count()`/`CountAll` builder, and the `GroupBy`/`Having` method signatures — settled during implementation.
-- Output-key collision when two selected columns resolve to the same alias/name — the in-scope ACs use distinct keys; last-write-wins vs. error is settled during implementation, consistent with the same open question in `query-column-projection`.
-- `MIN`/`MAX` over non-numeric (string) values — the in-scope ACs aggregate numeric fields; non-numeric ordering semantics are deferred.
+- Add a portable decimal scalar before offering decimal-preserving SUM/AVG.
+- Add aggregate-local order expressions before expanding deterministic
+  FIRST/LAST pushdown.
 
 ---
 *This document follows the https://specscore.md/plan-specification*

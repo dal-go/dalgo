@@ -1,0 +1,52 @@
+from:
+  name: orders
+where:
+  op: ==
+  left:
+    field: status
+  right:
+    value: paid
+groupBy:
+  - field: country
+having:
+  op: '>'
+  left:
+    field: revenue
+  right:
+    value: 10000
+orderBy:
+  - field: revenue
+    desc: true
+columns:
+  - field: country
+  - aggregate:
+      function: count
+      args:
+        - star: true
+    as: orders
+  - aggregate:
+      function: count
+      distinct: true
+      args:
+        - field: customer_id
+    as: customers
+  - aggregate:
+      function: sum
+      args:
+        - field: total
+    as: revenue
+  - aggregate:
+      function: avg
+      args:
+        - field: total
+    as: avg_order
+  - aggregate:
+      function: min
+      args:
+        - field: total
+    as: smallest_order
+  - aggregate:
+      function: max
+      args:
+        - field: total
+    as: largest_order

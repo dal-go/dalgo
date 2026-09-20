@@ -17,11 +17,10 @@ This package imports `dal` but adds **no YAML dependency to `dal`**.
 ## Covered subset
 
 DTQL represents a single `From` (with no `Joins()`) over a **root** `CollectionRef`
-(`Parent() == nil`), the selected `Columns`, the `Where` condition (`Comparison`
-and And/Or `GroupCondition` trees), `OrderBy`, and `Limit`/`Offset`. The
-in-scope expression nodes are field references, constants and constant arrays;
-literal values are carried **inline**. Anything outside this subset — joins,
-`CollectionGroupRef` / parented `CollectionRef`, `GroupBy`, functions/aggregates,
+(`Parent() == nil`), `Where`, `GroupBy`, `Having`, `OrderBy`, `Limit`/`Offset`,
+and the final `Columns` projection. Expressions include fields, constants,
+arrays, parameters, arithmetic, aggregate functions and `COUNT(*)`. Anything
+outside this subset — joins, `CollectionGroupRef` / parented `CollectionRef`,
 a cursor (`StartFrom`), or an operator outside the in-scope set — is **rejected**
 by `Serialize` with a descriptive error rather than silently dropped.
 
@@ -36,15 +35,74 @@ by `Serialize` with a descriptive error rather than silently dropped.
 | `GroupCondition` (And) | `{ and: [ <condition>, ... ] }` |
 | `GroupCondition` (Or) | `{ or: [ <condition>, ... ] }` |
 | `OrderExpression` | a sequence item under `orderBy:`, an expression plus optional `desc: true` |
-| `FieldRef` | `{ field: <name> }` |
+| `GroupBy` | `groupBy: [ <expression>, ... ]` |
+| `Having` | `having: <condition>` |
+| `FieldRef` | `{ field: <name>, source?: <alias> }` |
 | `Constant` | `{ value: <scalar> }` (inline string, bool, int or float) |
 | `Array` | `{ values: [ <scalar>, ... ] }` (inline, for `In` membership) |
 | `Param` | `{ param: <name> }` — a runtime parameter (`$name` in query text), substituted with a constant or array before execution; names are dotted identifiers such as `currentUser` or `principal.roles` |
+| aggregate | `{ aggregate: { function: count|sum|avg|min|max|first|last, distinct?: true, args: [<expr>] } }` |
+| arithmetic | `{ binary: { op: +|-|*|/, left: <expr>, right: <expr> } }` |
+| `COUNT(*)` argument | `{ star: true }` |
 | `Operator` | the `dal.Operator` string itself: `==`, `In`, `>`, `>=`, `<`, `<=` |
 | `Limit` / `Offset` | `limit: <int>` / `offset: <int>` (omitted when zero) |
 
-An expression node sets **exactly one** of `field`, `value`, `values` or
-`param`, which discriminates a `FieldRef`, a `Constant`, an `Array` or a `Param`.
+An expression node sets exactly one discriminator. Aggregate arguments are
+expressions, so `SUM(quantity * unit_price)` needs no later AST redesign.
+Qualified fields keep the source structural, for example
+`{field: country, source: c}`; the source is never flattened into a dotted
+field name.
+
+## Aggregation
+
+DTQL keeps projection at the end of the YAML pipeline:
+
+```yaml
+from:
+  name: orders
+where:
+  op: ==
+  left: {field: status}
+  right: {value: paid}
+groupBy:
+  - field: country
+having:
+  op: '>'
+  left: {field: revenue}
+  right: {value: 10000}
+orderBy:
+  - field: revenue
+    desc: true
+columns:
+  - field: country
+  - aggregate:
+      function: count
+      args: [{star: true}]
+    as: orders
+  - aggregate:
+      function: count
+      distinct: true
+      args: [{field: customer_id}]
+    as: customers
+  - aggregate:
+      function: sum
+      args: [{field: total}]
+    as: revenue
+```
+
+With `groupBy` and no `columns`, grouping expressions are selected implicitly.
+Without `groupBy`, aggregate columns operate on one implicit group. `WHERE`
+filters rows; `HAVING` filters groups; requested ordering, offset and limit
+apply to aggregate rows.
+
+`COUNT(*)` counts rows. Other aggregates ignore nulls except `FIRST`/`LAST`,
+where null is a legitimate first/last value. Empty ungrouped input returns one
+row (`COUNT(*) = 0`, other aggregates null); empty explicit grouping returns no
+rows. `SUM`/`AVG` use finite `float64` accumulation and `COUNT` returns `int64`.
+Arithmetic normalizes numeric operands to `float64`; non-numeric operands and
+division by zero evaluate to null.
+`FIRST`/`LAST` require a provider-declared stable input order; aggregate-local
+ordering is a future extension.
 
 ## Negative projection
 
@@ -92,10 +150,6 @@ when empty/zero, except `from` which is required):
 ```yaml
 from:
   name: users
-columns:
-  - field: name
-  - field: age
-    as: years
 where:
   and:
     - op: '>='
@@ -122,6 +176,10 @@ orderBy:
     desc: true
 limit: 10
 offset: 20
+columns:
+  - field: name
+  - field: age
+    as: years
 ```
 
 For a schema-qualified source, `schema` is a separate optional identifier:
@@ -148,8 +206,8 @@ path resources are defined.
 ## Round-trip guarantees
 
 - **Structural** — `Deserialize(Serialize(q))` reconstructs a `StructuredQuery`
-  structurally equal to `q` across `From`, `Columns`, `Where` (including inline
-  `Constant`/`Array` values), `OrderBy`, `Limit` and `Offset` (see `dtql.Equal`).
+  structurally equal to `q` across `From`, `Where`, `GroupBy`, `Having`,
+  `OrderBy`, `Limit`/`Offset`, and `Columns` (see `dtql.Equal`).
 - **Canonical** — `Serialize` emits a canonical document (stable key order and
   2-space indentation), so `Serialize(Deserialize(d))` is byte-identical to a
   valid in-scope document `d` and saved queries diff cleanly across edits.
@@ -159,7 +217,7 @@ path resources are defined.
 `Deserialize` returns a descriptive error and **no** partially-populated query on
 malformed or schema-invalid input: unknown keys, wrong value types, a missing
 required `from.name`, an unknown operator, a comparison missing `left`/`right`,
-an expression that is not exactly one of `field`/`value`/`values`, or a
+an expression that does not select exactly one expression form, or a
 condition that mixes the comparison and group forms.
 
 ## Published artifacts

@@ -1,5 +1,62 @@
 {
   "$defs": {
+    "aggregate": {
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "items": {
+            "$ref": "#/$defs/expression"
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "type": "array"
+        },
+        "distinct": {
+          "type": "boolean"
+        },
+        "function": {
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max",
+            "first",
+            "last"
+          ]
+        }
+      },
+      "required": [
+        "function",
+        "args"
+      ],
+      "type": "object"
+    },
+    "binary": {
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "$ref": "#/$defs/expression"
+        },
+        "op": {
+          "enum": [
+            "+",
+            "-",
+            "*",
+            "/"
+          ]
+        },
+        "right": {
+          "$ref": "#/$defs/expression"
+        }
+      },
+      "required": [
+        "op",
+        "left",
+        "right"
+      ],
+      "type": "object"
+    },
     "column": {
       "additionalProperties": false,
       "oneOf": [
@@ -22,6 +79,11 @@
         {
           "allOf": [
             {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              },
               "required": [
                 "value"
               ]
@@ -38,6 +100,11 @@
         {
           "allOf": [
             {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              },
               "required": [
                 "values"
               ]
@@ -54,8 +121,76 @@
         {
           "allOf": [
             {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              },
               "required": [
                 "param"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "wildcard"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              },
+              "required": [
+                "star"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "wildcard"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              },
+              "required": [
+                "aggregate"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "wildcard"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              },
+              "required": [
+                "binary"
               ]
             },
             {
@@ -92,6 +227,26 @@
               },
               {
                 "required": [
+                  "star"
+                ]
+              },
+              {
+                "required": [
+                  "aggregate"
+                ]
+              },
+              {
+                "required": [
+                  "binary"
+                ]
+              },
+              {
+                "required": [
+                  "source"
+                ]
+              },
+              {
+                "required": [
                   "as"
                 ]
               }
@@ -103,8 +258,14 @@
         }
       ],
       "properties": {
+        "aggregate": {
+          "$ref": "#/$defs/aggregate"
+        },
         "as": {
           "type": "string"
+        },
+        "binary": {
+          "$ref": "#/$defs/binary"
         },
         "field": {
           "type": "string"
@@ -113,11 +274,19 @@
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
         },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "star": {
+          "const": true
+        },
         "value": {
           "type": [
             "string",
             "number",
-            "boolean"
+            "boolean",
+            "null"
           ]
         },
         "values": {
@@ -125,7 +294,8 @@
             "type": [
               "string",
               "number",
-              "boolean"
+              "boolean",
+              "null"
             ]
           },
           "type": "array"
@@ -182,22 +352,73 @@
           ]
         },
         {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
           "required": [
             "value"
           ]
         },
         {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
           "required": [
             "values"
           ]
         },
         {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
           "required": [
             "param"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
+          "required": [
+            "star"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
+          "required": [
+            "aggregate"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
+          "required": [
+            "binary"
           ]
         }
       ],
       "properties": {
+        "aggregate": {
+          "$ref": "#/$defs/aggregate"
+        },
+        "binary": {
+          "$ref": "#/$defs/binary"
+        },
         "field": {
           "type": "string"
         },
@@ -205,11 +426,19 @@
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
         },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "star": {
+          "const": true
+        },
         "value": {
           "type": [
             "string",
             "number",
-            "boolean"
+            "boolean",
+            "null"
           ]
         },
         "values": {
@@ -217,7 +446,8 @@
             "type": [
               "string",
               "number",
-              "boolean"
+              "boolean",
+              "null"
             ]
           },
           "type": "array"
@@ -284,22 +514,73 @@
           ]
         },
         {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
           "required": [
             "value"
           ]
         },
         {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
           "required": [
             "values"
           ]
         },
         {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
           "required": [
             "param"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
+          "required": [
+            "star"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
+          "required": [
+            "aggregate"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
+          "required": [
+            "binary"
           ]
         }
       ],
       "properties": {
+        "aggregate": {
+          "$ref": "#/$defs/aggregate"
+        },
+        "binary": {
+          "$ref": "#/$defs/binary"
+        },
         "desc": {
           "type": "boolean"
         },
@@ -310,11 +591,19 @@
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
         },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "star": {
+          "const": true
+        },
         "value": {
           "type": [
             "string",
             "number",
-            "boolean"
+            "boolean",
+            "null"
           ]
         },
         "values": {
@@ -322,7 +611,8 @@
             "type": [
               "string",
               "number",
-              "boolean"
+              "boolean",
+              "null"
             ]
           },
           "type": "array"
@@ -365,6 +655,15 @@
     },
     "from": {
       "$ref": "#/$defs/from"
+    },
+    "groupBy": {
+      "items": {
+        "$ref": "#/$defs/expression"
+      },
+      "type": "array"
+    },
+    "having": {
+      "$ref": "#/$defs/condition"
     },
     "limit": {
       "minimum": 0,
