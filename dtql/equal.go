@@ -30,7 +30,22 @@ func Equal(a, b dal.StructuredQuery) bool {
 	if !condEqual(a.Where(), b.Where()) {
 		return false
 	}
+	if !expressionsEqual(a.GroupBy(), b.GroupBy()) || !condEqual(a.Having(), b.Having()) {
+		return false
+	}
 	return orderEqual(a.OrderBy(), b.OrderBy())
+}
+
+func expressionsEqual(a, b []dal.Expression) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !exprEqual(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 func fromEqual(a, b dal.FromSource) bool {
@@ -129,6 +144,25 @@ func exprEqual(a, b dal.Expression) bool {
 	case dal.Array:
 		bv, ok := b.(dal.Array)
 		return ok && ae.Equal(bv)
+	case dal.StarExpression:
+		_, ok := b.(dal.StarExpression)
+		return ok
+	case dal.AggregateFunc:
+		bv, ok := b.(dal.AggregateFunc)
+		if !ok || ae.FuncName() != bv.FuncName() || len(ae.FuncArgs()) != len(bv.FuncArgs()) {
+			return false
+		}
+		ad, bd := false, false
+		if d, ok := ae.(dal.DistinctAggregateFunc); ok {
+			ad = d.IsDistinct()
+		}
+		if d, ok := bv.(dal.DistinctAggregateFunc); ok {
+			bd = d.IsDistinct()
+		}
+		return ad == bd && expressionsEqual(ae.FuncArgs(), bv.FuncArgs())
+	case dal.BinaryExpression:
+		bv, ok := b.(dal.BinaryExpression)
+		return ok && ae.Operator == bv.Operator && exprEqual(ae.Left, bv.Left) && exprEqual(ae.Right, bv.Right)
 	default:
 		return false
 	}

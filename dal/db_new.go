@@ -93,6 +93,15 @@ func (validatedDB) dalgoDB() {}
 
 func (db validatedDB) dalgoBackend() Backend { return db.Backend }
 
+// RunReadonlyTransaction keeps framework query behavior, including generic
+// aggregation fallback, inside a provider transaction.
+func (db validatedDB) RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error {
+	capabilities := queryCapabilitiesOf(db.Backend)
+	return db.Backend.RunReadonlyTransaction(ctx, func(ctx context.Context, tx ReadTransaction) error {
+		return f(ctx, &validatedReadTx{ReadTransaction: tx, capabilities: capabilities})
+	}, options...)
+}
+
 // RunReadwriteTransaction hands the worker a transaction whose writes run
 // through the framework pipeline before reaching the adapter's transaction.
 func (db validatedDB) RunReadwriteTransaction(ctx context.Context, f RWTxWorker, options ...TransactionOption) error {
@@ -124,11 +133,42 @@ func (db *validatedWriteDB) dalgoWithoutValidation() WriteSession {
 // framework write pipeline. Reads and transaction metadata are forwarded
 // unchanged.
 func newValidatedTx(tx ReadwriteTransaction, db DB) *validatedTx {
+	capabilities := QueryCapabilities{}
+	if provider, ok := As[QueryCapabilitiesProvider](db); ok {
+		capabilities = provider.QueryCapabilities()
+	}
 	return &validatedTx{
 		ReadTransaction: tx,
 		writePipeline:   writePipeline{ws: tx, db: db, validate: true},
 		rw:              tx,
+		capabilities:    capabilities,
 	}
+}
+
+type validatedReadTx struct {
+	ReadTransaction
+	capabilities QueryCapabilities
+}
+
+var _ ReadTransaction = (*validatedReadTx)(nil)
+
+func (tx *validatedReadTx) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
+	return executeAggregationRecords(ctx, tx.ReadTransaction, query, tx.capabilities)
+}
+
+// Select preserves the legacy optional transaction surface used by SQL
+// adapters while routing structured aggregation through the same framework
+// planner as ExecuteQueryToRecordsReader.
+func (tx *validatedReadTx) Select(ctx context.Context, query Query) (Reader, error) {
+	if q, ok := query.(StructuredQuery); ok && HasAggregation(q) {
+		return executeAggregationRecords(ctx, tx.ReadTransaction, query, tx.capabilities)
+	}
+	if selector, ok := tx.ReadTransaction.(interface {
+		Select(context.Context, Query) (Reader, error)
+	}); ok {
+		return selector.Select(ctx, query)
+	}
+	return tx.ReadTransaction.ExecuteQueryToRecordsReader(ctx, query)
 }
 
 // validatedTx embeds ReadTransaction for reads and transaction options, and
@@ -137,12 +177,29 @@ func newValidatedTx(tx ReadwriteTransaction, db DB) *validatedTx {
 type validatedTx struct {
 	ReadTransaction
 	writePipeline
-	rw ReadwriteTransaction
+	rw           ReadwriteTransaction
+	capabilities QueryCapabilities
 }
 
 var _ ReadwriteTransaction = (*validatedTx)(nil)
 
 func (tx *validatedTx) ID() string { return tx.rw.ID() }
+
+func (tx *validatedTx) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
+	return executeAggregationRecords(ctx, tx.ReadTransaction, query, tx.capabilities)
+}
+
+func (tx *validatedTx) Select(ctx context.Context, query Query) (Reader, error) {
+	if q, ok := query.(StructuredQuery); ok && HasAggregation(q) {
+		return executeAggregationRecords(ctx, tx.ReadTransaction, query, tx.capabilities)
+	}
+	if selector, ok := tx.ReadTransaction.(interface {
+		Select(context.Context, Query) (Reader, error)
+	}); ok {
+		return selector.Select(ctx, query)
+	}
+	return tx.ReadTransaction.ExecuteQueryToRecordsReader(ctx, query)
+}
 
 func (tx *validatedTx) dalgoWithoutValidation() WriteSession {
 	unvalidated := *tx

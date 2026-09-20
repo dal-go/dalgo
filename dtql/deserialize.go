@@ -55,6 +55,24 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 		}
 		qb.Where(cond)
 	}
+	if len(doc.GroupBy) > 0 {
+		groups := make([]dal.Expression, len(doc.GroupBy))
+		for i, encoded := range doc.GroupBy {
+			expr, err := exprFromYAML(encoded)
+			if err != nil {
+				return nil, fmt.Errorf("invalid DTQL: groupBy #%d: %w", i, err)
+			}
+			groups[i] = expr
+		}
+		qb.GroupBy(groups...)
+	}
+	if doc.Having != nil {
+		condition, err := condFromYAML(*doc.Having)
+		if err != nil {
+			return nil, fmt.Errorf("invalid DTQL: having: %w", err)
+		}
+		qb.Having(condition)
+	}
 
 	orderBy, err := orderFromYAML(doc.OrderBy)
 	if err != nil {
@@ -71,8 +89,11 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 		return nil, err
 	}
 
-	base := qb.SelectIntoRecordset()
-	return reconstructedQuery{StructuredQuery: base, columns: columns}, nil
+	base := reconstructedQuery{StructuredQuery: qb.SelectIntoRecordset(), columns: columns}
+	if err := dal.ValidateAggregation(base); err != nil {
+		return nil, fmt.Errorf("invalid DTQL: aggregation: %w", err)
+	}
+	return base, nil
 }
 
 func columnsFromYAML(cols []columnYAML, from fromYAML) ([]dal.Column, error) {
@@ -82,7 +103,7 @@ func columnsFromYAML(cols []columnYAML, from fromYAML) ([]dal.Column, error) {
 	out := make([]dal.Column, 0, len(cols))
 	for i, c := range cols {
 		if c.Wildcard != nil {
-			if c.expressionKeyCount != 0 {
+			if c.expressionKeyCount != 0 || c.sourcePresent {
 				return nil, fmt.Errorf("invalid DTQL: column #%d mixes wildcard and expression forms", i)
 			}
 			if c.asPresent {
@@ -115,6 +136,15 @@ func expressionFieldsSet(e exprYAML) int {
 		set++
 	}
 	if e.Param != "" {
+		set++
+	}
+	if e.Star {
+		set++
+	}
+	if e.Aggregate != nil {
+		set++
+	}
+	if e.Binary != nil {
 		set++
 	}
 	return set
@@ -155,16 +185,19 @@ func orderFromYAML(orders []orderYAML) ([]dal.OrderExpression, error) {
 }
 
 func exprFromYAML(e exprYAML) (dal.Expression, error) {
+	if e.sourcePresent && e.Field == "" {
+		return nil, fmt.Errorf("source is valid only with field")
+	}
 	set := expressionFieldsSet(e)
 	if set == 0 {
-		return nil, fmt.Errorf("expression must set exactly one of field, value, values or param")
+		return nil, fmt.Errorf("expression must set exactly one expression form")
 	}
 	if set > 1 {
-		return nil, fmt.Errorf("expression must set exactly one of field, value, values or param, but several are set")
+		return nil, fmt.Errorf("expression must set exactly one expression form, but several are set")
 	}
 	switch {
 	case e.Field != "":
-		return dal.NewFieldRef("", e.Field), nil
+		return dal.NewFieldRef(e.Source, e.Field), nil
 	case e.Value != nil:
 		if !portableScalar(*e.Value) {
 			return nil, fmt.Errorf("value must be a scalar")
@@ -175,6 +208,35 @@ func exprFromYAML(e exprYAML) (dal.Expression, error) {
 			return nil, fmt.Errorf("invalid parameter name %q", e.Param)
 		}
 		return dal.Param{Name: e.Param}, nil
+	case e.Star:
+		return dal.Star(), nil
+	case e.Aggregate != nil:
+		if e.Aggregate.Function == "" {
+			return nil, fmt.Errorf("aggregate.function is required")
+		}
+		args := make([]dal.Expression, len(e.Aggregate.Args))
+		for i, encoded := range e.Aggregate.Args {
+			arg, err := exprFromYAML(encoded)
+			if err != nil {
+				return nil, fmt.Errorf("aggregate argument #%d: %w", i, err)
+			}
+			args[i] = arg
+		}
+		aggregate := dal.NewAggregate(e.Aggregate.Function, e.Aggregate.Distinct, args...)
+		return aggregate, nil
+	case e.Binary != nil:
+		if e.Binary.Left == nil || e.Binary.Right == nil {
+			return nil, fmt.Errorf("binary requires left and right")
+		}
+		left, err := exprFromYAML(*e.Binary.Left)
+		if err != nil {
+			return nil, fmt.Errorf("binary left: %w", err)
+		}
+		right, err := exprFromYAML(*e.Binary.Right)
+		if err != nil {
+			return nil, fmt.Errorf("binary right: %w", err)
+		}
+		return dal.Binary(left, dal.ArithmeticOperator(e.Binary.Op), right), nil
 	default: // e.Values != nil
 		if !portableScalarArray(e.Values) {
 			return nil, fmt.Errorf("values must be an array of scalars")

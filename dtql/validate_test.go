@@ -79,6 +79,8 @@ func TestSchemaRejectsInvalid(t *testing.T) {
 		"empty wildcard exclusions": "from:\n  name: users\ncolumns:\n  - wildcard:\n      exclude: []\n",
 		"wildcard mixed with field": "from:\n  name: users\ncolumns:\n  - field: id\n    wildcard:\n      exclude: [email]\n",
 		"wildcard with alias":       "from:\n  name: users\ncolumns:\n  - wildcard:\n      exclude: [email]\n    as: rest\n",
+		"empty field source":        "from: {name: users}\ncolumns: [{field: id, source: ''}]\n",
+		"wildcard sibling source":   "from: {name: users}\ncolumns: [{source: u, wildcard: {exclude: [email]}}]\n",
 	}
 	for name, doc := range invalid {
 		t.Run(name, func(t *testing.T) {

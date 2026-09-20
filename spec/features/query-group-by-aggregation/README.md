@@ -3,11 +3,11 @@ format: https://specscore.md/feature-specification
 status: Stable
 ---
 
-# Feature: GROUP BY with aggregation in the query builder, executed by dalgo2memory
+# Feature: Provider-independent GROUP BY and aggregation
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-group-by-aggregation?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-group-by-aggregation?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-group-by-aggregation?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/query-group-by-aggregation?op=request-change) |
 **Status:** Stable
-**Date:** 2026-06-05
+**Date:** 2026-09-20
 **Owner:** alex
 **Source Ideas:** query-group-by-aggregation
 **Supersedes:** —
@@ -15,178 +15,185 @@ status: Stable
 
 ## Summary
 
-Adds `GroupBy` and `Having` to `dal.QueryBuilder` (plus a `COUNT(*)` star expression with a `Count()` alias), and teaches `dalgo2memory` to execute grouped queries: partition matched rows into groups, emit one aggregated row per group, evaluate `SUM`/`COUNT`/`MIN`/`MAX`/`AVG` with standard SQL null handling, and filter groups with `HAVING` — for both single-source and join queries. An empty `GroupBy()` keeps today's behavior unchanged.
-
-## Problem
-
-The grouping infrastructure is half-built and unreachable. `dal.StructuredQuery` already exposes `GroupBy() []Expression`, `structuredQuery` carries the `groupBy` field and getter, and `String()` already renders a `GROUP BY` clause — but `IQueryBuilder`/`QueryBuilder` has no setter, so `structuredQuery.groupBy` is never assigned from normal code (the same dead-code trap `query-column-projection` found with `columns`). The aggregate `Column` builders (`SumAs`/`CountAs`/`MinAs`/`MaxAs`/`AverageAs`) exist too, but `dalgo2memory` never reads `q.GroupBy()` and its `validateColumns` actively rejects any non-`FieldRef` column, so those aggregates cannot execute against the in-memory adapter. There is no `Having()` anywhere, and no way to express `COUNT(*)`. This Feature makes GROUP BY a first-class builder capability and gives it a real executor, reusing the source-aware field resolver the join `WHERE`/`ORDER BY` already use.
+DTQL and DALgo represent, validate, plan, and execute aggregation independently
+of any one provider. DTQL uses YAML pipeline order with `columns` last. DALgo
+chooses full native execution, ordered streaming, or hash aggregation from
+granular provider capabilities. SQLite renders its supported subset natively.
 
 ## Behavior
 
-### Expressing grouped queries (the `dal` builder)
+### REQ: yaml-aggregation
 
-#### REQ: group-by-builder
+DTQL MUST serialize and deserialize `groupBy`, aggregate/binary expressions,
+`having`, aliases, and aggregate ordering. Canonical YAML MUST keep `columns`
+after filtering, grouping, HAVING, ordering and pagination. With `groupBy` and
+no `columns`, grouping expressions MUST be the implicit projection.
 
-`dal.QueryBuilder` MUST provide a `GroupBy(expressions ...dal.Expression) dal.IQueryBuilder` method (also on the `IQueryBuilder` interface) that appends the given expressions to the query's group-by list, readable via `GroupBy()`, chainable like `OrderBy`. A query on which `GroupBy` is never called MUST have an empty `GroupBy()`.
+### REQ: aggregate-functions
 
-#### REQ: having-builder
+DALgo MUST represent `COUNT(*)`, `COUNT(expr)`, distinct `COUNT`/`SUM`/`AVG`,
+ordinary `SUM`/`AVG`, `MIN`, `MAX`, `FIRST`, and `LAST`. Arguments MUST be
+expressions, including arithmetic binary expressions. Existing AggregateFunc
+implementers MUST remain source-compatible.
 
-`dal.StructuredQuery` MUST expose `Having() dal.Condition`, backed by a new `having` field on `structuredQuery`. `dal.QueryBuilder` MUST provide a `Having(conditions ...dal.Condition) dal.IQueryBuilder` method (also on `IQueryBuilder`) that records the condition, AND-combining multiple conditions exactly as `Where` does. `structuredQuery.String()` MUST render the `HAVING` clause after the `GROUP BY` clause. A query on which `Having` is never called MUST have a nil `Having()`.
+### REQ: grouping-validation
 
-#### REQ: count-star
+An aggregate query MUST reject output expressions that are neither aggregated
+nor present in `groupBy`. GROUP BY expressions MUST NOT contain aggregates.
+Nested aggregates, unsupported arity, `COUNT(DISTINCT *)`, and DISTINCT on
+MIN/MAX/FIRST/LAST MUST produce descriptive errors. Aliases MAY be used by
+HAVING and result ORDER BY independently of target SQL alias rules.
 
-The `dal` query model MUST provide a way to express `COUNT(*)` — counting all rows in a group regardless of nulls — via a star/row expression, with a `Count()` builder defined as an alias for `Count(*)`. The expression MUST render as `COUNT(*)` in `String()`. The existing `CountAs(field, alias)` MUST retain its field-count (skip-nulls) semantics, distinct from `COUNT(*)`.
+### REQ: logical-stages
 
-### Executing grouped queries (`dalgo2memory`)
+Execution MUST preserve: source, WHERE, grouping, aggregation, HAVING, requested
+result ordering, OFFSET/LIMIT, output. Internal grouping order MUST remain
+separate from requested result order. Result OFFSET/LIMIT MUST NOT be pushed
+into a raw scan below local grouping.
 
-#### REQ: partition-into-groups
+### REQ: value-semantics
 
-When `q.GroupBy()` is non-empty, `dalgo2memory` MUST, after applying `WHERE`, partition the matched rows into groups keyed by the ordered tuple of the group-by expression values — each resolved via the same per-source resolver used by `WHERE`/`ORDER BY` (empty `Source()` → `From` base; non-empty → the recordset whose `Alias()`/`Name()` matches) — and emit exactly one result row per distinct group, for both single-source and join queries.
+COUNT(*) counts rows and returns int64. Other aggregates ignore null, except
+FIRST/LAST where null is a legitimate value. SUM/AVG use finite float64
+accumulation; non-numeric dynamic inputs are ignored. Empty implicit grouping
+returns one row with count zero and other aggregates null; empty explicit
+grouping returns no rows. FIRST/LAST MUST require a declared stable input order
+until aggregate-local ordering exists. Arithmetic MUST normalize numeric
+operands to float64; non-numeric operands and division by zero evaluate to null.
 
-#### REQ: aggregate-evaluation
+### REQ: capabilities-plan
 
-For a grouped query, each selected aggregate function column (`SUM`, `COUNT`, `MIN`, `MAX`, `AVG`, and `COUNT(*)`) MUST be evaluated over the rows of its group using standard SQL null handling: `NULL` inputs are skipped; `AVG` divides the sum by the non-null count; `SUM`/`AVG`/`MIN`/`MAX` over a group with no non-null value yield `NULL`; `COUNT(<field>)` counts non-null values; `COUNT(*)` counts all rows in the group. Numeric inputs reuse the adapter's existing numeric coercion. A selected group-by column resolves to that group's key value.
+DALgo MUST expose additive granular capabilities for GROUP BY, HAVING, result
+ORDER BY, stable input order, and each ordinary/distinct aggregate form. The
+inspectable plan MUST select native execution only when every required stage is
+supported, ordered streaming when grouping keys can be requested as source
+order, and hash aggregation otherwise.
 
-#### REQ: select-grouping-rule
+### REQ: ordered-streaming
 
-When `q.GroupBy()` is non-empty, a selected column that is neither an aggregate function expression nor one of the group-by expressions MUST produce a descriptive error and yield no result rows, before any group row is emitted — consistent with the eager-validation, hard-reject behavior `validateColumns` already applies.
+Ordered streaming MUST consume rows incrementally, retain only the active
+group's aggregate states, finalize HAVING when the key changes, and emit the
+completed row immediately when no downstream result sort requires buffering.
+DISTINCT MUST retain only its per-state value set.
 
-#### REQ: having-filter
+### REQ: hash-fallback
 
-When `q.Having()` is non-nil, `dalgo2memory` MUST evaluate it as a post-aggregation filter over each group's aggregated row and drop the groups for which it is false. A `HAVING` operand MUST resolve an aggregate referenced **either** by its aggregate expression (e.g. `SUM(amount)`) **or** by the SELECT alias bound to that aggregate (e.g. `total`); both forms MUST yield the same per-group value. An aggregate referenced only in `HAVING` (not selected) MUST still be computed over the group and MUST NOT appear in the output row.
+Hash execution MUST use collision-safe typed composite keys and retain aggregate
+states rather than source rows. It MUST finalize HAVING before result ordering,
+OFFSET and LIMIT. Group/distinct entry and retained-key byte limits MUST return
+explicit errors.
 
-#### REQ: grouped-order-limit
+### REQ: sqlite-native
 
-For a grouped query, `ORDER BY`, `LIMIT`, and `OFFSET` MUST be applied to the post-`HAVING` group rows, not to the pre-grouping input rows.
+SQLite MUST render GROUP BY, aggregate expressions, DISTINCT, HAVING, aliases
+rewritten to expressions, result ORDER BY and pagination in SQL clause order.
+It MUST advertise only operations it executes with DALgo semantics. FIRST/LAST
+MUST remain local/unsupported until deterministic aggregate ordering is modeled.
 
-#### REQ: empty-groupby-unchanged
+### REQ: lifecycle
 
-A query with an empty `GroupBy()` MUST behave exactly as before this Feature — the grouping/aggregation path is not entered, and the existing projection / full-record / keys-only behavior is untouched.
+Local readers MUST observe context cancellation, propagate mid-stream provider
+errors, stop upstream reading when downstream completion permits it, and close
+upstream resources.
 
 ## Acceptance Criteria
 
-### AC: group-by-recorded (verifies REQ:group-by-builder)
+### AC: yaml-round-trip (verifies REQ:yaml-aggregation)
 
-**Given** a `dal.QueryBuilder`
-**When** `GroupBy` is called with the field `category`
-**Then** the resulting query's `GroupBy()` returns that one expression, while a query on which `GroupBy` was never called returns an empty `GroupBy()`.
+Given grouped YAML with HAVING, DISTINCT, arithmetic and aliases, deserialize
+then serialize yields the canonical equivalent with `columns` last.
 
-### AC: having-recorded-and-rendered (verifies REQ:having-builder)
+### AC: omitted-projection (verifies REQ:yaml-aggregation)
 
-**Given** a query grouped by `category`
-**When** `Having` is called with a condition `COUNT(*) > 2`
-**Then** `Having()` returns that condition and `String()` renders a `HAVING` clause positioned after the `GROUP BY` clause.
+Given `groupBy: [country, city]` without `columns`, effective output contains
+country and city in that order.
 
-### AC: count-star-expressible (verifies REQ:count-star)
+### AC: all-functions (verifies REQ:aggregate-functions, REQ:value-semantics)
 
-**Given** the `dal` query model
-**When** a column is built via `Count()`
-**Then** it equals the `Count(*)` star form, renders as `COUNT(*)`, and is distinct from `CountAs("amount", "n")` which counts a field.
+Grouped and ungrouped queries cover count star/expression/distinct, sum and avg
+ordinary/distinct, min, max, first and last, including nulls and empty input.
 
-### AC: single-source-grouping-with-aggregates (verifies REQ:partition-into-groups, REQ:aggregate-evaluation)
+### AC: invalid-selection (verifies REQ:grouping-validation)
 
-**Given** a single-source collection with three rows in category `A` (amounts `10`, `20`, `null`) and one row in category `B` (amount `5`), grouped by `category`, selecting `category`, `Count(*)` as `n`, `SumAs(amount,"total")`, and `AverageAs(amount,"avg")`
-**When** it is executed by `dalgo2memory`
-**Then** exactly two rows are returned — `A` with `n=3`, `total=30`, `avg=15` (the null amount skipped, so avg divides by 2); `B` with `n=1`, `total=5`, `avg=5`.
+Grouping by country while selecting city without aggregation fails before any
+result row is emitted.
 
-### AC: join-grouping-qualified (verifies REQ:partition-into-groups)
+### AC: aliases (verifies REQ:grouping-validation)
 
-**Given** an INNER join of `users u` and `orders o` grouped by `u.country`, selecting `u.country` and `Count(*)` as `orders`
-**When** it is executed
-**Then** exactly one row per distinct country is returned, each carrying the count of joined `u`/`o` rows for that country.
+HAVING and ORDER BY referencing a SELECT aggregate alias produce the same values
+as the equivalent aggregate-expression form.
 
-### AC: non-grouped-select-column-errors (verifies REQ:select-grouping-rule)
+### AC: stage-order (verifies REQ:logical-stages)
 
-**Given** a query grouped by `category` that selects a non-aggregate column `name` which is not in the `GROUP BY` list
-**When** it is executed
-**Then** it returns a descriptive error and yields no result rows.
+WHERE filters input, HAVING filters finalized groups, requested ordering differs
+from internal group order, and OFFSET/LIMIT select aggregate rows rather than raw
+rows.
 
-### AC: all-null-group-aggregates-null (verifies REQ:aggregate-evaluation)
+### AC: native-plan (verifies REQ:capabilities-plan, REQ:sqlite-native)
 
-**Given** a single-source collection where every row of group `A` has a `null` `amount`, grouped by `category`, selecting `SumAs(amount,"total")`, `MaxAs(amount,"hi")`, and `Count(*)` as `n`
-**When** it is executed
-**Then** group `A`'s row has `total=null` and `hi=null` while `n` equals the row count of the group.
+A SQLite query whose required aggregate forms are advertised uses native SQL
+with GROUP BY/HAVING/DISTINCT and returns the expected result.
 
-### AC: having-filters-by-alias (verifies REQ:having-filter)
+### AC: streaming-plan (verifies REQ:capabilities-plan, REQ:ordered-streaming)
 
-**Given** the rows grouped by `category` (group `A` total `30`, group `B` total `5`), `SumAs(amount,"total")` selected, with `HAVING total > 10`
-**When** it is executed
-**Then** only group `A` is returned; group `B` is dropped.
+A provider advertising ORDER BY but not GROUP BY receives grouping-key source
+ordering and produces correct aggregate rows incrementally.
 
-### AC: having-filters-by-aggregate-expression (verifies REQ:having-filter)
+### AC: hash-plan (verifies REQ:capabilities-plan, REQ:hash-fallback)
 
-**Given** the same grouping with `HAVING SUM(amount) > 10` (the aggregate-expression form)
-**When** it is executed
-**Then** the result is identical to the alias form — only group `A` is returned.
+A provider advertising neither grouping nor useful ordering produces the same
+observable rows as ordered streaming.
 
-### AC: having-on-unselected-aggregate (verifies REQ:having-filter)
+### AC: strategy-parity (verifies REQ:capabilities-plan, REQ:value-semantics, REQ:sqlite-native)
 
-**Given** rows grouped by `category` selecting only `category` and `Count(*)` as `n`, with `HAVING SUM(amount) > 10` where `SUM(amount)` is not selected
-**When** it is executed
-**Then** group `A` (sum `30`) is returned and group `B` (sum `5`) is dropped, and each output row contains only `category` and `n` — no `SUM` value is added to the output.
+One identical dataset and logical query produce equivalent observable rows via
+native SQLite, ordered streaming and hash execution, including portable numeric
+normalization and binary string equality.
 
-### AC: grouped-order-and-limit (verifies REQ:grouped-order-limit)
+### AC: unsafe-limit (verifies REQ:logical-stages)
 
-**Given** rows producing three groups with `Count(*)` values `5`, `3`, and `1`, grouped and ordered by `Count(*)` descending with `LIMIT 2`
-**When** it is executed
-**Then** exactly the two highest-count groups are returned, in descending count order.
+Local aggregation clears source OFFSET/LIMIT and applies them only after HAVING
+and requested result ordering.
 
-### AC: empty-groupby-unchanged (verifies REQ:empty-groupby-unchanged)
+### AC: deterministic-first-last (verifies REQ:value-semantics)
 
-**Given** a query with no `GroupBy` call (empty `GroupBy()`)
-**When** it is executed by `dalgo2memory`
-**Then** it returns records exactly as before this Feature, with no grouping or aggregation applied.
+FIRST/LAST include null and execute with declared stable input order; planning
+without that guarantee returns an explicit deterministic-order error.
+
+### AC: cancellation-errors (verifies REQ:lifecycle)
+
+Cancellation closes the upstream reader and a provider error after one or more
+rows is returned unchanged to the caller.
 
 ## Architecture & Components
 
-- **`dal` builder.** New chainable `GroupBy(expressions ...Expression) IQueryBuilder` and `Having(conditions ...Condition) IQueryBuilder` on `QueryBuilder` (and `IQueryBuilder`); `GroupBy` appends to `structuredQuery.groupBy`, `Having` records onto a new `having Condition` field (AND-combined like `Where`'s `conditions`). `StructuredQuery` gains `Having() Condition`; `String()` renders `HAVING` after the existing `GROUP BY` block. A new star/row `Expression` plus a `Count()` builder (alias for `Count(*)`) extend `q_functions.go` alongside the existing `CountAs`.
-- **`dalgo2memory` grouping engine.** When `q.GroupBy()` is non-empty, both `ExecuteQueryToRecordsReader` (single-source) and `executeJoinQuery` (join) route through a grouping pass: validate selected columns (each must be an aggregate `function` or a group-by expression, else error before rows), partition WHERE-matched rows by the group-key tuple via the shared per-source resolver, evaluate each selected aggregate per group (reusing the existing `number()` coercion), build the aggregated output row keyed by alias/field-name, apply `Having()` over that row, then apply `ORDER BY`/`LIMIT`/`OFFSET` to the surviving group rows. Empty `GroupBy()` bypasses the pass entirely.
-- **HAVING resolver.** A small operand resolver that maps a `HAVING` operand to a per-group value by matching either the SELECT alias→value map or an aggregate expression evaluated over the group (computing it on demand when it is not in SELECT), then feeds the existing `Condition` evaluator (`matchesWhere`-style).
-
-## Data Flow
-
-`GroupBy(exprs...)`/`Having(conds...)` record on the `StructuredQuery` → `dalgo2memory` checks `q.GroupBy()`; if empty it follows the existing path. If non-empty: validate selected columns (aggregate-or-group-key, else error) → scan/join to WHERE-matched rows → partition rows into groups by the group-key tuple → per group, resolve group-key columns and evaluate aggregate columns (null-skipping, `number()` coercion) into one output row → evaluate `Having()` over each group row (operand resolved by alias or aggregate expression) and drop failing groups → apply `ORDER BY`/`LIMIT`/`OFFSET` to the group rows → records with map data.
+- `dal/q_functions.go` and `dal/q_binary.go`: backward-compatible aggregate and
+  scalar expression model.
+- `dal/aggregation_plan.go`: validation, capabilities and inspectable strategy.
+- `dal/aggregation_execute.go`: framework wrapper, ordered stream and hash state.
+- `dtql`: canonical recursive YAML codec and generated schema.
+- `dalgo2sql/sqlite_emit.go`: native SQLite compilation and alias rewriting.
 
 ## Error Handling & Failure Modes
 
-- Selected column that is neither an aggregate nor a group-by expression → descriptive error, no rows (`REQ:select-grouping-rule`).
-- A group-by or aggregate `FieldRef` naming a non-empty source that matches no recordset → descriptive error, no rows — consistent with the existing `WHERE`/`ORDER BY`/projection unresolvable-source behavior.
-- An aggregate over a group with no non-null value yields a `null` cell (not an error); `COUNT` of such a group yields `0`/the row count, never `null`.
-- A `HAVING` operand referencing an alias/aggregate that resolves to nothing computable → descriptive error, no rows.
-
-## Testing Strategy
-
-Table tests in `dal` (the `GroupBy`/`Having` methods record and `String()` renders them in order; `Count()` equals `Count(*)` and renders `COUNT(*)`) and in `dalgo2memory` (single-source grouping with `COUNT(*)`/`SUM`/`AVG` and a null amount; all-null group yields null aggregates; join grouping by a qualified key; the non-grouped-select-column error; `HAVING` by alias, by aggregate expression, and on an unselected aggregate; grouped `ORDER BY` + `LIMIT`; empty-`GroupBy()` unchanged). `dalgo2memory` MUST remain at 100% statement coverage, exercising every branch of the grouping, aggregation, validation, and `HAVING` paths.
-
-## Rehearse Integration
-
-All ACs are testable through pure Go — `dal` builder calls and `dalgo2memory` execution over in-memory collections — so they map directly to table tests (see `## Testing Strategy`). Per-AC Rehearse stub files are deferred to the Plan, where each AC becomes a concrete `*_test.go` case; the rehearsal surface is the Go test suite.
+Unsupported expression shapes, aggregate combinations, unstable FIRST/LAST,
+non-portable group keys, non-finite native or local accumulation and exhausted
+resource budgets are explicit errors. Provider/cancellation errors are not
+converted into partial success. Native/local collation differences remain provider-visible and MUST be
+reflected by conservative capability declarations.
 
 ## Out of Scope
 
-- DTQL serialization of `GROUP BY`/`HAVING` — `dtql/serialize.go` already rejects `GroupBy` as unsupported; left unchanged.
-- SQL adapters (`dalgo2sql`/`dalgo2sqlite`) — separate repos, unblocked by the shared `dal` capability.
-- `DISTINCT`, `GROUPING SETS`/`ROLLUP`/`CUBE`, and window functions — only flat `GROUP BY` is in scope.
-- New aggregate functions beyond the existing `SUM`/`COUNT`/`MIN`/`MAX`/`AVG` (plus the `COUNT(*)` star form) — no other function builders are added.
-- The columnar `ExecuteQueryToRecordsetReader` — stays `ErrNotSupported`; aggregation lands in the `RecordsReader` path as map records.
-
-## Assumption Carryover
-
-From the source Idea `query-group-by-aggregation`:
-
-- **Carried (Must):** `GroupBy`/`Having` terminals fit `dal.QueryBuilder` without disrupting the existing terminals — validated by `AC:group-by-recorded`, `AC:having-recorded-and-rendered`.
-- **Carried (Must):** the source-aware resolver computes group-key tuples and aggregate inputs over single-source and join rows — validated by `AC:single-source-grouping-with-aggregates`, `AC:join-grouping-qualified`.
-- **Carried (Must):** `validateColumns`/`projectRow` extend to evaluate aggregate `function` expressions and enforce the group-key-or-aggregate SELECT rule — validated by `AC:single-source-grouping-with-aggregates`, `AC:non-grouped-select-column-errors`.
-- **Resolved (was Should):** `HAVING` reuses `dal.Condition`, evaluated post-grouping, with operands by alias or aggregate expression — now `REQ:having-filter`, validated by the three `having-*` ACs.
-- **Carried (Should):** empty `GroupBy()` preserves today's behavior — validated by `AC:empty-groupby-unchanged`.
-- **Resolved decisions:** hard-error on the SELECT-grouping rule; `COUNT(*)` star expression with `Count()` alias; standard-SQL null skipping — now `REQ:select-grouping-rule`, `REQ:count-star`, `REQ:aggregate-evaluation`.
-- **Deferred (Might):** whether consumers adopt in-memory aggregation — not validated here; the capability is delivered regardless.
+JOIN implementation, ROLLUP, CUBE, GROUPING SETS, window functions,
+percentiles/statistical aggregates, distributed aggregation and disk spilling.
+Qualified fields remain representable for future JOIN work.
 
 ## Open Questions
 
-- Exact name/shape of the star expression and the `Count()`/`CountAll` builder, and the `GroupBy`/`Having` method signatures — implementation details for the Plan.
-- Output-key collision when two selected columns resolve to the same alias/name — out of the MVP ACs (distinct keys used); last-write-wins vs. error is a Plan-time decision, consistent with the same open question in `query-column-projection`.
-- `MIN`/`MAX` over non-numeric (string) values — the in-scope ACs aggregate numeric fields; ordering semantics for non-numeric aggregates is deferred.
+- Aggregate-local ordering syntax for deterministic FIRST/LAST remains a later
+  compatible extension.
+- Decimal accumulation can be added when DALgo gains a portable decimal scalar;
+  the current cross-provider contract is finite float64.
 
 ---
 *This document follows the https://specscore.md/feature-specification*

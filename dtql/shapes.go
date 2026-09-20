@@ -9,12 +9,16 @@ import (
 // document is the YAML representation of an in-scope dal.StructuredQuery.
 // Field order here defines the canonical key order of a DTQL-YAML document.
 type document struct {
-	From    fromYAML     `yaml:"from"`
+	From    fromYAML    `yaml:"from"`
+	Where   *condYAML   `yaml:"where,omitempty"`
+	GroupBy []exprYAML  `yaml:"groupBy,omitempty"`
+	Having  *condYAML   `yaml:"having,omitempty"`
+	OrderBy []orderYAML `yaml:"orderBy,omitempty"`
+	Limit   int         `yaml:"limit,omitempty"`
+	Offset  int         `yaml:"offset,omitempty"`
+	// Columns is deliberately last: DTQL's SELECT/projection stage remains at
+	// the end of the pipeline rather than inheriting SQL's textual order.
 	Columns []columnYAML `yaml:"columns,omitempty"`
-	Where   *condYAML    `yaml:"where,omitempty"`
-	OrderBy []orderYAML  `yaml:"orderBy,omitempty"`
-	Limit   int          `yaml:"limit,omitempty"`
-	Offset  int          `yaml:"offset,omitempty"`
 }
 
 // fromYAML is the YAML representation of the root dal.CollectionRef source.
@@ -108,13 +112,29 @@ func resolvedYAMLAlias(node *yaml.Node) *yaml.Node {
 }
 
 // exprYAML is the YAML representation of an in-scope dal.Expression.
-// Exactly one of Field / Value / Values / Param is set, which discriminates a
-// FieldRef, a Constant, an Array or a Param respectively.
+// Exactly one discriminator is set.
 type exprYAML struct {
-	Field  string `yaml:"field,omitempty"`  // dal.FieldRef
-	Value  *any   `yaml:"value,omitempty"`  // dal.Constant (inline scalar, including null)
-	Values any    `yaml:"values,omitempty"` // dal.Array (inline sequence)
-	Param  string `yaml:"param,omitempty"`  // dal.Param (runtime parameter, "$name")
+	Field         string         `yaml:"field,omitempty"`
+	Source        string         `yaml:"source,omitempty"`
+	Value         *any           `yaml:"value,omitempty"`
+	Values        any            `yaml:"values,omitempty"`
+	Param         string         `yaml:"param,omitempty"`
+	Star          bool           `yaml:"star,omitempty"`
+	Aggregate     *aggregateYAML `yaml:"aggregate,omitempty"`
+	Binary        *binaryYAML    `yaml:"binary,omitempty"`
+	sourcePresent bool
+}
+
+type aggregateYAML struct {
+	Function string     `yaml:"function"`
+	Distinct bool       `yaml:"distinct,omitempty"`
+	Args     []exprYAML `yaml:"args"`
+}
+
+type binaryYAML struct {
+	Op    string    `yaml:"op"`
+	Left  *exprYAML `yaml:"left"`
+	Right *exprYAML `yaml:"right"`
 }
 
 func (expression *exprYAML) UnmarshalYAML(node *yaml.Node) error {
@@ -172,7 +192,7 @@ func (column *columnYAML) UnmarshalYAML(node *yaml.Node) error {
 	}
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		switch node.Content[i].Value {
-		case "field", "value", "values", "param":
+		case "field", "value", "values", "param", "star", "aggregate", "binary":
 			column.expressionKeyCount++
 		}
 	}
@@ -228,6 +248,12 @@ func encodeExpressionNode(expression exprYAML, extra []yaml.Node) (*yaml.Node, e
 		key, value = "values", expression.Values
 	case expression.Param != "":
 		key, value = "param", expression.Param
+	case expression.Star:
+		key, value = "star", true
+	case expression.Aggregate != nil:
+		key, value = "aggregate", expression.Aggregate
+	case expression.Binary != nil:
+		key, value = "binary", expression.Binary
 	}
 	if key != "" {
 		var encoded yaml.Node
@@ -235,6 +261,9 @@ func encodeExpressionNode(expression exprYAML, extra []yaml.Node) (*yaml.Node, e
 			return nil, err
 		}
 		node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, &encoded)
+		if key == "field" && expression.Source != "" {
+			node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "source"}, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: expression.Source})
+		}
 	}
 	for i := range extra {
 		node.Content = append(node.Content, &extra[i])
@@ -261,6 +290,12 @@ func decodeExpressionNode(node *yaml.Node, expression *exprYAML, extra map[strin
 		switch key {
 		case "field":
 			err = value.Decode(&expression.Field)
+		case "source":
+			expression.sourcePresent = true
+			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" || value.Value == "" {
+				return &yaml.TypeError{Errors: []string{"expression source must be a non-empty string"}}
+			}
+			err = value.Decode(&expression.Source)
 		case "value":
 			var decoded any
 			err = value.Decode(&decoded)
@@ -269,6 +304,22 @@ func decodeExpressionNode(node *yaml.Node, expression *exprYAML, extra map[strin
 			err = value.Decode(&expression.Values)
 		case "param":
 			err = value.Decode(&expression.Param)
+		case "star":
+			err = value.Decode(&expression.Star)
+		case "aggregate":
+			if err = validateExpressionObjectKeys(value, "aggregate", map[string]bool{"function": true, "distinct": true, "args": true}); err != nil {
+				break
+			}
+			var decoded aggregateYAML
+			err = value.Decode(&decoded)
+			expression.Aggregate = &decoded
+		case "binary":
+			if err = validateExpressionObjectKeys(value, "binary", map[string]bool{"op": true, "left": true, "right": true}); err != nil {
+				break
+			}
+			var decoded binaryYAML
+			err = value.Decode(&decoded)
+			expression.Binary = &decoded
 		default:
 			if decode := extra[key]; decode != nil {
 				err = decode(value)
@@ -278,6 +329,18 @@ func decodeExpressionNode(node *yaml.Node, expression *exprYAML, extra map[strin
 		}
 		if err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func validateExpressionObjectKeys(node *yaml.Node, label string, allowed map[string]bool) error {
+	if node.Kind != yaml.MappingNode {
+		return &yaml.TypeError{Errors: []string{label + " must be a mapping"}}
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if !allowed[node.Content[i].Value] {
+			return &yaml.TypeError{Errors: []string{"field " + node.Content[i].Value + " not found in " + label}}
 		}
 	}
 	return nil

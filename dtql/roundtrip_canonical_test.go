@@ -12,10 +12,6 @@ limit: 50
 `,
 	"comparison with in array": `from:
   name: users
-columns:
-  - field: name
-  - field: age
-    as: years
 where:
   op: In
   left:
@@ -30,13 +26,13 @@ orderBy:
     desc: true
 limit: 10
 offset: 20
-`,
-	"nested and/or groups": `from:
-  name: users
 columns:
   - field: name
   - field: age
     as: years
+`,
+	"nested and/or groups": `from:
+  name: users
 where:
   and:
     - op: '>='
@@ -63,6 +59,10 @@ orderBy:
     desc: true
 limit: 10
 offset: 20
+columns:
+  - field: name
+  - field: age
+    as: years
 `,
 }
 

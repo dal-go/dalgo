@@ -1,4 +1,46 @@
 $defs:
+  aggregate:
+    additionalProperties: false
+    properties:
+      args:
+        items:
+          $ref: '#/$defs/expression'
+        maxItems: 1
+        minItems: 1
+        type: array
+      distinct:
+        type: boolean
+      function:
+        enum:
+          - count
+          - sum
+          - avg
+          - min
+          - max
+          - first
+          - last
+    required:
+      - function
+      - args
+    type: object
+  binary:
+    additionalProperties: false
+    properties:
+      left:
+        $ref: '#/$defs/expression'
+      op:
+        enum:
+          - +
+          - '-'
+          - '*'
+          - /
+      right:
+        $ref: '#/$defs/expression'
+    required:
+      - op
+      - left
+      - right
+    type: object
   column:
     additionalProperties: false
     oneOf:
@@ -9,20 +51,56 @@ $defs:
               required:
                 - wildcard
       - allOf:
-          - required:
+          - not:
+              required:
+                - source
+            required:
               - value
           - not:
               required:
                 - wildcard
       - allOf:
-          - required:
+          - not:
+              required:
+                - source
+            required:
               - values
           - not:
               required:
                 - wildcard
       - allOf:
-          - required:
+          - not:
+              required:
+                - source
+            required:
               - param
+          - not:
+              required:
+                - wildcard
+      - allOf:
+          - not:
+              required:
+                - source
+            required:
+              - star
+          - not:
+              required:
+                - wildcard
+      - allOf:
+          - not:
+              required:
+                - source
+            required:
+              - aggregate
+          - not:
+              required:
+                - wildcard
+      - allOf:
+          - not:
+              required:
+                - source
+            required:
+              - binary
           - not:
               required:
                 - wildcard
@@ -37,28 +115,47 @@ $defs:
             - required:
                 - param
             - required:
+                - star
+            - required:
+                - aggregate
+            - required:
+                - binary
+            - required:
+                - source
+            - required:
                 - as
         required:
           - wildcard
     properties:
+      aggregate:
+        $ref: '#/$defs/aggregate'
       as:
         type: string
+      binary:
+        $ref: '#/$defs/binary'
       field:
         type: string
       param:
         pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
         type: string
+      source:
+        minLength: 1
+        type: string
+      star:
+        const: true
       value:
         type:
           - string
           - number
           - boolean
+          - "null"
       values:
         items:
           type:
             - string
             - number
             - boolean
+            - "null"
         type: array
       wildcard:
         $ref: '#/$defs/wildcardProjection'
@@ -92,29 +189,64 @@ $defs:
     oneOf:
       - required:
           - field
-      - required:
+      - not:
+          required:
+            - source
+        required:
           - value
-      - required:
+      - not:
+          required:
+            - source
+        required:
           - values
-      - required:
+      - not:
+          required:
+            - source
+        required:
           - param
+      - not:
+          required:
+            - source
+        required:
+          - star
+      - not:
+          required:
+            - source
+        required:
+          - aggregate
+      - not:
+          required:
+            - source
+        required:
+          - binary
     properties:
+      aggregate:
+        $ref: '#/$defs/aggregate'
+      binary:
+        $ref: '#/$defs/binary'
       field:
         type: string
       param:
         pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
         type: string
+      source:
+        minLength: 1
+        type: string
+      star:
+        const: true
       value:
         type:
           - string
           - number
           - boolean
+          - "null"
       values:
         items:
           type:
             - string
             - number
             - boolean
+            - "null"
         type: array
     type: object
   from:
@@ -153,13 +285,41 @@ $defs:
     oneOf:
       - required:
           - field
-      - required:
+      - not:
+          required:
+            - source
+        required:
           - value
-      - required:
+      - not:
+          required:
+            - source
+        required:
           - values
-      - required:
+      - not:
+          required:
+            - source
+        required:
           - param
+      - not:
+          required:
+            - source
+        required:
+          - star
+      - not:
+          required:
+            - source
+        required:
+          - aggregate
+      - not:
+          required:
+            - source
+        required:
+          - binary
     properties:
+      aggregate:
+        $ref: '#/$defs/aggregate'
+      binary:
+        $ref: '#/$defs/binary'
       desc:
         type: boolean
       field:
@@ -167,17 +327,24 @@ $defs:
       param:
         pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
         type: string
+      source:
+        minLength: 1
+        type: string
+      star:
+        const: true
       value:
         type:
           - string
           - number
           - boolean
+          - "null"
       values:
         items:
           type:
             - string
             - number
             - boolean
+            - "null"
         type: array
     type: object
   wildcardProjection:
@@ -206,6 +373,12 @@ properties:
     type: array
   from:
     $ref: '#/$defs/from'
+  groupBy:
+    items:
+      $ref: '#/$defs/expression'
+    type: array
+  having:
+    $ref: '#/$defs/condition'
   limit:
     minimum: 0
     type: integer

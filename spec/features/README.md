@@ -24,7 +24,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [First-class INNER/LEFT joins in dal's query model](query-joins/README.md) | Approved | — |
 | [Source-qualified, multi-key ORDER BY resolution in dalgo2memory](qualified-orderby-resolution/README.md) | Approved | — |
 | [Column selection in the query builder, projected by dalgo2memory](query-column-projection/README.md) | Stable | — |
-| [GROUP BY with aggregation in the query builder, executed by dalgo2memory](query-group-by-aggregation/README.md) | Stable | — |
+| [Provider-independent GROUP BY and aggregation](query-group-by-aggregation/README.md) | Stable | — |
 | [Pluggable per-collection storage engine seam (dalgo2memory)](storage-engine-seam/README.md) | Stable | — |
 | [Serialized storage engine (dalgo2memory default)](serialized-storage/README.md) | Stable | — |
 | [Columnar storage engine (dalgo2memory)](columnar-storage/README.md) | Stable | — |

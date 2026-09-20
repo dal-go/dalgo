@@ -191,6 +191,13 @@ type database struct {
 	collectionSeq map[string]uint64
 }
 
+// QueryCapabilities advertises source ordering only. Aggregation intentionally
+// runs through DALgo's provider-independent ordered-stream engine so the memory
+// adapter is the reference fallback implementation rather than a special case.
+func (db *database) QueryCapabilities() dal.QueryCapabilities {
+	return dal.QueryCapabilities{OrderBy: true, StableRowOrder: true}
+}
+
 func (db *database) ID() string {
 	return "dalgo2memory"
 }

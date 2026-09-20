@@ -17,18 +17,25 @@ const SchemaID = "https://dal-go.github.io/dtql/schema.json"
 // the gen-schema command and re-derived by the freshness test, so the committed
 // schema cannot drift from the types.
 func schemaDocument() map[string]any {
-	scalar := map[string]any{"type": []any{"string", "number", "boolean"}}
+	scalar := map[string]any{"type": []any{"string", "number", "boolean", "null"}}
 	exprProps := map[string]any{
-		"field":  map[string]any{"type": "string"},
-		"value":  scalar,
-		"values": map[string]any{"type": "array", "items": scalar},
-		"param":  map[string]any{"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"},
+		"field":     map[string]any{"type": "string"},
+		"source":    map[string]any{"type": "string", "minLength": 1},
+		"value":     scalar,
+		"values":    map[string]any{"type": "array", "items": scalar},
+		"param":     map[string]any{"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"},
+		"star":      map[string]any{"const": true},
+		"aggregate": map[string]any{"$ref": "#/$defs/aggregate"},
+		"binary":    map[string]any{"$ref": "#/$defs/binary"},
 	}
 	exprOneOf := []any{
 		map[string]any{"required": []any{"field"}},
-		map[string]any{"required": []any{"value"}},
-		map[string]any{"required": []any{"values"}},
-		map[string]any{"required": []any{"param"}},
+		map[string]any{"required": []any{"value"}, "not": map[string]any{"required": []any{"source"}}},
+		map[string]any{"required": []any{"values"}, "not": map[string]any{"required": []any{"source"}}},
+		map[string]any{"required": []any{"param"}, "not": map[string]any{"required": []any{"source"}}},
+		map[string]any{"required": []any{"star"}, "not": map[string]any{"required": []any{"source"}}},
+		map[string]any{"required": []any{"aggregate"}, "not": map[string]any{"required": []any{"source"}}},
+		map[string]any{"required": []any{"binary"}, "not": map[string]any{"required": []any{"source"}}},
 	}
 	// A column is either an expression plus optional alias, or a wildcard
 	// projection. An order is an expression plus the optional direction.
@@ -53,6 +60,10 @@ func schemaDocument() map[string]any {
 			map[string]any{"required": []any{"value"}},
 			map[string]any{"required": []any{"values"}},
 			map[string]any{"required": []any{"param"}},
+			map[string]any{"required": []any{"star"}},
+			map[string]any{"required": []any{"aggregate"}},
+			map[string]any{"required": []any{"binary"}},
+			map[string]any{"required": []any{"source"}},
 			map[string]any{"required": []any{"as"}},
 		}},
 	})
@@ -73,6 +84,24 @@ func schemaDocument() map[string]any {
 			"additionalProperties": false,
 			"properties":           exprProps,
 			"oneOf":                exprOneOf,
+		},
+		"aggregate": map[string]any{
+			"type": "object", "additionalProperties": false,
+			"required": []any{"function", "args"},
+			"properties": map[string]any{
+				"function": map[string]any{"enum": []any{"count", "sum", "avg", "min", "max", "first", "last"}},
+				"distinct": map[string]any{"type": "boolean"},
+				"args":     map[string]any{"type": "array", "minItems": 1, "maxItems": 1, "items": map[string]any{"$ref": "#/$defs/expression"}},
+			},
+		},
+		"binary": map[string]any{
+			"type": "object", "additionalProperties": false,
+			"required": []any{"op", "left", "right"},
+			"properties": map[string]any{
+				"op":    map[string]any{"enum": []any{"+", "-", "*", "/"}},
+				"left":  map[string]any{"$ref": "#/$defs/expression"},
+				"right": map[string]any{"$ref": "#/$defs/expression"},
+			},
 		},
 		"wildcardProjection": map[string]any{
 			"type":                 "object",
@@ -139,11 +168,13 @@ func schemaDocument() map[string]any {
 		"required":             []any{"from"},
 		"properties": map[string]any{
 			"from":    map[string]any{"$ref": "#/$defs/from"},
-			"columns": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/column"}},
 			"where":   map[string]any{"$ref": "#/$defs/condition"},
+			"groupBy": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/expression"}},
+			"having":  map[string]any{"$ref": "#/$defs/condition"},
 			"orderBy": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/order"}},
 			"limit":   map[string]any{"type": "integer", "minimum": 0},
 			"offset":  map[string]any{"type": "integer", "minimum": 0},
+			"columns": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/column"}},
 		},
 		"$defs": defs,
 	}

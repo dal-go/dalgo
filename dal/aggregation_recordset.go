@@ -1,0 +1,82 @@
+package dal
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/dal-go/dalgo/recordset"
+)
+
+// ExecuteQueryToRecordsetReader gives columnar consumers the same generic
+// aggregation fallback as RecordsReader. Native aggregate queries still pass
+// straight through to the provider.
+func (db validatedDB) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	return executeAggregationRecordset(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend), options...)
+}
+
+func (tx *validatedReadTx) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	return executeAggregationRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, options...)
+}
+
+func (tx *validatedTx) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	return executeAggregationRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, options...)
+}
+
+func executeAggregationRecordset(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, options ...recordset.Option) (RecordsetReader, error) {
+	q, ok := query.(StructuredQuery)
+	if !ok || !HasAggregation(q) {
+		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+	}
+	plan, err := PlanAggregation(q, capabilities)
+	if err != nil {
+		return nil, fmt.Errorf("dalgo aggregation: %w", err)
+	}
+	if plan.Strategy == AggregationNative {
+		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+	}
+	reader, err := executeAggregationRecords(ctx, executor, query, capabilities)
+	if err != nil {
+		return nil, err
+	}
+	records, err := ReadAllToRecords(ctx, reader)
+	if err != nil {
+		return nil, err
+	}
+	columns := EffectiveAggregationColumns(q)
+	names := make([]string, len(columns))
+	definitions := make([]recordset.Column[any], len(columns))
+	for i, column := range columns {
+		names[i] = aggregationColumnName(column)
+		definitions[i] = recordset.NewTypedColumn[any](names[i], nil)
+	}
+	name := q.From().Base().Name()
+	if configured := recordset.NewOptions(options...).Name(); configured != "" {
+		name = configured
+	}
+	rs := recordset.NewColumnarRecordset(name, definitions...)
+	for _, rec := range records {
+		data := rec.Data().(map[string]any)
+		row := rs.NewRow()
+		for _, column := range names {
+			_ = row.SetValueByName(column, data[column], rs)
+		}
+	}
+	return &aggregationRecordsetReader{recordset: rs}, nil
+}
+
+type aggregationRecordsetReader struct {
+	recordset *recordset.ColumnarRecordset
+	position  int
+}
+
+func (r *aggregationRecordsetReader) Recordset() recordset.Recordset { return r.recordset }
+func (r *aggregationRecordsetReader) Cursor() (string, error)        { return "", nil }
+func (r *aggregationRecordsetReader) Close() error                   { return nil }
+func (r *aggregationRecordsetReader) Next() (recordset.Row, recordset.Recordset, error) {
+	if r.position >= r.recordset.RowsCount() {
+		return nil, r.recordset, ErrNoMoreRecords
+	}
+	row := r.recordset.GetRow(r.position)
+	r.position++
+	return row, r.recordset, nil
+}
