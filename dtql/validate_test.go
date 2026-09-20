@@ -70,12 +70,15 @@ func TestSerializedValidatesAgainstSchema(t *testing.T) {
 func TestSchemaRejectsInvalid(t *testing.T) {
 	sch := compileSchema(t)
 	invalid := map[string]string{
-		"missing from":     "columns:\n  - field: name\n",
-		"empty schema":     "from:\n  schema: ''\n  name: users\n",
-		"unknown from key": "from:\n  namespace: main\n  name: users\n",
-		"unknown operator": "from:\n  name: users\nwhere:\n  op: \"!=\"\n  left:\n    field: a\n  right:\n    value: 1\n",
-		"unknown top key":  "from:\n  name: users\nbogus: 1\n",
-		"empty expression": "from:\n  name: users\ncolumns:\n  - as: x\n",
+		"missing from":              "columns:\n  - field: name\n",
+		"empty schema":              "from:\n  schema: ''\n  name: users\n",
+		"unknown from key":          "from:\n  namespace: main\n  name: users\n",
+		"unknown operator":          "from:\n  name: users\nwhere:\n  op: \"!=\"\n  left:\n    field: a\n  right:\n    value: 1\n",
+		"unknown top key":           "from:\n  name: users\nbogus: 1\n",
+		"empty expression":          "from:\n  name: users\ncolumns:\n  - as: x\n",
+		"empty wildcard exclusions": "from:\n  name: users\ncolumns:\n  - wildcard:\n      exclude: []\n",
+		"wildcard mixed with field": "from:\n  name: users\ncolumns:\n  - field: id\n    wildcard:\n      exclude: [email]\n",
+		"wildcard with alias":       "from:\n  name: users\ncolumns:\n  - wildcard:\n      exclude: [email]\n    as: rest\n",
 	}
 	for name, doc := range invalid {
 		t.Run(name, func(t *testing.T) {

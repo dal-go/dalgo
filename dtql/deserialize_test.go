@@ -1,6 +1,7 @@
 package dtql
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -62,6 +63,49 @@ func TestQualifiedSourceRoundTrip(t *testing.T) {
 			ref := q.From().Base().(dal.CollectionRef)
 			if ref.Schema() != tt.schema || ref.Name() != "Customer" {
 				t.Fatalf("source = schema %q, name %q; want schema %q, name Customer", ref.Schema(), ref.Name(), tt.schema)
+			}
+			got, err := Serialize(q)
+			if err != nil {
+				t.Fatalf("Serialize: %v", err)
+			}
+			if string(got) != tt.yaml {
+				t.Fatalf("canonical round-trip mismatch\n--- want ---\n%s--- got ---\n%s", tt.yaml, got)
+			}
+		})
+	}
+}
+
+func TestWildcardExclusionRoundTrip(t *testing.T) {
+	tests := []struct {
+		name       string
+		yaml       string
+		wantSource string
+		wantNames  []string
+	}{
+		{
+			name:      "unqualified",
+			yaml:      "from:\n  name: customers\ncolumns:\n  - wildcard:\n      exclude:\n        - email\n        - password_hash\n",
+			wantNames: []string{"email", "password_hash"},
+		},
+		{
+			name:       "qualified with missing and duplicate exclusions",
+			yaml:       "from:\n  name: customers\n  alias: c\ncolumns:\n  - wildcard:\n      source: c\n      exclude:\n        - email\n        - missing\n        - email\n",
+			wantSource: "c",
+			wantNames:  []string{"email", "missing", "email"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q, err := Deserialize([]byte(tt.yaml))
+			if err != nil {
+				t.Fatalf("Deserialize: %v", err)
+			}
+			wildcard := q.Columns()[0].Wildcard
+			if wildcard == nil {
+				t.Fatal("Wildcard = nil")
+			}
+			if wildcard.Source != tt.wantSource || !reflect.DeepEqual(wildcard.Exclude, tt.wantNames) {
+				t.Fatalf("Wildcard = %#v, want source %q exclusions %#v", wildcard, tt.wantSource, tt.wantNames)
 			}
 			got, err := Serialize(q)
 			if err != nil {
@@ -153,6 +197,61 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 		yaml    string
 		wantErr string
 	}{
+		{
+			name:    "wildcard without exclusions",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {}\n",
+			wantErr: "must contain at least one",
+		},
+		{
+			name:    "wildcard with empty exclusion",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {exclude: ['']}\n",
+			wantErr: "must not be empty",
+		},
+		{
+			name:    "wildcard is not a mapping",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: email\n",
+			wantErr: "must be a mapping",
+		},
+		{
+			name:    "wildcard exclusions are not a sequence",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {exclude: email}\n",
+			wantErr: "cannot unmarshal",
+		},
+		{
+			name:    "wildcard with unknown source",
+			yaml:    "from: {name: users, alias: u}\ncolumns:\n  - wildcard: {source: x, exclude: [email]}\n",
+			wantErr: "does not match from name or alias",
+		},
+		{
+			name:    "wildcard mixed with field",
+			yaml:    "from: {name: users}\ncolumns:\n  - field: id\n    wildcard: {exclude: [email]}\n",
+			wantErr: "mixes wildcard and expression",
+		},
+		{
+			name:    "wildcard with alias",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {exclude: [email]}\n    as: rest\n",
+			wantErr: "cannot have an alias",
+		},
+		{
+			name:    "wildcard with explicitly empty alias",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {exclude: [email]}\n    as: ''\n",
+			wantErr: "cannot have an alias",
+		},
+		{
+			name:    "wildcard with explicitly empty source",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {source: '', exclude: [email]}\n",
+			wantErr: "source must be a non-empty string",
+		},
+		{
+			name:    "wildcard mixed with empty field",
+			yaml:    "from: {name: users}\ncolumns:\n  - field: ''\n    wildcard: {exclude: [email]}\n",
+			wantErr: "mixes wildcard and expression",
+		},
+		{
+			name:    "wildcard with unknown key",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {except: [email]}\n",
+			wantErr: "not found in column wildcard",
+		},
 		{
 			name:    "unknown key",
 			yaml:    "from:\n  name: users\nbogus: 1\n",

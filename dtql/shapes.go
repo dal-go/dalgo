@@ -127,19 +127,67 @@ func (expression exprYAML) MarshalYAML() (any, error) {
 
 // columnYAML is the YAML representation of a dal.Column.
 type columnYAML struct {
-	exprYAML `yaml:",inline"`
-	As       string `yaml:"as,omitempty"` // dal.Column.Alias
+	exprYAML           `yaml:",inline"`
+	As                 string        `yaml:"as,omitempty"` // dal.Column.Alias
+	Wildcard           *wildcardYAML `yaml:"wildcard,omitempty"`
+	asPresent          bool
+	expressionKeyCount int
+}
+
+// wildcardYAML is a column-set projection: all columns from the optional
+// source except the explicitly named columns.
+type wildcardYAML struct {
+	Source  string   `yaml:"source,omitempty"`
+	Exclude []string `yaml:"exclude"`
 }
 
 func (column *columnYAML) UnmarshalYAML(node *yaml.Node) error {
 	extra := map[string]func(*yaml.Node) error{
-		"as": func(value *yaml.Node) error { return value.Decode(&column.As) },
+		"as": func(value *yaml.Node) error {
+			column.asPresent = true
+			return value.Decode(&column.As)
+		},
+		"wildcard": func(value *yaml.Node) error {
+			if value.Kind != yaml.MappingNode {
+				return &yaml.TypeError{Errors: []string{"column wildcard must be a mapping"}}
+			}
+			for i := 0; i+1 < len(value.Content); i += 2 {
+				switch value.Content[i].Value {
+				case "source":
+					if value.Content[i+1].Kind != yaml.ScalarNode || value.Content[i+1].Tag != "!!str" || value.Content[i+1].Value == "" {
+						return &yaml.TypeError{Errors: []string{"column wildcard source must be a non-empty string"}}
+					}
+				case "exclude":
+				default:
+					return &yaml.TypeError{Errors: []string{"field " + value.Content[i].Value + " not found in column wildcard"}}
+				}
+			}
+			var wildcard wildcardYAML
+			if err := value.Decode(&wildcard); err != nil {
+				return err
+			}
+			column.Wildcard = &wildcard
+			return nil
+		},
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		switch node.Content[i].Value {
+		case "field", "value", "values", "param":
+			column.expressionKeyCount++
+		}
 	}
 	return decodeExpressionNode(node, &column.exprYAML, extra)
 }
 
 func (column columnYAML) MarshalYAML() (any, error) {
 	extra := []yaml.Node{}
+	if column.Wildcard != nil {
+		var encoded yaml.Node
+		// wildcardYAML contains only strings and string slices, so it is always
+		// representable by yaml.Node.
+		_ = encoded.Encode(column.Wildcard)
+		extra = append(extra, yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "wildcard"}, encoded)
+	}
 	if column.As != "" {
 		extra = append(extra, yaml.Node{Kind: yaml.ScalarNode, Value: "as"}, yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: column.As})
 	}

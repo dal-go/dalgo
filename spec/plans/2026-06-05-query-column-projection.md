@@ -13,11 +13,11 @@ status: Implemented
 
 ## Summary
 
-Decomposes the `query-column-projection` Feature into three linear tasks: add the `SelectColumns` terminal to `dal.QueryBuilder`, then project a non-empty `q.Columns()` into map records in `dalgo2memory` (single-source and join), then add the column validation errors. All six acceptance criteria are covered by a task; none are deferred.
+Decomposes the `query-column-projection` Feature into the original explicit-column work plus the YAML-native negative-projection extension. The extension adds an explicit wildcard-exclusion model, round-trips it through DTQL, and executes it in DALgo2SQL without changing existing wildcard or explicit projection behavior. All acceptance criteria are covered by a task; none are deferred.
 
 ## Approach
 
-The Feature is a builder capability plus an executor that honors it, so the order is build-the-input then consume-it. Task 1 adds the `SelectColumns(...)` terminal that records `[]Column` on the `StructuredQuery` (the only producer of non-empty `Columns()` from the core builder), with the other terminals leaving it empty. Task 2 makes `dalgo2memory` honor a non-empty `Columns()`: it projects each result row of both the single-source and join paths to a `map[string]any` of exactly the selected columns (keyed by alias/field-name), resolving each column's `FieldRef` through the shared source-aware resolver, while an empty `Columns()` keeps the existing full-record path untouched — these three ACs are the cohesive core of the projection. Task 3 adds the up-front column validation the projection needs: an unknown column source and a non-`FieldRef` column each error with no rows. Task 2 depends on Task 1's terminal; Task 3 depends on Task 2's projection path.
+The original builder and dalgo2memory tasks remain unchanged. Negative projection then proceeds from shared AST to interchange to execution: Task 4 adds the wildcard-exclusion projection item without extending `StructuredQuery`; Task 5 adds its strict, canonical DTQL YAML form; Task 6 teaches DALgo2SQL to emit the real wildcard and filter driver-discovered columns in place. This ordering keeps missing exclusions non-fatal and preserves the requested exclusion list for future diagnostics.
 
 ## Tasks
 
@@ -43,6 +43,30 @@ When `q.Columns()` is non-empty, project each result row of both `ExecuteQueryTo
 **Status:** complete
 
 Validate the selected columns before producing rows: a column whose `FieldRef` names a non-empty source matching no recordset, or whose expression is not a `FieldRef`, returns a descriptive error and no rows — consistent with the `WHERE`/`ORDER BY` unresolvable-source behavior.
+
+### Task 4: model wildcard exclusion as a projection item
+
+**Verifies:** query-column-projection#ac:wildcard-exclusion-round-trip
+**Depends-On:** 3
+**Status:** complete
+
+Add an additive `dal.Column` wildcard projection variant carrying optional source scope and the ordered requested exclusions. Preserve duplicates and render compact diagnostic notation without changing the `StructuredQuery` interface or the meaning of an empty `Columns()` list.
+
+### Task 5: round-trip negative projection through DTQL YAML
+
+**Verifies:** query-column-projection#ac:wildcard-exclusion-round-trip
+**Depends-On:** 4
+**Status:** complete
+
+Add the strict `wildcard: {source?, exclude}` column form to DTQL shapes, schema, canonical serialization, deserialization, equality, examples, and reference documentation. Reject mixed/empty/unknown-source shapes while retaining exclusion spelling, order, and duplicates.
+
+### Task 6: execute wildcard exclusion in DALgo2SQL
+
+**Verifies:** query-column-projection#ac:sql-wildcard-exclusion-results, query-column-projection#ac:projection-regression-compatibility
+**Depends-On:** 5
+**Status:** complete
+
+Compile a single-source wildcard exclusion to the source wildcard, use SQL driver column metadata to omit matched names from record and recordset readers, and protect any explicit helper projection appended after the wildcard. Cover unqualified and qualified forms, missing and duplicate exclusions, stable ordering, identity handling, invalid shapes, and existing explicit/wildcard regression behavior.
 
 ## Open Questions
 

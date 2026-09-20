@@ -310,11 +310,39 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuer
 		return query, true
 	}
 	if selected := query.Columns(); len(selected) > 0 {
+		hasWildcard := false
 		for _, column := range selected {
+			if column.Wildcard != nil {
+				hasWildcard = true
+				continue
+			}
 			field, ok := column.Expression.(dal.FieldRef)
 			if !ok || !sets.allowsWhole(field.Name()) {
 				return query, false
 			}
+		}
+		if hasWildcard {
+			allowed, ok := sets.enumerable()
+			if !ok {
+				return query, false
+			}
+			columns := make([]dal.Column, 0, len(allowed)+len(selected)-1)
+			for _, column := range selected {
+				if column.Wildcard == nil {
+					columns = append(columns, column)
+					continue
+				}
+				excluded := make(map[string]struct{}, len(column.Wildcard.Exclude))
+				for _, name := range column.Wildcard.Exclude {
+					excluded[name] = struct{}{}
+				}
+				for _, name := range allowed {
+					if _, skip := excluded[name]; !skip {
+						columns = append(columns, dal.Column{Expression: dal.Field(name)})
+					}
+				}
+			}
+			return dal.WithColumns(query, columns), true
 		}
 		return query, true
 	}

@@ -53,6 +53,22 @@ func TestSelect(t *testing.T) {
 			want: "SELECT * FROM [User]",
 		},
 		{
+			name: "select_all_except_from_User",
+			q: structuredQuery{
+				from:    From(&CollectionRef{name: "User"}),
+				columns: []Column{AllColumnsExcept("email", "password_hash")},
+			},
+			want: "SELECT *-(email, password_hash) FROM [User]",
+		},
+		{
+			name: "select_qualified_all_except_from_User",
+			q: structuredQuery{
+				from:    From(&CollectionRef{name: "User", alias: "u"}),
+				columns: []Column{AllColumnsExceptFrom("u", "email")},
+			},
+			want: "SELECT u.*-(email) FROM [User]",
+		},
+		{
 			name: "select_top_10_*_from_User",
 			q: structuredQuery{
 				from:  From(&CollectionRef{name: "User"}),

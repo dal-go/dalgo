@@ -49,6 +49,9 @@ func preserveRequestedQuery(query dal.Query, requested dal.StructuredQuery) dal.
 
 func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) error {
 	resource := resourcesForQuery(query)[0]
+	unsupported := func(explanation string) error {
+		return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotFields, Explanation: explanation}}
+	}
 	deny := func(usage, field string) error {
 		slot := DecisionSlotFields
 		if usage == "filter" {
@@ -127,7 +130,38 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			return err
 		}
 	}
-	for _, column := range query.Columns() {
+	wildcards := 0
+	for i, column := range query.Columns() {
+		if column.Wildcard != nil {
+			wildcards++
+			if wildcards > 1 || i != 0 {
+				return unsupported("wildcard projection must be the first and only wildcard item")
+			}
+			if query.From() != nil && len(query.From().Joins()) != 0 {
+				return unsupported("wildcard projection with joins cannot be safely enforced")
+			}
+			if column.Expression != nil || column.Alias != "" {
+				return unsupported("wildcard projection cannot contain an expression or alias")
+			}
+			if len(column.Wildcard.Exclude) == 0 {
+				return unsupported("wildcard projection requires at least one exclusion")
+			}
+			for _, name := range column.Wildcard.Exclude {
+				if name == "" {
+					return unsupported("wildcard projection contains an empty exclusion")
+				}
+			}
+			if source := column.Wildcard.Source; source != "" {
+				from := query.From()
+				if from == nil || from.Base() == nil || source != from.Base().Name() && source != from.Base().Alias() {
+					return unsupported("wildcard projection source does not match the query source")
+				}
+			}
+			// A wildcard exclusion names columns to omit, not columns the caller
+			// demands access to. projectQuery intersects it with enumerable field
+			// policy; non-enumerable policies fall back to result redaction.
+			continue
+		}
 		if column.Expression == nil {
 			return deny("selected", "")
 		}

@@ -31,6 +31,7 @@ by `Serialize` with a descriptive error rather than silently dropped.
 |---|---|
 | `From` over root `CollectionRef` | `from: { schema?: <string>, name: <string>, alias?: <string> }` |
 | `Column` | a sequence item under `columns:`, an expression plus optional `as: <alias>` |
+| wildcard exclusion projection | `{ wildcard: { source?: <alias-or-name>, exclude: [<column>, ...] } }` under `columns:` |
 | `Comparison` | `{ op: <operator>, left: <expr>, right: <expr> }` |
 | `GroupCondition` (And) | `{ and: [ <condition>, ... ] }` |
 | `GroupCondition` (Or) | `{ or: [ <condition>, ... ] }` |
@@ -44,6 +45,44 @@ by `Serialize` with a descriptive error rather than silently dropped.
 
 An expression node sets **exactly one** of `field`, `value`, `values` or
 `param`, which discriminates a `FieldRef`, a `Constant`, an `Array` or a `Param`.
+
+## Negative projection
+
+A wildcard column item may exclude one or more unqualified column names. The
+unqualified form selects every available column except the requested names:
+
+```yaml
+from:
+  name: customers
+columns:
+  - wildcard:
+      exclude:
+        - email
+        - password_hash
+```
+
+When the source has an alias, `source` scopes the wildcard while the names in
+`exclude` remain unqualified:
+
+```yaml
+from:
+  name: customers
+  alias: c
+columns:
+  - wildcard:
+      source: c
+      exclude:
+        - email
+```
+
+An excluded name that is absent from the result schema is ignored. Duplicate
+names are harmless, and removing columns preserves the relative order of every
+remaining column. This makes defensive requests such as excluding `password`,
+`password_hash`, `secret`, and `api_key` useful without prior schema discovery.
+It is a projection convenience, not a security boundary; access control and
+sensitive-data policy remain separate concerns. The AST retains the requested
+exclusion list so future response metadata can distinguish matched and
+unmatched exclusions without changing query semantics.
 
 ## Document shape
 

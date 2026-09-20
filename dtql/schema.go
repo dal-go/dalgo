@@ -30,9 +30,32 @@ func schemaDocument() map[string]any {
 		map[string]any{"required": []any{"values"}},
 		map[string]any{"required": []any{"param"}},
 	}
-	// A column/order is an expression plus one extra key (as / desc).
-	columnProps := mergeProps(exprProps, map[string]any{"as": map[string]any{"type": "string"}})
+	// A column is either an expression plus optional alias, or a wildcard
+	// projection. An order is an expression plus the optional direction.
+	columnProps := mergeProps(exprProps, map[string]any{
+		"as":       map[string]any{"type": "string"},
+		"wildcard": map[string]any{"$ref": "#/$defs/wildcardProjection"},
+	})
 	orderProps := mergeProps(exprProps, map[string]any{"desc": map[string]any{"type": "boolean"}})
+	columnOneOf := make([]any, 0, len(exprOneOf)+1)
+	for _, form := range exprOneOf {
+		columnOneOf = append(columnOneOf, map[string]any{
+			"allOf": []any{
+				form,
+				map[string]any{"not": map[string]any{"required": []any{"wildcard"}}},
+			},
+		})
+	}
+	columnOneOf = append(columnOneOf, map[string]any{
+		"required": []any{"wildcard"},
+		"not": map[string]any{"anyOf": []any{
+			map[string]any{"required": []any{"field"}},
+			map[string]any{"required": []any{"value"}},
+			map[string]any{"required": []any{"values"}},
+			map[string]any{"required": []any{"param"}},
+			map[string]any{"required": []any{"as"}},
+		}},
+	})
 
 	defs := map[string]any{
 		"from": map[string]any{
@@ -51,11 +74,24 @@ func schemaDocument() map[string]any {
 			"properties":           exprProps,
 			"oneOf":                exprOneOf,
 		},
+		"wildcardProjection": map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []any{"exclude"},
+			"properties": map[string]any{
+				"source": map[string]any{"type": "string", "minLength": 1},
+				"exclude": map[string]any{
+					"type":     "array",
+					"minItems": 1,
+					"items":    map[string]any{"type": "string", "minLength": 1},
+				},
+			},
+		},
 		"column": map[string]any{
 			"type":                 "object",
 			"additionalProperties": false,
 			"properties":           columnProps,
-			"oneOf":                exprOneOf,
+			"oneOf":                columnOneOf,
 		},
 		"order": map[string]any{
 			"type":                 "object",
