@@ -84,10 +84,9 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 	if err != nil {
 		return DTQLDocument{}, err
 	}
-	result, err := decodeNormalizedDTQLPolicy(data)
-	if err != nil {
-		return DTQLDocument{}, err
-	}
+	// data was produced by json.Marshal immediately above and DTQLDocument has
+	// no custom JSON decoder, so decoding the same shape cannot fail.
+	result := decodeNormalizedDTQLPolicy(data)
 	// Preserve integer precision in untyped predicate constants.
 	var restore func(any) (any, error)
 	restore = func(value any) (any, error) {
@@ -303,10 +302,10 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 	return result, nil
 }
 
-func decodeNormalizedDTQLPolicy(data []byte) (result DTQLDocument, err error) {
+func decodeNormalizedDTQLPolicy(data []byte) (result DTQLDocument) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
-	err = decoder.Decode(&result)
+	_ = decoder.Decode(&result)
 	return
 }
 

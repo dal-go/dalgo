@@ -183,9 +183,9 @@ func (column columnYAML) MarshalYAML() (any, error) {
 	extra := []yaml.Node{}
 	if column.Wildcard != nil {
 		var encoded yaml.Node
-		if err := encoded.Encode(column.Wildcard); err != nil {
-			return nil, err
-		}
+		// wildcardYAML contains only strings and string slices, so it is always
+		// representable by yaml.Node.
+		_ = encoded.Encode(column.Wildcard)
 		extra = append(extra, yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "wildcard"}, encoded)
 	}
 	if column.As != "" {

@@ -502,8 +502,24 @@ func TestFieldEdgeBranches(t *testing.T) {
 	if len(columns) != 2 || columns[0].Expression.(dal.FieldRef).Name() != "id" || columns[1].Expression.(dal.FieldRef).Name() != "name" {
 		t.Fatalf("policy-intersected wildcard columns = %#v", columns)
 	}
+	nonEnumerable, err := parseFieldPatterns([]string{"*_id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := projectQuery(wildcard, fieldSets{nonEnumerable}); ok {
+		t.Fatal("wildcard projection unexpectedly expanded a non-enumerable policy")
+	}
+	wildcardWithTail := dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(
+		dal.AllColumnsExceptFrom("u", "email"),
+		dal.Column{Expression: dal.Field("name")},
+	)
+	projected, ok = projectQuery(wildcardWithTail, fieldSets{allowed})
+	if !ok || len(projected.Columns()) != 3 || projected.Columns()[2].Expression.(dal.FieldRef).Name() != "name" {
+		t.Fatalf("policy projection did not preserve explicit tail: %#v, ok=%v", projected.Columns(), ok)
+	}
 	malformedWildcards := []dal.StructuredQuery{
 		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.AllColumnsExcept()),
+		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.AllColumnsExcept("")),
 		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.AllColumnsExceptFrom("other", "email")),
 		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.Column{Expression: dal.Field("id"), Wildcard: &dal.WildcardProjection{Exclude: []string{"email"}}}),
 		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.AllColumnsExcept("email"), dal.AllColumnsExcept("secret")),

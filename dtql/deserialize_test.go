@@ -203,6 +203,21 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 			wantErr: "must contain at least one",
 		},
 		{
+			name:    "wildcard with empty exclusion",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {exclude: ['']}\n",
+			wantErr: "must not be empty",
+		},
+		{
+			name:    "wildcard is not a mapping",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: email\n",
+			wantErr: "must be a mapping",
+		},
+		{
+			name:    "wildcard exclusions are not a sequence",
+			yaml:    "from: {name: users}\ncolumns:\n  - wildcard: {exclude: email}\n",
+			wantErr: "cannot unmarshal",
+		},
+		{
 			name:    "wildcard with unknown source",
 			yaml:    "from: {name: users, alias: u}\ncolumns:\n  - wildcard: {source: x, exclude: [email]}\n",
 			wantErr: "does not match from name or alias",
