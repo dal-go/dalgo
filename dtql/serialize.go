@@ -80,6 +80,20 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 		Offset: q.Offset(),
 	}
 	for i, col := range q.Columns() {
+		if col.Wildcard != nil {
+			if col.Expression != nil {
+				return document{}, fmt.Errorf("column #%d mixes wildcard and expression forms", i)
+			}
+			if col.Alias != "" {
+				return document{}, fmt.Errorf("column #%d wildcard cannot have an alias", i)
+			}
+			wildcard := wildcardYAML{Source: col.Wildcard.Source, Exclude: append([]string(nil), col.Wildcard.Exclude...)}
+			if err := validateWildcardYAML(wildcard, fromDoc); err != nil {
+				return document{}, fmt.Errorf("column #%d: %w", i, err)
+			}
+			doc.Columns = append(doc.Columns, columnYAML{Wildcard: &wildcard})
+			continue
+		}
 		expr, err := exprToYAML(col.Expression)
 		if err != nil {
 			return document{}, fmt.Errorf("column #%d: %w", i, err)

@@ -2,14 +2,44 @@ $defs:
   column:
     additionalProperties: false
     oneOf:
-      - required:
-          - field
-      - required:
-          - value
-      - required:
-          - values
-      - required:
-          - param
+      - allOf:
+          - required:
+              - field
+          - not:
+              required:
+                - wildcard
+      - allOf:
+          - required:
+              - value
+          - not:
+              required:
+                - wildcard
+      - allOf:
+          - required:
+              - values
+          - not:
+              required:
+                - wildcard
+      - allOf:
+          - required:
+              - param
+          - not:
+              required:
+                - wildcard
+      - not:
+          anyOf:
+            - required:
+                - field
+            - required:
+                - value
+            - required:
+                - values
+            - required:
+                - param
+            - required:
+                - as
+        required:
+          - wildcard
     properties:
       as:
         type: string
@@ -30,6 +60,8 @@ $defs:
             - number
             - boolean
         type: array
+      wildcard:
+        $ref: '#/$defs/wildcardProjection'
     type: object
   comparison:
     additionalProperties: false
@@ -147,6 +179,21 @@ $defs:
             - number
             - boolean
         type: array
+    type: object
+  wildcardProjection:
+    additionalProperties: false
+    properties:
+      exclude:
+        items:
+          minLength: 1
+          type: string
+        minItems: 1
+        type: array
+      source:
+        minLength: 1
+        type: string
+    required:
+      - exclude
     type: object
 $id: https://dal-go.github.io/dtql/schema.json
 $schema: https://json-schema.org/draft/2020-12/schema

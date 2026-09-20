@@ -46,14 +46,16 @@ func TestExamplesValid(t *testing.T) {
 
 	// Together the examples must exercise the whole in-scope subset.
 	for _, feature := range []string{
-		"columns:", // columns
-		"where:",   // filters
-		"and:",     // And group
-		"or:",      // Or group
-		"values:",  // In with array
-		"orderBy:", // ordering
-		"limit:",   // limit
-		"offset:",  // offset
+		"columns:",  // columns
+		"wildcard:", // wildcard exclusion projection
+		"exclude:",  // excluded names
+		"where:",    // filters
+		"and:",      // And group
+		"or:",       // Or group
+		"values:",   // In with array
+		"orderBy:",  // ordering
+		"limit:",    // limit
+		"offset:",   // offset
 	} {
 		if !strings.Contains(corpus, feature) {
 			t.Errorf("example corpus does not exercise %q", feature)

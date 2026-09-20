@@ -485,6 +485,35 @@ func TestFieldEdgeBranches(t *testing.T) {
 	if q, ok := projectQuery(bare, fieldSets{nil}); !ok || len(q.Columns()) != 0 {
 		t.Errorf("unrestricted projection = %v, %v", q, ok)
 	}
+	// A negative projection is intersected with enumerable policy fields. The
+	// requested exclusion remains non-failing even when it names no allowed
+	// field, while an existing excluded field is not reintroduced by policy.
+	wildcard := dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().
+		SelectColumns(dal.AllColumnsExceptFrom("u", "email", "missing"))
+	allowed, err := parseFieldPatterns([]string{"id", "name", "email"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projected, ok := projectQuery(wildcard, fieldSets{allowed})
+	if !ok {
+		t.Fatal("enumerable wildcard projection was not projected")
+	}
+	columns := projected.Columns()
+	if len(columns) != 2 || columns[0].Expression.(dal.FieldRef).Name() != "id" || columns[1].Expression.(dal.FieldRef).Name() != "name" {
+		t.Fatalf("policy-intersected wildcard columns = %#v", columns)
+	}
+	malformedWildcards := []dal.StructuredQuery{
+		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.AllColumnsExcept()),
+		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.AllColumnsExceptFrom("other", "email")),
+		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.Column{Expression: dal.Field("id"), Wildcard: &dal.WildcardProjection{Exclude: []string{"email"}}}),
+		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.AllColumnsExcept("email"), dal.AllColumnsExcept("secret")),
+		dal.From(dal.NewRootCollectionRef("users", "u")).Join(dal.NewJoinedSource(dal.NewRootCollectionRef("teams", "t"), dal.JoinInner)).NewQuery().SelectColumns(dal.AllColumnsExceptFrom("u", "email")),
+	}
+	for i, malformed := range malformedWildcards {
+		if err := validateRequestedQueryFields(malformed, fieldSets{allowed}); !errors.Is(err, ErrAccessDenied) {
+			t.Errorf("malformed wildcard %d bypassed field validation: %v", i, err)
+		}
+	}
 	// decidingFields reports an unevaluable alternative.
 	bad := writeResidual{policy: "p", resource: RecordResourceForKey(key), residual: &WriteResidual{Alternatives: []WriteAlternative{{Rule: "bad", Where: fakeCond{}}}}}
 	if _, err := decidingFields(Get, map[string]any{}, []writeResidual{bad}); !errors.Is(err, ErrAccessDenied) {

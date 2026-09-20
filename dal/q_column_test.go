@@ -58,3 +58,29 @@ func TestColumn(t *testing.T) {
 		})
 	}
 }
+
+func TestWildcardProjection(t *testing.T) {
+	tests := []struct {
+		name string
+		got  Column
+		want string
+	}{
+		{name: "unqualified", got: AllColumnsExcept("email", "password_hash"), want: "*-(email, password_hash)"},
+		{name: "qualified", got: AllColumnsExceptFrom("c", "email"), want: "c.*-(email)"},
+		{name: "duplicates retained", got: AllColumnsExcept("email", "email"), want: "*-(email, email)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.got.String(); got != tt.want {
+				t.Fatalf("String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+
+	excluded := []string{"email"}
+	column := AllColumnsExcept(excluded...)
+	excluded[0] = "changed"
+	if got := column.Wildcard.Exclude[0]; got != "email" {
+		t.Fatalf("constructor retained caller slice: got %q", got)
+	}
+}

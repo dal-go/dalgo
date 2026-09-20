@@ -4,23 +4,101 @@
       "additionalProperties": false,
       "oneOf": [
         {
-          "required": [
-            "field"
+          "allOf": [
+            {
+              "required": [
+                "field"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "wildcard"
+                ]
+              }
+            }
           ]
         },
         {
-          "required": [
-            "value"
+          "allOf": [
+            {
+              "required": [
+                "value"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "wildcard"
+                ]
+              }
+            }
           ]
         },
         {
-          "required": [
-            "values"
+          "allOf": [
+            {
+              "required": [
+                "values"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "wildcard"
+                ]
+              }
+            }
           ]
         },
         {
+          "allOf": [
+            {
+              "required": [
+                "param"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "wildcard"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "field"
+                ]
+              },
+              {
+                "required": [
+                  "value"
+                ]
+              },
+              {
+                "required": [
+                  "values"
+                ]
+              },
+              {
+                "required": [
+                  "param"
+                ]
+              },
+              {
+                "required": [
+                  "as"
+                ]
+              }
+            ]
+          },
           "required": [
-            "param"
+            "wildcard"
           ]
         }
       ],
@@ -51,6 +129,9 @@
             ]
           },
           "type": "array"
+        },
+        "wildcard": {
+          "$ref": "#/$defs/wildcardProjection"
         }
       },
       "type": "object"
@@ -247,6 +328,27 @@
           "type": "array"
         }
       },
+      "type": "object"
+    },
+    "wildcardProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "exclude": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "exclude"
+      ],
       "type": "object"
     }
   },

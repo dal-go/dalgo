@@ -47,6 +47,14 @@ func roundTripCases() map[string]dal.StructuredQuery {
 				{Expression: dal.Field("age"), Alias: "years"},
 			},
 		},
+		"wildcard exclusion": fakeQuery{
+			from:    rootFrom(),
+			columns: []dal.Column{dal.AllColumnsExcept("email", "password_hash", "missing")},
+		},
+		"qualified wildcard exclusion": fakeQuery{
+			from:    dal.From(dal.NewRootCollectionRef("users", "u")),
+			columns: []dal.Column{dal.AllColumnsExceptFrom("u", "email")},
+		},
 		"order limit offset": fakeQuery{
 			from: rootFrom(),
 			orderBy: []dal.OrderExpression{

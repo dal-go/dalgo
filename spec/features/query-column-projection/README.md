@@ -51,6 +51,20 @@ When projecting, a selected column whose `FieldRef` names a non-empty source tha
 
 When projecting, a selected column whose expression is not a `FieldRef` MUST produce a descriptive error and yield no result rows; non-`FieldRef` column expressions are out of MVP scope and rejected rather than silently dropped.
 
+### Negative projection
+
+#### REQ: wildcard-exclusion-model
+
+DALgo MUST represent an ordered wildcard projection explicitly as a projection item containing an optional source and the caller's requested exclusion names. It MUST distinguish ordinary wildcard selection, unqualified wildcard exclusion, and source-qualified wildcard exclusion without expanding the wildcard into an explicit field list. Duplicate and unmatched exclusion names MUST remain non-errors, and the model MUST retain the requested names so future diagnostic metadata can report unmatched exclusions.
+
+#### REQ: dtql-wildcard-exclusion
+
+DTQL YAML MUST represent negative projection under `columns` as `wildcard: {source?: <alias-or-name>, exclude: [<name>, ...]}`. `exclude` MUST be nonempty, its entries MUST be nonempty unqualified names, an optional source MUST match the `from` name or alias, and a wildcard item MUST NOT also carry an expression or result alias. Serialization and deserialization MUST preserve source, exclusion spelling, order, and duplicates.
+
+#### REQ: sql-wildcard-exclusion
+
+DALgo2SQL MUST execute a single-source wildcard exclusion by selecting the source wildcard and omitting matching result columns after SQL column discovery. Missing names and duplicates MUST be ignored, qualified projection MUST apply only to the matching source, and the remaining result columns MUST retain the database driver's wildcard order. Existing wildcard and explicit projections MUST remain unchanged.
+
 ## Acceptance Criteria
 
 ### AC: select-columns-recorded (verifies REQ:select-columns-terminal)
@@ -88,6 +102,24 @@ When projecting, a selected column whose expression is not a `FieldRef` MUST pro
 **Given** a query selecting a column whose expression is not a `FieldRef` (e.g. a constant)
 **When** it is executed
 **Then** it returns a descriptive error and yields no result rows.
+
+### AC: wildcard-exclusion-round-trip (verifies REQ:wildcard-exclusion-model, REQ:dtql-wildcard-exclusion)
+
+**Given** unqualified and source-qualified DTQL YAML wildcard projections containing existing, missing, and duplicate exclusion names
+**When** each query is deserialized and serialized
+**Then** its explicit wildcard AST and canonical YAML preserve the source and requested exclusion sequence without converting it to explicit columns or raising an error for a missing or duplicate name.
+
+### AC: sql-wildcard-exclusion-results (verifies REQ:sql-wildcard-exclusion)
+
+**Given** a SQL source whose wildcard order is `id`, `name`, `email`, `created_at`
+**When** unqualified and matching source-qualified queries exclude `email` together with missing or duplicate names
+**Then** both record and recordset readers return `id`, `name`, `created_at` in that order and do not fail because any requested exclusion was absent or repeated.
+
+### AC: projection-regression-compatibility (verifies REQ:sql-wildcard-exclusion)
+
+**Given** existing ordinary wildcard and explicit-column DALgo queries
+**When** DALgo2SQL executes them after negative projection support is added
+**Then** their generated SQL, result columns, ordering, aliases, and row values remain unchanged.
 
 ## Architecture & Components
 

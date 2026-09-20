@@ -55,7 +55,7 @@ func columnsEqual(a, b []dal.Column) bool {
 		return false
 	}
 	for i := range a {
-		if a[i].Alias != b[i].Alias || !exprEqual(a[i].Expression, b[i].Expression) {
+		if a[i].Alias != b[i].Alias || !reflect.DeepEqual(a[i].Wildcard, b[i].Wildcard) || !exprEqual(a[i].Expression, b[i].Expression) {
 			return false
 		}
 	}
@@ -116,6 +116,9 @@ func groupEqual(a dal.GroupCondition, b dal.Condition) bool {
 }
 
 func exprEqual(a, b dal.Expression) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
 	switch ae := a.(type) {
 	case dal.FieldRef:
 		bv, ok := b.(dal.FieldRef)

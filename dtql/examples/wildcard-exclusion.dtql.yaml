@@ -1,0 +1,10 @@
+from:
+  name: customers
+  alias: c
+columns:
+  - wildcard:
+      source: c
+      exclude:
+        - email
+        - password_hash
+        - api_key

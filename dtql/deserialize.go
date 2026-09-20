@@ -66,7 +66,7 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	qb.Limit(doc.Limit)
 	qb.Offset(doc.Offset)
 
-	columns, err := columnsFromYAML(doc.Columns)
+	columns, err := columnsFromYAML(doc.Columns, doc.From)
 	if err != nil {
 		return nil, err
 	}
@@ -75,12 +75,25 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	return reconstructedQuery{StructuredQuery: base, columns: columns}, nil
 }
 
-func columnsFromYAML(cols []columnYAML) ([]dal.Column, error) {
+func columnsFromYAML(cols []columnYAML, from fromYAML) ([]dal.Column, error) {
 	if len(cols) == 0 {
 		return nil, nil
 	}
 	out := make([]dal.Column, 0, len(cols))
 	for i, c := range cols {
+		if c.Wildcard != nil {
+			if c.expressionKeyCount != 0 {
+				return nil, fmt.Errorf("invalid DTQL: column #%d mixes wildcard and expression forms", i)
+			}
+			if c.asPresent {
+				return nil, fmt.Errorf("invalid DTQL: column #%d wildcard cannot have an alias", i)
+			}
+			if err := validateWildcardYAML(*c.Wildcard, from); err != nil {
+				return nil, fmt.Errorf("invalid DTQL: column #%d: %w", i, err)
+			}
+			out = append(out, dal.AllColumnsExceptFrom(c.Wildcard.Source, c.Wildcard.Exclude...))
+			continue
+		}
 		expr, err := exprFromYAML(c.exprYAML)
 		if err != nil {
 			return nil, fmt.Errorf("invalid DTQL: column #%d: %w", i, err)
@@ -88,6 +101,38 @@ func columnsFromYAML(cols []columnYAML) ([]dal.Column, error) {
 		out = append(out, dal.Column{Expression: expr, Alias: c.As})
 	}
 	return out, nil
+}
+
+func expressionFieldsSet(e exprYAML) int {
+	set := 0
+	if e.Field != "" {
+		set++
+	}
+	if e.Value != nil {
+		set++
+	}
+	if e.Values != nil {
+		set++
+	}
+	if e.Param != "" {
+		set++
+	}
+	return set
+}
+
+func validateWildcardYAML(wildcard wildcardYAML, from fromYAML) error {
+	if len(wildcard.Exclude) == 0 {
+		return fmt.Errorf("wildcard.exclude must contain at least one column name")
+	}
+	for i, name := range wildcard.Exclude {
+		if name == "" {
+			return fmt.Errorf("wildcard.exclude #%d must not be empty", i)
+		}
+	}
+	if wildcard.Source != "" && wildcard.Source != from.Alias && wildcard.Source != from.Name {
+		return fmt.Errorf("wildcard source %q does not match from name or alias", wildcard.Source)
+	}
+	return nil
 }
 
 func orderFromYAML(orders []orderYAML) ([]dal.OrderExpression, error) {
@@ -110,19 +155,7 @@ func orderFromYAML(orders []orderYAML) ([]dal.OrderExpression, error) {
 }
 
 func exprFromYAML(e exprYAML) (dal.Expression, error) {
-	set := 0
-	if e.Field != "" {
-		set++
-	}
-	if e.Value != nil {
-		set++
-	}
-	if e.Values != nil {
-		set++
-	}
-	if e.Param != "" {
-		set++
-	}
+	set := expressionFieldsSet(e)
 	if set == 0 {
 		return nil, fmt.Errorf("expression must set exactly one of field, value, values or param")
 	}
