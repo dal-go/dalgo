@@ -57,7 +57,9 @@ func TestDALgoGenericUngroupedEmptyInput(t *testing.T) {
 
 func readResultMaps(t *testing.T, reader dal.RecordsReader) []map[string]any {
 	t.Helper()
-	defer reader.Close()
+	defer func() {
+		require.NoError(t, reader.Close())
+	}()
 	var rows []map[string]any
 	for {
 		rec, err := reader.Next()
@@ -121,7 +123,9 @@ func TestDALgoGenericAggregationRecordset(t *testing.T) {
 	)
 	reader, err := dal.NewDB(backend).ExecuteQueryToRecordsetReader(ctx, q)
 	require.NoError(t, err)
-	defer reader.Close()
+	defer func() {
+		require.NoError(t, reader.Close())
+	}()
 	require.Equal(t, 2, reader.Recordset().RowsCount())
 	row, rs, err := reader.Next()
 	require.NoError(t, err)

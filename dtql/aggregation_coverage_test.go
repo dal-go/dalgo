@@ -21,7 +21,7 @@ func (q *varyingAggregationQuery) GroupBy() []dal.Expression {
 	if q.varyGroup && q.groupCalls >= 3 {
 		return []dal.Expression{unsupportedExpr{}}
 	}
-	return q.fakeQuery.groupBy
+	return q.groupBy
 }
 
 func (q *varyingAggregationQuery) Having() dal.Condition {
@@ -29,7 +29,7 @@ func (q *varyingAggregationQuery) Having() dal.Condition {
 	if q.varyHaving && q.havingCalls >= 3 {
 		return unsupportedCond{}
 	}
-	return q.fakeQuery.having
+	return q.having
 }
 
 func TestAggregationYAMLDeserializationErrorCoverage(t *testing.T) {
