@@ -46,7 +46,8 @@ Add checked-in YAML and JSON documents, normalized expected rows, and structured
 
 **Id:** task-3
 **Verifies:** dtql-subqueries#ac:recursive-documents, dtql-subqueries#ac:scope-errors, dtql-subqueries#ac:scalar-cardinality, dtql-subqueries#ac:derived-sources
-**Status:** in_progress
+**Status:** complete
+**Implemented-by:** 34a7a2a
 **Note:** Implementing Go recursive model and serialization only.
 **Depends-On:** task-2
 
@@ -56,7 +57,7 @@ Add new optional expression, condition, and source node types and constructors; 
 
 **Id:** task-4
 **Verifies:** dtql-subqueries#ac:scalar-cardinality, dtql-subqueries#ac:derived-sources, dtql-subqueries#ac:membership-null-table, dtql-subqueries#ac:existence, dtql-subqueries#ac:adapter-matrix, dtql-subqueries#ac:complex-composition, dtql-subqueries#ac:policy-preservation, dtql-subqueries#ac:read-routing
-**Status:** planning
+**Status:** in_progress
 **Depends-On:** task-3
 
 Reuse the existing generic JOIN and aggregate stages for relation production and the validated DB/transaction records, recordset, and Select entrypoints. Add an inspectable query-specific native/generic/unsupported decision; unknown adapter capabilities remain conservative. Bind serialized field names into internal `(lexical depth, source identity, field identity)` references and execute with stacked row environments. Evaluate uncorrelated nodes once, cache safe repeated outer bindings, short-circuit EXISTS, and preserve access-policy enforcement for every leaf scan. Share a root budget of 10,000 fetched rows, 10,000 materialized result rows, 100,000 candidate evaluations, and 16 MiB retained data across all nesting; return `query_limit` with path/counter before partial output. Implement relational TRUE/FALSE/UNKNOWN composition and scalar cardinality in shared evaluator paths. Test scan counts, policy denials/masks, cancellation, every read route, all four bounds, and returned rows.

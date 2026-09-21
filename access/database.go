@@ -168,6 +168,10 @@ func (db *securedDB) ExecuteQueryToRecordsetReader(ctx context.Context, query da
 	return securedReadSession{session: db.DB, guard: db.guard}.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
+func (db *securedDB) Select(ctx context.Context, query dal.Query) (dal.Reader, error) {
+	return securedReadSession{session: db.DB, guard: db.guard}.ExecuteQueryToRecordsReader(ctx, query)
+}
+
 func (db *securedDB) RunReadonlyTransaction(ctx context.Context, worker dal.ROTxWorker, options ...dal.TransactionOption) error {
 	if err := db.guard.checkContext(ctx); err != nil {
 		return err
@@ -259,11 +263,19 @@ type securedReadTransaction struct {
 	tx dal.ReadTransaction
 }
 
+func (tx *securedReadTransaction) Select(ctx context.Context, query dal.Query) (dal.Reader, error) {
+	return tx.ExecuteQueryToRecordsReader(ctx, query)
+}
+
 func (tx *securedReadTransaction) Options() dal.TransactionOptions { return tx.tx.Options() }
 
 type securedReadwriteTransaction struct {
 	securedReadwriteSession
 	tx dal.ReadwriteTransaction
+}
+
+func (tx *securedReadwriteTransaction) Select(ctx context.Context, query dal.Query) (dal.Reader, error) {
+	return tx.ExecuteQueryToRecordsReader(ctx, query)
 }
 
 func (tx *securedReadwriteTransaction) ID() string { return tx.tx.ID() }

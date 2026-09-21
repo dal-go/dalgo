@@ -90,7 +90,7 @@ func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool 
 			}
 		}
 		for _, order := range query.OrderBy() {
-			if visitExpr(order.Expression()) {
+			if order != nil && visitExpr(order.Expression()) {
 				return true
 			}
 		}
