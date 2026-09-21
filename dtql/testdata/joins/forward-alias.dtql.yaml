@@ -1,0 +1,14 @@
+from:
+  name: A
+  alias: a
+  joins:
+    - from: {name: B, alias: b}
+      on:
+        - left: {field: id, source: a}
+          op: '=='
+          right: {field: aId, source: c}
+    - from: {name: C, alias: c}
+      on:
+        - left: {field: id, source: a}
+          op: '=='
+          right: {field: aId, source: c}

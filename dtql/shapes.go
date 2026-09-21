@@ -23,21 +23,64 @@ type document struct {
 
 // fromYAML is the YAML representation of the root dal.CollectionRef source.
 type fromYAML struct {
-	Schema *string `yaml:"schema,omitempty"`
-	Name   string  `yaml:"name"`
-	Alias  string  `yaml:"alias,omitempty"`
+	Schema *string    `yaml:"schema,omitempty"`
+	Name   string     `yaml:"name"`
+	Alias  string     `yaml:"alias,omitempty"`
+	Joins  []joinYAML `yaml:"joins,omitempty"`
 }
 
 func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
 	if err := validateFromYAMLNode(node); err != nil {
 		return err
 	}
-	type plainFromYAML fromYAML
-	var decoded plainFromYAML
+	var decoded struct {
+		Schema *string    `yaml:"schema,omitempty"`
+		Name   string     `yaml:"name"`
+		Alias  *string    `yaml:"alias,omitempty"`
+		As     *string    `yaml:"as,omitempty"`
+		Joins  []joinYAML `yaml:"joins,omitempty"`
+	}
 	if err := node.Decode(&decoded); err != nil {
 		return err
 	}
-	*from = fromYAML(decoded)
+	if decoded.Alias != nil && decoded.As != nil {
+		return &yaml.TypeError{Errors: []string{"from cannot contain both alias and as"}}
+	}
+	alias := ""
+	if decoded.Alias != nil {
+		alias = *decoded.Alias
+	} else if decoded.As != nil {
+		alias = *decoded.As
+	}
+	*from = fromYAML{Schema: decoded.Schema, Name: decoded.Name, Alias: alias, Joins: decoded.Joins}
+	return nil
+}
+
+// joinYAML represents one recursively joined relation. The canonical spelling
+// is type/from/on; type is omitted for INNER joins.
+type joinYAML struct {
+	Type string     `yaml:"type,omitempty"`
+	From *fromYAML  `yaml:"from"`
+	On   []condYAML `yaml:"on"`
+}
+
+func (join *joinYAML) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return &yaml.TypeError{Errors: []string{"join must be a mapping"}}
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		switch node.Content[i].Value {
+		case "type", "from", "on":
+		default:
+			return &yaml.TypeError{Errors: []string{"field " + node.Content[i].Value + " not found in join"}}
+		}
+	}
+	type plainJoin joinYAML
+	var decoded plainJoin
+	if err := node.Decode(&decoded); err != nil {
+		return err
+	}
+	*join = joinYAML(decoded)
 	return nil
 }
 
@@ -73,7 +116,29 @@ func validateFromYAMLNodeWithState(node *yaml.Node, visiting, validated map[*yam
 			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
 				return &yaml.TypeError{Errors: []string{"from.schema must be a string"}}
 			}
-		case "name", "alias":
+		case "name", "alias", "as":
+			value = resolvedYAMLAlias(value)
+			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
+				return &yaml.TypeError{Errors: []string{"from." + key + " must be a string"}}
+			}
+		case "joins":
+			value = resolvedYAMLAlias(value)
+			if value.Kind != yaml.SequenceNode {
+				return &yaml.TypeError{Errors: []string{"from.joins must be a sequence"}}
+			}
+			for _, item := range value.Content {
+				item = resolvedYAMLAlias(item)
+				if item.Kind != yaml.MappingNode {
+					return &yaml.TypeError{Errors: []string{"join must be a mapping"}}
+				}
+				for j := 0; j+1 < len(item.Content); j += 2 {
+					if item.Content[j].Value == "from" {
+						if err := validateFromYAMLNodeWithState(item.Content[j+1], visiting, validated); err != nil {
+							return err
+						}
+					}
+				}
+			}
 		default:
 			return &yaml.TypeError{Errors: []string{"field " + key + " not found in from"}}
 		}

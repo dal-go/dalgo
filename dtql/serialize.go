@@ -46,15 +46,18 @@ func (w *yamlBuffer) Write(p []byte) (int, error) {
 
 // queryToDocument validates and builds in one pass. It is the single enforcement
 // point of the lossless guarantee: it rejects any out-of-scope construct
-// (joins, GroupBy, cursor, a non-root source, an unsupported expression,
+// (GroupBy, cursor, a non-root source, an unsupported expression,
 // condition or operator) with a descriptive error rather than dropping it.
 func queryToDocument(q dal.StructuredQuery) (document, error) {
 	from := q.From()
 	if from == nil {
 		return document{}, fmt.Errorf("query has no From source")
 	}
-	if len(from.Joins()) > 0 {
-		return document{}, fmt.Errorf("joins are not supported by DTQL")
+	if err := dal.ValidateJoinTree(from); err != nil {
+		return document{}, err
+	}
+	if err := validateJoinClauseFields(q); err != nil {
+		return document{}, err
 	}
 	if err := dal.ValidateAggregation(q); err != nil {
 		return document{}, fmt.Errorf("invalid aggregation: %w", err)
@@ -140,6 +143,26 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 	result := fromYAML{Name: base.Name(), Alias: base.Alias()}
 	if schema := base.Schema(); schema != "" {
 		result.Schema = &schema
+	}
+	for i, join := range from.Joins() {
+		child := join.From()
+		if child == nil {
+			child = dal.From(join.RecordsetSource)
+		}
+		childDoc, err := fromToYAML(child)
+		if err != nil {
+			return fromYAML{}, fmt.Errorf("from.joins[%d].from: %w", i, err)
+		}
+		on := make([]condYAML, 0, len(join.On()))
+		for _, condition := range join.On() {
+			encoded, _ := condToYAML(condition) // ValidateJoinTree checked every ON shape and operator.
+			on = append(on, *encoded)
+		}
+		joinDoc := joinYAML{From: &childDoc, On: on}
+		if join.JoinType() == dal.JoinLeft {
+			joinDoc.Type = "left"
+		}
+		result.Joins = append(result.Joins, joinDoc)
 	}
 	return result, nil
 }

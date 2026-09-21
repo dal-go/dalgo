@@ -16,11 +16,11 @@ This package imports `dal` but adds **no YAML dependency to `dal`**.
 
 ## Covered subset
 
-DTQL represents a single `From` (with no `Joins()`) over a **root** `CollectionRef`
+DTQL represents a recursive `From` relation tree over **root** `CollectionRef`
 (`Parent() == nil`), `Where`, `GroupBy`, `Having`, `OrderBy`, `Limit`/`Offset`,
 and the final `Columns` projection. Expressions include fields, constants,
 arrays, parameters, arithmetic, aggregate functions and `COUNT(*)`. Anything
-outside this subset — joins, `CollectionGroupRef` / parented `CollectionRef`,
+outside this subset — `CollectionGroupRef` / parented `CollectionRef`,
 a cursor (`StartFrom`), or an operator outside the in-scope set — is **rejected**
 by `Serialize` with a descriptive error rather than silently dropped.
 
@@ -28,7 +28,8 @@ by `Serialize` with a descriptive error rather than silently dropped.
 
 | `dal` node | YAML representation |
 |---|---|
-| `From` over root `CollectionRef` | `from: { schema?: <string>, name: <string>, alias?: <string> }` |
+| `From` over root `CollectionRef` | `from: { schema?: <string>, name: <string>, alias?: <string>, joins?: [<join>, ...] }` |
+| `JoinedSource` | `{ type?: inner|left, from: <from>, on: [<qualified equality>, ...] }`; omitted `type` is `inner` |
 | `Column` | a sequence item under `columns:`, an expression plus optional `as: <alias>` |
 | wildcard exclusion projection | `{ wildcard: { source?: <alias-or-name>, exclude: [<column>, ...] } }` under `columns:` |
 | `Comparison` | `{ op: <operator>, left: <expr>, right: <expr> }` |
@@ -52,6 +53,41 @@ expressions, so `SUM(quantity * unit_price)` needs no later AST redesign.
 Qualified fields keep the source structural, for example
 `{field: country, source: c}`; the source is never flattened into a dotted
 field name.
+
+## Recursive joins
+
+Every relation node may contain ordered `joins`. A join's `from` is another
+relation node, `on` contains one or more `==` predicates, and every ON operand
+is a qualified field reference. `inner` is the default; `left` is the other
+supported type. The serializer emits `alias` and `==`; deserialization also
+accepts `as` and `eq` and normalizes them on output.
+
+```yaml
+from:
+  name: Invoice
+  alias: i
+  joins:
+    - from:
+        name: Customer
+        alias: c
+        joins:
+          - type: left
+            from: {name: Employee, alias: e}
+            on:
+              - left: {field: SupportRepId, source: c}
+                op: '=='
+                right: {field: EmployeeId, source: e}
+      on:
+        - left: {field: CustomerId, source: i}
+          op: '=='
+          right: {field: CustomerId, source: c}
+```
+
+Validation reports stable JOIN category and zero-based path pairs, such as
+`join_scope at from.joins[1].on[0]`. It checks relation shape, `inner`/`left`,
+qualified equality predicates, duplicate aliases, forward references, lexical
+scope, and cyclic in-memory relation trees. Field existence and key runtime
+types require schema or execution data and are validated by later layers.
 
 ## Aggregation
 
@@ -209,8 +245,9 @@ path resources are defined.
   structurally equal to `q` across `From`, `Where`, `GroupBy`, `Having`,
   `OrderBy`, `Limit`/`Offset`, and `Columns` (see `dtql.Equal`).
 - **Canonical** — `Serialize` emits a canonical document (stable key order and
-  2-space indentation), so `Serialize(Deserialize(d))` is byte-identical to a
-  valid in-scope document `d` and saved queries diff cleanly across edits.
+  2-space indentation). `Serialize(Deserialize(d))` normalizes accepted input
+  aliases (`as` to `alias`, `eq` to `==`) and omitted INNER types, then remains
+  byte-identical on later round trips.
 
 ## Errors
 

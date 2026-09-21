@@ -40,8 +40,8 @@ func TestSerialize_rejectsOutOfScopeConstructs(t *testing.T) {
 		{"nil from", fakeQuery{}, "no From source"},
 		{
 			"join",
-			fakeQuery{from: rootFrom().Join(dal.JoinedSource{RecordsetSource: dal.NewRootCollectionRef("orders", "")})},
-			"joins are not supported",
+			fakeQuery{from: rootFrom().Join(dal.NewJoinedSource(dal.NewRootCollectionRef("orders", ""), dal.JoinInner))},
+			"join_shape at from.joins[0].on",
 		},
 		{"collection group ref", fakeQuery{from: dal.From(dal.NewCollectionGroupRef("users", ""))}, "unsupported From source"},
 		{"parented collection ref", fakeQuery{from: dal.From(dal.NewCollectionRef("users", "", parentKey))}, "parented collection reference"},

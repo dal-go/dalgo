@@ -1,0 +1,34 @@
+from:
+  schema: main
+  name: Invoice
+  alias: i
+  joins:
+    - type: inner
+      from:
+        schema: main
+        name: Customer
+        alias: c
+        joins:
+          - type: left
+            from: {schema: main, name: Employee, alias: e}
+            on:
+              - left: {field: SupportRepId, source: c}
+                op: '=='
+                right: {field: EmployeeId, source: e}
+      on:
+        - left: {field: CustomerId, source: i}
+          op: '=='
+          right: {field: CustomerId, source: c}
+orderBy:
+  - field: InvoiceId
+    source: i
+    desc: true
+limit: 10
+columns:
+  - field: InvoiceId
+    source: i
+    as: invoice_id
+  - wildcard: {source: c, exclude: [CustomerId, SupportRepId]}
+  - field: FirstName
+    source: e
+    as: employee
