@@ -36,6 +36,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [Hierarchical access and audit policies](access-policies/README.md) | Stable | — |
 | [Triggers and webhooks: change events, transactional outbox, dispatcher](triggers/README.md) | Draft | — |
 | [Recursive DTQL JOINs across DALgo Go and TypeScript](dtql-recursive-joins/README.md) | Draft | — |
+| [Recursive DTQL subqueries across DALgo Go and TypeScript](dtql-subqueries/README.md) | Draft | — |
 
 ## Open Questions
 
