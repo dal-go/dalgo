@@ -35,7 +35,9 @@ Finish the SpecScore Feature after an independent adversarial review. Record the
 
 **Id:** task-2
 **Verifies:** dtql-subqueries#ac:recursive-documents, dtql-subqueries#ac:scalar-cardinality, dtql-subqueries#ac:membership-null-table, dtql-subqueries#ac:existence, dtql-subqueries#ac:scope-errors, dtql-subqueries#ac:complex-composition, dtql-subqueries#ac:nested-pipeline
-**Status:** in_progress
+**Status:** complete
+**Note:** DALgo-JS vendored the frozen Go fixture source byte-for-byte.
+**Evidence:** dalgo-js@3e49c99, pnpm check:5 files/41 tests, fixture source da4e671be46e9c2c4906cb645d9e16c0fd90d590
 **Depends-On:** task-1
 
 Add checked-in YAML and JSON documents, normalized expected rows, and structured expected errors under the Go DTQL tree. Include old flat/JOIN documents with hint lists; scalar zero/NULL/one/many rows and columns; derived FROM/JOIN with aggregates; the inner pipeline with ordering on an unselected local field and separate OFFSET/LIMIT cases; the full IN/NOT IN three-valued table; EXISTS short circuit; shadowing/ambiguity/multi-level correlation; and the complete customer/invoice journey. Pin copied fixture digests in DALgo-JS. Keep fixtures usable by independent CI without sibling checkouts.
@@ -44,7 +46,8 @@ Add checked-in YAML and JSON documents, normalized expected rows, and structured
 
 **Id:** task-3
 **Verifies:** dtql-subqueries#ac:recursive-documents, dtql-subqueries#ac:scope-errors, dtql-subqueries#ac:scalar-cardinality, dtql-subqueries#ac:derived-sources
-**Status:** planning
+**Status:** in_progress
+**Note:** Implementing Go recursive model and serialization only.
 **Depends-On:** task-2
 
 Add new optional expression, condition, and source node types and constructors; do not extend `StructuredQuery`, `QueryExecutor`, `FromSource`, or `RecordsetSource` method sets. Build one recursion-aware scope binder and contextual shape validator. Preserve old query output, add cycle detection and path-specific diagnostics, update the Go YAML/JSON schema and examples, and run existing DTQL/JOIN/aggregation suites. Treat derived query aliases as relation names and preserve `query.as` as the result name.

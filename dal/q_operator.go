@@ -10,6 +10,9 @@ const (
 	// In is a Comparison operator
 	In Operator = "In"
 
+	// NotIn is a Comparison operator for membership negation.
+	NotIn Operator = "NotIn"
+
 	// GreaterThen is a Comparison operator
 	GreaterThen Operator = ">"
 

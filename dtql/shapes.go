@@ -9,6 +9,7 @@ import (
 // document is the YAML representation of an in-scope dal.StructuredQuery.
 // Field order here defines the canonical key order of a DTQL-YAML document.
 type document struct {
+	As      string      `yaml:"as,omitempty"`
 	From    fromYAML    `yaml:"from"`
 	Where   *condYAML   `yaml:"where,omitempty"`
 	GroupBy []exprYAML  `yaml:"groupBy,omitempty"`
@@ -24,8 +25,9 @@ type document struct {
 // fromYAML is the YAML representation of the root dal.CollectionRef source.
 type fromYAML struct {
 	Schema *string    `yaml:"schema,omitempty"`
-	Name   string     `yaml:"name"`
+	Name   string     `yaml:"name,omitempty"`
 	Alias  string     `yaml:"alias,omitempty"`
+	Query  *document  `yaml:"query,omitempty"`
 	Joins  []joinYAML `yaml:"joins,omitempty"`
 }
 
@@ -38,6 +40,7 @@ func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
 		Name   string     `yaml:"name"`
 		Alias  *string    `yaml:"alias,omitempty"`
 		As     *string    `yaml:"as,omitempty"`
+		Query  *document  `yaml:"query,omitempty"`
 		Joins  []joinYAML `yaml:"joins,omitempty"`
 	}
 	if err := node.Decode(&decoded); err != nil {
@@ -52,7 +55,7 @@ func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
 	} else if decoded.As != nil {
 		alias = *decoded.As
 	}
-	*from = fromYAML{Schema: decoded.Schema, Name: decoded.Name, Alias: alias, Joins: decoded.Joins}
+	*from = fromYAML{Schema: decoded.Schema, Name: decoded.Name, Alias: alias, Query: decoded.Query, Joins: decoded.Joins}
 	return nil
 }
 
@@ -68,7 +71,7 @@ type joinYAML struct {
 
 func (join *joinYAML) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode {
-		return &yaml.TypeError{Errors: []string{"join must be a mapping"}}
+		return &yaml.TypeError{Errors: []string{fmt.Sprintf("join must be a mapping (got %d)", node.Kind)}}
 	}
 	clean := *node
 	clean.Content = nil
@@ -151,10 +154,20 @@ func validateFromYAMLNodeWithState(node *yaml.Node, visiting, validated map[*yam
 			if value.Kind != yaml.SequenceNode {
 				return &yaml.TypeError{Errors: []string{"from.joins must be a sequence"}}
 			}
+		case "query":
+			value = resolvedYAMLAlias(value)
+			if value.Kind != yaml.MappingNode {
+				return &yaml.TypeError{Errors: []string{"from.query must be a mapping"}}
+			}
+			if err := validateDocumentYAMLNode(value, visiting, validated); err != nil {
+				return err
+			}
 			for _, item := range value.Content {
 				item = resolvedYAMLAlias(item)
 				if item.Kind != yaml.MappingNode {
-					return &yaml.TypeError{Errors: []string{"join must be a mapping"}}
+					// joinYAML.UnmarshalYAML owns the shape diagnostic. Do not
+					// preempt it here while walking aliases for nested sources.
+					continue
 				}
 				for j := 0; j+1 < len(item.Content); j += 2 {
 					if item.Content[j].Value == "from" {
@@ -166,6 +179,30 @@ func validateFromYAMLNodeWithState(node *yaml.Node, visiting, validated map[*yam
 			}
 		default:
 			return &yaml.TypeError{Errors: []string{"field " + key + " not found in from"}}
+		}
+	}
+	validated[node] = true
+	return nil
+}
+
+func validateDocumentYAMLNode(node *yaml.Node, visiting, validated map[*yaml.Node]bool) error {
+	node = resolvedYAMLAlias(node)
+	if node.Kind != yaml.MappingNode {
+		return &yaml.TypeError{Errors: []string{"query must be a mapping"}}
+	}
+	if validated[node] {
+		return nil
+	}
+	if visiting[node] {
+		return &yaml.TypeError{Errors: []string{"query contains a recursive alias"}}
+	}
+	visiting[node] = true
+	defer delete(visiting, node)
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == "from" {
+			if err := validateFromYAMLNodeWithState(node.Content[i+1], visiting, validated); err != nil {
+				return err
+			}
 		}
 	}
 	validated[node] = true
@@ -212,6 +249,7 @@ type exprYAML struct {
 	Star          bool           `yaml:"star,omitempty"`
 	Aggregate     *aggregateYAML `yaml:"aggregate,omitempty"`
 	Binary        *binaryYAML    `yaml:"binary,omitempty"`
+	Query         *document      `yaml:"query,omitempty"`
 	sourcePresent bool
 }
 
@@ -282,7 +320,7 @@ func (column *columnYAML) UnmarshalYAML(node *yaml.Node) error {
 	}
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		switch node.Content[i].Value {
-		case "field", "value", "values", "param", "star", "aggregate", "binary":
+		case "field", "value", "values", "param", "star", "aggregate", "binary", "query":
 			column.expressionKeyCount++
 		}
 	}
@@ -344,6 +382,8 @@ func encodeExpressionNode(expression exprYAML, extra []yaml.Node) (*yaml.Node, e
 		key, value = "aggregate", expression.Aggregate
 	case expression.Binary != nil:
 		key, value = "binary", expression.Binary
+	case expression.Query != nil:
+		key, value = "query", expression.Query
 	}
 	if key != "" {
 		var encoded yaml.Node
@@ -410,6 +450,10 @@ func decodeExpressionNode(node *yaml.Node, expression *exprYAML, extra map[strin
 			var decoded binaryYAML
 			err = value.Decode(&decoded)
 			expression.Binary = &decoded
+		case "query":
+			var decoded document
+			err = value.Decode(&decoded)
+			expression.Query = &decoded
 		default:
 			if decode := extra[key]; decode != nil {
 				err = decode(value)
@@ -439,9 +483,15 @@ func validateExpressionObjectKeys(node *yaml.Node, label string, allowed map[str
 // condYAML is the YAML representation of a dal.Condition.
 // A Comparison sets Op/Left/Right; a GroupCondition sets And or Or.
 type condYAML struct {
-	Op    string     `yaml:"op,omitempty"`    // dal.Comparison.Operator
-	Left  *exprYAML  `yaml:"left,omitempty"`  // dal.Comparison.Left
-	Right *exprYAML  `yaml:"right,omitempty"` // dal.Comparison.Right
-	And   []condYAML `yaml:"and,omitempty"`   // dal.GroupCondition (And)
-	Or    []condYAML `yaml:"or,omitempty"`    // dal.GroupCondition (Or)
+	Op        string      `yaml:"op,omitempty"`    // dal.Comparison.Operator
+	Left      *exprYAML   `yaml:"left,omitempty"`  // dal.Comparison.Left
+	Right     *exprYAML   `yaml:"right,omitempty"` // dal.Comparison.Right
+	And       []condYAML  `yaml:"and,omitempty"`   // dal.GroupCondition (And)
+	Or        []condYAML  `yaml:"or,omitempty"`    // dal.GroupCondition (Or)
+	Exists    *existsYAML `yaml:"exists,omitempty"`
+	NotExists *existsYAML `yaml:"notExists,omitempty"`
+}
+
+type existsYAML struct {
+	Query *document `yaml:"query"`
 }

@@ -52,13 +52,17 @@ func fromEqual(a, b dal.FromSource) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
 	}
-	an, aok := rootCollection(a)
-	bn, bok := rootCollection(b)
-	if !aok || !bok {
-		return false
-	}
-	if !an.Equal(bn, false) {
-		return false
+	if aq, ok := a.Base().(dal.QuerySource); ok {
+		bq, ok := b.Base().(dal.QuerySource)
+		if !ok || aq.Alias() != bq.Alias() || !Equal(aq.Query(), bq.Query()) {
+			return false
+		}
+	} else {
+		an, aok := rootCollection(a)
+		bn, bok := rootCollection(b)
+		if !aok || !bok || !an.Equal(bn, false) {
+			return false
+		}
 	}
 	aj, bj := a.Joins(), b.Joins()
 	if len(aj) != len(bj) {
@@ -131,6 +135,9 @@ func condEqual(a, b dal.Condition) bool {
 		return comparisonEqual(ac, b)
 	case dal.GroupCondition:
 		return groupEqual(ac, b)
+	case dal.ExistsCondition:
+		bc, ok := b.(dal.ExistsCondition)
+		return ok && ac.Negated() == bc.Negated() && Equal(ac.Query(), bc.Query())
 	default:
 		return false
 	}
@@ -197,6 +204,9 @@ func exprEqual(a, b dal.Expression) bool {
 	case dal.BinaryExpression:
 		bv, ok := b.(dal.BinaryExpression)
 		return ok && ae.Operator == bv.Operator && exprEqual(ae.Left, bv.Left) && exprEqual(ae.Right, bv.Right)
+	case dal.QueryExpression:
+		bv, ok := b.(dal.QueryExpression)
+		return ok && ae.As() == bv.As() && Equal(ae.Query(), bv.Query())
 	default:
 		return false
 	}
