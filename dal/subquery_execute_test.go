@@ -6,8 +6,41 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/dal-go/dalgo/recordset"
 	"github.com/dal-go/record"
 )
+
+type cappedTestReader struct {
+	records []record.Record
+	next    int
+	closed  bool
+}
+
+func (r *cappedTestReader) Next() (record.Record, error) {
+	if r.next >= len(r.records) {
+		return nil, ErrNoMoreRecords
+	}
+	value := r.records[r.next]
+	r.next++
+	return value, nil
+}
+func (*cappedTestReader) Cursor() (string, error) { return "", nil }
+func (r *cappedTestReader) Close() error          { r.closed = true; return nil }
+
+type cappedTestBackend struct {
+	data    map[string][]record.Record
+	readers map[string]*cappedTestReader
+}
+
+func (b *cappedTestBackend) ExecuteQueryToRecordsReader(_ context.Context, q Query) (RecordsReader, error) {
+	name := q.(StructuredQuery).From().Base().Name()
+	r := &cappedTestReader{records: b.data[name]}
+	b.readers[name] = r
+	return r, nil
+}
+func (*cappedTestBackend) ExecuteQueryToRecordsetReader(context.Context, Query, ...recordset.Option) (RecordsetReader, error) {
+	return nil, errors.New("recordset unsupported")
+}
 
 func TestGenericRecursiveExistsAndScalar(t *testing.T) {
 	backend := &ignoringJoinBackend{data: map[string][]record.Record{
@@ -36,6 +69,24 @@ func TestGenericRecursiveExistsAndScalar(t *testing.T) {
 	}
 	if backend.reads["Invoice"] < 2 {
 		t.Fatalf("nested leaf scans = %d", backend.reads["Invoice"])
+	}
+}
+
+func TestRecursiveSimpleChildCapClosesAfterSecondScalarRow(t *testing.T) {
+	backend := &cappedTestBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
+		"Invoice":  {joinTestRecord("Invoice", "1", map[string]any{"id": 1}), joinTestRecord("Invoice", "2", map[string]any{"id": 2}), joinTestRecord("Invoice", "3", map[string]any{"id": 3})},
+	}, readers: map[string]*cappedTestReader{}}
+	child := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Expression: NewFieldRef("i", "id")})
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().SelectColumns(Column{Expression: NewQueryExpression(child, "invoice")})
+	_, err := ExecuteRecursiveQuery(context.Background(), backend, query)
+	var diagnostic *QueryValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Category != "cardinality" {
+		t.Fatalf("scalar error = %v", err)
+	}
+	invoice := backend.readers["Invoice"]
+	if invoice == nil || invoice.next != 2 || !invoice.closed {
+		t.Fatalf("invoice reader = %#v", invoice)
 	}
 }
 

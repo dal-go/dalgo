@@ -1062,7 +1062,7 @@ func (e *joinExecution) evalExpression(expr Expression, row joinRow) (any, error
 	case FieldRef:
 		return e.field(row, value), nil
 	case QueryExpression:
-		records, err := e.queryRecords(value.Query(), &row)
+		records, err := e.queryRecordsCapped(value.Query(), &row, 2)
 		if err != nil {
 			return nil, err
 		}
@@ -1101,8 +1101,15 @@ func (e *joinExecution) evalExpression(expr Expression, row joinRow) (any, error
 }
 
 func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]record.Record, error) {
+	return e.queryRecordsCapped(query, outer, 0)
+}
+
+func (e *joinExecution) queryRecordsCapped(query StructuredQuery, outer *joinRow, cap int) ([]record.Record, error) {
 	if query == nil {
 		return nil, queryError("query_shape", "query", "query is required")
+	}
+	if cap > 0 && simpleRecursiveQuery(query) {
+		return e.executeSimpleCapped(query, outer, cap)
 	}
 	key := query.String()
 	if !queryHasOuterReference(query) {
@@ -1124,6 +1131,56 @@ func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]r
 	return records, err
 }
 
+func simpleRecursiveQuery(q StructuredQuery) bool {
+	return q.From() != nil && q.From().Base() != nil && len(q.From().Joins()) == 0 && len(q.GroupBy()) == 0 && q.Having() == nil && len(q.OrderBy()) == 0 && q.Offset() == 0 && !HasAggregation(q)
+}
+
+func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, cap int) (records []record.Record, resultErr error) {
+	reader, err := e.executor.ExecuteQueryToRecordsReader(e.ctx, From(q.From().Base()).NewQuery().SelectIntoRecord(nil))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := reader.Close(); resultErr == nil && closeErr != nil {
+			resultErr = closeErr
+		}
+	}()
+	child := &joinExecution{ctx: e.ctx, q: q, executor: e.executor, outer: outer, recursive: true, budget: e.budget, aliases: []string{joinAlias(q.From().Base())}, memo: e.memo}
+	for len(records) < cap {
+		if err := e.ctx.Err(); err != nil {
+			return nil, err
+		}
+		rec, err := reader.Next()
+		if errors.Is(err, ErrNoMoreRecords) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		data, err := normalizedJoinRecordMap(rec)
+		if err != nil {
+			return nil, err
+		}
+		row := joinRow{key: rec.Key(), base: child.aliases[0], sources: map[string]map[string]any{child.aliases[0]: data}, outer: outer}
+		ok, err := child.evalCondition(q.Where(), row)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		output := data
+		if len(q.Columns()) > 0 {
+			output, err = child.project(q.Columns(), row)
+			if err != nil {
+				return nil, err
+			}
+		}
+		records = append(records, record.NewRecordWithData(rec.Key(), output))
+	}
+	return records, nil
+}
+
 func (e *joinExecution) evalCondition(condition Condition, row joinRow) (bool, error) {
 	truth, err := e.evalTruth(condition, row)
 	return truth == queryTrue, err
@@ -1135,7 +1192,7 @@ func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth,
 	}
 	switch value := condition.(type) {
 	case ExistsCondition:
-		records, err := e.queryRecords(value.Query(), &row)
+		records, err := e.queryRecordsCapped(value.Query(), &row, 1)
 		if err != nil {
 			return queryUnknown, err
 		}
