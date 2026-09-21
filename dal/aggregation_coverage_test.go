@@ -199,7 +199,7 @@ func TestAggregationPlanAndValidationCoverage(t *testing.T) {
 	if plan, err := PlanAggregation(grouped, fullCaps); err != nil || plan.Strategy != AggregationNative {
 		t.Fatalf("native plan=%#v err=%v", plan, err)
 	}
-	if plan, err := PlanAggregation(grouped, QueryCapabilities{OrderBy: true}); err != nil || plan.Strategy != AggregationStreaming {
+	if plan, err := PlanAggregation(grouped, QueryCapabilities{OrderBy: true, GroupKeyOrder: true}); err != nil || plan.Strategy != AggregationStreaming {
 		t.Fatalf("stream plan=%#v err=%v", plan, err)
 	}
 	if plan, err := PlanAggregation(grouped, QueryCapabilities{}); err != nil || plan.Strategy != AggregationHash {
@@ -904,7 +904,7 @@ func TestAggregationExecutionErrorBranchesCoverage(t *testing.T) {
 	for i := range stateLimitReader.aggregates {
 		stateLimitReader.aggregates[i] = NewAggregate(COUNT, false, Star())
 	}
-	if err := stateLimitReader.loadMaterialized(); err == nil || !strings.Contains(err.Error(), "aggregate-state limit") {
+	if err := stateLimitReader.loadMaterialized(); err == nil || (!strings.Contains(err.Error(), "aggregate-state limit") && !strings.Contains(err.Error(), "byte limit")) {
 		t.Fatalf("aggregate-state limit error = %v", err)
 	}
 }

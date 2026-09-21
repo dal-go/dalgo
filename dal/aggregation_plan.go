@@ -20,9 +20,12 @@ type AggregateCapabilities struct {
 // the operations they can preserve exactly. Missing capability information is
 // treated conservatively and selects DALgo's local hash strategy.
 type QueryCapabilities struct {
-	GroupBy        bool
-	Having         bool
-	OrderBy        bool
+	GroupBy bool
+	Having  bool
+	OrderBy bool
+	// GroupKeyOrder, together with OrderBy, reports that raw field ordering
+	// keeps every DALgo-normalized typed grouping key in one contiguous run.
+	GroupKeyOrder  bool
 	StableRowOrder bool
 	Aggregate      AggregateCapabilities
 }
@@ -61,16 +64,16 @@ func PlanAggregation(q StructuredQuery, capabilities QueryCapabilities) (Aggrega
 	if nativeAggregationSupported(q, capabilities) {
 		return AggregationPlan{Strategy: AggregationNative, Reason: "provider supports every required aggregation stage"}, nil
 	}
-	if canStreamAggregation(q) && capabilities.OrderBy {
-		return AggregationPlan{Strategy: AggregationStreaming, Reason: "provider lacks full aggregation but can order raw rows by grouping keys"}, nil
+	if canStreamAggregation(q) && capabilities.OrderBy && capabilities.GroupKeyOrder {
+		return AggregationPlan{Strategy: AggregationStreaming, Reason: "provider lacks full aggregation but guarantees DALgo-normalized grouping-key runs"}, nil
 	}
-	return AggregationPlan{Strategy: AggregationHash, Reason: "provider lacks full aggregation and useful grouping order"}, nil
+	return AggregationPlan{Strategy: AggregationHash, Reason: "provider lacks full aggregation and compatible grouping-key order"}, nil
 }
 
-// canStreamAggregation is deliberately conservative. The generic ORDER BY
-// capability guarantees field ordering; providers may not evaluate arbitrary
-// scalar expressions in their raw-row ordering path. Expression group keys
-// therefore use hash aggregation unless the whole query is native.
+// canStreamAggregation remains conservative about expressions because the
+// GroupKeyOrder guarantee applies only to field group keys. Generic OrderBy is
+// insufficient: its comparator can treat values that DALgo groups separately
+// as equal, allowing a group to be interleaved.
 func canStreamAggregation(q StructuredQuery) bool {
 	if len(q.GroupBy()) == 0 {
 		return false

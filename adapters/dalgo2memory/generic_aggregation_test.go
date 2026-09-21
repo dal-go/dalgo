@@ -2,6 +2,7 @@ package dalgo2memory
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
@@ -112,6 +113,34 @@ func TestDALgoGenericStreamingHashParityAndResultOrder(t *testing.T) {
 	require.Equal(t, streamed, hashed)
 	require.Equal(t, "A", streamed[0]["category"])
 	require.EqualValues(t, 3, streamed[0]["orders"])
+}
+
+func TestDALgoGenericAggregationUsesHashForMixedTypeOrderTies(t *testing.T) {
+	backend := newDatabase()
+	ctx := context.Background()
+	for id, category := range map[string]any{"1": false, "2": "false", "3": false} {
+		require.NoError(t, backend.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("sales", id), &map[string]any{"category": category})))
+	}
+	require.False(t, backend.QueryCapabilities().GroupKeyOrder)
+	count := dal.Count()
+	count.Alias = "rows"
+	q := dal.From(dal.NewRootCollectionRef("sales", "")).NewQuery().
+		GroupBy(dal.Field("category")).
+		SelectColumns(dal.Column{Expression: dal.Field("category")}, count)
+	reader, err := dal.NewDB(backend).ExecuteQueryToRecordsReader(ctx, q)
+	require.NoError(t, err)
+	rows := readResultMaps(t, reader)
+	require.Len(t, rows, 2)
+	counts := map[string]int64{}
+	for _, row := range rows {
+		counts[categoryTypeKey(row["category"])] = row["rows"].(int64)
+	}
+	require.EqualValues(t, 2, counts["bool:false"])
+	require.EqualValues(t, 1, counts["string:false"])
+}
+
+func categoryTypeKey(value any) string {
+	return fmt.Sprintf("%T:%v", value, value)
 }
 
 func TestDALgoGenericAggregationRecordset(t *testing.T) {
