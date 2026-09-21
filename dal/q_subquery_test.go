@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -61,6 +62,76 @@ func TestQueryTreeInspectionForms(t *testing.T) {
 	)).GroupBy(NewQueryExpression(leaf, "g")).OrderBy(Ascending(NewQueryExpression(leaf, "o"))).SelectColumns(Column{Expression: NewQueryExpression(leaf, "v")})
 	if !HasSubquery(child) {
 		t.Fatal("nested forms were not inspected")
+	}
+}
+
+func TestQueryTreeInspectionTraversesEveryRecursivePosition(t *testing.T) {
+	leaf := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Expression: NewFieldRef("i", "id")})
+	derived := NewQuerySource(leaf, "d")
+	from := From(derived).Join(NewJoinedSource(NewRootCollectionRef("Payment", "p"), JoinInner,
+		NewComparison(NewFieldRef("d", "id"), Equal, NewFieldRef("p", "invoice"))))
+	query := from.NewQuery().Where(NewGroupCondition(And,
+		NewExistsCondition(leaf),
+		NewComparison(NewQueryExpression(leaf, "left"), Equal, Binary(NewQueryExpression(leaf, "right"), Add, Constant{Value: 1})),
+	)).Having(NewExistsCondition(leaf)).GroupBy(NewQueryExpression(leaf, "group")).OrderBy(Ascending(NewQueryExpression(leaf, "order"))).SelectColumns(
+		Column{Expression: NewQueryExpression(leaf, "column")},
+		Column{Expression: NewAggregate(COUNT, false, NewQueryExpression(leaf, "aggregate"))},
+	)
+	if inspectQueryTree(query, func(StructuredQuery) bool { return false }) {
+		t.Fatal("false predicate reported a recursive node")
+	}
+	if !inspectQueryTree(query, func(candidate StructuredQuery) bool { return candidate.String() == leaf.String() }) {
+		t.Fatal("recursive node was not reported to predicate")
+	}
+}
+
+func TestRecursiveScopeValidatorsReportEveryNestedPosition(t *testing.T) {
+	visible := map[string]bool{"c": true}
+	visiting := map[uintptr]bool{}
+	badField := NewFieldRef("missing", "id")
+	conditions := []Condition{
+		NewExistsCondition(nil),
+		NewComparison(badField, Equal, Constant{Value: 1}),
+		NewComparison(Constant{Value: 1}, Equal, badField),
+		NewGroupCondition(And, NewComparison(badField, Equal, Constant{Value: 1})),
+	}
+	for i, condition := range conditions {
+		if err := validateConditionScope(condition, visible, fmt.Sprintf("where.conditions[%d]", i), visiting); err == nil {
+			t.Fatalf("condition %d unexpectedly valid", i)
+		}
+	}
+	expressions := []Expression{
+		badField,
+		NewQueryExpression(nil, "q"),
+		Binary(badField, Add, Constant{Value: 1}),
+		Binary(Constant{Value: 1}, Add, badField),
+		NewAggregate(COUNT, false, badField),
+	}
+	for i, expression := range expressions {
+		if err := validateExpressionScope(expression, visible, fmt.Sprintf("columns[%d]", i), visiting); err == nil {
+			t.Fatalf("expression %d unexpectedly valid", i)
+		}
+	}
+	if err := validateConditionScope(nil, visible, "where", visiting); err != nil {
+		t.Fatalf("nil condition: %v", err)
+	}
+	if err := validateExpressionScope(nil, visible, "columns[0]", visiting); err != nil {
+		t.Fatalf("nil expression: %v", err)
+	}
+}
+
+func TestRecursiveScopeRejectsMalformedJoinTreesBeforeExecution(t *testing.T) {
+	root := NewRootCollectionRef("Customer", "c")
+	cases := []StructuredQuery{
+		From(root).Join(NewNestedJoinedSource(nil, JoinInner)).NewQuery().SelectIntoRecord(nil),
+		From(root).Join(NewJoinedSource(NewRootCollectionRef("Invoice", "c"), JoinInner)).NewQuery().SelectIntoRecord(nil),
+		From(root).Join(NewJoinedSource(NewRootCollectionRef("Invoice", "i"), JoinInner,
+			NewComparison(NewFieldRef("later", "id"), Equal, NewFieldRef("i", "id")))).NewQuery().SelectIntoRecord(nil),
+	}
+	for i, query := range cases {
+		if err := ValidateQueryScope(query); err == nil {
+			t.Fatalf("malformed query %d was accepted", i)
+		}
 	}
 }
 

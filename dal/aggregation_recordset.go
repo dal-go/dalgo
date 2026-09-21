@@ -47,7 +47,12 @@ func executeRecursiveRecordset(ctx context.Context, executor QueryExecutor, quer
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
+	return recursiveReaderToRecordset(ctx, reader, query, options...)
+}
+
+// recursiveReaderToRecordset materializes the output of the generic executor.
+// ReadAllToRecords owns and closes the reader, including on read failure.
+func recursiveReaderToRecordset(ctx context.Context, reader RecordsReader, query StructuredQuery, options ...recordset.Option) (RecordsetReader, error) {
 	records, err := ReadAllToRecords(ctx, reader)
 	if err != nil {
 		return nil, err
@@ -66,7 +71,7 @@ func executeRecursiveRecordset(ctx context.Context, executor QueryExecutor, quer
 	// list. Keep that shape for recordset consumers instead of inferring no
 	// columns from the absence of rows.
 	if len(names) == 0 {
-		for i, column := range query.Columns() {
+		for _, column := range query.Columns() {
 			if column.Wildcard != nil {
 				continue // a wildcard requires source metadata, which an empty scan lacks.
 			}
@@ -77,9 +82,6 @@ func executeRecursiveRecordset(ctx context.Context, executor QueryExecutor, quer
 				} else if column.Expression != nil {
 					columnName = aggregationColumnName(column)
 				}
-			}
-			if columnName == "" {
-				columnName = fmt.Sprintf("column_%d", i)
 			}
 			names[columnName] = true
 		}

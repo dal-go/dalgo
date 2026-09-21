@@ -99,12 +99,8 @@ func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Qu
 // adapters must opt into a complete recursive implementation in a later
 // capability contract.
 func executeGenericRecursive(ctx context.Context, executor QueryExecutor, q StructuredQuery, outer *joinRow) (RecordsReader, error) {
-	plan, err := PlanRecursiveQuery(q)
-	if err != nil {
+	if _, err := PlanRecursiveQuery(q); err != nil {
 		return nil, err
-	}
-	if plan.Strategy != RecursiveQueryGeneric {
-		return nil, queryError("query_plan", "query", "recursive query has no supported execution strategy")
 	}
 	return executeGenericRecursiveBudget(ctx, executor, q, outer, &recursiveBudget{})
 }
@@ -169,11 +165,11 @@ func (e *joinExecution) execute() (RecordsReader, error) {
 		}
 		aggregated := newLocalAggregationReader(e.ctx, e.q, NewRecordsReader(records), plan)
 		materialized, err := ReadAllToRecords(e.ctx, aggregated)
-		if closeErr := aggregated.Close(); err == nil && closeErr != nil {
-			err = closeErr
-		}
 		if err != nil {
 			return nil, err
+		}
+		if materialized == nil {
+			materialized = []record.Record{}
 		}
 		return NewRecordsReader(materialized), nil
 	}
@@ -1168,16 +1164,13 @@ func (e *joinExecution) queryRecordsCappedAt(query StructuredQuery, outer *joinR
 		return nil, nestedLimitError(err, path)
 	}
 	records, err := ReadAllToRecords(e.ctx, reader)
-	if closeErr := reader.Close(); err == nil && closeErr != nil {
-		err = closeErr
-	}
 	if err != nil {
 		return nil, nestedLimitError(err, path)
 	}
-	if err == nil && !queryHasOuterReference(query) {
+	if !queryHasOuterReference(query) {
 		e.memo[key] = append(e.memo[key], memoizedQuery{query: query, records: records, candidateWork: e.budget.candidates - before})
 	}
-	return records, nestedLimitError(err, path)
+	return records, nil
 }
 
 func nestedLimitError(err error, path string) error {
@@ -1467,18 +1460,32 @@ func queryError(category, path, message string) error {
 	return &QueryValidationError{Category: category, Path: path, Message: message}
 }
 
-// queryHasOuterReference conservatively identifies a direct lexical reference
-// outside the query's own FROM tree. Returning true merely disables caching.
+// queryHasOuterReference finds free lexical bindings across the whole subtree.
+// A nested query may capture this query's aliases without making this query
+// dependent on its own caller.
 func queryHasOuterReference(q StructuredQuery) bool {
+	return len(queryFreeReferences(q, map[uintptr]bool{})) != 0
+}
+
+func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[string]bool {
+	free := map[string]bool{}
+	if q == nil {
+		free[""] = true
+		return free
+	}
+	if id := queryPointerID(q); id != 0 {
+		if visiting[id] {
+			free[""] = true
+			return free
+		}
+		visiting[id] = true
+		defer delete(visiting, id)
+	}
 	local := map[string]bool{}
-	derivedCapturesOuter := false
 	var collect func(FromSource)
 	collect = func(from FromSource) {
 		if from == nil || from.Base() == nil {
 			return
-		}
-		if source, ok := asQuerySource(from.Base()); ok && source.Query() != nil && queryHasOuterReference(source.Query()) {
-			derivedCapturesOuter = true
 		}
 		local[joinAlias(from.Base())] = true
 		for _, join := range from.Joins() {
@@ -1486,62 +1493,73 @@ func queryHasOuterReference(q StructuredQuery) bool {
 		}
 	}
 	collect(q.From())
-	if derivedCapturesOuter {
-		return true
+	mergeChild := func(child StructuredQuery) {
+		for alias := range queryFreeReferences(child, visiting) {
+			if !local[alias] {
+				free[alias] = true
+			}
+		}
 	}
-	var expression func(Expression) bool
-	expression = func(expr Expression) bool {
+	var expression func(Expression)
+	expression = func(expr Expression) {
 		switch value := expr.(type) {
 		case FieldRef:
-			return value.Source() == "" || !local[value.Source()]
+			if value.Source() == "" || !local[value.Source()] {
+				free[value.Source()] = true
+			}
 		case BinaryExpression:
-			return expression(value.Left) || expression(value.Right)
+			expression(value.Left)
+			expression(value.Right)
 		case QueryExpression:
-			return true // nested scope may capture this query's sources
+			mergeChild(value.Query())
 		case AggregateFunc:
 			for _, arg := range value.FuncArgs() {
-				if expression(arg) {
-					return true
-				}
+				expression(arg)
 			}
 		}
-		return false
 	}
-	var condition func(Condition) bool
-	condition = func(value Condition) bool {
+	var condition func(Condition)
+	condition = func(value Condition) {
 		switch item := value.(type) {
 		case ExistsCondition:
-			return true
+			mergeChild(item.Query())
 		case Comparison:
-			return expression(item.Left) || expression(item.Right)
+			expression(item.Left)
+			expression(item.Right)
 		case GroupCondition:
 			for _, child := range item.Conditions() {
-				if condition(child) {
-					return true
-				}
+				condition(child)
 			}
 		}
-		return false
 	}
-	if condition(q.Where()) || condition(q.Having()) {
-		return true
-	}
-	for _, column := range q.Columns() {
-		if expression(column.Expression) {
-			return true
+	var inspectFrom func(FromSource)
+	inspectFrom = func(from FromSource) {
+		if from == nil || from.Base() == nil {
+			return
 		}
+		if source, ok := asQuerySource(from.Base()); ok {
+			mergeChild(source.Query())
+		}
+		for _, join := range from.Joins() {
+			inspectFrom(joinedFrom(join))
+			for _, on := range join.On() {
+				condition(on)
+			}
+		}
+	}
+	inspectFrom(q.From())
+	condition(q.Where())
+	condition(q.Having())
+	for _, column := range q.Columns() {
+		expression(column.Expression)
 	}
 	for _, value := range q.GroupBy() {
-		if expression(value) {
-			return true
-		}
+		expression(value)
 	}
 	for _, value := range q.OrderBy() {
-		if expression(value.Expression()) {
-			return true
-		}
+		expression(value.Expression())
 	}
-	return false
+	return free
 }
 
 func projectJoinRow(columns []Column, row joinRow, fields map[string][]string) (map[string]any, error) {
