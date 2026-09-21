@@ -1481,83 +1481,75 @@ func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[strin
 		visiting[id] = true
 		defer delete(visiting, id)
 	}
-	local := map[string]bool{}
-	var collect func(FromSource)
-	collect = func(from FromSource) {
-		if from == nil || from.Base() == nil {
-			return
-		}
-		local[joinAlias(from.Base())] = true
-		for _, join := range from.Joins() {
-			collect(joinedFrom(join))
-		}
-	}
-	collect(q.From())
-	mergeChild := func(child StructuredQuery) {
+	mergeChild := func(child StructuredQuery, visible map[string]bool) {
 		for alias := range queryFreeReferences(child, visiting) {
-			if !local[alias] {
+			if !visible[alias] {
 				free[alias] = true
 			}
 		}
 	}
-	var expression func(Expression)
-	expression = func(expr Expression) {
+	var expression func(Expression, map[string]bool)
+	expression = func(expr Expression, visible map[string]bool) {
 		switch value := expr.(type) {
 		case FieldRef:
-			if value.Source() == "" || !local[value.Source()] {
+			if value.Source() == "" || !visible[value.Source()] {
 				free[value.Source()] = true
 			}
 		case BinaryExpression:
-			expression(value.Left)
-			expression(value.Right)
+			expression(value.Left, visible)
+			expression(value.Right, visible)
 		case QueryExpression:
-			mergeChild(value.Query())
+			mergeChild(value.Query(), visible)
 		case AggregateFunc:
 			for _, arg := range value.FuncArgs() {
-				expression(arg)
+				expression(arg, visible)
 			}
 		}
 	}
-	var condition func(Condition)
-	condition = func(value Condition) {
+	var condition func(Condition, map[string]bool)
+	condition = func(value Condition, visible map[string]bool) {
 		switch item := value.(type) {
 		case ExistsCondition:
-			mergeChild(item.Query())
+			mergeChild(item.Query(), visible)
 		case Comparison:
-			expression(item.Left)
-			expression(item.Right)
+			expression(item.Left, visible)
+			expression(item.Right, visible)
 		case GroupCondition:
 			for _, child := range item.Conditions() {
-				condition(child)
+				condition(child, visible)
 			}
 		}
 	}
-	var inspectFrom func(FromSource)
-	inspectFrom = func(from FromSource) {
+	var inspectFrom func(FromSource, map[string]bool) map[string]bool
+	inspectFrom = func(from FromSource, visible map[string]bool) map[string]bool {
 		if from == nil || from.Base() == nil {
-			return
+			return visible
 		}
 		if source, ok := asQuerySource(from.Base()); ok {
-			mergeChild(source.Query())
+			mergeChild(source.Query(), visible)
 		}
+		visible = cloneQueryAliases(visible)
+		visible[joinAlias(from.Base())] = true
 		for _, join := range from.Joins() {
-			inspectFrom(joinedFrom(join))
+			childVisible := inspectFrom(joinedFrom(join), visible)
 			for _, on := range join.On() {
-				condition(on)
+				condition(on, childVisible)
 			}
+			visible = childVisible
 		}
+		return visible
 	}
-	inspectFrom(q.From())
-	condition(q.Where())
-	condition(q.Having())
+	local := inspectFrom(q.From(), map[string]bool{})
+	condition(q.Where(), local)
+	condition(q.Having(), local)
 	for _, column := range q.Columns() {
-		expression(column.Expression)
+		expression(column.Expression, local)
 	}
 	for _, value := range q.GroupBy() {
-		expression(value)
+		expression(value, local)
 	}
 	for _, value := range q.OrderBy() {
-		expression(value.Expression())
+		expression(value.Expression(), local)
 	}
 	return free
 }

@@ -345,6 +345,41 @@ func TestRecursiveMemoizesQueryWithOnlyLocallyCorrelatedNestedPredicate(t *testi
 	}
 }
 
+func TestRecursiveDerivedCapturePrecedesShadowingJoinAlias(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1}), joinTestRecord("Customer", "2", map[string]any{"id": 2})},
+		"Invoice":  {joinTestRecord("Invoice", "one", map[string]any{"id": 1, "customer": 1}), joinTestRecord("Invoice", "two", map[string]any{"id": 2, "customer": 2})},
+		"Other":    {joinTestRecord("Other", "one", map[string]any{"id": 1}), joinTestRecord("Other", "two", map[string]any{"id": 2})},
+	}, reads: map[string]int{}}
+	derived := From(NewRootCollectionRef("Invoice", "i")).NewQuery().Where(
+		NewComparison(NewFieldRef("i", "customer"), Equal, NewFieldRef("x", "id")),
+	).SelectColumns(Column{Expression: NewFieldRef("i", "id")})
+	inner := From(NewQuerySource(derived, "d")).Join(NewJoinedSource(NewRootCollectionRef("Other", "x"), JoinInner,
+		NewComparison(NewFieldRef("d", "id"), Equal, NewFieldRef("x", "id")),
+	)).NewQuery().SelectColumns(Column{Expression: NewFieldRef("d", "id")})
+	if !queryHasOuterReference(inner) {
+		t.Fatal("derived outer capture was hidden by a later JOIN alias")
+	}
+	query := From(NewRootCollectionRef("Customer", "x")).NewQuery().SelectColumns(Column{Expression: NewQueryExpression(inner, "invoice")})
+	if err := ValidateQueryScope(query); err != nil {
+		t.Fatalf("outer capture followed by local shadowing should be valid: %v", err)
+	}
+	reader, err := ExecuteRecursiveQuery(context.Background(), backend, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil || len(records) != 2 {
+		t.Fatalf("results = %d, %v", len(records), err)
+	}
+	if !valuesEqual(records[0].Data().(map[string]any)["invoice"], 1) || !valuesEqual(records[1].Data().(map[string]any)["invoice"], 2) {
+		t.Fatalf("shadowed derived results = %#v, %#v", records[0].Data(), records[1].Data())
+	}
+	if backend.reads["Invoice"] != 2 {
+		t.Fatalf("correlated Invoice scans = %d, want 2", backend.reads["Invoice"])
+	}
+}
+
 func TestRecursiveMemoSeparatesDistinctJoinTrees(t *testing.T) {
 	backend := &ignoringJoinBackend{data: map[string][]record.Record{
 		"A": {joinTestRecord("A", "1", map[string]any{"id": 1})},
