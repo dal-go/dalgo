@@ -6,7 +6,9 @@ import (
 )
 
 // NativeJoinProvider is an optional, query-specific promise that the adapter
-// can execute the entire relation tree with DALgo's JOIN semantics. A non-nil
+// can execute the entire relation tree with DALgo's JOIN semantics. The query
+// retains every ordered per-edge JoinedSource.Algorithms hint unchanged; a
+// native dialect documents which applicable preferences it honors. A non-nil
 // error declines pushdown; DALgo then attempts a bounded generic plan.
 // Human reason from the approved brief: “Not every adapter supports native
 // JOINs—especially Firestore, document/key-value stores, HTTP/API sources,
