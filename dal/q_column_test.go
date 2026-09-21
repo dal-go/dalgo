@@ -84,3 +84,47 @@ func TestWildcardProjection(t *testing.T) {
 		t.Fatalf("constructor retained caller slice: got %q", got)
 	}
 }
+
+func TestWildcardProjectionExcludes(t *testing.T) {
+	projection := WildcardProjection{Exclude: []string{
+		"Email",
+		"Billing*",
+		"*Password*",
+		"*Token",
+		"a*b*c",
+		"MÜNCHEN*",
+		"api?key",
+		"Billing*",
+	}}
+
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{name: "Email", want: true},
+		{name: "email", want: false},
+		{name: "billingAddress", want: true},
+		{name: "BILLINGCode", want: true},
+		{name: "customerPasswordHash", want: true},
+		{name: "Password", want: true},
+		{name: "accessToken", want: true},
+		{name: "abXYZc", want: true},
+		{name: "abc", want: true},
+		{name: "a/b/c", want: true},
+		{name: "MünchenOffice", want: true},
+		{name: "api?key", want: true},
+		{name: "apiXkey", want: false},
+		{name: "billing", want: true},
+		{name: "notBilling", want: false},
+		{name: "customerSecret", want: false},
+		{name: "accessTokens", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := projection.Excludes(tt.name); got != tt.want {
+				t.Errorf("Excludes(%q) = %t, want %t", tt.name, got, tt.want)
+			}
+		})
+	}
+}

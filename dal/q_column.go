@@ -12,6 +12,57 @@ type WildcardProjection struct {
 	Exclude []string `json:"exclude"`
 }
 
+// Excludes reports whether name is excluded by this projection. Exclusions
+// without a '*' match exactly and case-sensitively. An exclusion containing
+// one or more '*' is a case-insensitive mask that must match the entire column
+// name; '*' may occur anywhere and matches zero or more characters. No other
+// mask characters have special meaning.
+func (v WildcardProjection) Excludes(name string) bool {
+	for _, exclusion := range v.Exclude {
+		if strings.ContainsRune(exclusion, '*') {
+			if wildcardMaskMatches(exclusion, name) {
+				return true
+			}
+			continue
+		}
+		if exclusion == name {
+			return true
+		}
+	}
+	return false
+}
+
+// wildcardMaskMatches reports whether mask matches name. Both values are
+// split into runes so masks work for Unicode column names as well as ASCII.
+func wildcardMaskMatches(mask, name string) bool {
+	pattern := []rune(mask)
+	value := []rune(name)
+	states := make([]bool, len(value)+1)
+	states[0] = true
+
+	for _, token := range pattern {
+		next := make([]bool, len(value)+1)
+		if token == '*' {
+			for i := range states {
+				if states[i] {
+					next[i] = true
+				}
+				if i > 0 && next[i-1] {
+					next[i] = true
+				}
+			}
+		} else {
+			for i := 1; i < len(states); i++ {
+				if states[i-1] && strings.EqualFold(string(token), string(value[i-1])) {
+					next[i] = true
+				}
+			}
+		}
+		states = next
+	}
+	return states[len(value)]
+}
+
 // String renders the wildcard projection in DTQL's compact notation.
 func (v WildcardProjection) String() string {
 	prefix := "*"
