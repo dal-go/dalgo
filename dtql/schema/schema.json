@@ -461,6 +461,12 @@
         "alias": {
           "type": "string"
         },
+        "joins": {
+          "items": {
+            "$ref": "#/$defs/join"
+          },
+          "type": "array"
+        },
         "name": {
           "minLength": 1,
           "type": "string"
@@ -503,6 +509,55 @@
           "type": "array"
         }
       },
+      "type": "object"
+    },
+    "join": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/from"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/joinComparison"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "type": {
+          "enum": [
+            "inner",
+            "left"
+          ]
+        }
+      },
+      "required": [
+        "from",
+        "on"
+      ],
+      "type": "object"
+    },
+    "joinComparison": {
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "$ref": "#/$defs/qualifiedField"
+        },
+        "op": {
+          "enum": [
+            "==",
+            "eq"
+          ]
+        },
+        "right": {
+          "$ref": "#/$defs/qualifiedField"
+        }
+      },
+      "required": [
+        "op",
+        "left",
+        "right"
+      ],
       "type": "object"
     },
     "order": {
@@ -618,6 +673,24 @@
           "type": "array"
         }
       },
+      "type": "object"
+    },
+    "qualifiedField": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "source"
+      ],
       "type": "object"
     },
     "wildcardProjection": {

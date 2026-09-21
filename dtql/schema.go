@@ -77,6 +77,37 @@ func schemaDocument() map[string]any {
 				"schema": map[string]any{"type": "string", "minLength": 1},
 				"name":   map[string]any{"type": "string", "minLength": 1},
 				"alias":  map[string]any{"type": "string"},
+				"joins":  map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/join"}},
+			},
+		},
+		"join": map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []any{"from", "on"},
+			"properties": map[string]any{
+				"type": map[string]any{"enum": []any{"inner", "left"}},
+				"from": map[string]any{"$ref": "#/$defs/from"},
+				"on": map[string]any{
+					"type": "array", "minItems": 1,
+					"items": map[string]any{"$ref": "#/$defs/joinComparison"},
+				},
+			},
+		},
+		"joinComparison": map[string]any{
+			"type": "object", "additionalProperties": false,
+			"required": []any{"op", "left", "right"},
+			"properties": map[string]any{
+				"op":    map[string]any{"enum": []any{"==", "eq"}},
+				"left":  map[string]any{"$ref": "#/$defs/qualifiedField"},
+				"right": map[string]any{"$ref": "#/$defs/qualifiedField"},
+			},
+		},
+		"qualifiedField": map[string]any{
+			"type": "object", "additionalProperties": false,
+			"required": []any{"field", "source"},
+			"properties": map[string]any{
+				"field":  map[string]any{"type": "string", "minLength": 1},
+				"source": map[string]any{"type": "string", "minLength": 1},
 			},
 		},
 		"expression": map[string]any{

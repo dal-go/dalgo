@@ -37,16 +37,14 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	if doc.Limit < 0 || doc.Offset < 0 {
 		return nil, fmt.Errorf("invalid DTQL: limit and offset must be non-negative")
 	}
-	var source dal.CollectionRef
-	if doc.From.Schema == nil {
-		source = dal.NewRootCollectionRef(doc.From.Name, doc.From.Alias)
-	} else {
-		if *doc.From.Schema == "" {
-			return nil, fmt.Errorf("invalid DTQL: from.schema must not be empty")
-		}
-		source = dal.NewQualifiedRootCollectionRef(*doc.From.Schema, doc.From.Name, doc.From.Alias)
+	from, err := fromFromYAML(doc.From, "from")
+	if err != nil {
+		return nil, err
 	}
-	qb := dal.From(source).NewQuery()
+	if err := dal.ValidateJoinTree(from); err != nil {
+		return nil, fmt.Errorf("invalid DTQL: %w", err)
+	}
+	qb := from.NewQuery()
 
 	if doc.Where != nil {
 		cond, err := condFromYAML(*doc.Where)
@@ -94,6 +92,56 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 		return nil, fmt.Errorf("invalid DTQL: aggregation: %w", err)
 	}
 	return base, nil
+}
+
+func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
+	if encoded.Name == "" {
+		return nil, fmt.Errorf("invalid DTQL: join_shape at %s.name: name is required", path)
+	}
+	var source dal.CollectionRef
+	if encoded.Schema == nil {
+		source = dal.NewRootCollectionRef(encoded.Name, encoded.Alias)
+	} else {
+		if *encoded.Schema == "" {
+			return nil, fmt.Errorf("invalid DTQL: %s.schema must not be empty (join_shape at %s.schema)", path, path)
+		}
+		source = dal.NewQualifiedRootCollectionRef(*encoded.Schema, encoded.Name, encoded.Alias)
+	}
+	from := dal.From(source)
+	for i, join := range encoded.Joins {
+		joinPath := fmt.Sprintf("%s.joins[%d]", path, i)
+		if join.From == nil {
+			return nil, fmt.Errorf("invalid DTQL: join_shape at %s.from: from is required", joinPath)
+		}
+		if len(join.On) == 0 {
+			return nil, fmt.Errorf("invalid DTQL: join_shape at %s.on: on must contain at least one predicate", joinPath)
+		}
+		child, err := fromFromYAML(*join.From, joinPath+".from")
+		if err != nil {
+			return nil, err
+		}
+		joinType := dal.JoinInner
+		switch join.Type {
+		case "", "inner":
+		case "left":
+			joinType = dal.JoinLeft
+		default:
+			return nil, fmt.Errorf("invalid DTQL: join_type at %s.type: unsupported join type %q", joinPath, join.Type)
+		}
+		on := make([]dal.Condition, 0, len(join.On))
+		for j, predicate := range join.On {
+			if predicate.Op == "eq" {
+				predicate.Op = string(dal.Equal)
+			}
+			condition, err := condFromYAML(predicate)
+			if err != nil {
+				return nil, fmt.Errorf("invalid DTQL: join_shape at %s.on[%d]: %w", joinPath, j, err)
+			}
+			on = append(on, condition)
+		}
+		from.Join(dal.NewJoinedFrom(child, joinType, on...))
+	}
+	return from, nil
 }
 
 func columnsFromYAML(cols []columnYAML, from fromYAML) ([]dal.Column, error) {

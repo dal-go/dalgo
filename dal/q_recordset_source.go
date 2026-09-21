@@ -35,6 +35,7 @@ func (f *from) NewQuery() *QueryBuilder {
 			RecordsetSource: join.RecordsetSource,
 			joinType:        join.joinType,
 			on:              make([]Condition, len(join.on)),
+			from:            cloneFrom(join.from),
 		}
 		copy(f2.joins[i].on, join.on)
 	}
@@ -69,6 +70,7 @@ type JoinedSource struct {
 	RecordsetSource
 	joinType JoinType
 	on       []Condition
+	from     FromSource
 }
 
 // NewJoinedSource builds a JoinedSource of the given join type over src
@@ -76,6 +78,24 @@ type JoinedSource struct {
 // construct a fully-populated join (type + ON clause).
 func NewJoinedSource(src RecordsetSource, joinType JoinType, on ...Condition) JoinedSource {
 	return JoinedSource{RecordsetSource: src, joinType: joinType, on: on}
+}
+
+// NewJoinedFrom builds a JoinedSource over a relation tree. It is additive to
+// NewJoinedSource: callers with a single source can keep using that constructor.
+// The returned JoinedSource exposes the child tree through From.
+func NewJoinedFrom(from FromSource, joinType JoinType, on ...Condition) JoinedSource {
+	return NewNestedJoinedSource(from, joinType, on...)
+}
+
+// NewNestedJoinedSource builds a JoinedSource over a relation tree. It is
+// additive to NewJoinedSource: callers with a single source can keep using
+// that constructor. The returned JoinedSource exposes the child tree through
+// From.
+func NewNestedJoinedSource(from FromSource, joinType JoinType, on ...Condition) JoinedSource {
+	if from == nil {
+		return JoinedSource{joinType: joinType, on: append([]Condition(nil), on...)}
+	}
+	return JoinedSource{RecordsetSource: from.Base(), joinType: joinType, on: append([]Condition(nil), on...), from: from}
 }
 
 // JoinType returns the kind of join (INNER, LEFT, ...).
@@ -86,5 +106,35 @@ func (j JoinedSource) JoinType() JoinType {
 // On returns the join's ON conditions. The value receiver makes a join
 // returned by From().Joins() readable without taking its address.
 func (j JoinedSource) On() []Condition {
-	return j.on
+	return append([]Condition(nil), j.on...)
+}
+
+// From returns the recursively joined relation when this source was created
+// with NewJoinedFrom. It returns nil for the compatible single-source form.
+func (j JoinedSource) From() FromSource {
+	return j.from
+}
+
+func cloneFrom(source FromSource) FromSource {
+	return cloneFromWithSeen(source, map[FromSource]FromSource{})
+}
+
+func cloneFromWithSeen(source FromSource, seen map[FromSource]FromSource) FromSource {
+	if source == nil {
+		return nil
+	}
+	if clone := seen[source]; clone != nil {
+		return clone
+	}
+	clone := &from{RecordsetSource: source.Base()}
+	seen[source] = clone
+	for _, join := range source.Joins() {
+		clone.joins = append(clone.joins, JoinedSource{
+			RecordsetSource: join.RecordsetSource,
+			joinType:        join.joinType,
+			on:              append([]Condition(nil), join.on...),
+			from:            cloneFromWithSeen(join.from, seen),
+		})
+	}
+	return clone
 }

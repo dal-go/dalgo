@@ -57,7 +57,41 @@ func fromEqual(a, b dal.FromSource) bool {
 	if !aok || !bok {
 		return false
 	}
-	return an.Equal(bn, false)
+	if !an.Equal(bn, false) {
+		return false
+	}
+	aj, bj := a.Joins(), b.Joins()
+	if len(aj) != len(bj) {
+		return false
+	}
+	for i := range aj {
+		if aj[i].JoinType() != bj[i].JoinType() || !conditionsEqual(aj[i].On(), bj[i].On()) {
+			return false
+		}
+		ac, bc := aj[i].From(), bj[i].From()
+		if ac == nil {
+			ac = dal.From(aj[i].RecordsetSource)
+		}
+		if bc == nil {
+			bc = dal.From(bj[i].RecordsetSource)
+		}
+		if !fromEqual(ac, bc) {
+			return false
+		}
+	}
+	return true
+}
+
+func conditionsEqual(a, b []dal.Condition) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !condEqual(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 func rootCollection(from dal.FromSource) (dal.CollectionRef, bool) {
