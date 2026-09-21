@@ -332,12 +332,8 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuer
 					columns = append(columns, column)
 					continue
 				}
-				excluded := make(map[string]struct{}, len(column.Wildcard.Exclude))
-				for _, name := range column.Wildcard.Exclude {
-					excluded[name] = struct{}{}
-				}
 				for _, name := range allowed {
-					if _, skip := excluded[name]; !skip {
+					if !column.Wildcard.Excludes(name) {
 						columns = append(columns, dal.Column{Expression: dal.Field(name)})
 					}
 				}

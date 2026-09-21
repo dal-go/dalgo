@@ -295,6 +295,27 @@ func TestQueryFieldRestrictionsCoverCallerExpressions(t *testing.T) {
 	}
 }
 
+func TestWildcardProjectionMasksThroughSecureSession(t *testing.T) {
+	ctx := WithCurrentUser(context.Background(), "u1")
+	stub := &stubReadwriteSession{rows: map[string]map[string]any{}}
+	session := SecureReadwriteSession(stub, MustPolicy("users", Collection("users",
+		Allow(Query, "list").Fields("id", "name", "BillingAddress", "BillingCode", "PasswordHash"),
+	)))
+	query := dal.NewQueryBuilder(dal.From(dal.NewRootCollectionRef("users", ""))).
+		SelectColumns(dal.AllColumnsExcept("Billing*", "Password*"))
+
+	if _, err := session.ExecuteQueryToRecordsReader(ctx, query); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(stub.queries) != 1 {
+		t.Fatalf("adapter queries = %d, want 1", len(stub.queries))
+	}
+	columns := stub.queries[0].(dal.StructuredQuery).Columns()
+	if len(columns) != 2 || columns[0].Expression.(dal.FieldRef).Name() != "id" || columns[1].Expression.(dal.FieldRef).Name() != "name" {
+		t.Fatalf("masked projection reached adapter as %#v", columns)
+	}
+}
+
 func TestQueryFieldValidationHandlesPointerExpressionsAndConditions(t *testing.T) {
 	set, err := parseFieldPatterns([]string{"name"})
 	if err != nil {
