@@ -49,12 +49,17 @@ type joinExecution struct {
 	outer      *joinRow
 	recursive  bool
 	budget     *recursiveBudget
-	memo       map[string][]record.Record
+	memo       map[string][]memoizedQuery
 }
 
 type recursiveBudget struct {
 	fetched, output, candidates, bytes int
-	memo                               map[string][]record.Record
+	memo                               map[string][]memoizedQuery
+}
+
+type memoizedQuery struct {
+	query   StructuredQuery
+	records []record.Record
 }
 
 // queryTruth retains SQL's third truth value until a WHERE, ON, or HAVING
@@ -105,7 +110,7 @@ func executeGenericRecursive(ctx context.Context, executor QueryExecutor, q Stru
 
 func executeGenericRecursiveBudget(ctx context.Context, executor QueryExecutor, q StructuredQuery, outer *joinRow, budget *recursiveBudget) (RecordsReader, error) {
 	if budget.memo == nil {
-		budget.memo = map[string][]record.Record{}
+		budget.memo = map[string][]memoizedQuery{}
 	}
 	e := &joinExecution{ctx: ctx, q: q, executor: executor, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}, outer: outer, recursive: true, budget: budget, memo: budget.memo}
 	return e.execute()
@@ -1101,8 +1106,10 @@ func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]r
 	}
 	key := query.String()
 	if !queryHasOuterReference(query) {
-		if cached, ok := e.memo[key]; ok {
-			return cached, nil
+		for _, cached := range e.memo[key] {
+			if reflect.DeepEqual(cached.query, query) {
+				return cached.records, nil
+			}
 		}
 	}
 	reader, err := executeGenericRecursiveBudget(e.ctx, e.executor, query, outer, e.budget)
@@ -1112,7 +1119,7 @@ func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]r
 	defer reader.Close()
 	records, err := ReadAllToRecords(e.ctx, reader)
 	if err == nil && !queryHasOuterReference(query) {
-		e.memo[key] = records
+		e.memo[key] = append(e.memo[key], memoizedQuery{query: query, records: records})
 	}
 	return records, err
 }

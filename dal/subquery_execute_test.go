@@ -58,6 +58,29 @@ func TestGenericRecursiveMemoizesUncorrelatedNestedQuery(t *testing.T) {
 	}
 }
 
+func TestRecursiveMemoSeparatesDistinctJoinTrees(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"A": {joinTestRecord("A", "1", map[string]any{"id": 1})},
+		"B": {joinTestRecord("B", "1", map[string]any{"aid": 1})},
+		"C": {joinTestRecord("C", "1", map[string]any{"aid": 1})},
+	}, reads: map[string]int{}}
+	join := func(name, alias string) StructuredQuery {
+		return From(NewRootCollectionRef("A", "a")).Join(NewJoinedSource(NewRootCollectionRef(name, alias), JoinInner,
+			NewComparison(NewFieldRef("a", "id"), Equal, NewFieldRef(alias, "aid")))).NewQuery().SelectIntoRecord(nil)
+	}
+	budget := &recursiveBudget{memo: map[string][]memoizedQuery{}}
+	e := &joinExecution{ctx: context.Background(), executor: backend, budget: budget, memo: budget.memo}
+	if _, err := e.queryRecords(join("B", "b"), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.queryRecords(join("C", "c"), nil); err != nil {
+		t.Fatal(err)
+	}
+	if backend.reads["C"] == 0 {
+		t.Fatal("distinct JOIN tree reused cached B result")
+	}
+}
+
 func TestGenericRecursiveScalarDiagnosticsAndEmptyRecordsetShape(t *testing.T) {
 	backend := &ignoringJoinBackend{data: map[string][]record.Record{
 		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
