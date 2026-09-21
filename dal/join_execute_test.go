@@ -245,6 +245,38 @@ func TestGenericJoinNestedLeftInnerAndSingleScans(t *testing.T) {
 	}
 }
 
+func TestGenericJoinNestedLeftLeftPreservesBothUnmatchedLevels(t *testing.T) {
+	a := NewRootCollectionRef("A", "a")
+	b := NewRootCollectionRef("B", "b")
+	c := NewRootCollectionRef("C", "c")
+	child := From(b).Join(NewJoinedSource(c, JoinLeft, joinOn("b", "cid", "c", "id")))
+	root := From(a).Join(NewNestedJoinedSource(child, JoinLeft, joinOn("a", "id", "b", "aid")))
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"A": {joinTestRecord("A", "a1", map[string]any{"id": 1}), joinTestRecord("A", "a2", map[string]any{"id": 2})},
+		"B": {joinTestRecord("B", "b1", map[string]any{"id": "B1", "aid": 1, "cid": 9})},
+		"C": {},
+	}, reads: map[string]int{}}
+	q := root.NewQuery().SelectColumns(Column{Expression: NewFieldRef("a", "id"), Alias: "aID"}, Column{Expression: NewFieldRef("b", "id"), Alias: "bID"}, Column{Expression: NewFieldRef("c", "id"), Alias: "cID"})
+	reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("LEFT subtree returned %d rows", len(rows))
+	}
+	first, second := rows[0].Data().(map[string]any), rows[1].Data().(map[string]any)
+	if first["bID"] != "B1" || first["cID"] != nil || second["bID"] != nil || second["cID"] != nil {
+		t.Fatalf("nested LEFT null extension: %v / %v", first, second)
+	}
+	if !reflect.DeepEqual(backend.reads, map[string]int{"A": 1, "B": 1, "C": 1}) {
+		t.Fatalf("relation scans: %v", backend.reads)
+	}
+}
+
 func TestGenericJoinOptionalSelectUsesPlanner(t *testing.T) {
 	backend := &ignoringJoinBackend{data: map[string][]record.Record{
 		"A": {joinTestRecord("A", "one", map[string]any{"id": 1})},

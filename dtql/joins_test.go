@@ -193,7 +193,7 @@ func TestChinookNestedFixture_RoundTripsCanonically(t *testing.T) {
 }
 
 func TestDeserialize_JoinInputAliasesNormalize(t *testing.T) {
-	query, err := Deserialize([]byte(`from:
+	input := []byte(`from:
   name: Invoice
   as: i
   joins:
@@ -204,7 +204,11 @@ func TestDeserialize_JoinInputAliasesNormalize(t *testing.T) {
         - left: {field: CustomerId, source: i}
           op: eq
           right: {field: CustomerId, source: c}
-`))
+`)
+	if err := validateDTQL(compileSchema(t), input); err != nil {
+		t.Fatalf("schema rejected nested from.as: %v", err)
+	}
+	query, err := Deserialize(input)
 	if err != nil {
 		t.Fatalf("Deserialize: %v", err)
 	}

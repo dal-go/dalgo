@@ -457,8 +457,17 @@
     },
     "from": {
       "additionalProperties": false,
+      "not": {
+        "required": [
+          "alias",
+          "as"
+        ]
+      },
       "properties": {
         "alias": {
+          "type": "string"
+        },
+        "as": {
           "type": "string"
         },
         "joins": {

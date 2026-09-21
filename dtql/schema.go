@@ -73,10 +73,12 @@ func schemaDocument() map[string]any {
 			"type":                 "object",
 			"additionalProperties": false,
 			"required":             []any{"name"},
+			"not":                  map[string]any{"required": []any{"alias", "as"}},
 			"properties": map[string]any{
 				"schema": map[string]any{"type": "string", "minLength": 1},
 				"name":   map[string]any{"type": "string", "minLength": 1},
 				"alias":  map[string]any{"type": "string"},
+				"as":     map[string]any{"type": "string"},
 				"joins":  map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/join"}},
 			},
 		},
