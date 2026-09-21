@@ -33,14 +33,16 @@ func (v WildcardProjection) Excludes(name string) bool {
 }
 
 // wildcardMaskMatches reports whether mask matches name. Both values are
-// split into runes so masks work for Unicode column names as well as ASCII.
+// iterated as runes so masks work for Unicode column names as well as ASCII.
 func wildcardMaskMatches(mask, name string) bool {
-	pattern := []rune(mask)
-	value := []rune(name)
+	value := make([]rune, 0, len(name))
+	for _, runeValue := range name {
+		value = append(value, runeValue)
+	}
 	states := make([]bool, len(value)+1)
 	states[0] = true
 
-	for _, token := range pattern {
+	for _, token := range mask {
 		next := make([]bool, len(value)+1)
 		if token == '*' {
 			for i := range states {
