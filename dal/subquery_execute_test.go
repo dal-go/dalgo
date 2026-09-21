@@ -155,6 +155,36 @@ func TestGenericRecursiveUsesBoundUnqualifiedProjectionSource(t *testing.T) {
 	}
 }
 
+func TestGenericRecursiveCorrelatesDerivedJoinRightPerLeftRow(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Customer": {
+			joinTestRecord("Customer", "1", map[string]any{"id": 1}),
+			joinTestRecord("Customer", "2", map[string]any{"id": 2}),
+		},
+		"Invoice": {joinTestRecord("Invoice", "i", map[string]any{"customer": 1, "total": 9})},
+	}, reads: map[string]int{}}
+	derived := From(NewRootCollectionRef("Invoice", "i")).NewQuery().Where(
+		NewComparison(NewFieldRef("i", "customer"), Equal, NewFieldRef("c", "id")),
+	).SelectColumns(Column{Expression: NewFieldRef("i", "customer")}, Column{Expression: NewFieldRef("i", "total")})
+	from := From(NewRootCollectionRef("Customer", "c")).Join(NewJoinedSource(NewQuerySource(derived, "d"), JoinLeft,
+		NewComparison(NewFieldRef("c", "id"), Equal, NewFieldRef("d", "customer"))))
+	query := from.NewQuery().Where(NewExistsCondition(From(NewRootCollectionRef("Customer", "e")).NewQuery().SelectIntoRecord(nil))).OrderBy(Ascending(NewFieldRef("c", "id"))).SelectColumns(
+		Column{Expression: NewFieldRef("c", "id")}, Column{Expression: NewFieldRef("d", "total")},
+	)
+	reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("derived rows=%#v err=%v", rows, err)
+	}
+	first, second := rows[0].Data().(map[string]any), rows[1].Data().(map[string]any)
+	if first["total"] != float64(9) || second["total"] != nil {
+		t.Fatalf("derived values = %#v, %#v", first, second)
+	}
+}
+
 func TestRecursiveTruthTablesRetainUnknownUntilFilterBoundary(t *testing.T) {
 	e := &joinExecution{}
 	row := joinRow{base: "t", sources: map[string]map[string]any{"t": {"value": nil}}}

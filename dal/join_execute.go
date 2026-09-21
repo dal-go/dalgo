@@ -458,6 +458,12 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		if source.Query() == nil {
 			return joinError("query_shape", path+".query", "query is required")
 		}
+		// A derived source on a JOIN edge is evaluated by applyJoin with that
+		// edge's left row as its lexical outer scope. Scanning it here would
+		// discard the correlation before a left row exists.
+		if e.recursive && strings.Contains(path, ".joins[") {
+			return nil
+		}
 		reader, err = executeGenericRecursiveBudget(e.ctx, e.executor, source.Query(), e.outer, e.budget)
 	} else {
 		query := From(node.Base()).NewQuery().SelectIntoRecord(nil)
@@ -683,9 +689,34 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 	var out []joinRow
 	for _, parent := range left {
 		candidates := e.scans[alias]
+		if source, ok := child.Base().(QuerySource); ok && e.recursive {
+			reader, err := executeGenericRecursiveBudget(e.ctx, e.executor, source.Query(), &parent, e.budget)
+			if err != nil {
+				return nil, err
+			}
+			records, readErr := ReadAllToRecords(e.ctx, reader)
+			closeErr := reader.Close()
+			if readErr != nil {
+				return nil, readErr
+			}
+			if closeErr != nil {
+				return nil, closeErr
+			}
+			candidates = make([]scannedJoinRow, 0, len(records))
+			for _, rec := range records {
+				data, err := normalizedJoinRecordMap(rec)
+				if err != nil {
+					return nil, err
+				}
+				candidates = append(candidates, scannedJoinRow{key: rec.Key(), data: data})
+			}
+		}
 		// A selected nested loop deliberately probes every right base row.
 		// A selected hash narrows the scan on a direct cross-side equality.
 		right, other, hashApplicable := directJoinHashKey(join, alias, parent)
+		if _, derived := child.Base().(QuerySource); derived && e.recursive {
+			hashApplicable = false
+		}
 		if selectGenericJoinAlgorithm(join.Algorithms(), hashApplicable) == genericJoinHash {
 			// Every referenced key was validated on its raw fetched row.
 			key, _ := joinValueKey(fieldInJoinRow(parent, other), path+".on")
