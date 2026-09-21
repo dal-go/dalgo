@@ -266,7 +266,7 @@ func queryPointerID(q StructuredQuery) uintptr {
 		return 0
 	}
 	switch v.Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Func:
+	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Func:
 		if !v.IsNil() {
 			return v.Pointer()
 		}

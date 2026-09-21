@@ -84,7 +84,6 @@ func TestSubqueryFixturesExecuteThroughLeafScans(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer reader.Close()
 			records, err := dal.ReadAllToRecords(context.Background(), reader)
 			if err != nil {
 				t.Fatal(err)

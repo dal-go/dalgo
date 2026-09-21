@@ -1379,9 +1379,10 @@ func (e *joinExecution) evalTruthAt(condition Condition, row joinRow, path strin
 				truth = queryUnknown
 			}
 			if value.Operator == NotIn {
-				if truth == queryTrue {
+				switch truth {
+				case queryTrue:
 					truth = queryFalse
-				} else if truth == queryFalse {
+				case queryFalse:
 					truth = queryTrue
 				}
 			}

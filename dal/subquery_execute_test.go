@@ -441,7 +441,11 @@ func TestGenericRecursiveScalarDiagnosticsAndEmptyRecordsetShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer recordsetReader.Close()
+	t.Cleanup(func() {
+		if err := recordsetReader.Close(); err != nil {
+			t.Errorf("close recordset reader: %v", err)
+		}
+	})
 	var names []string
 	for _, column := range recordsetReader.Recordset().Columns() {
 		names = append(names, column.Name())
@@ -487,7 +491,11 @@ func TestRecursiveRecordsetRoutesAndMaterializesRows(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer reader.Close()
+			t.Cleanup(func() {
+				if err := reader.Close(); err != nil {
+					t.Errorf("close recordset reader: %v", err)
+				}
+			})
 			if reader.Recordset().Name() != "customers" || reader.Recordset().RowsCount() != 1 {
 				t.Fatalf("recordset = %q with %d rows", reader.Recordset().Name(), reader.Recordset().RowsCount())
 			}
