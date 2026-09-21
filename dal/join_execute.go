@@ -1058,6 +1058,10 @@ func (e *joinExecution) projection(columns []Column, row joinRow) (map[string]an
 }
 
 func (e *joinExecution) evalExpression(expr Expression, row joinRow) (any, error) {
+	return e.evalExpressionAt(expr, row, "expression")
+}
+
+func (e *joinExecution) evalExpressionAt(expr Expression, row joinRow, path string) (any, error) {
 	switch value := expr.(type) {
 	case FieldRef:
 		return e.field(row, value), nil
@@ -1070,24 +1074,24 @@ func (e *joinExecution) evalExpression(expr Expression, row joinRow) (any, error
 			return nil, nil
 		}
 		if len(records) > 1 {
-			return nil, queryError("cardinality", "columns[0].query", "scalar query returned more than one row")
+			return nil, queryError("cardinality", path+".query", "scalar query returned more than one row")
 		}
 		data, ok := records[0].Data().(map[string]any)
 		if !ok {
-			return nil, queryError("shape", "columns[0].query", "scalar query returned non-object row")
+			return nil, queryError("shape", path+".query", "scalar query returned non-object row")
 		}
 		if len(data) != 1 {
-			return nil, queryError("shape", "columns[0].query.columns", "scalar query requires exactly one column")
+			return nil, queryError("shape", path+".query.columns", "scalar query requires exactly one column")
 		}
 		for _, result := range data {
 			return result, nil
 		}
 	case BinaryExpression:
-		left, err := e.evalExpression(value.Left, row)
+		left, err := e.evalExpressionAt(value.Left, row, path+".left")
 		if err != nil {
 			return nil, err
 		}
-		right, err := e.evalExpression(value.Right, row)
+		right, err := e.evalExpressionAt(value.Right, row, path+".right")
 		if err != nil {
 			return nil, err
 		}
@@ -1359,7 +1363,7 @@ func (e *joinExecution) project(columns []Column, row joinRow) (map[string]any, 
 				name = fmt.Sprintf("column_%d", i)
 			}
 		}
-		value, err := e.evalExpression(column.Expression, row)
+		value, err := e.evalExpressionAt(column.Expression, row, fmt.Sprintf("columns[%d]", i))
 		if err != nil {
 			return nil, err
 		}

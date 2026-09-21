@@ -148,6 +148,12 @@ func TestGenericRecursiveScalarDiagnosticsAndEmptyRecordsetShape(t *testing.T) {
 	if !errors.As(err, &validation) || validation.Category != "cardinality" || validation.Path != "columns[0].query" {
 		t.Fatalf("many-row scalar error = %#v", err)
 	}
+	_, err = NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), outer.SelectColumns(
+		Column{Expression: NewFieldRef("c", "id")}, Column{Expression: NewQueryExpression(rows, "invoice")},
+	))
+	if !errors.As(err, &validation) || validation.Category != "cardinality" || validation.Path != "columns[1].query" {
+		t.Fatalf("second-column scalar error = %#v", err)
+	}
 	manyColumns := From(NewRootCollectionRef("Invoice", "i")).NewQuery().Where(NewComparison(NewFieldRef("i", "id"), Equal, Constant{Value: 1})).SelectColumns(
 		Column{Expression: NewFieldRef("i", "id")},
 		Column{Expression: NewFieldRef("i", "total")},
