@@ -11,7 +11,7 @@ status: Draft
 
 ## Summary
 
-DTQL defines an ordered recursive `from` relation tree with `inner` and `left` joins. DALgo Go and DALgo-JS parse, validate, and execute the same tree without changing existing single-source documents. The supplied [engineering brief](../../../docs/engineering/dtql-recursive-joins-brief.md) records the originating design intent.
+DTQL defines an ordered recursive `from` relation tree with `inner` and `left` joins. DALgo Go and DALgo-JS parse, validate, and execute the same tree without changing existing single-source documents. Per-JOIN ordered algorithm hints express execution preferences without changing results. The supplied [JOIN brief](../../../docs/engineering/dtql-recursive-joins-brief.md) and [algorithm hint brief](../../../docs/engineering/dtql-join-algorithm-hints-brief.md) record the originating design intent.
 
 ## Problem
 
@@ -57,6 +57,14 @@ Joined rows retain a per-alias map for expression evaluation. Explicit `columns`
 
 DALgo MUST execute supported INNER/LEFT trees when a provider lacks native JOINs but can provide bounded relation scans, with reads per relation rather than per left row. Equality matching SHOULD use a hash index over the portable key domain. The plan MUST preserve multiplicity, LEFT null extension, filtering, pagination, and aggregation. Go and TypeScript generic execution use the same default caps: 10,000 total fetched rows, 16 MiB retained data, 10,000 result rows, and 100,000 candidate ON evaluations; a native adapter may have its own provider limits. A provider that cannot scan a relation, cannot supply required schema for wildcard projection, or exceeds declared resource bounds may reject before output with `join_plan`. Capability checks are explicit; unsupported mixed plans fail before partial output. An adapter MUST NOT silently ignore joins.
 
+#### REQ: algorithm-hints
+
+Each JOIN MAY contain `hints: {algorithms: [...]}`. `algorithms` is a nonempty ordered sequence of distinct, case-sensitive identifiers from exactly `hash`, `merge`, `lookup`, `batchedLookup`, and `nestedLoop`. Go DTQL and DALgo-JS MUST preserve its order and each JOIN's independent value through parse/serialize/parse; omission remains omission and does not change existing unhinted serialization. Empty lists, duplicates, unknown identifiers, and malformed hint shapes fail before execution with `join_algorithm` at the offending `from.joins[i].hints.algorithms` path (including `[i]` for an invalid entry). The same validation applies to direct in-memory model queries before provider reads. A defensive copy of the list MUST be exposed to callers. The exported Go model addition is justified by the brief's requirement to retain structured per-edge preferences for future policy while keeping the existing builders valid.
+
+The identifiers describe physical strategies: `hash` indexes one input's equality keys in memory; `merge` walks both inputs ordered by the key and correctly handles duplicate key groups; `lookup` asks the joined source for each distinct key where efficient; `batchedLookup` asks it for bounded batches and respects source request limits; `nestedLoop` evaluates each candidate pair. A naive `nestedLoop` costs approximately O(N × M) predicate evaluations (100,000 by 100,000 can require billions), so it SHOULD only be selected deliberately for small relations, nonindexable predicates, testing, or debugging. Existing row, memory, result, and candidate bounds remain mandatory for all strategies.
+
+An executor MUST validate the vocabulary, then consider the ordered list for each JOIN independently. It MAY honor, ignore, warn about, or reject a recognized preference according to its documented capabilities; a policy rejection of a valid preference is `join_plan` at that JOIN path. It MUST NOT claim to have honored an algorithm it did not run. The initial Go and JS generic executors honor `hash` when a direct cross-side equality key admits their existing index and honor bounded `nestedLoop` when requested. They skip currently unavailable `merge`, `lookup`, and `batchedLookup`; if no listed algorithm is applicable, they use their ordinary unhinted strategy (`hash` where applicable, bounded candidate evaluation otherwise). A preferred `nestedLoop` deliberately bypasses an otherwise applicable hash index; its candidate bound may reject an expensive query before output, even when the same unhinted query succeeds under `hash`. Resource limits therefore can change success versus rejection, but every successful strategy MUST return equivalent logical rows in the same order. The executor MUST NOT silently retry another algorithm after a selected strategy exhausts a bound. SQL/SQLite native execution may ignore physical hints while preserving logical semantics. No hint may change matching, multiplicity, LEFT extension, output order, projections, diagnostics for invalid keys, or query clause stages. Future source- and environment-specific honor/ignore/warn/reject policies are outside this Feature; retain the structured hints for them.
+
 #### REQ: native-and-mixed-plans
 
 An adapter MAY advertise complete-subtree native execution only when translation passes the same semantic tests. SQLite/SQL MUST translate ordinary uncorrelated same-database subtrees, such as `A LEFT (B INNER C ON b.cId=c.id) ON a.id=b.aId`, with parentheses preserving the right subtree. Native ON translation MUST enforce typed equality (numeric 1 equals 1.0; number 1 differs from text '1' and boolean true), null rules, and invalid-key rejection, or decline native execution in favor of generic execution. Shared fixtures cover those boundaries. A correlated nested ON such as `A LEFT (B INNER C ON c.aId=a.id) ON a.id=b.aId` is outside ordinary parenthesized SQL JOIN translation; it MUST use generic execution or fail with `join_plan`. The planner MUST leave a seam for mixed native plus DALgo composition; mixed execution may be deferred with an explicit diagnostic.
@@ -76,6 +84,7 @@ The error contract is category plus path, with wording free to differ by languag
 | recursive model/YAML reference | `join_cycle` | `from.joins[0].from` |
 | invalid scanned key value | `join_key_type` | `from.joins[0].on[0].left` |
 | incapable adapter or resource bound | `join_plan` | `from.joins[0]` |
+| invalid algorithm list or identifier | `join_algorithm` | `from.joins[0].hints.algorithms[1]` |
 
 ## Dependencies
 
@@ -125,6 +134,12 @@ The error contract is category plus path, with wording free to differ by languag
 **Given** Chinook-style Invoice, Customer, and Employee data
 **When** the documented nested query filters and selects joined fields, then orders and limits invoices
 **Then** Go SQLite and TypeScript generic execution return equivalent rows, including invoices with an absent LEFT Employee.
+
+### AC: algorithm-hints (verifies REQ:algorithm-hints, REQ:generic-execution, REQ:nested-semantics)
+
+**Given** ordered hints on the outer, nested, and sibling JOINs, including an unavailable preferred algorithm followed by `hash` and an explicitly preferred `nestedLoop`
+**When** Go and DALgo-JS parse, serialize, validate, and run equivalent data, including duplicate keys and LEFT null extension
+**Then** each list retains its order and isolation; a directly tested per-JOIN selector proves the chosen strategy and fallback; successful hinted and unhinted results are identical; unknown or malformed values fail at a JOIN-specific `join_algorithm` path; and bounded nested-loop work fails with `join_plan` before rows without silently retrying `hash`.
 
 ## Architecture & Components
 
