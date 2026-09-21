@@ -119,6 +119,13 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 		if len(join.On) == 0 {
 			return nil, fmt.Errorf("invalid DTQL: join_shape at %s.on: on must contain at least one predicate", joinPath)
 		}
+		if join.hintsRepeated {
+			return nil, &dal.JoinValidationError{Category: "join_algorithm", Path: joinPath + ".hints.algorithms", Message: "hints must appear once"}
+		}
+		algorithms, err := algorithmsFromYAML(join.Hints, joinPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid DTQL: %w", err)
+		}
 		child, err := fromFromYAML(*join.From, joinPath+".from")
 		if err != nil {
 			return nil, err
@@ -142,7 +149,11 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 			}
 			on = append(on, condition)
 		}
-		from.Join(dal.NewJoinedFrom(child, joinType, on...))
+		joined := dal.NewJoinedFrom(child, joinType, on...)
+		if join.Hints != nil {
+			joined = joined.WithAlgorithms(algorithms...)
+		}
+		from.Join(joined)
 	}
 	return from, nil
 }

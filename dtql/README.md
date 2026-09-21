@@ -29,7 +29,7 @@ by `Serialize` with a descriptive error rather than silently dropped.
 | `dal` node | YAML representation |
 |---|---|
 | `From` over root `CollectionRef` | `from: { schema?: <string>, name: <string>, alias?: <string>, joins?: [<join>, ...] }` |
-| `JoinedSource` | `{ type?: inner|left, from: <from>, on: [<qualified equality>, ...] }`; omitted `type` is `inner` |
+| `JoinedSource` | `{ type?: inner|left, from: <from>, on: [<qualified equality>, ...], hints?: {algorithms: [<name>, ...]} }`; omitted `type` is `inner` |
 | `Column` | a sequence item under `columns:`, an expression plus optional `as: <alias>` |
 | wildcard exclusion projection | `{ wildcard: { source?: <alias-or-name>, exclude: [<column>, ...] } }` under `columns:` |
 | `Comparison` | `{ op: <operator>, left: <expr>, right: <expr> }` |
@@ -77,11 +77,24 @@ from:
               - left: {field: SupportRepId, source: c}
                 op: '=='
                 right: {field: EmployeeId, source: e}
+            hints:
+              algorithms: [nestedLoop, hash]
       on:
         - left: {field: CustomerId, source: i}
           op: '=='
           right: {field: CustomerId, source: c}
+      hints:
+        algorithms: [merge, hash]
 ```
+
+Each JOIN can independently request an ordered list of `hash`, `merge`,
+`lookup`, `batchedLookup`, and `nestedLoop`. Lists must be nonempty and contain
+distinct, case-sensitive names. The generic executor currently selects `hash`
+for a direct cross-side key and `nestedLoop` for bounded candidate evaluation.
+It skips unavailable algorithms and uses its ordinary strategy when no hint
+applies. A preferred `nestedLoop` bypasses an available hash index and can hit
+the candidate bound after up to O(N × M) comparisons for N left and M right
+rows. Hints never change successful query results or their order.
 
 Validation reports stable JOIN category and zero-based path pairs, such as
 `join_scope at from.joins[1].on[0]`. It checks relation shape, `inner`/`left`,

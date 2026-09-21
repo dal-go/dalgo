@@ -554,40 +554,30 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 	var out []joinRow
 	for _, parent := range left {
 		candidates := e.scans[alias]
-		// A direct cross-side equality narrows the right base scan. Nested ON is
-		// still evaluated after the complete right subtree has been built.
-		for _, condition := range join.On() {
-			cmp := condition.(Comparison)
-			l, r := cmp.Left.(FieldRef), cmp.Right.(FieldRef)
-			var right, other FieldRef
-			if l.Source() == alias && parent.sources[r.Source()] != nil {
-				right, other = l, r
-			} else if r.Source() == alias && parent.sources[l.Source()] != nil {
-				right, other = r, l
-			} else {
-				continue
-			}
+		// A selected nested loop deliberately probes every right base row.
+		// A selected hash narrows the scan on a direct cross-side equality.
+		right, other, hashApplicable := directJoinHashKey(join, alias, parent)
+		if selectGenericJoinAlgorithm(join.Algorithms(), hashApplicable) == genericJoinHash {
 			// Every referenced key was validated on its raw fetched row.
 			key, _ := joinValueKey(fieldInJoinRow(parent, other), path+".on")
 			if key == "" {
 				candidates = nil
-				break
-			}
-			indexName := alias + "\x00" + right.Name()
-			index := e.indexes[indexName]
-			if index == nil {
-				index = map[string][]scannedJoinRow{}
-				for _, candidate := range e.scans[alias] {
-					value, _ := lookupAggregationField(candidate.data, right.Name())
-					candidateKey, _ := joinValueKey(value, path+".on")
-					if candidateKey != "" {
-						index[candidateKey] = append(index[candidateKey], candidate)
+			} else {
+				indexName := alias + "\x00" + right.Name()
+				index := e.indexes[indexName]
+				if index == nil {
+					index = map[string][]scannedJoinRow{}
+					for _, candidate := range e.scans[alias] {
+						value, _ := lookupAggregationField(candidate.data, right.Name())
+						candidateKey, _ := joinValueKey(value, path+".on")
+						if candidateKey != "" {
+							index[candidateKey] = append(index[candidateKey], candidate)
+						}
 					}
+					e.indexes[indexName] = index
 				}
-				e.indexes[indexName] = index
+				candidates = index[key]
 			}
-			candidates = index[key]
-			break
 		}
 		if candidates == nil {
 			candidates = []scannedJoinRow{}
@@ -633,6 +623,46 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 		}
 	}
 	return out, nil
+}
+
+type genericJoinAlgorithm string
+
+const (
+	genericJoinHash       genericJoinAlgorithm = "hash"
+	genericJoinNestedLoop genericJoinAlgorithm = "nestedLoop"
+)
+
+// selectGenericJoinAlgorithm decides one edge independently. An unavailable
+// preference is skipped; no applicable preference uses the ordinary strategy.
+func selectGenericJoinAlgorithm(preferences []JoinAlgorithm, hashApplicable bool) genericJoinAlgorithm {
+	for _, preference := range preferences {
+		switch preference {
+		case JoinAlgorithmHash:
+			if hashApplicable {
+				return genericJoinHash
+			}
+		case JoinAlgorithmNestedLoop:
+			return genericJoinNestedLoop
+		}
+	}
+	if hashApplicable {
+		return genericJoinHash
+	}
+	return genericJoinNestedLoop
+}
+
+func directJoinHashKey(join JoinedSource, alias string, parent joinRow) (right, other FieldRef, applicable bool) {
+	for _, condition := range join.On() {
+		cmp := condition.(Comparison) // ValidateJoinTree checked the ON shape.
+		left, rightOperand := cmp.Left.(FieldRef), cmp.Right.(FieldRef)
+		if _, ok := parent.sources[rightOperand.Source()]; left.Source() == alias && ok {
+			return left, rightOperand, true
+		}
+		if _, ok := parent.sources[left.Source()]; rightOperand.Source() == alias && ok {
+			return rightOperand, left, true
+		}
+	}
+	return FieldRef{}, FieldRef{}, false
 }
 
 func childAliases(node FromSource) []string {

@@ -65,7 +65,7 @@ func fromEqual(a, b dal.FromSource) bool {
 		return false
 	}
 	for i := range aj {
-		if aj[i].JoinType() != bj[i].JoinType() || !conditionsEqual(aj[i].On(), bj[i].On()) {
+		if aj[i].JoinType() != bj[i].JoinType() || !conditionsEqual(aj[i].On(), bj[i].On()) || !reflect.DeepEqual(aj[i].Algorithms(), bj[i].Algorithms()) {
 			return false
 		}
 		ac, bc := aj[i].From(), bj[i].From()

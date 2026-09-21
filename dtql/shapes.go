@@ -57,31 +57,56 @@ func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
 }
 
 // joinYAML represents one recursively joined relation. The canonical spelling
-// is type/from/on; type is omitted for INNER joins.
+// is type/from/on/hints; type and hints are omitted when absent.
 type joinYAML struct {
-	Type string     `yaml:"type,omitempty"`
-	From *fromYAML  `yaml:"from"`
-	On   []condYAML `yaml:"on"`
+	Type          string     `yaml:"type,omitempty"`
+	From          *fromYAML  `yaml:"from"`
+	On            []condYAML `yaml:"on"`
+	Hints         *yaml.Node `yaml:"-"`
+	hintsRepeated bool
 }
 
 func (join *joinYAML) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode {
 		return &yaml.TypeError{Errors: []string{"join must be a mapping"}}
 	}
+	clean := *node
+	clean.Content = nil
+	var hints *yaml.Node
+	var hintsRepeated bool
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		switch node.Content[i].Value {
-		case "type", "from", "on":
+		case "type", "from", "on", "hints":
 		default:
 			return &yaml.TypeError{Errors: []string{"field " + node.Content[i].Value + " not found in join"}}
+		}
+		if node.Content[i].Value == "hints" {
+			if hints != nil {
+				hintsRepeated = true
+			}
+			hints = node.Content[i+1]
+		} else {
+			clean.Content = append(clean.Content, node.Content[i], node.Content[i+1])
 		}
 	}
 	type plainJoin joinYAML
 	var decoded plainJoin
-	if err := node.Decode(&decoded); err != nil {
+	if err := clean.Decode(&decoded); err != nil {
 		return err
 	}
 	*join = joinYAML(decoded)
+	join.Hints = hints
+	join.hintsRepeated = hintsRepeated
 	return nil
+}
+
+func (join joinYAML) MarshalYAML() (any, error) {
+	return struct {
+		Type  string     `yaml:"type,omitempty"`
+		From  *fromYAML  `yaml:"from"`
+		On    []condYAML `yaml:"on"`
+		Hints *yaml.Node `yaml:"hints,omitempty"`
+	}{join.Type, join.From, join.On, join.Hints}, nil
 }
 
 func validateFromYAMLNode(node *yaml.Node) error {
