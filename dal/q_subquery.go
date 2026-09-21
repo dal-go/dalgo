@@ -95,6 +95,29 @@ type QueryValidationError struct {
 	Message  string
 }
 
+// RecursiveQueryStrategy records the execution boundary chosen for a query
+// containing recursive nodes. Providers do not receive recursive DTQL as a
+// native query unless a future capability explicitly supports it.
+type RecursiveQueryStrategy string
+
+const RecursiveQueryGeneric RecursiveQueryStrategy = "generic"
+
+// RecursiveQueryPlan is the conservative plan exposed before recursive
+// execution begins. Generic execution obtains each leaf through QueryExecutor.
+type RecursiveQueryPlan struct {
+	Strategy RecursiveQueryStrategy
+	Reason   string
+}
+
+// PlanRecursiveQuery validates the portable graph and selects the only
+// currently supported strategy for nested queries.
+func PlanRecursiveQuery(q StructuredQuery) (RecursiveQueryPlan, error) {
+	if err := ValidateQueryScope(q); err != nil {
+		return RecursiveQueryPlan{}, err
+	}
+	return RecursiveQueryPlan{Strategy: RecursiveQueryGeneric, Reason: "nested queries are evaluated through bounded ordinary leaf scans"}, nil
+}
+
 func (e *QueryValidationError) Error() string {
 	if e.Path == "" {
 		return fmt.Sprintf("%s: %s", e.Category, e.Message)

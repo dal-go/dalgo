@@ -96,6 +96,19 @@ func TestGenericRecursiveValidatesScopeBeforeLeafScan(t *testing.T) {
 	}
 }
 
+func TestPlanRecursiveQueryIsConservative(t *testing.T) {
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(NewExistsCondition(
+		From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectIntoRecord(nil),
+	)).SelectIntoRecord(nil)
+	plan, err := PlanRecursiveQuery(query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Strategy != RecursiveQueryGeneric || plan.Reason == "" {
+		t.Fatalf("plan = %#v", plan)
+	}
+}
+
 func TestGenericRecursiveBindsAmbiguousUnqualifiedFieldWithSchema(t *testing.T) {
 	backend := &ignoringJoinBackend{data: map[string][]record.Record{
 		"Customer": {joinTestRecord("Customer", "1", map[string]any{"CustomerId": 1})},

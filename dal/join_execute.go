@@ -79,8 +79,12 @@ func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Qu
 // adapters must opt into a complete recursive implementation in a later
 // capability contract.
 func executeGenericRecursive(ctx context.Context, executor QueryExecutor, q StructuredQuery, outer *joinRow) (RecordsReader, error) {
-	if err := ValidateQueryScope(q); err != nil {
+	plan, err := PlanRecursiveQuery(q)
+	if err != nil {
 		return nil, err
+	}
+	if plan.Strategy != RecursiveQueryGeneric {
+		return nil, queryError("query_plan", "query", "recursive query has no supported execution strategy")
 	}
 	return executeGenericRecursiveBudget(ctx, executor, q, outer, &recursiveBudget{})
 }
