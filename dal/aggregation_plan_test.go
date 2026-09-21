@@ -3,8 +3,10 @@ package dal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/dal-go/dalgo/recordset"
 	"github.com/dal-go/record"
 )
 
@@ -19,13 +21,39 @@ func TestPlanAggregationStrategies(t *testing.T) {
 	if err != nil || plan.Strategy != AggregationNative {
 		t.Fatalf("native plan=%#v err=%v", plan, err)
 	}
-	plan, err = PlanAggregation(q, QueryCapabilities{OrderBy: true})
+	plan, err = PlanAggregation(q, QueryCapabilities{OrderBy: true, GroupKeyOrder: true})
 	if err != nil || plan.Strategy != AggregationStreaming {
 		t.Fatalf("stream plan=%#v err=%v", plan, err)
 	}
 	plan, err = PlanAggregation(q, QueryCapabilities{})
 	if err != nil || plan.Strategy != AggregationHash {
 		t.Fatalf("hash plan=%#v err=%v", plan, err)
+	}
+}
+
+func TestPlanAggregationUsesHashForGenericOrderOnly(t *testing.T) {
+	q := From(NewRootCollectionRef("sales", "")).NewQuery().
+		GroupBy(Field("category")).
+		SelectColumns(Column{Expression: Field("category")}, Count())
+	plan, err := PlanAggregation(q, QueryCapabilities{OrderBy: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Strategy != AggregationHash {
+		t.Fatalf("strategy = %s, want %s", plan.Strategy, AggregationHash)
+	}
+}
+
+func TestPlanAggregationUsesHashForGroupKeyOrderWithoutOrderBy(t *testing.T) {
+	q := From(NewRootCollectionRef("sales", "")).NewQuery().
+		GroupBy(Field("category")).
+		SelectColumns(Column{Expression: Field("category")}, Count())
+	plan, err := PlanAggregation(q, QueryCapabilities{GroupKeyOrder: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Strategy != AggregationHash {
+		t.Fatalf("strategy = %s, want %s", plan.Strategy, AggregationHash)
 	}
 }
 
@@ -86,6 +114,68 @@ func (r *aggregationErrorReader) Next() (record.Record, error) {
 }
 func (r *aggregationErrorReader) Cursor() (string, error) { return "", nil }
 func (r *aggregationErrorReader) Close() error            { r.closed = true; return nil }
+
+type interleavingOrderExecutor struct {
+	records []record.Record
+	orders  []OrderExpression
+}
+
+func (e *interleavingOrderExecutor) ExecuteQueryToRecordsReader(_ context.Context, query Query) (RecordsReader, error) {
+	e.orders = query.(StructuredQuery).OrderBy()
+	return NewRecordsReader(e.records), nil
+}
+
+func (*interleavingOrderExecutor) ExecuteQueryToRecordsetReader(context.Context, Query, ...recordset.Option) (RecordsetReader, error) {
+	return nil, ErrNotSupported
+}
+
+func TestGenericOrderOnlyFallsBackToHashForInterleavedTypedGroups(t *testing.T) {
+	// An ORDER BY comparator that considers false and "false" equal can return
+	// bool(false), string("false"), bool(false). The boolean group's DALgo key
+	// is therefore not contiguous even though the provider claims generic order.
+	executor := &interleavingOrderExecutor{records: []record.Record{
+		record.NewRecordWithData(record.NewKeyWithID("sales", "1"), map[string]any{"category": false}),
+		record.NewRecordWithData(record.NewKeyWithID("sales", "2"), map[string]any{"category": "false"}),
+		record.NewRecordWithData(record.NewKeyWithID("sales", "3"), map[string]any{"category": false}),
+	}}
+	count := Count()
+	count.Alias = "rows"
+	q := From(NewRootCollectionRef("sales", "")).NewQuery().
+		GroupBy(Field("category")).
+		SelectColumns(Column{Expression: Field("category")}, count)
+	reader, err := executeAggregationRecords(context.Background(), executor, q, QueryCapabilities{OrderBy: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reader.Close() }()
+	if len(executor.orders) != 0 {
+		t.Fatalf("hash fallback unexpectedly requested raw ORDER BY: %#v", executor.orders)
+	}
+	rows := map[string]int64{}
+	for {
+		rec, err := reader.Next()
+		if err == ErrNoMoreRecords {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := rec.Data().(map[string]any)
+		rows[encodeTestGroupValue(t, data["category"])] = data["rows"].(int64)
+	}
+	if rows["b:false"] != 2 || rows["s:5:false"] != 1 {
+		t.Fatalf("groups = %#v, want bool false=2 and string false=1", rows)
+	}
+}
+
+func encodeTestGroupValue(t *testing.T, value any) string {
+	t.Helper()
+	key, err := encodeTypedValue(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
+}
 
 func TestLocalAggregationPropagatesMidstreamError(t *testing.T) {
 	boom := errors.New("provider failed")
@@ -154,6 +244,62 @@ func TestLocalAggregationRetainedKeyByteBudget(t *testing.T) {
 	cyclic["self"] = cyclic
 	if aggregationValueBytes(cyclic) <= defaultMaxAggregationBytes {
 		t.Fatal("unmeasurable aggregate value did not exceed the byte budget")
+	}
+}
+
+func TestLocalAggregationAccountsForGroupStateAndMaterializedOutput(t *testing.T) {
+	count := Count()
+	reader := newLocalAggregationReader(context.Background(), From(NewRootCollectionRef("sales", "")).NewQuery().SelectColumns(count), &aggregationErrorReader{}, AggregationPlan{Strategy: AggregationHash})
+	groupBytes := len("implicit")*2 + aggregationGroupOverheadBytes + aggregationAggregateStateOverheadBytes + aggregationMapEntryOverheadBytes + len(count.String())
+	reader.retainedBytes = defaultMaxAggregationBytes - groupBytes + 1
+	if _, err := reader.newGroup("implicit", map[string]any{}); err == nil {
+		t.Fatal("expected group/state overhead to exhaust byte budget")
+	}
+
+	output := map[string]any{"category": "A", "rows": int64(1)}
+	reader.retainedBytes = defaultMaxAggregationBytes - aggregationOutputMapOverheadBytes - aggregationRecordOverheadBytes
+	if err := reader.reserveMaterializedOutput(output); err == nil {
+		t.Fatal("expected materialized output to exhaust byte budget")
+	}
+	cyclic := map[string]any{}
+	cyclic["self"] = cyclic
+	if err := (&localAggregationReader{}).reserveMaterializedOutput(map[string]any{"value": cyclic}); err == nil {
+		t.Fatal("expected unmeasurable materialized output to exhaust byte budget")
+	}
+	distinct := CountDistinctAs(Field("category"), "categories")
+	distinctReader := newLocalAggregationReader(context.Background(), From(NewRootCollectionRef("sales", "")).NewQuery().SelectColumns(distinct), &aggregationErrorReader{}, AggregationPlan{Strategy: AggregationHash})
+	distinctGroup, err := distinctReader.newGroup("implicit", map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	distinctReader.retainedBytes = defaultMaxAggregationBytes - aggregationMapEntryOverheadBytes - len("s:1:A") + 1
+	if err := distinctReader.updateGroup(distinctGroup, map[string]any{"category": "A"}); err == nil {
+		t.Fatal("expected distinct-map entry overhead to exhaust byte budget")
+	}
+}
+
+func TestLocalAggregationAccountsForWideNullGroupKeyMetadata(t *testing.T) {
+	const groupFields = 64
+	builder := From(NewRootCollectionRef("sales", "")).NewQuery()
+	for i := 0; i < groupFields; i++ {
+		builder.GroupBy(Field(fmt.Sprintf("wide_group_key_%02d", i)))
+	}
+	q := builder.SelectColumns(Column{Expression: Field("wide_group_key_00")})
+	reader := newLocalAggregationReader(context.Background(), q, &aggregationErrorReader{}, AggregationPlan{Strategy: AggregationHash})
+	key, values, err := reader.groupKey(map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(values) != groupFields {
+		t.Fatalf("group values = %d, want %d", len(values), groupFields)
+	}
+	groupBytes := len(key)*2 + aggregationGroupOverheadBytes
+	for name := range values {
+		groupBytes += aggregationMapEntryOverheadBytes + len(name)
+	}
+	reader.retainedBytes = defaultMaxAggregationBytes - groupBytes + 1
+	if _, err := reader.newGroup(key, values); err == nil {
+		t.Fatal("expected wide null group-key metadata to exhaust byte budget")
 	}
 }
 

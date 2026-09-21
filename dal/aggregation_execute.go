@@ -20,6 +20,15 @@ const (
 	defaultMaxAggregateStates   = 1_000_000
 	defaultMaxTotalDistinct     = 1_000_000
 	defaultMaxAggregationBytes  = 64 << 20
+
+	// These are deliberately conservative estimates rather than Go runtime
+	// layout promises. The 64 MiB guard bounds retained group/state structures
+	// and materialized output, including maps, entries, and record wrappers.
+	aggregationGroupOverheadBytes          = 256
+	aggregationAggregateStateOverheadBytes = 192
+	aggregationOutputMapOverheadBytes      = 128
+	aggregationMapEntryOverheadBytes       = 96
+	aggregationRecordOverheadBytes         = 128
 )
 
 // ExecuteQueryToRecordsReader intercepts aggregate structured queries and
@@ -366,6 +375,9 @@ func (r *localAggregationReader) loadMaterialized() (resultErr error) {
 				}
 				out[aggregationOrderKey(i)] = value
 			}
+			if err := r.reserveMaterializedOutput(out); err != nil {
+				return err
+			}
 			output = append(output, out)
 		}
 	}
@@ -406,9 +418,16 @@ func (r *localAggregationReader) loadMaterialized() (resultErr error) {
 
 func (r *localAggregationReader) newGroup(key string, values map[string]any) (*localGroup, error) {
 	// The encoded key and decoded values retain equivalent scalar payloads.
-	// Charging twice the encoded key length bounds both representations without
-	// relying on Go runtime object-layout details.
-	bytes := len(key) * 2
+	// Charge both plus conservative group/state and map overhead, including the
+	// retained keyValues names and aggregate-state map keys, rather than
+	// depending on Go runtime object-layout details.
+	bytes := len(key)*2 + aggregationGroupOverheadBytes
+	for name := range values {
+		bytes += aggregationMapEntryOverheadBytes + len(name)
+	}
+	for _, aggregate := range r.aggregates {
+		bytes += aggregationAggregateStateOverheadBytes + aggregationMapEntryOverheadBytes + len(aggregate.String())
+	}
 	if err := r.reserveAggregationBytes(bytes); err != nil {
 		return nil, err
 	}
@@ -425,10 +444,25 @@ func (r *localAggregationReader) newGroup(key string, values map[string]any) (*l
 
 func (r *localAggregationReader) reserveAggregationBytes(bytes int) error {
 	if bytes < 0 || r.retainedBytes > defaultMaxAggregationBytes-bytes {
-		return fmt.Errorf("dalgo aggregation: retained-key byte limit %d exceeded", defaultMaxAggregationBytes)
+		return fmt.Errorf("dalgo aggregation: retained aggregation byte limit %d exceeded", defaultMaxAggregationBytes)
 	}
 	r.retainedBytes += bytes
 	return nil
+}
+
+func (r *localAggregationReader) reserveMaterializedOutput(row map[string]any) error {
+	bytes := aggregationOutputMapOverheadBytes + aggregationRecordOverheadBytes
+	for name, value := range row {
+		valueBytes := aggregationValueBytes(value)
+		if valueBytes > defaultMaxAggregationBytes ||
+			len(name) > defaultMaxAggregationBytes-aggregationMapEntryOverheadBytes ||
+			bytes > defaultMaxAggregationBytes-aggregationMapEntryOverheadBytes-len(name)-valueBytes {
+			return r.reserveAggregationBytes(defaultMaxAggregationBytes + 1)
+		}
+		entryBytes := aggregationMapEntryOverheadBytes + len(name) + valueBytes
+		bytes += entryBytes
+	}
+	return r.reserveAggregationBytes(bytes)
 }
 
 func (r *localAggregationReader) releaseGroup(group *localGroup) {
@@ -487,11 +521,12 @@ func (r *localAggregationReader) updateGroup(group *localGroup, row map[string]a
 			if r.totalDistinct >= defaultMaxTotalDistinct {
 				return fmt.Errorf("dalgo aggregation: total distinct-value limit %d exceeded", defaultMaxTotalDistinct)
 			}
-			if err := r.reserveAggregationBytes(len(key)); err != nil {
+			distinctBytes := len(key) + aggregationMapEntryOverheadBytes
+			if err := r.reserveAggregationBytes(distinctBytes); err != nil {
 				return err
 			}
 			state.distinct[key] = struct{}{}
-			group.bytes += len(key)
+			group.bytes += distinctBytes
 			r.totalDistinct++
 		}
 		switch strings.ToUpper(aggregate.FuncName()) {
