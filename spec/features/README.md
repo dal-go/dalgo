@@ -35,6 +35,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [dalgo2namecheap: NameCheap API Adapter](dalgo2namecheap-namecheap-api-adapter/README.md) | Approved | — |
 | [Hierarchical access and audit policies](access-policies/README.md) | Stable | — |
 | [Triggers and webhooks: change events, transactional outbox, dispatcher](triggers/README.md) | Draft | — |
+| [Recursive DTQL JOINs across DALgo Go and TypeScript](dtql-recursive-joins/README.md) | Draft | — |
 
 ## Open Questions
 
