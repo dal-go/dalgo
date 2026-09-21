@@ -86,8 +86,12 @@ func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, que
 		return nil, err
 	}
 	if structured, ok := query.(dal.StructuredQuery); ok && sets.restrictive() {
-		if projected, ok := projectQuery(structured, sets); ok {
-			query = projected
+		projection := projectQuery(structured, sets)
+		if projection.status == queryProjectionEmpty {
+			return nil, emptyProjectionDeniedError(query)
+		}
+		if projection.status == queryProjectionApplied {
+			query = projection.query
 		}
 	}
 	query = preserveRequestedQuery(query, requested)
@@ -105,14 +109,21 @@ func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, q
 	}
 	if sets.restrictive() {
 		structured, _ := query.(dal.StructuredQuery)
-		projected, ok := projectQuery(structured, sets)
-		if !ok {
+		projection := projectQuery(structured, sets)
+		if projection.status != queryProjectionApplied {
+			if projection.status == queryProjectionEmpty {
+				return nil, emptyProjectionDeniedError(query)
+			}
 			return nil, &DeniedError{Decision: Decision{Operation: Query, Resource: resourcesForQuery(query)[0], Policy: "fields", Effect: effectDeny.String(), Explanation: fmt.Sprintf("the allowed fields (%s) cannot be projected onto a recordset; select explicit columns or read records", sets.sources())}}
 		}
-		query = projected
+		query = projection.query
 	}
 	query = preserveRequestedQuery(query, requested)
 	return s.session.ExecuteQueryToRecordsetReader(ctx, query, options...)
+}
+
+func emptyProjectionDeniedError(query dal.Query) error {
+	return &DeniedError{Decision: Decision{Operation: Query, Resource: resourcesForQuery(query)[0], Policy: "fields", Effect: effectDeny.String(), Explanation: "wildcard exclusions remove every allowed field; no columns can be selected safely"}}
 }
 
 // authorizeQuery authorizes every source of a query and returns the query to
