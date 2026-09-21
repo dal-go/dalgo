@@ -339,6 +339,25 @@ func TestWildcardProjectionMasksThroughSecureSession(t *testing.T) {
 	}
 }
 
+func TestEmptyProjectionDenialDoesNotAssumeWildcard(t *testing.T) {
+	left, err := parseFieldPatterns([]string{"name"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	right, err := parseFieldPatterns([]string{"id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := dal.From(dal.NewRootCollectionRef("users", "")).NewQuery().SelectColumns()
+	if got := projectQuery(query, fieldSets{left, right}).status; got != queryProjectionEmpty {
+		t.Fatalf("projection status = %v, want empty", got)
+	}
+	message := emptyProjectionDeniedError(query).Error()
+	if strings.Contains(message, "wildcard") || !strings.Contains(message, "no permitted columns remain") {
+		t.Fatalf("misleading empty-projection denial: %q", message)
+	}
+}
+
 func TestQueryFieldValidationHandlesPointerExpressionsAndConditions(t *testing.T) {
 	set, err := parseFieldPatterns([]string{"name"})
 	if err != nil {
