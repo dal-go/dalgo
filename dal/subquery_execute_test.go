@@ -39,6 +39,25 @@ func TestGenericRecursiveExistsAndScalar(t *testing.T) {
 	}
 }
 
+func TestGenericRecursiveMemoizesUncorrelatedNestedQuery(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1}), joinTestRecord("Customer", "2", map[string]any{"id": 2})},
+		"Invoice":  {joinTestRecord("Invoice", "a", map[string]any{"id": 1})},
+	}, reads: map[string]int{}}
+	uncorrelated := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Expression: NewFieldRef("i", "id")})
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(NewExistsCondition(uncorrelated)).SelectIntoRecord(nil)
+	reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadAllToRecords(context.Background(), reader); err != nil {
+		t.Fatal(err)
+	}
+	if backend.reads["Invoice"] != 1 {
+		t.Fatalf("uncorrelated reads = %d, want 1", backend.reads["Invoice"])
+	}
+}
+
 func TestGenericRecursiveScalarDiagnosticsAndEmptyRecordsetShape(t *testing.T) {
 	backend := &ignoringJoinBackend{data: map[string][]record.Record{
 		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},

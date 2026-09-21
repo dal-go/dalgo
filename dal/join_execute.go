@@ -49,9 +49,13 @@ type joinExecution struct {
 	outer      *joinRow
 	recursive  bool
 	budget     *recursiveBudget
+	memo       map[string][]record.Record
 }
 
-type recursiveBudget struct{ fetched, output, candidates, bytes int }
+type recursiveBudget struct {
+	fetched, output, candidates, bytes int
+	memo                               map[string][]record.Record
+}
 
 // queryTruth retains SQL's third truth value until a WHERE, ON, or HAVING
 // boundary decides that only TRUE retains a row.
@@ -100,7 +104,10 @@ func executeGenericRecursive(ctx context.Context, executor QueryExecutor, q Stru
 }
 
 func executeGenericRecursiveBudget(ctx context.Context, executor QueryExecutor, q StructuredQuery, outer *joinRow, budget *recursiveBudget) (RecordsReader, error) {
-	e := &joinExecution{ctx: ctx, q: q, executor: executor, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}, outer: outer, recursive: true, budget: budget}
+	if budget.memo == nil {
+		budget.memo = map[string][]record.Record{}
+	}
+	e := &joinExecution{ctx: ctx, q: q, executor: executor, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}, outer: outer, recursive: true, budget: budget, memo: budget.memo}
 	return e.execute()
 }
 
@@ -690,17 +697,9 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 	for _, parent := range left {
 		candidates := e.scans[alias]
 		if source, ok := child.Base().(QuerySource); ok && e.recursive {
-			reader, err := executeGenericRecursiveBudget(e.ctx, e.executor, source.Query(), &parent, e.budget)
+			records, err := e.queryRecords(source.Query(), &parent)
 			if err != nil {
 				return nil, err
-			}
-			records, readErr := ReadAllToRecords(e.ctx, reader)
-			closeErr := reader.Close()
-			if readErr != nil {
-				return nil, readErr
-			}
-			if closeErr != nil {
-				return nil, closeErr
 			}
 			candidates = make([]scannedJoinRow, 0, len(records))
 			for _, rec := range records {
@@ -1100,12 +1099,22 @@ func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]r
 	if query == nil {
 		return nil, queryError("query_shape", "query", "query is required")
 	}
+	key := query.String()
+	if !queryHasOuterReference(query) {
+		if cached, ok := e.memo[key]; ok {
+			return cached, nil
+		}
+	}
 	reader, err := executeGenericRecursiveBudget(e.ctx, e.executor, query, outer, e.budget)
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Close()
-	return ReadAllToRecords(e.ctx, reader)
+	records, err := ReadAllToRecords(e.ctx, reader)
+	if err == nil && !queryHasOuterReference(query) {
+		e.memo[key] = records
+	}
+	return records, err
 }
 
 func (e *joinExecution) evalCondition(condition Condition, row joinRow) (bool, error) {
@@ -1297,6 +1306,76 @@ func (e *joinExecution) project(columns []Column, row joinRow) (map[string]any, 
 
 func queryError(category, path, message string) error {
 	return &QueryValidationError{Category: category, Path: path, Message: message}
+}
+
+// queryHasOuterReference conservatively identifies a direct lexical reference
+// outside the query's own FROM tree. Returning true merely disables caching.
+func queryHasOuterReference(q StructuredQuery) bool {
+	local := map[string]bool{}
+	var collect func(FromSource)
+	collect = func(from FromSource) {
+		if from == nil || from.Base() == nil {
+			return
+		}
+		local[joinAlias(from.Base())] = true
+		for _, join := range from.Joins() {
+			collect(joinedFrom(join))
+		}
+	}
+	collect(q.From())
+	var expression func(Expression) bool
+	expression = func(expr Expression) bool {
+		switch value := expr.(type) {
+		case FieldRef:
+			return value.Source() == "" || !local[value.Source()]
+		case BinaryExpression:
+			return expression(value.Left) || expression(value.Right)
+		case QueryExpression:
+			return true // nested scope may capture this query's sources
+		case AggregateFunc:
+			for _, arg := range value.FuncArgs() {
+				if expression(arg) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	var condition func(Condition) bool
+	condition = func(value Condition) bool {
+		switch item := value.(type) {
+		case ExistsCondition:
+			return true
+		case Comparison:
+			return expression(item.Left) || expression(item.Right)
+		case GroupCondition:
+			for _, child := range item.Conditions() {
+				if condition(child) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if condition(q.Where()) || condition(q.Having()) {
+		return true
+	}
+	for _, column := range q.Columns() {
+		if expression(column.Expression) {
+			return true
+		}
+	}
+	for _, value := range q.GroupBy() {
+		if expression(value) {
+			return true
+		}
+	}
+	for _, value := range q.OrderBy() {
+		if expression(value.Expression()) {
+			return true
+		}
+	}
+	return false
 }
 
 func projectJoinRow(columns []Column, row joinRow, fields map[string][]string) (map[string]any, error) {
