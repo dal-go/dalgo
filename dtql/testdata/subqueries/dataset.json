@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "tables": {
+    "Customer": [
+      {"CustomerId": 1, "FirstName": "Ada", "Country": "IE"},
+      {"CustomerId": 2, "FirstName": "Bea", "Country": "US"},
+      {"CustomerId": 3, "FirstName": "Cy", "Country": null}
+    ],
+    "Invoice": [
+      {"InvoiceId": 10, "CustomerId": 1, "Total": 100, "InvoiceDate": "2024-01-01"},
+      {"InvoiceId": 11, "CustomerId": 1, "Total": null, "InvoiceDate": "2024-01-02"},
+      {"InvoiceId": 12, "CustomerId": 2, "Total": 200, "InvoiceDate": "2024-01-03"}
+    ],
+    "CountryInfo": [
+      {"Country": "IE", "Region": "EU"},
+      {"Country": "US", "Region": "NA"}
+    ],
+    "Ledger": [
+      {"CustomerId": 1, "Flag": "open"},
+      {"CustomerId": 2, "Flag": "open"}
+    ],
+    "Membership": [
+      {"SetName": "match-null", "Value": 1},
+      {"SetName": "match-null", "Value": null},
+      {"SetName": "one", "Value": 1},
+      {"SetName": "null-only", "Value": null}
+    ],
+    "Truth": [
+      {"Name": "match", "Value": 1, "SetName": "match-null"},
+      {"Name": "no-match-null-rhs", "Value": 2, "SetName": "match-null"},
+      {"Name": "null-nonempty", "Value": null, "SetName": "one"},
+      {"Name": "null-empty", "Value": null, "SetName": "empty"},
+      {"Name": "no-match-empty", "Value": 2, "SetName": "empty"},
+      {"Name": "no-match", "Value": 2, "SetName": "one"},
+      {"Name": "null-rhs", "Value": 2, "SetName": "null-only"}
+    ]
+  }
+}

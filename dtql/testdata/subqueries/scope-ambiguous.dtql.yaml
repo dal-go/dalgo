@@ -1,0 +1,11 @@
+from:
+  name: Customer
+  alias: c
+  joins:
+    - from: {name: Ledger, alias: l}
+      on:
+        - left: {field: CustomerId, source: c}
+          op: '=='
+          right: {field: CustomerId, source: l}
+limit: 1
+columns: [{field: CustomerId}]

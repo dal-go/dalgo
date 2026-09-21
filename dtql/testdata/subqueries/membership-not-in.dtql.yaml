@@ -1,0 +1,15 @@
+from: {name: Truth, alias: t}
+where:
+  op: NotIn
+  left: {field: Value, source: t}
+  right:
+    query:
+      from: {name: Membership, alias: m}
+      where:
+        op: '=='
+        left: {field: SetName, source: m}
+        right: {field: SetName, source: t}
+      columns: [{field: Value, source: m}]
+orderBy: [{field: Name, source: t}]
+limit: 7
+columns: [{field: Name, source: t}]

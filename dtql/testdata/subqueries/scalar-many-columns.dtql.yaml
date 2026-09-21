@@ -1,0 +1,13 @@
+from: {name: Customer, alias: c}
+limit: 1
+columns:
+  - query:
+      as: InvalidManyColumns
+      from: {name: Invoice, alias: i}
+      where:
+        op: '=='
+        left: {field: InvoiceId, source: i}
+        right: {value: 10}
+      columns:
+        - {field: InvoiceId, source: i}
+        - {field: Total, source: i}

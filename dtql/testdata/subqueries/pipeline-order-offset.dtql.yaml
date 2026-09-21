@@ -1,0 +1,10 @@
+from:
+  query:
+    as: secondNewest
+    from: {name: Invoice, alias: i}
+    orderBy: [{field: InvoiceDate, source: i, desc: true}]
+    offset: 1
+    limit: 1
+    columns: [{field: CustomerId, source: i}]
+limit: 1
+columns: [{field: CustomerId, source: secondNewest}]

@@ -1,0 +1,12 @@
+from: {name: Customer, alias: c}
+where:
+  notExists:
+    query:
+      from: {name: Invoice, alias: i}
+      where:
+        op: '=='
+        left: {field: CustomerId, source: i}
+        right: {field: CustomerId, source: c}
+orderBy: [{field: CustomerId, source: c}]
+limit: 3
+columns: [{field: CustomerId, source: c}]

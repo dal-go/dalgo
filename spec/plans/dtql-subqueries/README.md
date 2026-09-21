@@ -35,7 +35,7 @@ Finish the SpecScore Feature after an independent adversarial review. Record the
 
 **Id:** task-2
 **Verifies:** dtql-subqueries#ac:recursive-documents, dtql-subqueries#ac:scalar-cardinality, dtql-subqueries#ac:membership-null-table, dtql-subqueries#ac:existence, dtql-subqueries#ac:scope-errors, dtql-subqueries#ac:complex-composition, dtql-subqueries#ac:nested-pipeline
-**Status:** planning
+**Status:** in_progress
 **Depends-On:** task-1
 
 Add checked-in YAML and JSON documents, normalized expected rows, and structured expected errors under the Go DTQL tree. Include old flat/JOIN documents with hint lists; scalar zero/NULL/one/many rows and columns; derived FROM/JOIN with aggregates; the inner pipeline with ordering on an unselected local field and separate OFFSET/LIMIT cases; the full IN/NOT IN three-valued table; EXISTS short circuit; shadowing/ambiguity/multi-level correlation; and the complete customer/invoice journey. Pin copied fixture digests in DALgo-JS. Keep fixtures usable by independent CI without sibling checkouts.

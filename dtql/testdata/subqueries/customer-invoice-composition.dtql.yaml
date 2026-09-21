@@ -1,0 +1,51 @@
+from:
+  name: Customer
+  alias: c
+  joins:
+    - type: left
+      from:
+        query:
+          as: stats
+          from: {name: Invoice, alias: s}
+          groupBy: [{field: CustomerId, source: s}]
+          columns:
+            - {field: CustomerId, source: s}
+            - aggregate: {function: sum, args: [{field: Total, source: s}]}
+              as: TotalSpent
+      on:
+        - left: {field: CustomerId, source: c}
+          op: '=='
+          right: {field: CustomerId, source: stats}
+where:
+  and:
+    - exists:
+        query:
+          from: {name: Invoice, alias: e}
+          where:
+            op: '=='
+            left: {field: CustomerId, source: e}
+            right: {field: CustomerId, source: c}
+    - op: In
+      left: {field: CustomerId, source: c}
+      right:
+        query:
+          from: {name: Invoice, alias: p}
+          where:
+            op: '>'
+            left: {field: Total, source: p}
+            right: {value: 50}
+          columns: [{field: CustomerId, source: p}]
+orderBy: [{field: CustomerId, source: c}]
+limit: 3
+columns:
+  - {field: CustomerId, source: c}
+  - {field: TotalSpent, source: stats}
+  - query:
+      as: InvoiceCount
+      from: {name: Invoice, alias: q}
+      where:
+        op: '=='
+        left: {field: CustomerId, source: q}
+        right: {field: CustomerId, source: c}
+      columns:
+        - aggregate: {function: count, args: [{star: true}]}

@@ -1,0 +1,29 @@
+from: {name: Customer, alias: c}
+orderBy: [{field: CustomerId, source: c}]
+limit: 3
+columns:
+  - {field: CustomerId, source: c}
+  - query:
+      as: ZeroRows
+      from: {name: Invoice, alias: z}
+      where:
+        op: '=='
+        left: {field: InvoiceId, source: z}
+        right: {value: 999}
+      columns: [{field: Total, source: z}]
+  - query:
+      as: NullValue
+      from: {name: Invoice, alias: n}
+      where:
+        op: '=='
+        left: {field: InvoiceId, source: n}
+        right: {value: 11}
+      columns: [{field: Total, source: n}]
+  - query:
+      as: OneValue
+      from: {name: Invoice, alias: o}
+      where:
+        op: '=='
+        left: {field: InvoiceId, source: o}
+        right: {value: 12}
+      columns: [{field: Total, source: o}]
