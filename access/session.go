@@ -123,7 +123,7 @@ func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, q
 }
 
 func emptyProjectionDeniedError(query dal.Query) error {
-	return &DeniedError{Decision: Decision{Operation: Query, Resource: resourcesForQuery(query)[0], Policy: "fields", Effect: effectDeny.String(), Explanation: "wildcard exclusions remove every allowed field; no columns can be selected safely"}}
+	return &DeniedError{Decision: Decision{Operation: Query, Resource: resourcesForQuery(query)[0], Policy: "fields", Effect: effectDeny.String(), Explanation: "no permitted columns remain after applying the query projection and field policy"}}
 }
 
 // authorizeQuery authorizes every source of a query and returns the query to

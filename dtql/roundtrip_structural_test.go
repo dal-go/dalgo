@@ -51,6 +51,10 @@ func roundTripCases() map[string]dal.StructuredQuery {
 			from:    rootFrom(),
 			columns: []dal.Column{dal.AllColumnsExcept("email", "password_hash", "missing")},
 		},
+		"wildcard mask exclusion": fakeQuery{
+			from:    rootFrom(),
+			columns: []dal.Column{dal.AllColumnsExcept("Billing*", "Password*")},
+		},
 		"qualified wildcard exclusion": fakeQuery{
 			from:    dal.From(dal.NewRootCollectionRef("users", "u")),
 			columns: []dal.Column{dal.AllColumnsExceptFrom("u", "email")},

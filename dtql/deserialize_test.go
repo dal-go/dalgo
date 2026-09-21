@@ -93,6 +93,11 @@ func TestWildcardExclusionRoundTrip(t *testing.T) {
 			wantSource: "c",
 			wantNames:  []string{"email", "missing", "email"},
 		},
+		{
+			name:      "case-insensitive masks remain YAML strings",
+			yaml:      "from:\n  name: customers\ncolumns:\n  - wildcard:\n      exclude:\n        - Billing*\n        - Password*\n",
+			wantNames: []string{"Billing*", "Password*"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
