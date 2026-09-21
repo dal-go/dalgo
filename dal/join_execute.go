@@ -971,6 +971,20 @@ func evalJoinCondition(condition Condition, row joinRow) (bool, error) {
 
 func (e *joinExecution) field(row joinRow, field FieldRef) any {
 	alias := field.Source()
+	if alias == "" && e.recursive {
+		matches := make([]string, 0, len(e.aliases))
+		for _, candidate := range e.aliases {
+			for _, name := range e.fields[candidate] {
+				if name == field.Name() {
+					matches = append(matches, candidate)
+					break
+				}
+			}
+		}
+		if len(matches) == 1 {
+			alias = matches[0]
+		}
+	}
 	if alias == "" {
 		alias = row.base
 	}

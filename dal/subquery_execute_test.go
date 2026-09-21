@@ -132,6 +132,29 @@ func TestGenericRecursiveBindsAmbiguousUnqualifiedFieldWithSchema(t *testing.T) 
 	}
 }
 
+func TestGenericRecursiveUsesBoundUnqualifiedProjectionSource(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"CustomerId": 1})},
+		"Ledger":   {joinTestRecord("Ledger", "1", map[string]any{"CustomerId": 1, "total": 7})},
+	}, fields: map[string][]string{
+		"Customer": {"CustomerId"},
+		"Ledger":   {"CustomerId", "total"},
+	}, reads: map[string]int{}}
+	from := From(NewRootCollectionRef("Customer", "c")).Join(NewJoinedSource(NewRootCollectionRef("Ledger", "l"), JoinInner,
+		NewComparison(NewFieldRef("c", "CustomerId"), Equal, NewFieldRef("l", "CustomerId"))))
+	query := from.NewQuery().Where(NewExistsCondition(From(NewRootCollectionRef("Customer", "e")).NewQuery().SelectIntoRecord(nil))).SelectColumns(
+		Column{Expression: NewFieldRef("", "total")},
+	)
+	reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil || len(rows) != 1 || rows[0].Data().(map[string]any)["total"] != float64(7) {
+		t.Fatalf("bound projection rows=%#v err=%v", rows, err)
+	}
+}
+
 func TestRecursiveTruthTablesRetainUnknownUntilFilterBoundary(t *testing.T) {
 	e := &joinExecution{}
 	row := joinRow{base: "t", sources: map[string]map[string]any{"t": {"value": nil}}}
