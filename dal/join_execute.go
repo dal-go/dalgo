@@ -521,12 +521,18 @@ func (e *joinExecution) collectKeyRefs(node FromSource, path string) {
 	for i, join := range node.Joins() {
 		joinPath := fmt.Sprintf("%s.joins[%d]", path, i)
 		for j, condition := range join.On() {
-			cmp := condition.(Comparison)
+			cmp, ok := condition.(Comparison)
+			if !ok {
+				continue
+			}
 			for _, operand := range []struct {
 				side       string
 				expression Expression
 			}{{"left", cmp.Left}, {"right", cmp.Right}} {
-				field := operand.expression.(FieldRef)
+				field, ok := operand.expression.(FieldRef)
+				if !ok {
+					continue
+				}
 				e.keyRefs[field.Source()] = append(e.keyRefs[field.Source()], joinKeyReference{field.Name(), fmt.Sprintf("%s.on[%d].%s", joinPath, j, operand.side)})
 			}
 		}
@@ -723,11 +729,11 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 			}
 			valid := true
 			for _, condition := range join.On() {
-				cmp := condition.(Comparison)
-				l, r := cmp.Left.(FieldRef), cmp.Right.(FieldRef)
-				lk, _ := joinValueKey(fieldInJoinRow(candidate, l), path+".on.left")
-				rk, _ := joinValueKey(fieldInJoinRow(candidate, r), path+".on.right")
-				if lk == "" || rk == "" || lk != rk {
+				ok, err := e.condition(condition, candidate)
+				if err != nil {
+					return nil, err
+				}
+				if !ok {
 					valid = false
 					break
 				}
@@ -782,8 +788,15 @@ func selectGenericJoinAlgorithm(preferences []JoinAlgorithm, hashApplicable bool
 
 func directJoinHashKey(join JoinedSource, alias string, parent joinRow) (right, other FieldRef, applicable bool) {
 	for _, condition := range join.On() {
-		cmp := condition.(Comparison) // ValidateJoinTree checked the ON shape.
-		left, rightOperand := cmp.Left.(FieldRef), cmp.Right.(FieldRef)
+		cmp, ok := condition.(Comparison)
+		if !ok {
+			continue
+		}
+		left, leftOK := cmp.Left.(FieldRef)
+		rightOperand, rightOK := cmp.Right.(FieldRef)
+		if !leftOK || !rightOK {
+			continue
+		}
 		if _, ok := parent.sources[rightOperand.Source()]; left.Source() == alias && ok {
 			return left, rightOperand, true
 		}
