@@ -71,7 +71,7 @@ type joinYAML struct {
 
 func (join *joinYAML) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode {
-		return &yaml.TypeError{Errors: []string{fmt.Sprintf("join must be a mapping (got %d)", node.Kind)}}
+		return &yaml.TypeError{Errors: []string{"join must be a mapping"}}
 	}
 	clean := *node
 	clean.Content = nil
