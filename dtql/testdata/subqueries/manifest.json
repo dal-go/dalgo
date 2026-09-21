@@ -32,7 +32,7 @@
     "scalar-values.dtql.yaml": "fe7f578a624f36b134459140aa8ab399930f2876913014712a0696ed16049e08",
     "scalar-values.rows.json": "8bb98398919d1210769e371aafe43332d38a3b99ae70f2e5e9d07036f6c5a3e8",
     "schema.json": "40cb13a7f13ba919f27ad4d35483dc7011bdb9267478dba110bade500ac49c8c",
-    "scope-ambiguous.dtql.yaml": "90a279980ca13b9bfb52a5f83ed5de6b7b252008d92ff60c08f008107d745105",
+    "scope-ambiguous.dtql.yaml": "ae931f9d4a4c819050ac5d670655934a7c1e4b9c26607482e2b764cf6a72a8e6",
     "scope-ambiguous.error.json": "80fa9a83f3b23d2066f8d0c0765dcfc70243a60d4e1d979ee67389c8fa89073d",
     "scope-forward-join.dtql.yaml": "4879b9a6c88f503b2cd921896236c90eaab38540efb2d9ad0b6c30edaf385a3e",
     "scope-forward-join.error.json": "71b09ea5ab474337df73b816c7445d383b478e1f29643f87ed525f6f620be369",

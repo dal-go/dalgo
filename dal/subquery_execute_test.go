@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/dal-go/dalgo/recordset"
@@ -124,6 +126,176 @@ func TestRecursiveExistsSkipsChildProjection(t *testing.T) {
 	rows, err := ReadAllToRecords(context.Background(), reader)
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("exists rows=%#v err=%v", rows, err)
+	}
+}
+
+func TestRecursiveCappedPathDoesNotSendDerivedSourceToLeaf(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
+		"Invoice":  {joinTestRecord("Invoice", "1", map[string]any{"id": 1})},
+	}, reads: map[string]int{}}
+	derived := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Expression: NewFieldRef("i", "id")})
+	child := From(NewQuerySource(derived, "d")).NewQuery().SelectColumns(Column{Expression: NewFieldRef("d", "id")})
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(NewExistsCondition(child)).SelectIntoRecord(nil)
+	reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil || len(rows) != 1 || backend.reads["Invoice"] != 1 {
+		t.Fatalf("derived exists rows=%#v reads=%v err=%v", rows, backend.reads, err)
+	}
+}
+
+func TestRecursiveCappedPathRejectsChildCursorBeforeLeafScan(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
+		"Invoice":  {joinTestRecord("Invoice", "1", map[string]any{"id": 1})},
+	}, reads: map[string]int{}}
+	child := From(NewRootCollectionRef("Invoice", "i")).NewQuery().StartAfter("cursor").SelectIntoRecord(nil)
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(NewExistsCondition(child)).SelectIntoRecord(nil)
+	_, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), query)
+	if err == nil || !strings.Contains(err.Error(), "cursor") || backend.reads["Invoice"] != 0 {
+		t.Fatalf("cursor error=%v reads=%v", err, backend.reads)
+	}
+}
+
+func TestRecursiveRootBudgetCounters(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"A": {joinTestRecord("A", "1", map[string]any{"id": 1})},
+		"B": {joinTestRecord("B", "1", map[string]any{"id": "b1", "aid": 1, "cid": 9})},
+		"C": {joinTestRecord("C", "1", map[string]any{"id": 9})},
+	}, reads: map[string]int{}}
+	flat := From(NewRootCollectionRef("A", "a")).NewQuery().SelectIntoRecord(nil)
+	cases := []struct {
+		name, counter, path string
+		query               StructuredQuery
+		budget              recursiveBudget
+	}{
+		{name: "fetched", counter: "fetched_rows", path: "from", query: flat, budget: recursiveBudget{fetched: maxJoinRows}},
+		{name: "result", counter: "result_rows", path: "columns", query: flat, budget: recursiveBudget{output: maxJoinRows}},
+		{name: "bytes", counter: "retained_bytes", path: "from", query: flat, budget: recursiveBudget{bytes: maxJoinBytes}},
+		{name: "candidates", counter: "candidate_evaluations", path: "from.joins[0].from.joins[0]", query: joinTestQuery(), budget: recursiveBudget{candidates: maxJoinRows * 10}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := executeGenericRecursiveBudget(context.Background(), backend, tc.query, nil, &tc.budget)
+			var diagnostic *QueryValidationError
+			if !errors.As(err, &diagnostic) || diagnostic.Category != "query_limit" || diagnostic.Path != tc.path || diagnostic.Message != tc.counter {
+				t.Fatalf("budget error = %#v, want query_limit at %s: %s", err, tc.path, tc.counter)
+			}
+		})
+	}
+}
+
+func TestRecursiveMemoReuseChargesCandidateWork(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Invoice": {joinTestRecord("Invoice", "1", map[string]any{"id": 1})},
+	}, reads: map[string]int{}}
+	budget := &recursiveBudget{memo: map[string][]memoizedQuery{}}
+	execution := &joinExecution{ctx: context.Background(), executor: backend, budget: budget, memo: budget.memo}
+	query := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectIntoRecord(nil)
+	if _, err := execution.queryRecordsCapped(query, nil, 1, false); err != nil {
+		t.Fatal(err)
+	}
+	if backend.reads["Invoice"] != 1 {
+		t.Fatalf("first use leaf scans = %d", backend.reads["Invoice"])
+	}
+	fetched, bytes := budget.fetched, budget.bytes
+	budget.candidates = maxJoinRows * 10
+	_, err := execution.queryRecordsCapped(query, nil, 1, false)
+	var diagnostic *QueryValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Category != "query_limit" || diagnostic.Message != "candidate_evaluations" {
+		t.Fatalf("cache work diagnostic = %v", err)
+	}
+	if backend.reads["Invoice"] != 1 || budget.fetched != fetched || budget.bytes != bytes {
+		t.Fatalf("cache repeated leaf work: scans=%d fetched=%d bytes=%d", backend.reads["Invoice"], budget.fetched, budget.bytes)
+	}
+}
+
+func TestRecursiveMemoReuseChargesOriginalJoinCandidates(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"A": {joinTestRecord("A", "1", map[string]any{"id": 1})},
+		"B": {
+			joinTestRecord("B", "1", map[string]any{"id": 1, "aid": 1}),
+			joinTestRecord("B", "2", map[string]any{"id": 2, "aid": 1}),
+			joinTestRecord("B", "3", map[string]any{"id": 3, "aid": 1}),
+			joinTestRecord("B", "4", map[string]any{"id": 4, "aid": 1}),
+			joinTestRecord("B", "5", map[string]any{"id": 5, "aid": 1}),
+		},
+	}, reads: map[string]int{}}
+	budget := &recursiveBudget{memo: map[string][]memoizedQuery{}}
+	execution := &joinExecution{ctx: context.Background(), executor: backend, budget: budget, memo: budget.memo}
+	from := From(NewRootCollectionRef("A", "a")).Join(NewJoinedSource(NewRootCollectionRef("B", "b"), JoinInner,
+		NewComparison(NewFieldRef("a", "id"), Equal, NewFieldRef("b", "aid"))))
+	query := from.NewQuery().Where(NewComparison(NewFieldRef("b", "id"), Equal, NewConstant(1))).SelectColumns(Column{Expression: NewFieldRef("a", "id")})
+	rows, err := execution.queryRecords(query, nil)
+	if err != nil || len(rows) != 1 || budget.candidates < 5 {
+		t.Fatalf("first execution rows=%d candidates=%d err=%v", len(rows), budget.candidates, err)
+	}
+	reads := backend.reads["B"]
+	budget.candidates = maxJoinRows*10 - 4
+	_, err = execution.queryRecords(query, nil)
+	var diagnostic *QueryValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Category != "query_limit" || diagnostic.Message != "candidate_evaluations" || backend.reads["B"] != reads {
+		t.Fatalf("memo work error=%v B scans=%d, want cached work limit and %d scans", err, backend.reads["B"], reads)
+	}
+}
+
+func TestRecursivePointerDerivedSourceUsesGenericLeafScan(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Invoice": {joinTestRecord("Invoice", "1", map[string]any{"id": 1})},
+	}, reads: map[string]int{}}
+	inner := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Expression: NewFieldRef("i", "id")})
+	source := NewQuerySource(inner, "d")
+	query := From(&source).NewQuery().SelectColumns(Column{Expression: NewFieldRef("d", "id")})
+	if !HasSubquery(query) {
+		t.Fatal("pointer derived source missed recursive routing")
+	}
+	reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil || len(rows) != 1 || backend.reads["Invoice"] != 1 || backend.reads["d"] != 0 {
+		t.Fatalf("pointer derived rows=%d leaf scans=%v err=%v", len(rows), backend.reads, err)
+	}
+}
+
+func TestRecursiveCappedExistsChargesAllNonqualifyingRowsAcrossRoot(t *testing.T) {
+	invoices := make([]record.Record, maxJoinRows)
+	for i := range invoices {
+		invoices[i] = joinTestRecord("Invoice", strconv.Itoa(i), map[string]any{"id": i})
+	}
+	backend := &cappedTestBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
+		"Invoice":  invoices,
+	}, readers: map[string]*cappedTestReader{}}
+	child := From(NewRootCollectionRef("Invoice", "i")).NewQuery().Where(NewComparison(NewFieldRef("i", "id"), Equal, NewConstant(-1))).SelectIntoRecord(nil)
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(NewExistsCondition(child)).SelectIntoRecord(nil)
+	_, err := ExecuteRecursiveQuery(context.Background(), backend, query)
+	var diagnostic *QueryValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Category != "query_limit" || diagnostic.Path != "where.query.from" || diagnostic.Message != "fetched_rows" {
+		t.Fatalf("budget error = %#v", err)
+	}
+	if invoice := backend.readers["Invoice"]; invoice == nil || !invoice.closed {
+		t.Fatalf("invoice reader not closed: %#v", invoice)
+	}
+}
+
+func TestRecursiveNestedConditionLimitReportsActualPath(t *testing.T) {
+	backend := &cappedTestBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
+		"Invoice":  {joinTestRecord("Invoice", "1", map[string]any{"id": 1})},
+	}, readers: map[string]*cappedTestReader{}}
+	child := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectIntoRecord(nil)
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(NewGroupCondition(And,
+		NewExistsCondition(child))).SelectIntoRecord(nil)
+	budget := &recursiveBudget{fetched: maxJoinRows - 1}
+	_, err := executeGenericRecursiveBudget(context.Background(), backend, query, nil, budget)
+	var diagnostic *QueryValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Category != "query_limit" || diagnostic.Path != "where.conditions[0].query.from" || diagnostic.Message != "fetched_rows" {
+		t.Fatalf("nested limit path = %v", err)
 	}
 }
 

@@ -27,6 +27,20 @@ func (s QuerySource) recordsetSource() {}
 // Query returns the query that produces this relation.
 func (s QuerySource) Query() StructuredQuery { return s.query }
 
+func asQuerySource(source RecordsetSource) (QuerySource, bool) {
+	switch value := source.(type) {
+	case QuerySource:
+		return value, true
+	case *QuerySource:
+		if value == nil {
+			return QuerySource{}, true
+		}
+		return *value, true
+	default:
+		return QuerySource{}, false
+	}
+}
+
 // QueryExpression is a scalar subquery expression. Execution validates its
 // one-column, at-most-one-row cardinality; the model intentionally does not
 // choose a value for multi-row results.

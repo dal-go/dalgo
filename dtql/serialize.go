@@ -56,8 +56,10 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 	if err := dal.ValidateJoinTree(from); err != nil {
 		return document{}, err
 	}
-	if err := validateJoinClauseFields(q); err != nil {
-		return document{}, err
+	if len(from.Joins()) > 0 && !dal.HasSubquery(q) {
+		if err := validateJoinClauseFields(q); err != nil {
+			return document{}, err
+		}
 	}
 	if err := dal.ValidateAggregation(q); err != nil {
 		return document{}, fmt.Errorf("invalid aggregation: %w", err)
@@ -134,7 +136,7 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 
 func fromToYAML(from dal.FromSource) (fromYAML, error) {
 	base, ok := from.Base().(dal.CollectionRef)
-	if source, isQuery := from.Base().(dal.QuerySource); isQuery {
+	if source, isQuery := derivedQuerySource(from.Base()); isQuery {
 		if source.Query() == nil {
 			return fromYAML{}, fmt.Errorf("query_shape at source.query: query is required")
 		}
@@ -203,6 +205,20 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 		result.Joins = append(result.Joins, joinDoc)
 	}
 	return result, nil
+}
+
+func derivedQuerySource(source dal.RecordsetSource) (dal.QuerySource, bool) {
+	switch value := source.(type) {
+	case dal.QuerySource:
+		return value, true
+	case *dal.QuerySource:
+		if value == nil {
+			return dal.QuerySource{}, true
+		}
+		return *value, true
+	default:
+		return dal.QuerySource{}, false
+	}
 }
 
 func exprToYAML(expr dal.Expression) (exprYAML, error) {

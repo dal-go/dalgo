@@ -30,7 +30,7 @@ func TestSubqueryFixturesDeserializeAndRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			query, err := Deserialize(input)
-			if strings.HasPrefix(fixture.Name, "scope-") && fixture.Error != "" {
+			if strings.HasPrefix(fixture.Name, "scope-") && fixture.Name != "scope-ambiguous" && fixture.Error != "" {
 				if err == nil {
 					t.Fatal("Deserialize succeeded for an expected scope error fixture")
 				}

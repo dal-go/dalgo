@@ -57,7 +57,7 @@ func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool 
 			if from == nil || from.Base() == nil {
 				return false
 			}
-			if source, ok := from.Base().(QuerySource); ok {
+			if source, ok := asQuerySource(from.Base()); ok {
 				return found(source.Query()) || visitQuery(source.Query())
 			}
 			for _, join := range from.Joins() {
@@ -150,6 +150,9 @@ func validateQueryScope(q StructuredQuery, outer map[string]bool, path string, v
 
 func validateFromScope(from FromSource, outer, local map[string]bool, path string, visiting map[uintptr]bool) error {
 	base := from.Base()
+	if source, ok := base.(*QuerySource); ok && source == nil {
+		return queryValidationError("query_shape", path+".query", "query is required")
+	}
 	alias := base.Alias()
 	if alias == "" {
 		alias = base.Name()
@@ -160,7 +163,7 @@ func validateFromScope(from FromSource, outer, local map[string]bool, path strin
 	if local[alias] {
 		return queryValidationError("query_scope", path+".alias", fmt.Sprintf("duplicate alias %q", alias))
 	}
-	if source, ok := base.(QuerySource); ok {
+	if source, ok := asQuerySource(base); ok {
 		if source.Query() == nil {
 			return queryValidationError("query_shape", path+".query", "query is required")
 		}

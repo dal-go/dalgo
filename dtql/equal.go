@@ -52,8 +52,8 @@ func fromEqual(a, b dal.FromSource) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
 	}
-	if aq, ok := a.Base().(dal.QuerySource); ok {
-		bq, ok := b.Base().(dal.QuerySource)
+	if aq, ok := derivedQuerySource(a.Base()); ok {
+		bq, ok := derivedQuerySource(b.Base())
 		if !ok || aq.Alias() != bq.Alias() || !Equal(aq.Query(), bq.Query()) {
 			return false
 		}

@@ -102,8 +102,10 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 	}
 
 	base := reconstructedQuery{StructuredQuery: qb.SelectIntoRecordset(), columns: columns}
-	if err := validateJoinClauseFields(base); err != nil {
-		return nil, fmt.Errorf("invalid DTQL: %w", err)
+	if len(from.Joins()) > 0 && !dal.HasSubquery(base) {
+		if err := validateJoinClauseFields(base); err != nil {
+			return nil, fmt.Errorf("invalid DTQL: %w", err)
+		}
 	}
 	if err := dal.ValidateAggregation(base); err != nil {
 		return nil, fmt.Errorf("invalid DTQL: aggregation: %w", err)

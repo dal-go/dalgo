@@ -19,6 +19,15 @@ import (
 // provider as a native subquery or JOIN.
 type fixtureLeafExecutor struct{ tables map[string][]record.Record }
 
+type fixtureSchemaExecutor struct {
+	fixtureLeafExecutor
+	fields map[string][]string
+}
+
+func (e fixtureSchemaExecutor) JoinFields(_ context.Context, source dal.RecordsetSource) ([]string, error) {
+	return e.fields[source.Name()], nil
+}
+
 func (e fixtureLeafExecutor) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query) (dal.RecordsReader, error) {
 	q, ok := query.(dal.StructuredQuery)
 	if !ok || q.From() == nil || q.From().Base() == nil || len(q.From().Joins()) != 0 {
@@ -103,6 +112,80 @@ func TestSubqueryFixturesExecuteThroughLeafScans(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("rows = %#v, want %#v", got, want)
+			}
+		})
+	}
+}
+
+func TestSubqueryAmbiguousFixtureReportsExecutionScope(t *testing.T) {
+	const directory = "testdata/subqueries"
+	input, err := os.ReadFile(filepath.Join(directory, "scope-ambiguous.dtql.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	query, err := Deserialize(input)
+	if err != nil {
+		t.Fatalf("recursive fixture should parse before schema binding: %v", err)
+	}
+	executor := fixtureSchemaExecutor{
+		fixtureLeafExecutor: fixtureLeafExecutor{tables: map[string][]record.Record{
+			"Customer": {record.NewRecordWithData(record.NewKeyWithID("Customer", 1), map[string]any{"CustomerId": 1})},
+			"Ledger":   {record.NewRecordWithData(record.NewKeyWithID("Ledger", 1), map[string]any{"CustomerId": 1})},
+			"Invoice":  {record.NewRecordWithData(record.NewKeyWithID("Invoice", 1), map[string]any{"InvoiceId": 1})},
+		}},
+		fields: map[string][]string{
+			"Customer": {"CustomerId"},
+			"Ledger":   {"CustomerId"},
+			"Invoice":  {"InvoiceId"},
+		},
+	}
+	_, err = dal.ExecuteRecursiveQuery(context.Background(), executor, query)
+	var diagnostic *dal.QueryValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Category != "scope" || diagnostic.Path != "columns[0]" || diagnostic.Message != "ambiguous unqualified field CustomerId" {
+		t.Fatalf("scope diagnostic = %v", err)
+	}
+}
+
+func TestSubqueryNegativeFixtureCategoriesAndPaths(t *testing.T) {
+	const directory = "testdata/subqueries"
+	executor := fixtureLeafExecutor{tables: map[string][]record.Record{
+		"Customer": {record.NewRecordWithData(record.NewKeyWithID("Customer", 1), map[string]any{"CustomerId": 1})},
+		"Invoice": {
+			record.NewRecordWithData(record.NewKeyWithID("Invoice", 10), map[string]any{"InvoiceId": 10, "Total": 5}),
+			record.NewRecordWithData(record.NewKeyWithID("Invoice", 11), map[string]any{"InvoiceId": 11, "Total": 7}),
+		},
+	}}
+	for _, name := range []string{"scalar-many-rows", "scalar-many-columns", "scope-forward-join", "scope-unknown-qualifier"} {
+		t.Run(name, func(t *testing.T) {
+			input, err := os.ReadFile(filepath.Join(directory, name+".dtql.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantData, err := os.ReadFile(filepath.Join(directory, name+".error.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var want struct{ Category, Path string }
+			if err := json.Unmarshal(wantData, &want); err != nil {
+				t.Fatal(err)
+			}
+			query, err := Deserialize(input)
+			if err == nil {
+				_, err = dal.ExecuteRecursiveQuery(context.Background(), executor, query)
+			}
+			var recursive *dal.QueryValidationError
+			var join *dal.JoinValidationError
+			switch {
+			case errors.As(err, &recursive):
+				if recursive.Category != want.Category || recursive.Path != want.Path {
+					t.Fatalf("diagnostic = %v, want %s at %s", recursive, want.Category, want.Path)
+				}
+			case errors.As(err, &join):
+				if join.Category != want.Category || join.Path != want.Path {
+					t.Fatalf("diagnostic = %v, want %s at %s", join, want.Category, want.Path)
+				}
+			default:
+				t.Fatalf("missing structured diagnostic: %v", err)
 			}
 		})
 	}

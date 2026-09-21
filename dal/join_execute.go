@@ -58,8 +58,9 @@ type recursiveBudget struct {
 }
 
 type memoizedQuery struct {
-	query   StructuredQuery
-	records []record.Record
+	query         StructuredQuery
+	records       []record.Record
+	candidateWork int
 }
 
 // queryTruth retains SQL's third truth value until a WHERE, ON, or HAVING
@@ -145,7 +146,7 @@ func (e *joinExecution) execute() (RecordsReader, error) {
 	}
 	filtered := make([]joinRow, 0, len(rows))
 	for _, row := range rows {
-		ok, err := e.condition(e.q.Where(), row)
+		ok, err := e.conditionAt(e.q.Where(), row, "where")
 		if err != nil {
 			return nil, err
 		}
@@ -182,13 +183,14 @@ func (e *joinExecution) execute() (RecordsReader, error) {
 			if orderErr != nil {
 				return false
 			}
-			for _, order := range e.q.OrderBy() {
-				left, err := e.expression(order.Expression(), filtered[i])
+			for orderIndex, order := range e.q.OrderBy() {
+				path := fmt.Sprintf("orderBy[%d]", orderIndex)
+				left, err := e.expressionAt(order.Expression(), filtered[i], path)
 				if err != nil {
 					orderErr = err
 					return false
 				}
-				right, err := e.expression(order.Expression(), filtered[j])
+				right, err := e.expressionAt(order.Expression(), filtered[j], path)
 				if err != nil {
 					orderErr = err
 					return false
@@ -429,8 +431,11 @@ func (e *joinExecution) chargeOutput(data map[string]any) error {
 	if e.budget != nil {
 		e.budget.output++
 		e.budget.bytes += 128 + len(encoded)
-		if e.budget.output > maxJoinRows || e.budget.bytes > maxJoinBytes {
-			return queryError("query_limit", "columns", "result row or retained byte limit exceeded")
+		if e.budget.output > maxJoinRows {
+			return queryError("query_limit", "columns", "result_rows")
+		}
+		if e.budget.bytes > maxJoinBytes {
+			return queryError("query_limit", "columns", "retained_bytes")
 		}
 	}
 	if e.bytes > maxJoinBytes {
@@ -466,7 +471,7 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 	}
 	var reader RecordsReader
 	var err error
-	if source, ok := node.Base().(QuerySource); ok {
+	if source, ok := asQuerySource(node.Base()); ok {
 		if source.Query() == nil {
 			return joinError("query_shape", path+".query", "query is required")
 		}
@@ -518,8 +523,11 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		if e.budget != nil {
 			e.budget.fetched++
 			e.budget.bytes += 128 + len(encoded)
-			if e.budget.fetched > maxJoinRows || e.budget.bytes > maxJoinBytes {
-				return queryError("query_limit", path, "fetched row or retained byte limit exceeded")
+			if e.budget.fetched > maxJoinRows {
+				return queryError("query_limit", path, "fetched_rows")
+			}
+			if e.budget.bytes > maxJoinBytes {
+				return queryError("query_limit", path, "retained_bytes")
 			}
 		}
 		if e.fetched > maxJoinRows || e.bytes > maxJoinBytes {
@@ -701,8 +709,8 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 	var out []joinRow
 	for _, parent := range left {
 		candidates := e.scans[alias]
-		if source, ok := child.Base().(QuerySource); ok && e.recursive {
-			records, err := e.queryRecords(source.Query(), &parent)
+		if source, ok := asQuerySource(child.Base()); ok && e.recursive {
+			records, err := e.queryRecordsAt(source.Query(), &parent, path+".from.query")
 			if err != nil {
 				return nil, err
 			}
@@ -718,7 +726,7 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 		// A selected nested loop deliberately probes every right base row.
 		// A selected hash narrows the scan on a direct cross-side equality.
 		right, other, hashApplicable := directJoinHashKey(join, alias, parent)
-		if _, derived := child.Base().(QuerySource); derived && e.recursive {
+		if _, derived := asQuerySource(child.Base()); derived && e.recursive {
 			hashApplicable = false
 		}
 		if selectGenericJoinAlgorithm(join.Algorithms(), hashApplicable) == genericJoinHash {
@@ -756,15 +764,15 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 			if e.budget != nil {
 				e.budget.candidates++
 				if e.budget.candidates > maxJoinRows*10 {
-					return nil, queryError("query_limit", path, "candidate evaluation limit exceeded")
+					return nil, queryError("query_limit", path, "candidate_evaluations")
 				}
 			}
 			if e.candidates > maxJoinRows*10 {
 				return nil, joinError("join_plan", path, "candidate evaluation bound exceeded")
 			}
 			valid := true
-			for _, condition := range join.On() {
-				ok, err := e.condition(condition, candidate)
+			for onIndex, condition := range join.On() {
+				ok, err := e.conditionAt(condition, candidate, fmt.Sprintf("%s.on[%d]", path, onIndex))
 				if err != nil {
 					return nil, err
 				}
@@ -1037,17 +1045,25 @@ func (e *joinExecution) field(row joinRow, field FieldRef) any {
 }
 
 func (e *joinExecution) expression(expr Expression, row joinRow) (any, error) {
+	return e.expressionAt(expr, row, "expression")
+}
+
+func (e *joinExecution) expressionAt(expr Expression, row joinRow, path string) (any, error) {
 	if !e.recursive {
 		return evalJoinExpression(expr, row)
 	}
-	return e.evalExpression(expr, row)
+	return e.evalExpressionAt(expr, row, path)
 }
 
 func (e *joinExecution) condition(condition Condition, row joinRow) (bool, error) {
+	return e.conditionAt(condition, row, "where")
+}
+
+func (e *joinExecution) conditionAt(condition Condition, row joinRow, path string) (bool, error) {
 	if !e.recursive {
 		return evalJoinCondition(condition, row)
 	}
-	return e.evalCondition(condition, row)
+	return e.evalConditionAt(condition, row, path)
 }
 
 func (e *joinExecution) projection(columns []Column, row joinRow) (map[string]any, error) {
@@ -1066,7 +1082,7 @@ func (e *joinExecution) evalExpressionAt(expr Expression, row joinRow, path stri
 	case FieldRef:
 		return e.field(row, value), nil
 	case QueryExpression:
-		records, err := e.queryRecordsCapped(value.Query(), &row, 2, true)
+		records, err := e.queryRecordsCappedAt(value.Query(), &row, 2, true, path+".query")
 		if err != nil {
 			return nil, err
 		}
@@ -1108,35 +1124,83 @@ func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]r
 	return e.queryRecordsCapped(query, outer, 0, true)
 }
 
+func (e *joinExecution) queryRecordsAt(query StructuredQuery, outer *joinRow, path string) ([]record.Record, error) {
+	return e.queryRecordsCappedAt(query, outer, 0, true, path)
+}
+
 func (e *joinExecution) queryRecordsCapped(query StructuredQuery, outer *joinRow, cap int, project bool) ([]record.Record, error) {
+	return e.queryRecordsCappedAt(query, outer, cap, project, "query")
+}
+
+func (e *joinExecution) queryRecordsCappedAt(query StructuredQuery, outer *joinRow, cap int, project bool, path string) ([]record.Record, error) {
 	if query == nil {
-		return nil, queryError("query_shape", "query", "query is required")
+		return nil, queryError("query_shape", path, "query is required")
 	}
-	if cap > 0 && simpleRecursiveQuery(query) {
-		return e.executeSimpleCapped(query, outer, cap, project)
-	}
-	key := query.String()
+	key := fmt.Sprintf("%s\x00%d\x00%t", query.String(), cap, project)
 	if !queryHasOuterReference(query) {
 		for _, cached := range e.memo[key] {
 			if reflect.DeepEqual(cached.query, query) {
+				if e.budget != nil {
+					work := cached.candidateWork
+					if work == 0 {
+						work = 1
+					}
+					e.budget.candidates += work
+					if e.budget.candidates > maxJoinRows*10 {
+						return nil, queryError("query_limit", path, "candidate_evaluations")
+					}
+				}
 				return cached.records, nil
 			}
 		}
 	}
+	if cap > 0 && simpleRecursiveQuery(query) {
+		before := e.budget.candidates
+		records, err := e.executeSimpleCapped(query, outer, cap, project)
+		if err == nil && !queryHasOuterReference(query) {
+			e.memo[key] = append(e.memo[key], memoizedQuery{query: query, records: records, candidateWork: e.budget.candidates - before})
+		}
+		return records, nestedLimitError(err, path)
+	}
+	before := e.budget.candidates
 	reader, err := executeGenericRecursiveBudget(e.ctx, e.executor, query, outer, e.budget)
 	if err != nil {
-		return nil, err
+		return nil, nestedLimitError(err, path)
 	}
-	defer reader.Close()
 	records, err := ReadAllToRecords(e.ctx, reader)
-	if err == nil && !queryHasOuterReference(query) {
-		e.memo[key] = append(e.memo[key], memoizedQuery{query: query, records: records})
+	if closeErr := reader.Close(); err == nil && closeErr != nil {
+		err = closeErr
 	}
-	return records, err
+	if err != nil {
+		return nil, nestedLimitError(err, path)
+	}
+	if err == nil && !queryHasOuterReference(query) {
+		e.memo[key] = append(e.memo[key], memoizedQuery{query: query, records: records, candidateWork: e.budget.candidates - before})
+	}
+	return records, nestedLimitError(err, path)
+}
+
+func nestedLimitError(err error, path string) error {
+	var diagnostic *QueryValidationError
+	if path == "query" || !errors.As(err, &diagnostic) || diagnostic.Category != "query_limit" {
+		return err
+	}
+	relative := strings.TrimPrefix(diagnostic.Path, "query.")
+	if relative == "query" || relative == "" {
+		return queryError(diagnostic.Category, path, diagnostic.Message)
+	}
+	return queryError(diagnostic.Category, path+"."+relative, diagnostic.Message)
 }
 
 func simpleRecursiveQuery(q StructuredQuery) bool {
-	return q.From() != nil && q.From().Base() != nil && len(q.From().Joins()) == 0 && len(q.GroupBy()) == 0 && q.Having() == nil && len(q.OrderBy()) == 0 && q.Offset() == 0 && !HasAggregation(q)
+	if q.From() == nil || q.From().Base() == nil || q.StartFrom() != "" || q.StartAfter() != "" {
+		return false
+	}
+	switch q.From().Base().(type) {
+	case QuerySource, *QuerySource:
+		return false
+	}
+	return len(q.From().Joins()) == 0 && len(q.GroupBy()) == 0 && q.Having() == nil && len(q.OrderBy()) == 0 && q.Offset() == 0 && !HasAggregation(q)
 }
 
 func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, cap int, project bool) (records []record.Record, resultErr error) {
@@ -1168,8 +1232,19 @@ func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, c
 		if err != nil {
 			return nil, err
 		}
+		if child.budget != nil {
+			encoded, _ := json.Marshal(data)
+			child.budget.fetched++
+			child.budget.bytes += 128 + len(encoded)
+			if child.budget.fetched > maxJoinRows {
+				return nil, queryError("query_limit", "query.from", "fetched_rows")
+			}
+			if child.budget.bytes > maxJoinBytes {
+				return nil, queryError("query_limit", "query.from", "retained_bytes")
+			}
+		}
 		row := joinRow{key: rec.Key(), base: child.aliases[0], sources: map[string]map[string]any{child.aliases[0]: data}, outer: outer}
-		ok, err := child.evalCondition(q.Where(), row)
+		ok, err := child.evalConditionAt(q.Where(), row, "where")
 		if err != nil {
 			return nil, err
 		}
@@ -1184,22 +1259,35 @@ func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, c
 			}
 		}
 		records = append(records, record.NewRecordWithData(rec.Key(), output))
+		if child.budget != nil {
+			if err := child.chargeOutput(output); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return records, nil
 }
 
 func (e *joinExecution) evalCondition(condition Condition, row joinRow) (bool, error) {
-	truth, err := e.evalTruth(condition, row)
+	return e.evalConditionAt(condition, row, "where")
+}
+
+func (e *joinExecution) evalConditionAt(condition Condition, row joinRow, path string) (bool, error) {
+	truth, err := e.evalTruthAt(condition, row, path)
 	return truth == queryTrue, err
 }
 
 func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth, error) {
+	return e.evalTruthAt(condition, row, "where")
+}
+
+func (e *joinExecution) evalTruthAt(condition Condition, row joinRow, path string) (queryTruth, error) {
 	if condition == nil {
 		return queryTrue, nil
 	}
 	switch value := condition.(type) {
 	case ExistsCondition:
-		records, err := e.queryRecordsCapped(value.Query(), &row, 1, false)
+		records, err := e.queryRecordsCappedAt(value.Query(), &row, 1, false, path+".query")
 		if err != nil {
 			return queryUnknown, err
 		}
@@ -1218,8 +1306,8 @@ func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth,
 	case GroupCondition:
 		if value.Operator() == Or {
 			unknown := false
-			for _, child := range value.Conditions() {
-				truth, err := e.evalTruth(child, row)
+			for i, child := range value.Conditions() {
+				truth, err := e.evalTruthAt(child, row, fmt.Sprintf("%s.conditions[%d]", path, i))
 				if err != nil || truth == queryTrue {
 					return truth, err
 				}
@@ -1233,8 +1321,8 @@ func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth,
 			return queryFalse, nil
 		}
 		unknown := false
-		for _, child := range value.Conditions() {
-			truth, err := e.evalTruth(child, row)
+		for i, child := range value.Conditions() {
+			truth, err := e.evalTruthAt(child, row, fmt.Sprintf("%s.conditions[%d]", path, i))
 			if err != nil || truth == queryFalse {
 				return truth, err
 			}
@@ -1247,34 +1335,34 @@ func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth,
 		}
 		return queryTrue, nil
 	case Comparison:
-		left, err := e.evalExpression(value.Left, row)
+		left, err := e.evalExpressionAt(value.Left, row, path+".left")
 		if err != nil {
 			return queryUnknown, err
 		}
 		if value.Operator == In || value.Operator == NotIn {
 			var values []any
 			if subquery, ok := value.Right.(QueryExpression); ok {
-				records, err := e.queryRecords(subquery.Query(), &row)
+				records, err := e.queryRecordsAt(subquery.Query(), &row, path+".right.query")
 				if err != nil {
 					return queryUnknown, err
 				}
 				for _, rec := range records {
 					data, _ := rec.Data().(map[string]any)
 					if len(data) != 1 {
-						return queryUnknown, queryError("query_shape", "where.right.query", "membership query must return exactly one column")
+						return queryUnknown, queryError("query_shape", path+".right.query", "membership query must return exactly one column")
 					}
 					for _, item := range data {
 						values = append(values, item)
 					}
 				}
 			} else {
-				right, err := e.evalExpression(value.Right, row)
+				right, err := e.evalExpressionAt(value.Right, row, path+".right")
 				if err != nil {
 					return queryUnknown, err
 				}
 				rv := reflect.ValueOf(right)
 				if !rv.IsValid() || (rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array) {
-					return queryUnknown, queryError("query_shape", "where.right", "IN requires an array or query")
+					return queryUnknown, queryError("query_shape", path+".right", "IN requires an array or query")
 				}
 				for i := 0; i < rv.Len(); i++ {
 					values = append(values, rv.Index(i).Interface())
@@ -1306,7 +1394,7 @@ func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth,
 			}
 			return truth, nil
 		}
-		right, err := e.evalExpression(value.Right, row)
+		right, err := e.evalExpressionAt(value.Right, row, path+".right")
 		if err != nil {
 			return queryUnknown, err
 		}
@@ -1383,10 +1471,14 @@ func queryError(category, path, message string) error {
 // outside the query's own FROM tree. Returning true merely disables caching.
 func queryHasOuterReference(q StructuredQuery) bool {
 	local := map[string]bool{}
+	derivedCapturesOuter := false
 	var collect func(FromSource)
 	collect = func(from FromSource) {
 		if from == nil || from.Base() == nil {
 			return
+		}
+		if source, ok := asQuerySource(from.Base()); ok && source.Query() != nil && queryHasOuterReference(source.Query()) {
+			derivedCapturesOuter = true
 		}
 		local[joinAlias(from.Base())] = true
 		for _, join := range from.Joins() {
@@ -1394,6 +1486,9 @@ func queryHasOuterReference(q StructuredQuery) bool {
 		}
 	}
 	collect(q.From())
+	if derivedCapturesOuter {
+		return true
+	}
 	var expression func(Expression) bool
 	expression = func(expr Expression) bool {
 		switch value := expr.(type) {
