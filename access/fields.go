@@ -130,6 +130,22 @@ func (s *fieldSet) enumerable() (names []string, ok bool) {
 // imposes on one resource; a field is allowed only when every set allows it.
 type fieldSets []*fieldSet
 
+type queryProjectionStatus uint8
+
+const (
+	// queryProjectionApplied has an explicit, safe column list.
+	queryProjectionApplied queryProjectionStatus = iota
+	// queryProjectionUnavailable preserves the records-reader redaction fallback.
+	queryProjectionUnavailable
+	// queryProjectionEmpty would be interpreted as SELECT * by DALgo and is denied.
+	queryProjectionEmpty
+)
+
+type queryProjection struct {
+	query  dal.StructuredQuery
+	status queryProjectionStatus
+}
+
 func (sets fieldSets) allows(path string) bool {
 	for _, set := range sets {
 		if !set.allows(path) {
@@ -305,9 +321,12 @@ func (r redactingReader) Next() (record.Record, error) {
 // intersection of the allowed fields, keeping any columns the caller already
 // selected that are allowed. It returns ok=false when the sets are
 // restrictive but cannot be enumerated, so the caller must redact instead.
-func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuery, bool) {
+// projectQuery rewrites an enumerable restrictive policy into explicit columns.
+// Its status distinguishes a redaction-safe unavailable fallback from an empty
+// projection that must be denied before DALgo could interpret it as SELECT *.
+func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 	if !sets.restrictive() {
-		return query, true
+		return queryProjection{query: query, status: queryProjectionApplied}
 	}
 	if selected := query.Columns(); len(selected) > 0 {
 		hasWildcard := false
@@ -318,13 +337,13 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuer
 			}
 			field, ok := column.Expression.(dal.FieldRef)
 			if !ok || !sets.allowsWhole(field.Name()) {
-				return query, false
+				return queryProjection{query: query, status: queryProjectionUnavailable}
 			}
 		}
 		if hasWildcard {
 			allowed, ok := sets.enumerable()
 			if !ok {
-				return query, false
+				return queryProjection{query: query, status: queryProjectionUnavailable}
 			}
 			columns := make([]dal.Column, 0, len(allowed)+len(selected)-1)
 			for _, column := range selected {
@@ -338,19 +357,25 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuer
 					}
 				}
 			}
-			return dal.WithColumns(query, columns), true
+			if len(columns) == 0 {
+				return queryProjection{query: query, status: queryProjectionEmpty}
+			}
+			return queryProjection{query: dal.WithColumns(query, columns), status: queryProjectionApplied}
 		}
-		return query, true
+		return queryProjection{query: query, status: queryProjectionApplied}
 	}
 	allowed, ok := sets.enumerable()
 	if !ok {
-		return query, false
+		return queryProjection{query: query, status: queryProjectionUnavailable}
 	}
 	columns := make([]dal.Column, 0, len(allowed))
 	for _, name := range allowed {
 		columns = append(columns, dal.Column{Expression: dal.Field(name)})
 	}
-	return dal.WithColumns(query, columns), true
+	if len(columns) == 0 {
+		return queryProjection{query: query, status: queryProjectionEmpty}
+	}
+	return queryProjection{query: dal.WithColumns(query, columns), status: queryProjectionApplied}
 }
 
 var _ = context.Background

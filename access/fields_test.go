@@ -314,6 +314,29 @@ func TestWildcardProjectionMasksThroughSecureSession(t *testing.T) {
 	if len(columns) != 2 || columns[0].Expression.(dal.FieldRef).Name() != "id" || columns[1].Expression.(dal.FieldRef).Name() != "name" {
 		t.Fatalf("masked projection reached adapter as %#v", columns)
 	}
+
+	for _, excluded := range [][]string{
+		{"*"},
+		{"Billing*", "Password*", "id", "name"},
+	} {
+		t.Run(strings.Join(excluded, ","), func(t *testing.T) {
+			query := dal.NewQueryBuilder(dal.From(dal.NewRootCollectionRef("users", ""))).
+				SelectColumns(dal.AllColumnsExcept(excluded...))
+			stub.queries = nil
+			if _, err := session.ExecuteQueryToRecordsReader(ctx, query); !errors.Is(err, ErrAccessDenied) {
+				t.Fatalf("records query error = %v, want access denied", err)
+			}
+			if len(stub.queries) != 0 {
+				t.Fatalf("records query reached adapter: %#v", stub.queries)
+			}
+			if _, err := session.ExecuteQueryToRecordsetReader(ctx, query); !errors.Is(err, ErrAccessDenied) {
+				t.Fatalf("recordset query error = %v, want access denied", err)
+			}
+			if len(stub.queries) != 0 {
+				t.Fatalf("recordset query reached adapter: %#v", stub.queries)
+			}
+		})
+	}
 }
 
 func TestQueryFieldValidationHandlesPointerExpressionsAndConditions(t *testing.T) {
@@ -344,7 +367,7 @@ func TestQueryFieldValidationHandlesPointerExpressionsAndConditions(t *testing.T
 		t.Fatalf("grouped err=%v", err)
 	}
 	computed := dal.NewQueryBuilder(from).SelectColumns(dal.Column{Expression: dal.Constant{Value: 1}})
-	if _, ok := projectQuery(computed, sets); ok {
+	if projection := projectQuery(computed, sets); projection.status == queryProjectionApplied {
 		t.Fatal("computed projection accepted")
 	}
 }
@@ -503,8 +526,8 @@ func TestFieldEdgeBranches(t *testing.T) {
 	}
 	// projectQuery leaves unrestricted queries alone.
 	bare := dal.NewQueryBuilder(dal.From(dal.NewRootCollectionRef("users", ""))).SelectKeysOnly(reflect.String)
-	if q, ok := projectQuery(bare, fieldSets{nil}); !ok || len(q.Columns()) != 0 {
-		t.Errorf("unrestricted projection = %v, %v", q, ok)
+	if projection := projectQuery(bare, fieldSets{nil}); projection.status != queryProjectionApplied || len(projection.query.Columns()) != 0 {
+		t.Errorf("unrestricted projection = %v, %v", projection.query, projection.status)
 	}
 	// A negative projection is intersected with enumerable policy fields. The
 	// requested exclusion remains non-failing even when it names no allowed
@@ -515,11 +538,11 @@ func TestFieldEdgeBranches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	projected, ok := projectQuery(wildcard, fieldSets{allowed})
-	if !ok {
+	projection := projectQuery(wildcard, fieldSets{allowed})
+	if projection.status != queryProjectionApplied {
 		t.Fatal("enumerable wildcard projection was not projected")
 	}
-	columns := projected.Columns()
+	columns := projection.query.Columns()
 	if len(columns) != 2 || columns[0].Expression.(dal.FieldRef).Name() != "id" || columns[1].Expression.(dal.FieldRef).Name() != "name" {
 		t.Fatalf("policy-intersected wildcard columns = %#v", columns)
 	}
@@ -527,16 +550,16 @@ func TestFieldEdgeBranches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := projectQuery(wildcard, fieldSets{nonEnumerable}); ok {
+	if projection := projectQuery(wildcard, fieldSets{nonEnumerable}); projection.status == queryProjectionApplied {
 		t.Fatal("wildcard projection unexpectedly expanded a non-enumerable policy")
 	}
 	wildcardWithTail := dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(
 		dal.AllColumnsExceptFrom("u", "email"),
 		dal.Column{Expression: dal.Field("name")},
 	)
-	projected, ok = projectQuery(wildcardWithTail, fieldSets{allowed})
-	if !ok || len(projected.Columns()) != 3 || projected.Columns()[2].Expression.(dal.FieldRef).Name() != "name" {
-		t.Fatalf("policy projection did not preserve explicit tail: %#v, ok=%v", projected.Columns(), ok)
+	projection = projectQuery(wildcardWithTail, fieldSets{allowed})
+	if projection.status != queryProjectionApplied || len(projection.query.Columns()) != 3 || projection.query.Columns()[2].Expression.(dal.FieldRef).Name() != "name" {
+		t.Fatalf("policy projection did not preserve explicit tail: %#v, status=%v", projection.query.Columns(), projection.status)
 	}
 	malformedWildcards := []dal.StructuredQuery{
 		dal.From(dal.NewRootCollectionRef("users", "u")).NewQuery().SelectColumns(dal.AllColumnsExcept()),
