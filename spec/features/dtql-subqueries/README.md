@@ -1,12 +1,12 @@
 ---
 format: https://specscore.md/feature-specification
-status: Draft
+status: Implementing
 ---
 
 # Feature: Recursive DTQL subqueries across DALgo Go and TypeScript
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-subqueries?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-subqueries?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-subqueries?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-subqueries?op=request-change) |
-**Status:** Draft
+**Status:** Implementing
 **Source Ideas:** —
 
 ## Summary
@@ -17,7 +17,7 @@ One recursive DTQL query contract for scalar projection, derived FROM and JOIN s
 
 DTQL currently serializes a single query whose `from` may contain recursive JOINs, but a query cannot itself be a source, expression, or predicate operand. Go has a richer `dal.StructuredQuery` and generic JOIN/aggregation paths; DALgo-JS currently exposes a flat `StructuredQuery` and a Phase 1 DTQL parser that does not execute queries. Adding only YAML syntax would leave consumers with documents that parse but cannot run, and adding separate query variants would make composition and parity fragile.
 
-DALgo's repository rule requires a human's explicit, verbatim reason before adding exported query APIs. That reason is pending and must be recorded here and in the PR before implementation changes exported types or constructors. Existing exported interfaces and method signatures must remain source compatible.
+DALgo's repository rule requires a human's explicit, verbatim reason before adding exported query APIs. Alex approved the following reason on 2026-09-21: “First-class subqueries are needed for composable DTQL across DALgo Go and TypeScript; additive public query APIs are acceptable while existing queries remain compatible.” Existing exported interfaces and method signatures must remain source compatible.
 
 ## Behavior
 
@@ -195,12 +195,12 @@ Then it compares their normalized rows and errors with the checked-in expected o
 
 ## Open Questions
 
-- Human public-API justification is pending. Exported Go constructors/types and TypeScript query contracts cannot be implemented until the owner supplies a verbatim reason under `dalgo/AGENTS.md`.
+- Alex approved the public-API reason quoted in the Problem section on 2026-09-21. Record it verbatim in the PR description before exporting Go constructors/types or TypeScript query contracts.
 - Native SQL, SQLite, and browser adapter capability coverage must be decided from adapter implementation tests. Generic fallback is required only where scans preserve policy and work limits.
 
 ## Review resolution
 
-The independent review found six blocking gaps and four serious gaps in the first draft. The first revision defined the wire discriminator matrix, resolved binding representation, complete truth-value model, authorized-scan boundary, exact framework entrypoints, result naming, fixture ownership/normalization, and adapter verification matrix. The second review found a moving JOIN hint contract, missing inner pipeline and work-budget detail, and a missing released-package journey. This revision includes ordered JOIN hints in the shared wire contract, defines the per-query pipeline and root-wide budgets, and adds the standalone released-package acceptance. The TypeScript migration builds on the active JOIN AST while preserving legacy flat query consumers. A final review and human gates remain pending.
+The independent review found six blocking gaps and four serious gaps in the first draft. The first revision defined the wire discriminator matrix, resolved binding representation, complete truth-value model, authorized-scan boundary, exact framework entrypoints, result naming, fixture ownership/normalization, and adapter verification matrix. The second review found a moving JOIN hint contract, missing inner pipeline and work-budget detail, and a missing released-package journey. This revision includes ordered JOIN hints in the shared wire contract, defines the per-query pipeline and root-wide budgets, and adds the standalone released-package acceptance. The TypeScript migration builds on the active JOIN AST while preserving legacy flat query consumers. The independent final review resolved its findings, and Alex approved the feature and plan on 2026-09-21.
 
 ---
 *This document follows the https://specscore.md/feature-specification*
