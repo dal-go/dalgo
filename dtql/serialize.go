@@ -56,6 +56,9 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 	if err := dal.ValidateJoinTree(from); err != nil {
 		return document{}, err
 	}
+	if err := validateJoinClauseFields(q); err != nil {
+		return document{}, err
+	}
 	if err := dal.ValidateAggregation(q); err != nil {
 		return document{}, fmt.Errorf("invalid aggregation: %w", err)
 	}
@@ -142,9 +145,6 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 		result.Schema = &schema
 	}
 	for i, join := range from.Joins() {
-		if join.JoinType() != dal.JoinInner && join.JoinType() != dal.JoinLeft {
-			return fromYAML{}, fmt.Errorf("join_type at from.joins[%d].type: unsupported join type %q", i, join.JoinType())
-		}
 		child := join.From()
 		if child == nil {
 			child = dal.From(join.RecordsetSource)
@@ -154,11 +154,8 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 			return fromYAML{}, fmt.Errorf("from.joins[%d].from: %w", i, err)
 		}
 		on := make([]condYAML, 0, len(join.On()))
-		for j, condition := range join.On() {
-			encoded, err := condToYAML(condition)
-			if err != nil {
-				return fromYAML{}, fmt.Errorf("from.joins[%d].on[%d]: %w", i, j, err)
-			}
+		for _, condition := range join.On() {
+			encoded, _ := condToYAML(condition) // ValidateJoinTree checked every ON shape and operator.
 			on = append(on, *encoded)
 		}
 		joinDoc := joinYAML{From: &childDoc, On: on}

@@ -136,7 +136,10 @@ func relationAliases(from FromSource, path string, visiting map[FromSource]bool)
 
 func validateJoinCondition(condition Condition, path string, parent, child map[string]bool) error {
 	comparison, ok := condition.(Comparison)
-	if !ok || comparison.Operator != Equal {
+	if !ok {
+		return joinError("join_shape", path, "ON predicate must be a comparison")
+	}
+	if comparison.Operator != Equal {
 		return joinError("join_operator", path+".op", "only == is supported")
 	}
 	left, leftOK := comparison.Left.(FieldRef)
@@ -146,8 +149,11 @@ func validateJoinCondition(condition Condition, path string, parent, child map[s
 	}
 	leftInParent, rightInParent := parent[left.Source()], parent[right.Source()]
 	leftInChild, rightInChild := child[left.Source()], child[right.Source()]
-	if (!leftInParent && !leftInChild) || (!rightInParent && !rightInChild) {
-		return joinError("join_scope", path, "ON references an unknown or forward alias")
+	if !leftInParent && !leftInChild {
+		return joinError("join_scope", path+".left.source", fmt.Sprintf("unknown or forward alias %q", left.Source()))
+	}
+	if !rightInParent && !rightInChild {
+		return joinError("join_scope", path+".right.source", fmt.Sprintf("unknown or forward alias %q", right.Source()))
 	}
 	return nil
 }

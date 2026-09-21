@@ -34,7 +34,8 @@ const (
 // ExecuteQueryToRecordsReader intercepts aggregate structured queries and
 // delegates non-aggregate/native queries directly to the backend.
 func (db validatedDB) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
-	return executeAggregationRecords(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend))
+	provider, _ := db.Backend.(NativeJoinProvider)
+	return executePlannedRecords(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend), provider)
 }
 
 func executeAggregationRecords(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities) (RecordsReader, error) {
@@ -772,6 +773,17 @@ func uniqueAggregates(q StructuredQuery) []AggregateFunc {
 func evalScalar(expression Expression, row map[string]any) (any, error) {
 	switch e := expression.(type) {
 	case FieldRef:
+		if sources, ok := row[joinSourcesKey].(map[string]any); ok {
+			sourceName := e.Source()
+			if sourceName == "" {
+				sourceName, _ = row[joinBaseKey].(string)
+			}
+			if source, ok := sources[sourceName].(map[string]any); ok {
+				value, _ := lookupAggregationField(source, e.Name())
+				return value, nil
+			}
+			return nil, nil
+		}
 		value, _ := lookupAggregationField(row, e.Name())
 		return value, nil
 	case Constant:

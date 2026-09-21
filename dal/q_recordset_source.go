@@ -100,6 +100,9 @@ func NewNestedJoinedSource(from FromSource, joinType JoinType, on ...Condition) 
 
 // JoinType returns the kind of join (INNER, LEFT, ...).
 func (j JoinedSource) JoinType() JoinType {
+	if j.joinType == "" {
+		return JoinInner
+	}
 	return j.joinType
 }
 

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "files": {
+    "chinook-nested.dtql.yaml": "2eeef93ffb02a4272f06f6ab909b2db4cbbb9a2a1df280ae4c47851534f583b3",
+    "chinook-nested.rows.json": "9f5b32d506541afd8f651d5474f87b44d2e8646d1410e3a03d03c70fccf4a757",
+    "chinook-wildcard.dtql.yaml": "0101e5d1007dddccb7503524f4742b06462e2ab7f66fd623e6a449bb29ea2dce",
+    "forward-alias.dtql.yaml": "d60a3384f81861a020fb87948357b1d50399bd30f538dda24fbdbd9fd369e62b",
+    "forward-alias.error.json": "284f41b5e482176eda51483f90103f8190902fe545b928ae6dd62cb4805b7ee2",
+    "unknown-alias.dtql.yaml": "e2bc3d0b7d0e306c489eb17b4707428430c706c24854b57c0d4fe0eee654b1f1",
+    "unknown-alias.error.json": "c5f86029f1ef41187934d02bedebcbfa5f84b5010617537659cff4cb55b6b74e"
+  }
+}

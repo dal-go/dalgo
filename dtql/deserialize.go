@@ -88,6 +88,9 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	}
 
 	base := reconstructedQuery{StructuredQuery: qb.SelectIntoRecordset(), columns: columns}
+	if err := validateJoinClauseFields(base); err != nil {
+		return nil, fmt.Errorf("invalid DTQL: %w", err)
+	}
 	if err := dal.ValidateAggregation(base); err != nil {
 		return nil, fmt.Errorf("invalid DTQL: aggregation: %w", err)
 	}
@@ -207,10 +210,30 @@ func validateWildcardYAML(wildcard wildcardYAML, from fromYAML) error {
 			return fmt.Errorf("wildcard.exclude #%d must not be empty", i)
 		}
 	}
-	if wildcard.Source != "" && wildcard.Source != from.Alias && wildcard.Source != from.Name {
+	validSource := wildcard.Source == "" || fromHasAlias(from, wildcard.Source)
+	if len(from.Joins) == 0 && wildcard.Source == from.Name {
+		validSource = true
+	} // legacy single source
+	if !validSource {
 		return fmt.Errorf("wildcard source %q does not match from name or alias", wildcard.Source)
 	}
 	return nil
+}
+
+func fromHasAlias(from fromYAML, alias string) bool {
+	name := from.Alias
+	if name == "" {
+		name = from.Name
+	}
+	if alias == name {
+		return true
+	}
+	for _, join := range from.Joins {
+		if join.From != nil && fromHasAlias(*join.From, alias) {
+			return true
+		}
+	}
+	return false
 }
 
 func orderFromYAML(orders []orderYAML) ([]dal.OrderExpression, error) {

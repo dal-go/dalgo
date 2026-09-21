@@ -2,6 +2,7 @@ package dal
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -12,6 +13,12 @@ func joinFrom(name, alias string) FromSource {
 func joinOn(leftSource, leftField, rightSource, rightField string) Condition {
 	return NewComparison(NewFieldRef(leftSource, leftField), Equal, NewFieldRef(rightSource, rightField))
 }
+
+type malformedJoinSource struct{ name, alias string }
+
+func (s malformedJoinSource) Name() string   { return s.name }
+func (s malformedJoinSource) Alias() string  { return s.alias }
+func (malformedJoinSource) recordsetSource() {}
 
 func TestValidateJoinTree_RecursiveScope(t *testing.T) {
 	employees := joinFrom("Employee", "e")
@@ -32,12 +39,16 @@ func TestValidateJoinTree_Diagnostics(t *testing.T) {
 		from                 FromSource
 	}{
 		{
-			name: "forward sibling", category: "join_scope", path: "from.joins[0].on[0]",
+			name: "forward sibling", category: "join_scope", path: "from.joins[0].on[0].right.source",
 			from: joinFrom("A", "a").Join(NewJoinedSource(NewRootCollectionRef("B", "b"), JoinInner, joinOn("a", "id", "c", "bId"))).Join(NewJoinedSource(NewRootCollectionRef("C", "c"), JoinInner, joinOn("a", "id", "c", "aId"))),
 		},
 		{
 			name: "unqualified on", category: "join_shape", path: "from.joins[0].on[0]",
 			from: joinFrom("A", "a").Join(NewJoinedSource(NewRootCollectionRef("B", "b"), JoinInner, NewComparison(Field("id"), Equal, NewFieldRef("b", "aId")))),
+		},
+		{
+			name: "malformed predicate", category: "join_shape", path: "from.joins[0].on[0]",
+			from: joinFrom("A", "a").Join(NewJoinedSource(NewRootCollectionRef("B", "b"), JoinInner, NewGroupCondition(And, joinOn("a", "id", "b", "aId")))),
 		},
 		{
 			name: "unsupported type", category: "join_type", path: "from.joins[0].type",
@@ -69,6 +80,9 @@ func TestValidateJoinTree_RejectsCycle(t *testing.T) {
 }
 
 func TestJoinValidationCoverage(t *testing.T) {
+	if got := NewJoinedSource(NewRootCollectionRef("B", "b"), "").JoinType(); got != JoinInner {
+		t.Fatalf("omitted join type = %s", got)
+	}
 	if err := ValidateJoinTree(nil); err == nil {
 		t.Fatal("nil tree accepted")
 	}
@@ -94,5 +108,58 @@ func TestJoinValidationCoverage(t *testing.T) {
 	badChild := joinFrom("B", "b").Join(NewJoinedSource(NewRootCollectionRef("C", "c"), JoinInner))
 	if err := ValidateJoinTree(joinFrom("A", "a").Join(NewNestedJoinedSource(badChild, JoinInner, joinOn("a", "id", "b", "aId")))); err == nil {
 		t.Fatal("nested malformed join accepted")
+	}
+}
+
+func TestValidateJoinTreeMalformedRecursiveStructures(t *testing.T) {
+	tests := []struct {
+		name string
+		from FromSource
+		want string
+	}{
+		{"missing root base", &from{}, "join_shape at from"},
+		{"empty root name", From(malformedJoinSource{}), "join_shape at from.name"},
+		{"duplicate nested alias", joinFrom("A", "a").Join(NewNestedJoinedSource(joinFrom("B", "b").Join(NewJoinedSource(NewRootCollectionRef("C", "b"), JoinInner, joinOn("b", "id", "b", "id"))), JoinInner, joinOn("a", "id", "b", "aid"))), "join_scope"},
+		{"unknown left alias", joinFrom("A", "a").Join(NewJoinedSource(NewRootCollectionRef("B", "b"), JoinInner, joinOn("missing", "id", "b", "aid"))), "join_scope at from.joins[0].on[0].left.source"},
+		{"missing nested base", joinFrom("A", "a").Join(NewNestedJoinedSource(&from{}, JoinInner, joinOn("a", "id", "b", "aid"))), "join_shape at from.joins[0].from"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateJoinTree(tt.from); err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("want %s, got %v", tt.want, err)
+			}
+		})
+	}
+	if err := ValidateJoinTree(joinFrom("A", "a").Join(NewJoinedSource(NewRootCollectionRef("B", "a"), JoinInner, joinOn("a", "id", "a", "aid")))); err == nil || !strings.Contains(err.Error(), "duplicate alias") {
+		t.Fatalf("parent-child alias collision: %v", err)
+	}
+	badNested := joinFrom("B", "b").Join(JoinedSource{})
+	if _, err := relationAliases(badNested, "from", nil); err == nil || !strings.Contains(err.Error(), "join_shape") {
+		t.Fatalf("nested missing source: %v", err)
+	}
+	cyclic := joinFrom("B", "b")
+	cyclic.Join(NewNestedJoinedSource(cyclic, JoinInner))
+	if _, err := relationAliases(cyclic, "from", nil); err == nil || !strings.Contains(err.Error(), "join_cycle") {
+		t.Fatalf("nested cycle: %v", err)
+	}
+	badName := joinFrom("B", "b").Join(NewJoinedSource(malformedJoinSource{}, JoinInner))
+	if _, err := relationAliases(badName, "from", nil); err == nil || !strings.Contains(err.Error(), "join_shape") {
+		t.Fatalf("nested empty source: %v", err)
+	}
+	if cloned := cloneFrom(cyclic); cloned == nil {
+		t.Fatal("cyclic tree clone returned nil")
+	}
+	root := joinFrom("A", "a")
+	if err := validateJoinFrom(root, "from", map[string]bool{"a": true}, map[FromSource]bool{}); err == nil || !strings.Contains(err.Error(), "duplicate alias") {
+		t.Fatalf("visible alias collision: %v", err)
+	}
+	if err := validateJoinFrom(root, "from", nil, map[FromSource]bool{root: true}); err == nil || !strings.Contains(err.Error(), "join_cycle") {
+		t.Fatalf("recursive visit: %v", err)
+	}
+	if _, err := relationAliases(root, "from", map[FromSource]bool{root: true}); err == nil || !strings.Contains(err.Error(), "join_cycle") {
+		t.Fatalf("relation ancestor cycle: %v", err)
+	}
+	if _, err := relationAliases(&from{}, "from", nil); err == nil || !strings.Contains(err.Error(), "join_shape") {
+		t.Fatalf("relation without base: %v", err)
 	}
 }

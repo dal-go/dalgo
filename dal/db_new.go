@@ -93,12 +93,31 @@ func (validatedDB) dalgoDB() {}
 
 func (db validatedDB) dalgoBackend() Backend { return db.Backend }
 
+// Select preserves the adapter's optional legacy read surface while applying
+// the same JOIN and aggregation plan as the standard query entrypoints.
+func (db validatedDB) Select(ctx context.Context, query Query) (Reader, error) {
+	if q, ok := query.(StructuredQuery); ok && (hasJoin(query) || HasAggregation(q)) {
+		return db.ExecuteQueryToRecordsReader(ctx, query)
+	}
+	if selector, ok := db.Backend.(interface {
+		Select(context.Context, Query) (Reader, error)
+	}); ok {
+		return selector.Select(ctx, query)
+	}
+	return db.Backend.ExecuteQueryToRecordsReader(ctx, query)
+}
+
 // RunReadonlyTransaction keeps framework query behavior, including generic
 // aggregation fallback, inside a provider transaction.
 func (db validatedDB) RunReadonlyTransaction(ctx context.Context, f ROTxWorker, options ...TransactionOption) error {
 	capabilities := queryCapabilitiesOf(db.Backend)
+	joinProvider, _ := db.Backend.(NativeJoinProvider)
 	return db.Backend.RunReadonlyTransaction(ctx, func(ctx context.Context, tx ReadTransaction) error {
-		return f(ctx, &validatedReadTx{ReadTransaction: tx, capabilities: capabilities})
+		provider := joinProvider
+		if transactionalProvider, ok := tx.(NativeJoinProvider); ok {
+			provider = transactionalProvider
+		}
+		return f(ctx, &validatedReadTx{ReadTransaction: tx, capabilities: capabilities, joinProvider: provider})
 	}, options...)
 }
 
@@ -137,31 +156,37 @@ func newValidatedTx(tx ReadwriteTransaction, db DB) *validatedTx {
 	if provider, ok := As[QueryCapabilitiesProvider](db); ok {
 		capabilities = provider.QueryCapabilities()
 	}
+	joinProvider, _ := As[NativeJoinProvider](db)
+	if transactionalProvider, ok := tx.(NativeJoinProvider); ok {
+		joinProvider = transactionalProvider
+	}
 	return &validatedTx{
 		ReadTransaction: tx,
 		writePipeline:   writePipeline{ws: tx, db: db, validate: true},
 		rw:              tx,
 		capabilities:    capabilities,
+		joinProvider:    joinProvider,
 	}
 }
 
 type validatedReadTx struct {
 	ReadTransaction
 	capabilities QueryCapabilities
+	joinProvider NativeJoinProvider
 }
 
 var _ ReadTransaction = (*validatedReadTx)(nil)
 
 func (tx *validatedReadTx) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
-	return executeAggregationRecords(ctx, tx.ReadTransaction, query, tx.capabilities)
+	return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 }
 
 // Select preserves the legacy optional transaction surface used by SQL
 // adapters while routing structured aggregation through the same framework
 // planner as ExecuteQueryToRecordsReader.
 func (tx *validatedReadTx) Select(ctx context.Context, query Query) (Reader, error) {
-	if q, ok := query.(StructuredQuery); ok && HasAggregation(q) {
-		return executeAggregationRecords(ctx, tx.ReadTransaction, query, tx.capabilities)
+	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query)) {
+		return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 	}
 	if selector, ok := tx.ReadTransaction.(interface {
 		Select(context.Context, Query) (Reader, error)
@@ -179,6 +204,7 @@ type validatedTx struct {
 	writePipeline
 	rw           ReadwriteTransaction
 	capabilities QueryCapabilities
+	joinProvider NativeJoinProvider
 }
 
 var _ ReadwriteTransaction = (*validatedTx)(nil)
@@ -186,12 +212,12 @@ var _ ReadwriteTransaction = (*validatedTx)(nil)
 func (tx *validatedTx) ID() string { return tx.rw.ID() }
 
 func (tx *validatedTx) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
-	return executeAggregationRecords(ctx, tx.ReadTransaction, query, tx.capabilities)
+	return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 }
 
 func (tx *validatedTx) Select(ctx context.Context, query Query) (Reader, error) {
-	if q, ok := query.(StructuredQuery); ok && HasAggregation(q) {
-		return executeAggregationRecords(ctx, tx.ReadTransaction, query, tx.capabilities)
+	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query)) {
+		return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 	}
 	if selector, ok := tx.ReadTransaction.(interface {
 		Select(context.Context, Query) (Reader, error)

@@ -3,6 +3,7 @@ package dal
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/dal-go/dalgo/recordset"
 )
@@ -11,15 +12,107 @@ import (
 // aggregation fallback as RecordsReader. Native aggregate queries still pass
 // straight through to the provider.
 func (db validatedDB) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	if hasJoin(query) {
+		provider, _ := db.Backend.(NativeJoinProvider)
+		return executeJoinRecordset(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend), provider, options...)
+	}
 	return executeAggregationRecordset(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend), options...)
 }
 
 func (tx *validatedReadTx) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	if hasJoin(query) {
+		return executeJoinRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider, options...)
+	}
 	return executeAggregationRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, options...)
 }
 
 func (tx *validatedTx) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	if hasJoin(query) {
+		return executeJoinRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider, options...)
+	}
 	return executeAggregationRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, options...)
+}
+
+func executeJoinRecordset(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, provider NativeJoinProvider, options ...recordset.Option) (RecordsetReader, error) {
+	q := query.(StructuredQuery)
+	plan, err := PlanJoin(ctx, q, provider)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Strategy == JoinNative {
+		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+	}
+	reader, err := executeGenericJoin(ctx, executor, q)
+	if err != nil {
+		return nil, err
+	}
+	records, err := ReadAllToRecords(ctx, reader)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	seen := map[string]bool{}
+	sources := map[string]RecordsetSource{}
+	if len(q.Columns()) > 0 {
+		var collect func(FromSource)
+		collect = func(node FromSource) {
+			sources[joinAlias(node.Base())] = node.Base()
+			for _, child := range node.Joins() {
+				collect(joinedFrom(child))
+			}
+		}
+		collect(q.From())
+	}
+	for _, column := range q.Columns() {
+		if column.Wildcard != nil {
+			fieldProvider := executor.(JoinFieldsProvider) // executeGenericJoin already required schema metadata.
+			fields, err := fieldProvider.JoinFields(ctx, sources[column.Wildcard.Source])
+			if err != nil {
+				return nil, joinError("join_plan", "columns", fmt.Sprintf("cannot load wildcard fields: %v", err))
+			}
+			for _, name := range fields {
+				if !column.Wildcard.Excludes(name) && !seen[name] {
+					seen[name] = true
+					names = append(names, name)
+				}
+			}
+			continue
+		}
+		name := aggregationColumnName(column)
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	if len(q.Columns()) == 0 {
+		for _, rec := range records {
+			data := rec.Data().(map[string]any)
+			for name := range data {
+				if !seen[name] {
+					seen[name] = true
+					names = append(names, name)
+				}
+			}
+		}
+		sort.Strings(names)
+	}
+	definitions := make([]recordset.Column[any], len(names))
+	for i, name := range names {
+		definitions[i] = recordset.NewTypedColumn[any](name, nil)
+	}
+	name := q.From().Base().Name()
+	if configured := recordset.NewOptions(options...).Name(); configured != "" {
+		name = configured
+	}
+	rs := recordset.NewColumnarRecordset(name, definitions...)
+	for _, rec := range records {
+		data := rec.Data().(map[string]any)
+		row := rs.NewRow()
+		for _, name := range names {
+			_ = row.SetValueByName(name, data[name], rs)
+		}
+	}
+	return &aggregationRecordsetReader{recordset: rs}, nil
 }
 
 func executeAggregationRecordset(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, options ...recordset.Option) (RecordsetReader, error) {
