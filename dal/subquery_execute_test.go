@@ -90,6 +90,43 @@ func TestRecursiveSimpleChildCapClosesAfterSecondScalarRow(t *testing.T) {
 	}
 }
 
+func TestRecursiveSimpleScalarRespectsChildLimit(t *testing.T) {
+	backend := &cappedTestBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
+		"Invoice":  {joinTestRecord("Invoice", "1", map[string]any{"id": 1}), joinTestRecord("Invoice", "2", map[string]any{"id": 2})},
+	}, readers: map[string]*cappedTestReader{}}
+	child := From(NewRootCollectionRef("Invoice", "i")).NewQuery().Limit(1).SelectColumns(Column{Expression: NewFieldRef("i", "id")})
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().SelectColumns(Column{Expression: NewQueryExpression(child, "invoice")})
+	reader, err := ExecuteRecursiveQuery(context.Background(), backend, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadAllToRecords(context.Background(), reader); err != nil {
+		t.Fatal(err)
+	}
+	if backend.readers["Invoice"].next != 1 {
+		t.Fatalf("child reads = %d", backend.readers["Invoice"].next)
+	}
+}
+
+func TestRecursiveExistsSkipsChildProjection(t *testing.T) {
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
+		"Invoice":  {joinTestRecord("Invoice", "1", map[string]any{"id": 1}), joinTestRecord("Invoice", "2", map[string]any{"id": 2})},
+	}, reads: map[string]int{}}
+	badScalar := From(NewRootCollectionRef("Invoice", "s")).NewQuery().SelectColumns(Column{Expression: NewFieldRef("s", "id")})
+	exists := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Expression: NewQueryExpression(badScalar, "bad")})
+	query := From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(NewExistsCondition(exists)).SelectIntoRecord(nil)
+	reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("exists rows=%#v err=%v", rows, err)
+	}
+}
+
 func TestGenericRecursiveMemoizesUncorrelatedNestedQuery(t *testing.T) {
 	backend := &ignoringJoinBackend{data: map[string][]record.Record{
 		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1}), joinTestRecord("Customer", "2", map[string]any{"id": 2})},

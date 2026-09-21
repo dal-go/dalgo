@@ -1066,7 +1066,7 @@ func (e *joinExecution) evalExpressionAt(expr Expression, row joinRow, path stri
 	case FieldRef:
 		return e.field(row, value), nil
 	case QueryExpression:
-		records, err := e.queryRecordsCapped(value.Query(), &row, 2)
+		records, err := e.queryRecordsCapped(value.Query(), &row, 2, true)
 		if err != nil {
 			return nil, err
 		}
@@ -1105,15 +1105,15 @@ func (e *joinExecution) evalExpressionAt(expr Expression, row joinRow, path stri
 }
 
 func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]record.Record, error) {
-	return e.queryRecordsCapped(query, outer, 0)
+	return e.queryRecordsCapped(query, outer, 0, true)
 }
 
-func (e *joinExecution) queryRecordsCapped(query StructuredQuery, outer *joinRow, cap int) ([]record.Record, error) {
+func (e *joinExecution) queryRecordsCapped(query StructuredQuery, outer *joinRow, cap int, project bool) ([]record.Record, error) {
 	if query == nil {
 		return nil, queryError("query_shape", "query", "query is required")
 	}
 	if cap > 0 && simpleRecursiveQuery(query) {
-		return e.executeSimpleCapped(query, outer, cap)
+		return e.executeSimpleCapped(query, outer, cap, project)
 	}
 	key := query.String()
 	if !queryHasOuterReference(query) {
@@ -1139,7 +1139,10 @@ func simpleRecursiveQuery(q StructuredQuery) bool {
 	return q.From() != nil && q.From().Base() != nil && len(q.From().Joins()) == 0 && len(q.GroupBy()) == 0 && q.Having() == nil && len(q.OrderBy()) == 0 && q.Offset() == 0 && !HasAggregation(q)
 }
 
-func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, cap int) (records []record.Record, resultErr error) {
+func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, cap int, project bool) (records []record.Record, resultErr error) {
+	if limit := q.Limit(); limit > 0 && limit < cap {
+		cap = limit
+	}
 	reader, err := e.executor.ExecuteQueryToRecordsReader(e.ctx, From(q.From().Base()).NewQuery().SelectIntoRecord(nil))
 	if err != nil {
 		return nil, err
@@ -1174,7 +1177,7 @@ func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, c
 			continue
 		}
 		output := data
-		if len(q.Columns()) > 0 {
+		if project && len(q.Columns()) > 0 {
 			output, err = child.project(q.Columns(), row)
 			if err != nil {
 				return nil, err
@@ -1196,7 +1199,7 @@ func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth,
 	}
 	switch value := condition.(type) {
 	case ExistsCondition:
-		records, err := e.queryRecordsCapped(value.Query(), &row, 1)
+		records, err := e.queryRecordsCapped(value.Query(), &row, 1, false)
 		if err != nil {
 			return queryUnknown, err
 		}
