@@ -53,6 +53,16 @@ type joinExecution struct {
 
 type recursiveBudget struct{ fetched, output, candidates, bytes int }
 
+// queryTruth retains SQL's third truth value until a WHERE, ON, or HAVING
+// boundary decides that only TRUE retains a row.
+type queryTruth uint8
+
+const (
+	queryUnknown queryTruth = iota
+	queryFalse
+	queryTrue
+)
+
 type joinKeyReference struct{ field, path string }
 
 // executePlannedRecords is shared by DB and transaction entrypoints.
@@ -1041,53 +1051,79 @@ func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]r
 }
 
 func (e *joinExecution) evalCondition(condition Condition, row joinRow) (bool, error) {
+	truth, err := e.evalTruth(condition, row)
+	return truth == queryTrue, err
+}
+
+func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth, error) {
 	if condition == nil {
-		return true, nil
+		return queryTrue, nil
 	}
 	switch value := condition.(type) {
 	case ExistsCondition:
 		records, err := e.queryRecords(value.Query(), &row)
 		if err != nil {
-			return false, err
+			return queryUnknown, err
 		}
-		present := len(records) > 0
+		present := queryFalse
+		if len(records) > 0 {
+			present = queryTrue
+		}
 		if value.Negated() {
-			present = !present
+			if present == queryTrue {
+				present = queryFalse
+			} else {
+				present = queryTrue
+			}
 		}
 		return present, nil
 	case GroupCondition:
 		if value.Operator() == Or {
+			unknown := false
 			for _, child := range value.Conditions() {
-				ok, err := e.evalCondition(child, row)
-				if err != nil || ok {
-					return ok, err
+				truth, err := e.evalTruth(child, row)
+				if err != nil || truth == queryTrue {
+					return truth, err
+				}
+				if truth == queryUnknown {
+					unknown = true
 				}
 			}
-			return false, nil
+			if unknown {
+				return queryUnknown, nil
+			}
+			return queryFalse, nil
 		}
+		unknown := false
 		for _, child := range value.Conditions() {
-			ok, err := e.evalCondition(child, row)
-			if err != nil || !ok {
-				return ok, err
+			truth, err := e.evalTruth(child, row)
+			if err != nil || truth == queryFalse {
+				return truth, err
+			}
+			if truth == queryUnknown {
+				unknown = true
 			}
 		}
-		return true, nil
+		if unknown {
+			return queryUnknown, nil
+		}
+		return queryTrue, nil
 	case Comparison:
 		left, err := e.evalExpression(value.Left, row)
 		if err != nil {
-			return false, err
+			return queryUnknown, err
 		}
 		if value.Operator == In || value.Operator == NotIn {
 			var values []any
 			if subquery, ok := value.Right.(QueryExpression); ok {
 				records, err := e.queryRecords(subquery.Query(), &row)
 				if err != nil {
-					return false, err
+					return queryUnknown, err
 				}
 				for _, rec := range records {
 					data, _ := rec.Data().(map[string]any)
 					if len(data) != 1 {
-						return false, queryError("query_shape", "where.right.query", "membership query must return exactly one column")
+						return queryUnknown, queryError("query_shape", "where.right.query", "membership query must return exactly one column")
 					}
 					for _, item := range data {
 						values = append(values, item)
@@ -1096,11 +1132,11 @@ func (e *joinExecution) evalCondition(condition Condition, row joinRow) (bool, e
 			} else {
 				right, err := e.evalExpression(value.Right, row)
 				if err != nil {
-					return false, err
+					return queryUnknown, err
 				}
 				rv := reflect.ValueOf(right)
 				if !rv.IsValid() || (rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array) {
-					return false, queryError("query_shape", "where.right", "IN requires an array or query")
+					return queryUnknown, queryError("query_shape", "where.right", "IN requires an array or query")
 				}
 				for i := 0; i < rv.Len(); i++ {
 					values = append(values, rv.Index(i).Interface())
@@ -1115,36 +1151,60 @@ func (e *joinExecution) evalCondition(condition Condition, row joinRow) (bool, e
 					matched = true
 				}
 			}
-			if value.Operator == In {
-				return matched, nil
-			}
+			truth := queryFalse
 			if len(values) == 0 {
-				return true, nil
+				truth = queryFalse
+			} else if matched {
+				truth = queryTrue
+			} else if left == nil || hasNull {
+				truth = queryUnknown
 			}
-			return !matched && left != nil && !hasNull, nil
+			if value.Operator == NotIn {
+				if truth == queryTrue {
+					truth = queryFalse
+				} else if truth == queryFalse {
+					truth = queryTrue
+				}
+			}
+			return truth, nil
 		}
 		right, err := e.evalExpression(value.Right, row)
 		if err != nil {
-			return false, err
+			return queryUnknown, err
 		}
 		if left == nil || right == nil {
-			return false, nil
+			return queryUnknown, nil
 		}
 		cmp := compareAggregationValues(left, right)
 		switch value.Operator {
 		case Equal:
-			return valuesEqual(left, right), nil
+			if valuesEqual(left, right) {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
 		case GreaterThen:
-			return cmp > 0, nil
+			if cmp > 0 {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
 		case GreaterOrEqual:
-			return cmp >= 0, nil
+			if cmp >= 0 {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
 		case LessThen:
-			return cmp < 0, nil
+			if cmp < 0 {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
 		case LessOrEqual:
-			return cmp <= 0, nil
+			if cmp <= 0 {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
 		}
 	}
-	return false, queryError("query_shape", "where", fmt.Sprintf("unsupported condition %T", condition))
+	return queryUnknown, queryError("query_shape", "where", fmt.Sprintf("unsupported condition %T", condition))
 }
 
 func (e *joinExecution) project(columns []Column, row joinRow) (map[string]any, error) {

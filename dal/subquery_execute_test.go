@@ -131,3 +131,28 @@ func TestGenericRecursiveBindsAmbiguousUnqualifiedFieldWithSchema(t *testing.T) 
 		t.Fatalf("ambiguous field diagnostic = %v", err)
 	}
 }
+
+func TestRecursiveTruthTablesRetainUnknownUntilFilterBoundary(t *testing.T) {
+	e := &joinExecution{}
+	row := joinRow{base: "t", sources: map[string]map[string]any{"t": {"value": nil}}}
+	unknown := NewComparison(NewFieldRef("t", "value"), Equal, Constant{Value: 1})
+	falseCondition := NewComparison(Constant{Value: 1}, Equal, Constant{Value: 2})
+	trueCondition := NewComparison(Constant{Value: 1}, Equal, Constant{Value: 1})
+	for name, testCase := range map[string]struct {
+		condition Condition
+		want      queryTruth
+	}{
+		"comparison NULL":   {unknown, queryUnknown},
+		"unknown AND false": {NewGroupCondition(And, unknown, falseCondition), queryFalse},
+		"unknown OR false":  {NewGroupCondition(Or, unknown, falseCondition), queryUnknown},
+		"unknown OR true":   {NewGroupCondition(Or, unknown, trueCondition), queryTrue},
+		"NULL NOT IN empty": {NewComparison(NewFieldRef("t", "value"), NotIn, Array{Value: []int{}}), queryTrue},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := e.evalTruth(testCase.condition, row)
+			if err != nil || got != testCase.want {
+				t.Fatalf("truth = %v, %v; want %v", got, err, testCase.want)
+			}
+		})
+	}
+}
