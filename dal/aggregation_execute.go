@@ -418,11 +418,16 @@ func (r *localAggregationReader) loadMaterialized() (resultErr error) {
 
 func (r *localAggregationReader) newGroup(key string, values map[string]any) (*localGroup, error) {
 	// The encoded key and decoded values retain equivalent scalar payloads.
-	// Charge both plus conservative group/state and map overhead, rather than
+	// Charge both plus conservative group/state and map overhead, including the
+	// retained keyValues names and aggregate-state map keys, rather than
 	// depending on Go runtime object-layout details.
 	bytes := len(key)*2 + aggregationGroupOverheadBytes
-	bytes += len(r.aggregates) * aggregationAggregateStateOverheadBytes
-	bytes += (len(r.aggregates) + 1) * aggregationMapEntryOverheadBytes
+	for name := range values {
+		bytes += aggregationMapEntryOverheadBytes + len(name)
+	}
+	for _, aggregate := range r.aggregates {
+		bytes += aggregationAggregateStateOverheadBytes + aggregationMapEntryOverheadBytes + len(aggregate.String())
+	}
 	if err := r.reserveAggregationBytes(bytes); err != nil {
 		return nil, err
 	}

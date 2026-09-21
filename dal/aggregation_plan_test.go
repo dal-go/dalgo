@@ -3,6 +3,7 @@ package dal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dal-go/dalgo/recordset"
@@ -249,7 +250,7 @@ func TestLocalAggregationRetainedKeyByteBudget(t *testing.T) {
 func TestLocalAggregationAccountsForGroupStateAndMaterializedOutput(t *testing.T) {
 	count := Count()
 	reader := newLocalAggregationReader(context.Background(), From(NewRootCollectionRef("sales", "")).NewQuery().SelectColumns(count), &aggregationErrorReader{}, AggregationPlan{Strategy: AggregationHash})
-	groupBytes := len("implicit")*2 + aggregationGroupOverheadBytes + aggregationAggregateStateOverheadBytes + 2*aggregationMapEntryOverheadBytes
+	groupBytes := len("implicit")*2 + aggregationGroupOverheadBytes + aggregationAggregateStateOverheadBytes + aggregationMapEntryOverheadBytes + len(count.String())
 	reader.retainedBytes = defaultMaxAggregationBytes - groupBytes + 1
 	if _, err := reader.newGroup("implicit", map[string]any{}); err == nil {
 		t.Fatal("expected group/state overhead to exhaust byte budget")
@@ -274,6 +275,31 @@ func TestLocalAggregationAccountsForGroupStateAndMaterializedOutput(t *testing.T
 	distinctReader.retainedBytes = defaultMaxAggregationBytes - aggregationMapEntryOverheadBytes - len("s:1:A") + 1
 	if err := distinctReader.updateGroup(distinctGroup, map[string]any{"category": "A"}); err == nil {
 		t.Fatal("expected distinct-map entry overhead to exhaust byte budget")
+	}
+}
+
+func TestLocalAggregationAccountsForWideNullGroupKeyMetadata(t *testing.T) {
+	const groupFields = 64
+	builder := From(NewRootCollectionRef("sales", "")).NewQuery()
+	for i := 0; i < groupFields; i++ {
+		builder.GroupBy(Field(fmt.Sprintf("wide_group_key_%02d", i)))
+	}
+	q := builder.SelectColumns(Column{Expression: Field("wide_group_key_00")})
+	reader := newLocalAggregationReader(context.Background(), q, &aggregationErrorReader{}, AggregationPlan{Strategy: AggregationHash})
+	key, values, err := reader.groupKey(map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(values) != groupFields {
+		t.Fatalf("group values = %d, want %d", len(values), groupFields)
+	}
+	groupBytes := len(key)*2 + aggregationGroupOverheadBytes
+	for name := range values {
+		groupBytes += aggregationMapEntryOverheadBytes + len(name)
+	}
+	reader.retainedBytes = defaultMaxAggregationBytes - groupBytes + 1
+	if _, err := reader.newGroup(key, values); err == nil {
+		t.Fatal("expected wide null group-key metadata to exhaust byte budget")
 	}
 }
 
