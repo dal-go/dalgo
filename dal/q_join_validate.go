@@ -31,6 +31,9 @@ func validateJoinFrom(from FromSource, path string, visible map[string]bool, vis
 	if from == nil || from.Base() == nil {
 		return joinError("join_shape", path, "from is required")
 	}
+	if source, ok := from.Base().(*QuerySource); ok && source == nil {
+		return joinError("query_shape", path+".query", "query is required")
+	}
 	if visiting[from] {
 		return joinError("join_cycle", path, "recursive from reference")
 	}
@@ -120,6 +123,9 @@ func validateJoinAlgorithms(algorithms []JoinAlgorithm, joinPath string) error {
 func relationAliases(from FromSource, path string, visiting map[FromSource]bool) (map[string]bool, error) {
 	if from == nil || from.Base() == nil {
 		return nil, joinError("join_shape", path, "from is required")
+	}
+	if source, ok := from.Base().(*QuerySource); ok && source == nil {
+		return nil, joinError("query_shape", path+".query", "query is required")
 	}
 	if visiting[from] {
 		return nil, joinError("join_cycle", path, "recursive from reference")

@@ -1,0 +1,10 @@
+from:
+  query:
+    as: recent
+    from: {name: Invoice, alias: i}
+    orderBy: [{field: InvoiceDate, source: i, desc: true}]
+    limit: 2
+    columns: [{field: CustomerId, source: i}]
+orderBy: [{field: CustomerId, source: recent}]
+limit: 2
+columns: [{field: CustomerId, source: recent}]

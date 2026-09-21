@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "membership-truth-table",
+  "cases": [
+    {"name": "in-match", "left": 1, "rhs": [1, null], "in": "TRUE", "notIn": "FALSE", "whereIn": true, "whereNotIn": false},
+    {"name": "in-no-match-null-rhs", "left": 2, "rhs": [1, null], "in": "UNKNOWN", "notIn": "UNKNOWN", "whereIn": false, "whereNotIn": false},
+    {"name": "in-null-nonempty", "left": null, "rhs": [1], "in": "UNKNOWN", "notIn": "UNKNOWN", "whereIn": false, "whereNotIn": false},
+    {"name": "in-null-empty", "left": null, "rhs": [], "in": "FALSE", "notIn": "TRUE", "whereIn": false, "whereNotIn": true},
+    {"name": "in-no-match-empty", "left": 2, "rhs": [], "in": "FALSE", "notIn": "TRUE", "whereIn": false, "whereNotIn": true},
+    {"name": "in-no-match", "left": 2, "rhs": [1], "in": "FALSE", "notIn": "TRUE", "whereIn": false, "whereNotIn": true},
+    {"name": "in-null-rhs", "left": 2, "rhs": [null], "in": "UNKNOWN", "notIn": "UNKNOWN", "whereIn": false, "whereNotIn": false}
+  ]
+}

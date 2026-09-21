@@ -1,0 +1,1 @@
+{"category":"cardinality","path":"columns[0].query","message":"scalar query returned more than one row"}

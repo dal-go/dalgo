@@ -104,6 +104,15 @@ $defs:
           - not:
               required:
                 - wildcard
+      - allOf:
+          - not:
+              required:
+                - source
+            required:
+              - query
+          - not:
+              required:
+                - wildcard
       - not:
           anyOf:
             - required:
@@ -120,6 +129,8 @@ $defs:
                 - aggregate
             - required:
                 - binary
+            - required:
+                - query
             - required:
                 - source
             - required:
@@ -138,6 +149,8 @@ $defs:
       param:
         pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
         type: string
+      query:
+        $ref: '#/$defs/queryDocument'
       source:
         minLength: 1
         type: string
@@ -173,6 +186,7 @@ $defs:
           - '>'
           - '>='
           - In
+          - NotIn
       right:
         $ref: '#/$defs/expression'
     required:
@@ -184,6 +198,28 @@ $defs:
     oneOf:
       - $ref: '#/$defs/comparison'
       - $ref: '#/$defs/group'
+      - additionalProperties: false
+        properties:
+          exists:
+            $ref: '#/$defs/exists'
+        required:
+          - exists
+        type: object
+      - additionalProperties: false
+        properties:
+          notExists:
+            $ref: '#/$defs/exists'
+        required:
+          - notExists
+        type: object
+  exists:
+    additionalProperties: false
+    properties:
+      query:
+        $ref: '#/$defs/queryDocument'
+    required:
+      - query
+    type: object
   expression:
     additionalProperties: false
     oneOf:
@@ -219,6 +255,11 @@ $defs:
             - source
         required:
           - binary
+      - not:
+          required:
+            - source
+        required:
+          - query
     properties:
       aggregate:
         $ref: '#/$defs/aggregate'
@@ -229,6 +270,8 @@ $defs:
       param:
         pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
         type: string
+      query:
+        $ref: '#/$defs/queryDocument'
       source:
         minLength: 1
         type: string
@@ -255,6 +298,17 @@ $defs:
       required:
         - alias
         - as
+    oneOf:
+      - not:
+          required:
+            - query
+        required:
+          - name
+      - not:
+          required:
+            - name
+        required:
+          - query
     properties:
       alias:
         type: string
@@ -267,11 +321,11 @@ $defs:
       name:
         minLength: 1
         type: string
+      query:
+        $ref: '#/$defs/queryDocument'
       schema:
         minLength: 1
         type: string
-    required:
-      - name
     type: object
   group:
     additionalProperties: false
@@ -378,6 +432,11 @@ $defs:
             - source
         required:
           - binary
+      - not:
+          required:
+            - source
+        required:
+          - query
     properties:
       aggregate:
         $ref: '#/$defs/aggregate'
@@ -390,6 +449,8 @@ $defs:
       param:
         pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$
         type: string
+      query:
+        $ref: '#/$defs/queryDocument'
       source:
         minLength: 1
         type: string
@@ -423,6 +484,39 @@ $defs:
       - field
       - source
     type: object
+  queryDocument:
+    additionalProperties: false
+    properties:
+      as:
+        minLength: 1
+        type: string
+      columns:
+        items:
+          $ref: '#/$defs/column'
+        type: array
+      from:
+        $ref: '#/$defs/from'
+      groupBy:
+        items:
+          $ref: '#/$defs/expression'
+        type: array
+      having:
+        $ref: '#/$defs/condition'
+      limit:
+        minimum: 0
+        type: integer
+      offset:
+        minimum: 0
+        type: integer
+      orderBy:
+        items:
+          $ref: '#/$defs/order'
+        type: array
+      where:
+        $ref: '#/$defs/condition'
+    required:
+      - from
+    type: object
   wildcardProjection:
     additionalProperties: false
     properties:
@@ -439,35 +533,7 @@ $defs:
       - exclude
     type: object
 $id: https://dal-go.github.io/dtql/schema.json
+$ref: '#/$defs/queryDocument'
 $schema: https://json-schema.org/draft/2020-12/schema
-additionalProperties: false
 description: YAML serialization of dalgo's dal.StructuredQuery (core relational read-only subset).
-properties:
-  columns:
-    items:
-      $ref: '#/$defs/column'
-    type: array
-  from:
-    $ref: '#/$defs/from'
-  groupBy:
-    items:
-      $ref: '#/$defs/expression'
-    type: array
-  having:
-    $ref: '#/$defs/condition'
-  limit:
-    minimum: 0
-    type: integer
-  offset:
-    minimum: 0
-    type: integer
-  orderBy:
-    items:
-      $ref: '#/$defs/order'
-    type: array
-  where:
-    $ref: '#/$defs/condition'
-required:
-  - from
 title: DTQL
-type: object

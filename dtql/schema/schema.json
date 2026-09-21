@@ -203,6 +203,27 @@
           ]
         },
         {
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "source"
+                ]
+              },
+              "required": [
+                "query"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "wildcard"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "not": {
             "anyOf": [
               {
@@ -242,6 +263,11 @@
               },
               {
                 "required": [
+                  "query"
+                ]
+              },
+              {
+                "required": [
                   "source"
                 ]
               },
@@ -273,6 +299,9 @@
         "param": {
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
+        },
+        "query": {
+          "$ref": "#/$defs/queryDocument"
         },
         "source": {
           "minLength": 1,
@@ -319,7 +348,8 @@
             "==",
             "\u003e",
             "\u003e=",
-            "In"
+            "In",
+            "NotIn"
           ]
         },
         "right": {
@@ -340,8 +370,44 @@
         },
         {
           "$ref": "#/$defs/group"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "exists": {
+              "$ref": "#/$defs/exists"
+            }
+          },
+          "required": [
+            "exists"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "notExists": {
+              "$ref": "#/$defs/exists"
+            }
+          },
+          "required": [
+            "notExists"
+          ],
+          "type": "object"
         }
       ]
+    },
+    "exists": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "$ref": "#/$defs/queryDocument"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
     },
     "expression": {
       "additionalProperties": false,
@@ -410,6 +476,16 @@
           "required": [
             "binary"
           ]
+        },
+        {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
+          "required": [
+            "query"
+          ]
         }
       ],
       "properties": {
@@ -425,6 +501,9 @@
         "param": {
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
+        },
+        "query": {
+          "$ref": "#/$defs/queryDocument"
         },
         "source": {
           "minLength": 1,
@@ -463,6 +542,28 @@
           "as"
         ]
       },
+      "oneOf": [
+        {
+          "not": {
+            "required": [
+              "query"
+            ]
+          },
+          "required": [
+            "name"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "name"
+            ]
+          },
+          "required": [
+            "query"
+          ]
+        }
+      ],
       "properties": {
         "alias": {
           "type": "string"
@@ -480,14 +581,14 @@
           "minLength": 1,
           "type": "string"
         },
+        "query": {
+          "$ref": "#/$defs/queryDocument"
+        },
         "schema": {
           "minLength": 1,
           "type": "string"
         }
       },
-      "required": [
-        "name"
-      ],
       "type": "object"
     },
     "group": {
@@ -662,6 +763,16 @@
           "required": [
             "binary"
           ]
+        },
+        {
+          "not": {
+            "required": [
+              "source"
+            ]
+          },
+          "required": [
+            "query"
+          ]
         }
       ],
       "properties": {
@@ -680,6 +791,9 @@
         "param": {
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
           "type": "string"
+        },
+        "query": {
+          "$ref": "#/$defs/queryDocument"
         },
         "source": {
           "minLength": 1,
@@ -728,6 +842,54 @@
       ],
       "type": "object"
     },
+    "queryDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "as": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/column"
+          },
+          "type": "array"
+        },
+        "from": {
+          "$ref": "#/$defs/from"
+        },
+        "groupBy": {
+          "items": {
+            "$ref": "#/$defs/expression"
+          },
+          "type": "array"
+        },
+        "having": {
+          "$ref": "#/$defs/condition"
+        },
+        "limit": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "offset": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "orderBy": {
+          "items": {
+            "$ref": "#/$defs/order"
+          },
+          "type": "array"
+        },
+        "where": {
+          "$ref": "#/$defs/condition"
+        }
+      },
+      "required": [
+        "from"
+      ],
+      "type": "object"
+    },
     "wildcardProjection": {
       "additionalProperties": false,
       "properties": {
@@ -751,49 +913,8 @@
     }
   },
   "$id": "https://dal-go.github.io/dtql/schema.json",
+  "$ref": "#/$defs/queryDocument",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
   "description": "YAML serialization of dalgo's dal.StructuredQuery (core relational read-only subset).",
-  "properties": {
-    "columns": {
-      "items": {
-        "$ref": "#/$defs/column"
-      },
-      "type": "array"
-    },
-    "from": {
-      "$ref": "#/$defs/from"
-    },
-    "groupBy": {
-      "items": {
-        "$ref": "#/$defs/expression"
-      },
-      "type": "array"
-    },
-    "having": {
-      "$ref": "#/$defs/condition"
-    },
-    "limit": {
-      "minimum": 0,
-      "type": "integer"
-    },
-    "offset": {
-      "minimum": 0,
-      "type": "integer"
-    },
-    "orderBy": {
-      "items": {
-        "$ref": "#/$defs/order"
-      },
-      "type": "array"
-    },
-    "where": {
-      "$ref": "#/$defs/condition"
-    }
-  },
-  "required": [
-    "from"
-  ],
-  "title": "DTQL",
-  "type": "object"
+  "title": "DTQL"
 }

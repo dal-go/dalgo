@@ -27,6 +27,7 @@ func schemaDocument() map[string]any {
 		"star":      map[string]any{"const": true},
 		"aggregate": map[string]any{"$ref": "#/$defs/aggregate"},
 		"binary":    map[string]any{"$ref": "#/$defs/binary"},
+		"query":     map[string]any{"$ref": "#/$defs/queryDocument"},
 	}
 	exprOneOf := []any{
 		map[string]any{"required": []any{"field"}},
@@ -36,6 +37,7 @@ func schemaDocument() map[string]any {
 		map[string]any{"required": []any{"star"}, "not": map[string]any{"required": []any{"source"}}},
 		map[string]any{"required": []any{"aggregate"}, "not": map[string]any{"required": []any{"source"}}},
 		map[string]any{"required": []any{"binary"}, "not": map[string]any{"required": []any{"source"}}},
+		map[string]any{"required": []any{"query"}, "not": map[string]any{"required": []any{"source"}}},
 	}
 	// A column is either an expression plus optional alias, or a wildcard
 	// projection. An order is an expression plus the optional direction.
@@ -63,6 +65,7 @@ func schemaDocument() map[string]any {
 			map[string]any{"required": []any{"star"}},
 			map[string]any{"required": []any{"aggregate"}},
 			map[string]any{"required": []any{"binary"}},
+			map[string]any{"required": []any{"query"}},
 			map[string]any{"required": []any{"source"}},
 			map[string]any{"required": []any{"as"}},
 		}},
@@ -72,14 +75,18 @@ func schemaDocument() map[string]any {
 		"from": map[string]any{
 			"type":                 "object",
 			"additionalProperties": false,
-			"required":             []any{"name"},
 			"not":                  map[string]any{"required": []any{"alias", "as"}},
 			"properties": map[string]any{
 				"schema": map[string]any{"type": "string", "minLength": 1},
 				"name":   map[string]any{"type": "string", "minLength": 1},
 				"alias":  map[string]any{"type": "string"},
 				"as":     map[string]any{"type": "string"},
+				"query":  map[string]any{"$ref": "#/$defs/queryDocument"},
 				"joins":  map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/join"}},
+			},
+			"oneOf": []any{
+				map[string]any{"required": []any{"name"}, "not": map[string]any{"required": []any{"query"}}},
+				map[string]any{"required": []any{"query"}, "not": map[string]any{"required": []any{"name"}}},
 			},
 		},
 		"join": map[string]any{
@@ -194,33 +201,40 @@ func schemaDocument() map[string]any {
 				map[string]any{"required": []any{"or"}},
 			},
 		},
+		"exists": map[string]any{
+			"type": "object", "additionalProperties": false, "required": []any{"query"},
+			"properties": map[string]any{"query": map[string]any{"$ref": "#/$defs/queryDocument"}},
+		},
 		"condition": map[string]any{
 			"oneOf": []any{
 				map[string]any{"$ref": "#/$defs/comparison"},
 				map[string]any{"$ref": "#/$defs/group"},
+				map[string]any{"type": "object", "additionalProperties": false, "required": []any{"exists"}, "properties": map[string]any{"exists": map[string]any{"$ref": "#/$defs/exists"}}},
+				map[string]any{"type": "object", "additionalProperties": false, "required": []any{"notExists"}, "properties": map[string]any{"notExists": map[string]any{"$ref": "#/$defs/exists"}}},
 			},
 		},
 	}
 
+	queryProperties := map[string]any{
+		"as":      map[string]any{"type": "string", "minLength": 1},
+		"from":    map[string]any{"$ref": "#/$defs/from"},
+		"where":   map[string]any{"$ref": "#/$defs/condition"},
+		"groupBy": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/expression"}},
+		"having":  map[string]any{"$ref": "#/$defs/condition"},
+		"orderBy": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/order"}},
+		"limit":   map[string]any{"type": "integer", "minimum": 0},
+		"offset":  map[string]any{"type": "integer", "minimum": 0},
+		"columns": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/column"}},
+	}
+	defs["queryDocument"] = map[string]any{"type": "object", "additionalProperties": false, "required": []any{"from"}, "properties": queryProperties}
+
 	return map[string]any{
-		"$schema":              "https://json-schema.org/draft/2020-12/schema",
-		"$id":                  SchemaID,
-		"title":                "DTQL",
-		"description":          "YAML serialization of dalgo's dal.StructuredQuery (core relational read-only subset).",
-		"type":                 "object",
-		"additionalProperties": false,
-		"required":             []any{"from"},
-		"properties": map[string]any{
-			"from":    map[string]any{"$ref": "#/$defs/from"},
-			"where":   map[string]any{"$ref": "#/$defs/condition"},
-			"groupBy": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/expression"}},
-			"having":  map[string]any{"$ref": "#/$defs/condition"},
-			"orderBy": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/order"}},
-			"limit":   map[string]any{"type": "integer", "minimum": 0},
-			"offset":  map[string]any{"type": "integer", "minimum": 0},
-			"columns": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/column"}},
-		},
-		"$defs": defs,
+		"$schema":     "https://json-schema.org/draft/2020-12/schema",
+		"$id":         SchemaID,
+		"title":       "DTQL",
+		"description": "YAML serialization of dalgo's dal.StructuredQuery (core relational read-only subset).",
+		"$ref":        "#/$defs/queryDocument",
+		"$defs":       defs,
 	}
 }
 

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "tables": {
+    "Customer": ["CustomerId", "FirstName", "Country"],
+    "Invoice": ["InvoiceId", "CustomerId", "Total", "InvoiceDate"],
+    "CountryInfo": ["Country", "Region"],
+    "Ledger": ["CustomerId", "Flag"],
+    "Membership": ["SetName", "Value"],
+    "Truth": ["Name", "Value", "SetName"]
+  }
+}

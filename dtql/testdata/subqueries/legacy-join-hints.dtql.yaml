@@ -1,0 +1,21 @@
+from:
+  name: Customer
+  alias: c
+  joins:
+    - type: left
+      from: {name: Invoice, alias: i}
+      on:
+        - left: {field: CustomerId, source: c}
+          op: '=='
+          right: {field: CustomerId, source: i}
+      hints:
+        algorithms: [hash, nestedLoop]
+orderBy:
+  - field: CustomerId
+    source: c
+  - field: InvoiceId
+    source: i
+limit: 4
+columns:
+  - {field: CustomerId, source: c}
+  - {field: InvoiceId, source: i}

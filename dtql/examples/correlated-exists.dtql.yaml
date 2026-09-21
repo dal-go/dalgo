@@ -1,0 +1,11 @@
+from: {name: Customer, alias: c}
+where:
+  exists:
+    query:
+      from: {name: Invoice, alias: i}
+      where:
+        op: '=='
+        left: {field: CustomerId, source: i}
+        right: {field: CustomerId, source: c}
+columns:
+  - {field: CustomerId, source: c}

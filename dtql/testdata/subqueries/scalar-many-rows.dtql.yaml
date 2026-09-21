@@ -1,0 +1,7 @@
+from: {name: Customer, alias: c}
+limit: 1
+columns:
+  - query:
+      as: InvalidManyRows
+      from: {name: Invoice, alias: i}
+      columns: [{field: InvoiceId, source: i}]

@@ -96,7 +96,7 @@ func (db validatedDB) dalgoBackend() Backend { return db.Backend }
 // Select preserves the adapter's optional legacy read surface while applying
 // the same JOIN and aggregation plan as the standard query entrypoints.
 func (db validatedDB) Select(ctx context.Context, query Query) (Reader, error) {
-	if q, ok := query.(StructuredQuery); ok && (hasJoin(query) || HasAggregation(q)) {
+	if q, ok := query.(StructuredQuery); ok && (hasJoin(query) || HasAggregation(q) || HasSubquery(q)) {
 		return db.ExecuteQueryToRecordsReader(ctx, query)
 	}
 	if selector, ok := db.Backend.(interface {
@@ -185,7 +185,7 @@ func (tx *validatedReadTx) ExecuteQueryToRecordsReader(ctx context.Context, quer
 // adapters while routing structured aggregation through the same framework
 // planner as ExecuteQueryToRecordsReader.
 func (tx *validatedReadTx) Select(ctx context.Context, query Query) (Reader, error) {
-	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query)) {
+	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query) || HasSubquery(q)) {
 		return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 	}
 	if selector, ok := tx.ReadTransaction.(interface {
@@ -216,7 +216,7 @@ func (tx *validatedTx) ExecuteQueryToRecordsReader(ctx context.Context, query Qu
 }
 
 func (tx *validatedTx) Select(ctx context.Context, query Query) (Reader, error) {
-	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query)) {
+	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query) || HasSubquery(q)) {
 		return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 	}
 	if selector, ok := tx.ReadTransaction.(interface {

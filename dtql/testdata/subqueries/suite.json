@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "schema": "schema.json",
+  "dataset": "dataset.json",
+  "cases": [
+    {"name": "legacy-flat-json", "input": "legacy-flat.dtql.json", "rows": "legacy-flat.rows.json"},
+    {"name": "legacy-join-hints", "input": "legacy-join-hints.dtql.yaml", "rows": "legacy-join-hints.rows.json"},
+    {"name": "scalar-zero-null-one", "input": "scalar-values.dtql.yaml", "rows": "scalar-values.rows.json"},
+    {"name": "scalar-many-rows", "input": "scalar-many-rows.dtql.yaml", "error": "scalar-many-rows.error.json"},
+    {"name": "scalar-many-columns", "input": "scalar-many-columns.dtql.yaml", "error": "scalar-many-columns.error.json"},
+    {"name": "derived-from-and-join", "input": "derived-from-join.dtql.yaml", "rows": "derived-from-join.rows.json"},
+    {"name": "inner-order-and-limit", "input": "pipeline-order-limit.dtql.yaml", "rows": "pipeline-order-limit.rows.json"},
+    {"name": "inner-order-offset-and-limit", "input": "pipeline-order-offset.dtql.yaml", "rows": "pipeline-order-offset.rows.json"},
+    {"name": "in-not-in-null-table", "expectation": "membership-null-table.expect.json"},
+    {"name": "in-correlated", "input": "membership-in.dtql.yaml", "rows": "membership-in.rows.json"},
+    {"name": "not-in-correlated", "input": "membership-not-in.dtql.yaml", "rows": "membership-not-in.rows.json"},
+    {"name": "exists-short-circuit", "input": "exists-short-circuit.dtql.yaml", "rows": "exists-short-circuit.rows.json", "expectation": "exists-short-circuit.expect.json"},
+    {"name": "not-exists-correlated", "input": "not-exists.dtql.yaml", "rows": "not-exists.rows.json"},
+    {"name": "scope-shadowing", "input": "scope-shadowing.dtql.yaml", "rows": "scope-shadowing.rows.json"},
+    {"name": "scope-multi-level-correlation", "input": "scope-multilevel.dtql.yaml", "rows": "scope-multilevel.rows.json"},
+    {"name": "scope-ambiguous", "input": "scope-ambiguous.dtql.yaml", "error": "scope-ambiguous.error.json"},
+    {"name": "scope-forward-join", "input": "scope-forward-join.dtql.yaml", "error": "scope-forward-join.error.json"},
+    {"name": "scope-unknown-qualifier", "input": "scope-unknown-qualifier.dtql.yaml", "error": "scope-unknown-qualifier.error.json"},
+    {"name": "customer-invoice-composition", "input": "customer-invoice-composition.dtql.yaml", "rows": "customer-invoice-composition.rows.json"}
+  ]
+}

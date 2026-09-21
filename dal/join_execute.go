@@ -26,6 +26,7 @@ type joinRow struct {
 	key     *record.Key
 	base    string
 	sources map[string]map[string]any
+	outer   *joinRow
 }
 
 type scannedJoinRow struct {
@@ -45,12 +46,40 @@ type joinExecution struct {
 	bytes      int
 	fetched    int
 	candidates int
+	outer      *joinRow
+	recursive  bool
+	budget     *recursiveBudget
+	memo       map[string][]memoizedQuery
 }
+
+type recursiveBudget struct {
+	fetched, output, candidates, bytes int
+	memo                               map[string][]memoizedQuery
+}
+
+type memoizedQuery struct {
+	query         StructuredQuery
+	records       []record.Record
+	candidateWork int
+}
+
+// queryTruth retains SQL's third truth value until a WHERE, ON, or HAVING
+// boundary decides that only TRUE retains a row.
+type queryTruth uint8
+
+const (
+	queryUnknown queryTruth = iota
+	queryFalse
+	queryTrue
+)
 
 type joinKeyReference struct{ field, path string }
 
 // executePlannedRecords is shared by DB and transaction entrypoints.
 func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, provider NativeJoinProvider) (RecordsReader, error) {
+	if q, ok := query.(StructuredQuery); ok && HasSubquery(q) {
+		return executeGenericRecursive(ctx, executor, q, nil)
+	}
 	if !hasJoin(query) {
 		return executeAggregationRecords(ctx, executor, query, capabilities)
 	}
@@ -65,25 +94,55 @@ func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Qu
 	return executeGenericJoin(ctx, executor, q)
 }
 
+// executeGenericRecursive materializes a recursive DTQL query through ordinary
+// QueryExecutor leaf reads. It deliberately has no native capability route:
+// adapters must opt into a complete recursive implementation in a later
+// capability contract.
+func executeGenericRecursive(ctx context.Context, executor QueryExecutor, q StructuredQuery, outer *joinRow) (RecordsReader, error) {
+	if _, err := PlanRecursiveQuery(q); err != nil {
+		return nil, err
+	}
+	return executeGenericRecursiveBudget(ctx, executor, q, outer, &recursiveBudget{})
+}
+
+func executeGenericRecursiveBudget(ctx context.Context, executor QueryExecutor, q StructuredQuery, outer *joinRow, budget *recursiveBudget) (RecordsReader, error) {
+	if budget.memo == nil {
+		budget.memo = map[string][]memoizedQuery{}
+	}
+	e := &joinExecution{ctx: ctx, q: q, executor: executor, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}, outer: outer, recursive: true, budget: budget, memo: budget.memo}
+	return e.execute()
+}
+
+// ExecuteRecursiveQuery evaluates a recursive DTQL query through executor's
+// ordinary leaf-read surface. Callers that enforce access policy should pass
+// their secured executor so every nested source is authorized independently.
+func ExecuteRecursiveQuery(ctx context.Context, executor QueryExecutor, q StructuredQuery) (RecordsReader, error) {
+	return executeGenericRecursive(ctx, executor, q, nil)
+}
+
 func executeGenericJoin(ctx context.Context, executor QueryExecutor, q StructuredQuery) (RecordsReader, error) {
 	e := &joinExecution{ctx: ctx, q: q, executor: executor, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}}
-	if q.StartFrom() != "" || q.StartAfter() != "" {
+	return e.execute()
+}
+
+func (e *joinExecution) execute() (RecordsReader, error) {
+	if e.q.StartFrom() != "" || e.q.StartAfter() != "" {
 		return nil, joinError("join_plan", "from", "generic JOIN does not support provider cursors")
 	}
-	e.collectKeyRefs(q.From(), "from")
-	if err := e.scanTree(q.From(), "from"); err != nil {
+	e.collectKeyRefs(e.q.From(), "from")
+	if err := e.scanTree(e.q.From(), "from"); err != nil {
 		return nil, err
 	}
 	if err := e.validateQueryFields(); err != nil {
 		return nil, err
 	}
-	rows, err := e.build(q.From(), "from", nil, nil)
+	rows, err := e.build(e.q.From(), "from", nil, nil)
 	if err != nil {
 		return nil, err
 	}
 	filtered := make([]joinRow, 0, len(rows))
 	for _, row := range rows {
-		ok, err := evalJoinCondition(q.Where(), row)
+		ok, err := e.conditionAt(e.q.Where(), row, "where")
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +150,7 @@ func executeGenericJoin(ctx context.Context, executor QueryExecutor, q Structure
 			filtered = append(filtered, row)
 		}
 	}
-	if HasAggregation(q) {
+	if HasAggregation(e.q) {
 		records := make([]record.Record, len(filtered))
 		for i, row := range filtered {
 			data := flattenJoinRow(row, e.aliases, true)
@@ -100,25 +159,34 @@ func executeGenericJoin(ctx context.Context, executor QueryExecutor, q Structure
 			}
 			records[i] = record.NewRecordWithData(row.key, data)
 		}
-		plan, err := PlanAggregation(q, QueryCapabilities{StableRowOrder: true})
+		plan, err := PlanAggregation(e.q, QueryCapabilities{StableRowOrder: true})
 		if err != nil {
 			return nil, err
 		}
-		return newLocalAggregationReader(ctx, q, NewRecordsReader(records), plan), nil
+		aggregated := newLocalAggregationReader(e.ctx, e.q, NewRecordsReader(records), plan)
+		materialized, err := ReadAllToRecords(e.ctx, aggregated)
+		if err != nil {
+			return nil, err
+		}
+		if materialized == nil {
+			materialized = []record.Record{}
+		}
+		return NewRecordsReader(materialized), nil
 	}
-	if len(q.OrderBy()) > 0 {
+	if len(e.q.OrderBy()) > 0 {
 		var orderErr error
 		sort.SliceStable(filtered, func(i, j int) bool {
 			if orderErr != nil {
 				return false
 			}
-			for _, order := range q.OrderBy() {
-				left, err := evalJoinExpression(order.Expression(), filtered[i])
+			for orderIndex, order := range e.q.OrderBy() {
+				path := fmt.Sprintf("orderBy[%d]", orderIndex)
+				left, err := e.expressionAt(order.Expression(), filtered[i], path)
 				if err != nil {
 					orderErr = err
 					return false
 				}
-				right, err := evalJoinExpression(order.Expression(), filtered[j])
+				right, err := e.expressionAt(order.Expression(), filtered[j], path)
 				if err != nil {
 					orderErr = err
 					return false
@@ -137,7 +205,7 @@ func executeGenericJoin(ctx context.Context, executor QueryExecutor, q Structure
 			return nil, orderErr
 		}
 	}
-	start := q.Offset()
+	start := e.q.Offset()
 	if start < 0 {
 		start = 0
 	}
@@ -145,17 +213,17 @@ func executeGenericJoin(ctx context.Context, executor QueryExecutor, q Structure
 		start = len(filtered)
 	}
 	end := len(filtered)
-	if q.Limit() > 0 && start+q.Limit() < end {
-		end = start + q.Limit()
+	if e.q.Limit() > 0 && start+e.q.Limit() < end {
+		end = start + e.q.Limit()
 	}
 	filtered = filtered[start:end]
 	results := make([]record.Record, len(filtered))
 	for i, row := range filtered {
 		var data map[string]any
-		if len(q.Columns()) == 0 {
+		if len(e.q.Columns()) == 0 {
 			data = flattenJoinRow(row, e.aliases, false)
 		} else {
-			data, err = projectJoinRow(q.Columns(), row, e.fields)
+			data, err = e.projection(e.q.Columns(), row)
 			if err != nil {
 				return nil, err
 			}
@@ -193,7 +261,42 @@ func (e *joinExecution) validateQueryFields() error {
 	check := func(field FieldRef, path string) error {
 		alias := field.Source()
 		if alias == "" {
-			alias = joinAlias(e.q.From().Base())
+			// Legacy JOIN parsing keeps its own no-schema rule. Recursive
+			// evaluation can bind an unqualified reference when every scanned
+			// source supplied field metadata, and can then report ambiguity.
+			if e.recursive {
+				matches := make([]string, 0, len(e.aliases))
+				metadataComplete := true
+				for _, candidate := range e.aliases {
+					names := e.fields[candidate]
+					if names == nil {
+						metadataComplete = false
+						continue
+					}
+					for _, name := range names {
+						if name == field.Name() {
+							matches = append(matches, candidate)
+							break
+						}
+					}
+				}
+				if len(matches) > 1 {
+					return queryError("scope", path, fmt.Sprintf("ambiguous unqualified field %s", field.Name()))
+				}
+				if len(matches) == 1 {
+					alias = matches[0]
+				} else if metadataComplete {
+					return queryError("shape", path, fmt.Sprintf("field %q is unavailable", field.Name()))
+				}
+			}
+			if alias == "" {
+				alias = joinAlias(e.q.From().Base())
+			}
+		}
+		for outer := e.outer; !knownAlias[alias] && outer != nil; outer = outer.outer {
+			if _, ok := outer.sources[alias]; ok {
+				return nil
+			}
 		}
 		if !knownAlias[alias] {
 			return joinError("join_scope", path+".source", fmt.Sprintf("unknown alias %q", alias))
@@ -277,9 +380,16 @@ func (e *joinExecution) validateQueryFields() error {
 		if name == "" {
 			field, ok := column.Expression.(FieldRef)
 			if !ok {
-				return joinError("join_shape", path+".as", "non-field JOIN column requires alias")
+				if query, ok := column.Expression.(QueryExpression); ok && query.As() != "" {
+					name = query.As()
+				} else if _, aggregate := column.Expression.(AggregateFunc); aggregate {
+					name = aggregationColumnName(column)
+				} else {
+					return joinError("join_shape", path+".as", "non-field JOIN column requires alias")
+				}
+			} else {
+				name = field.Name()
 			}
-			name = field.Name()
 		}
 		if outputNames[name] {
 			return joinError("join_field", path, "duplicate output name "+name)
@@ -314,6 +424,16 @@ func (e *joinExecution) chargeOutput(data map[string]any) error {
 		return joinError("join_plan", "columns", fmt.Sprintf("output is not JSON serializable: %v", err))
 	}
 	e.bytes += 128 + len(encoded)
+	if e.budget != nil {
+		e.budget.output++
+		e.budget.bytes += 128 + len(encoded)
+		if e.budget.output > maxJoinRows {
+			return queryError("query_limit", "columns", "result_rows")
+		}
+		if e.budget.bytes > maxJoinBytes {
+			return queryError("query_limit", "columns", "retained_bytes")
+		}
+	}
 	if e.bytes > maxJoinBytes {
 		return joinError("join_plan", "columns", "joined byte bound exceeded")
 	}
@@ -345,8 +465,23 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 			e.fields[alias] = append(make([]string, 0, len(fields)), fields...)
 		}
 	}
-	query := From(node.Base()).NewQuery().SelectIntoRecord(nil)
-	reader, err := e.executor.ExecuteQueryToRecordsReader(e.ctx, query)
+	var reader RecordsReader
+	var err error
+	if source, ok := asQuerySource(node.Base()); ok {
+		if source.Query() == nil {
+			return joinError("query_shape", path+".query", "query is required")
+		}
+		// A derived source on a JOIN edge is evaluated by applyJoin with that
+		// edge's left row as its lexical outer scope. Scanning it here would
+		// discard the correlation before a left row exists.
+		if e.recursive && strings.Contains(path, ".joins[") {
+			return nil
+		}
+		reader, err = executeGenericRecursiveBudget(e.ctx, e.executor, source.Query(), e.outer, e.budget)
+	} else {
+		query := From(node.Base()).NewQuery().SelectIntoRecord(nil)
+		reader, err = e.executor.ExecuteQueryToRecordsReader(e.ctx, query)
+	}
 	if err != nil {
 		return joinError("join_plan", path, fmt.Sprintf("cannot scan %s: %v", alias, err))
 	}
@@ -381,6 +516,16 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		encoded, _ := json.Marshal(data) // normalizedJoinRecordMap produced JSON data.
 		e.bytes += 128 + len(encoded)
 		e.fetched++
+		if e.budget != nil {
+			e.budget.fetched++
+			e.budget.bytes += 128 + len(encoded)
+			if e.budget.fetched > maxJoinRows {
+				return queryError("query_limit", path, "fetched_rows")
+			}
+			if e.budget.bytes > maxJoinBytes {
+				return queryError("query_limit", path, "retained_bytes")
+			}
+		}
 		if e.fetched > maxJoinRows || e.bytes > maxJoinBytes {
 			return joinError("join_plan", path, "relation scan exceeds row or byte bound")
 		}
@@ -398,12 +543,18 @@ func (e *joinExecution) collectKeyRefs(node FromSource, path string) {
 	for i, join := range node.Joins() {
 		joinPath := fmt.Sprintf("%s.joins[%d]", path, i)
 		for j, condition := range join.On() {
-			cmp := condition.(Comparison)
+			cmp, ok := condition.(Comparison)
+			if !ok {
+				continue
+			}
 			for _, operand := range []struct {
 				side       string
 				expression Expression
 			}{{"left", cmp.Left}, {"right", cmp.Right}} {
-				field := operand.expression.(FieldRef)
+				field, ok := operand.expression.(FieldRef)
+				if !ok {
+					continue
+				}
 				e.keyRefs[field.Source()] = append(e.keyRefs[field.Source()], joinKeyReference{field.Name(), fmt.Sprintf("%s.on[%d].%s", joinPath, j, operand.side)})
 			}
 		}
@@ -531,7 +682,7 @@ func (e *joinExecution) build(node FromSource, path string, outer []joinRow, can
 			if base == "" {
 				base = alias
 			}
-			rows = append(rows, joinRow{key: key, base: base, sources: values})
+			rows = append(rows, joinRow{key: key, base: base, sources: values, outer: e.outer})
 			if len(rows) > maxJoinRows {
 				return nil, joinError("join_plan", path, "joined row bound exceeded")
 			}
@@ -554,9 +705,26 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 	var out []joinRow
 	for _, parent := range left {
 		candidates := e.scans[alias]
+		if source, ok := asQuerySource(child.Base()); ok && e.recursive {
+			records, err := e.queryRecordsAt(source.Query(), &parent, path+".from.query")
+			if err != nil {
+				return nil, err
+			}
+			candidates = make([]scannedJoinRow, 0, len(records))
+			for _, rec := range records {
+				data, err := normalizedJoinRecordMap(rec)
+				if err != nil {
+					return nil, err
+				}
+				candidates = append(candidates, scannedJoinRow{key: rec.Key(), data: data})
+			}
+		}
 		// A selected nested loop deliberately probes every right base row.
 		// A selected hash narrows the scan on a direct cross-side equality.
 		right, other, hashApplicable := directJoinHashKey(join, alias, parent)
+		if _, derived := asQuerySource(child.Base()); derived && e.recursive {
+			hashApplicable = false
+		}
 		if selectGenericJoinAlgorithm(join.Algorithms(), hashApplicable) == genericJoinHash {
 			// Every referenced key was validated on its raw fetched row.
 			key, _ := joinValueKey(fieldInJoinRow(parent, other), path+".on")
@@ -589,16 +757,22 @@ func (e *joinExecution) applyJoin(left []joinRow, join JoinedSource, path string
 		matched := false
 		for _, candidate := range rightRows {
 			e.candidates++
+			if e.budget != nil {
+				e.budget.candidates++
+				if e.budget.candidates > maxJoinRows*10 {
+					return nil, queryError("query_limit", path, "candidate_evaluations")
+				}
+			}
 			if e.candidates > maxJoinRows*10 {
 				return nil, joinError("join_plan", path, "candidate evaluation bound exceeded")
 			}
 			valid := true
-			for _, condition := range join.On() {
-				cmp := condition.(Comparison)
-				l, r := cmp.Left.(FieldRef), cmp.Right.(FieldRef)
-				lk, _ := joinValueKey(fieldInJoinRow(candidate, l), path+".on.left")
-				rk, _ := joinValueKey(fieldInJoinRow(candidate, r), path+".on.right")
-				if lk == "" || rk == "" || lk != rk {
+			for onIndex, condition := range join.On() {
+				ok, err := e.conditionAt(condition, candidate, fmt.Sprintf("%s.on[%d]", path, onIndex))
+				if err != nil {
+					return nil, err
+				}
+				if !ok {
 					valid = false
 					break
 				}
@@ -653,8 +827,15 @@ func selectGenericJoinAlgorithm(preferences []JoinAlgorithm, hashApplicable bool
 
 func directJoinHashKey(join JoinedSource, alias string, parent joinRow) (right, other FieldRef, applicable bool) {
 	for _, condition := range join.On() {
-		cmp := condition.(Comparison) // ValidateJoinTree checked the ON shape.
-		left, rightOperand := cmp.Left.(FieldRef), cmp.Right.(FieldRef)
+		cmp, ok := condition.(Comparison)
+		if !ok {
+			continue
+		}
+		left, leftOK := cmp.Left.(FieldRef)
+		rightOperand, rightOK := cmp.Right.(FieldRef)
+		if !leftOK || !rightOK {
+			continue
+		}
 		if _, ok := parent.sources[rightOperand.Source()]; left.Source() == alias && ok {
 			return left, rightOperand, true
 		}
@@ -825,6 +1006,553 @@ func evalJoinCondition(condition Condition, row joinRow) (bool, error) {
 	default:
 		return false, joinError("join_plan", "where", fmt.Sprintf("unsupported condition %T", condition))
 	}
+}
+
+func (e *joinExecution) field(row joinRow, field FieldRef) any {
+	alias := field.Source()
+	if alias == "" && e.recursive {
+		matches := make([]string, 0, len(e.aliases))
+		for _, candidate := range e.aliases {
+			for _, name := range e.fields[candidate] {
+				if name == field.Name() {
+					matches = append(matches, candidate)
+					break
+				}
+			}
+		}
+		if len(matches) == 1 {
+			alias = matches[0]
+		}
+	}
+	if alias == "" {
+		alias = row.base
+	}
+	if data, ok := row.sources[alias]; ok {
+		value, _ := lookupAggregationField(data, field.Name())
+		return value
+	}
+	for outer := e.outer; outer != nil; outer = outer.outer {
+		if data, ok := outer.sources[alias]; ok {
+			value, _ := lookupAggregationField(data, field.Name())
+			return value
+		}
+	}
+	return nil
+}
+
+func (e *joinExecution) expression(expr Expression, row joinRow) (any, error) {
+	return e.expressionAt(expr, row, "expression")
+}
+
+func (e *joinExecution) expressionAt(expr Expression, row joinRow, path string) (any, error) {
+	if !e.recursive {
+		return evalJoinExpression(expr, row)
+	}
+	return e.evalExpressionAt(expr, row, path)
+}
+
+func (e *joinExecution) condition(condition Condition, row joinRow) (bool, error) {
+	return e.conditionAt(condition, row, "where")
+}
+
+func (e *joinExecution) conditionAt(condition Condition, row joinRow, path string) (bool, error) {
+	if !e.recursive {
+		return evalJoinCondition(condition, row)
+	}
+	return e.evalConditionAt(condition, row, path)
+}
+
+func (e *joinExecution) projection(columns []Column, row joinRow) (map[string]any, error) {
+	if !e.recursive {
+		return projectJoinRow(columns, row, e.fields)
+	}
+	return e.project(columns, row)
+}
+
+func (e *joinExecution) evalExpression(expr Expression, row joinRow) (any, error) {
+	return e.evalExpressionAt(expr, row, "expression")
+}
+
+func (e *joinExecution) evalExpressionAt(expr Expression, row joinRow, path string) (any, error) {
+	switch value := expr.(type) {
+	case FieldRef:
+		return e.field(row, value), nil
+	case QueryExpression:
+		records, err := e.queryRecordsCappedAt(value.Query(), &row, 2, true, path+".query")
+		if err != nil {
+			return nil, err
+		}
+		if len(records) == 0 {
+			return nil, nil
+		}
+		if len(records) > 1 {
+			return nil, queryError("cardinality", path+".query", "scalar query returned more than one row")
+		}
+		data, ok := records[0].Data().(map[string]any)
+		if !ok {
+			return nil, queryError("shape", path+".query", "scalar query returned non-object row")
+		}
+		if len(data) != 1 {
+			return nil, queryError("shape", path+".query.columns", "scalar query requires exactly one column")
+		}
+		for _, result := range data {
+			return result, nil
+		}
+	case BinaryExpression:
+		left, err := e.evalExpressionAt(value.Left, row, path+".left")
+		if err != nil {
+			return nil, err
+		}
+		right, err := e.evalExpressionAt(value.Right, row, path+".right")
+		if err != nil {
+			return nil, err
+		}
+		return evalArithmeticValues(value.Operator, left, right)
+	case Constant:
+		return value.Value, nil
+	case Array:
+		return value.Value, nil
+	}
+	return nil, queryError("query_shape", "expression", fmt.Sprintf("unsupported expression %T", expr))
+}
+
+func (e *joinExecution) queryRecords(query StructuredQuery, outer *joinRow) ([]record.Record, error) {
+	return e.queryRecordsCapped(query, outer, 0, true)
+}
+
+func (e *joinExecution) queryRecordsAt(query StructuredQuery, outer *joinRow, path string) ([]record.Record, error) {
+	return e.queryRecordsCappedAt(query, outer, 0, true, path)
+}
+
+func (e *joinExecution) queryRecordsCapped(query StructuredQuery, outer *joinRow, cap int, project bool) ([]record.Record, error) {
+	return e.queryRecordsCappedAt(query, outer, cap, project, "query")
+}
+
+func (e *joinExecution) queryRecordsCappedAt(query StructuredQuery, outer *joinRow, cap int, project bool, path string) ([]record.Record, error) {
+	if query == nil {
+		return nil, queryError("query_shape", path, "query is required")
+	}
+	key := fmt.Sprintf("%s\x00%d\x00%t", query.String(), cap, project)
+	if !queryHasOuterReference(query) {
+		for _, cached := range e.memo[key] {
+			if reflect.DeepEqual(cached.query, query) {
+				if e.budget != nil {
+					work := cached.candidateWork
+					if work == 0 {
+						work = 1
+					}
+					e.budget.candidates += work
+					if e.budget.candidates > maxJoinRows*10 {
+						return nil, queryError("query_limit", path, "candidate_evaluations")
+					}
+				}
+				return cached.records, nil
+			}
+		}
+	}
+	if cap > 0 && simpleRecursiveQuery(query) {
+		before := e.budget.candidates
+		records, err := e.executeSimpleCapped(query, outer, cap, project)
+		if err == nil && !queryHasOuterReference(query) {
+			e.memo[key] = append(e.memo[key], memoizedQuery{query: query, records: records, candidateWork: e.budget.candidates - before})
+		}
+		return records, nestedLimitError(err, path)
+	}
+	before := e.budget.candidates
+	reader, err := executeGenericRecursiveBudget(e.ctx, e.executor, query, outer, e.budget)
+	if err != nil {
+		return nil, nestedLimitError(err, path)
+	}
+	records, err := ReadAllToRecords(e.ctx, reader)
+	if err != nil {
+		return nil, nestedLimitError(err, path)
+	}
+	if !queryHasOuterReference(query) {
+		e.memo[key] = append(e.memo[key], memoizedQuery{query: query, records: records, candidateWork: e.budget.candidates - before})
+	}
+	return records, nil
+}
+
+func nestedLimitError(err error, path string) error {
+	var diagnostic *QueryValidationError
+	if path == "query" || !errors.As(err, &diagnostic) || diagnostic.Category != "query_limit" {
+		return err
+	}
+	relative := strings.TrimPrefix(diagnostic.Path, "query.")
+	if relative == "query" || relative == "" {
+		return queryError(diagnostic.Category, path, diagnostic.Message)
+	}
+	return queryError(diagnostic.Category, path+"."+relative, diagnostic.Message)
+}
+
+func simpleRecursiveQuery(q StructuredQuery) bool {
+	if q.From() == nil || q.From().Base() == nil || q.StartFrom() != "" || q.StartAfter() != "" {
+		return false
+	}
+	switch q.From().Base().(type) {
+	case QuerySource, *QuerySource:
+		return false
+	}
+	return len(q.From().Joins()) == 0 && len(q.GroupBy()) == 0 && q.Having() == nil && len(q.OrderBy()) == 0 && q.Offset() == 0 && !HasAggregation(q)
+}
+
+func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, cap int, project bool) (records []record.Record, resultErr error) {
+	if limit := q.Limit(); limit > 0 && limit < cap {
+		cap = limit
+	}
+	reader, err := e.executor.ExecuteQueryToRecordsReader(e.ctx, From(q.From().Base()).NewQuery().SelectIntoRecord(nil))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := reader.Close(); resultErr == nil && closeErr != nil {
+			resultErr = closeErr
+		}
+	}()
+	child := &joinExecution{ctx: e.ctx, q: q, executor: e.executor, outer: outer, recursive: true, budget: e.budget, aliases: []string{joinAlias(q.From().Base())}, memo: e.memo}
+	for len(records) < cap {
+		if err := e.ctx.Err(); err != nil {
+			return nil, err
+		}
+		rec, err := reader.Next()
+		if errors.Is(err, ErrNoMoreRecords) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		data, err := normalizedJoinRecordMap(rec)
+		if err != nil {
+			return nil, err
+		}
+		if child.budget != nil {
+			encoded, _ := json.Marshal(data)
+			child.budget.fetched++
+			child.budget.bytes += 128 + len(encoded)
+			if child.budget.fetched > maxJoinRows {
+				return nil, queryError("query_limit", "query.from", "fetched_rows")
+			}
+			if child.budget.bytes > maxJoinBytes {
+				return nil, queryError("query_limit", "query.from", "retained_bytes")
+			}
+		}
+		row := joinRow{key: rec.Key(), base: child.aliases[0], sources: map[string]map[string]any{child.aliases[0]: data}, outer: outer}
+		ok, err := child.evalConditionAt(q.Where(), row, "where")
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		output := data
+		if project && len(q.Columns()) > 0 {
+			output, err = child.project(q.Columns(), row)
+			if err != nil {
+				return nil, err
+			}
+		}
+		records = append(records, record.NewRecordWithData(rec.Key(), output))
+		if child.budget != nil {
+			if err := child.chargeOutput(output); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return records, nil
+}
+
+func (e *joinExecution) evalCondition(condition Condition, row joinRow) (bool, error) {
+	return e.evalConditionAt(condition, row, "where")
+}
+
+func (e *joinExecution) evalConditionAt(condition Condition, row joinRow, path string) (bool, error) {
+	truth, err := e.evalTruthAt(condition, row, path)
+	return truth == queryTrue, err
+}
+
+func (e *joinExecution) evalTruth(condition Condition, row joinRow) (queryTruth, error) {
+	return e.evalTruthAt(condition, row, "where")
+}
+
+func (e *joinExecution) evalTruthAt(condition Condition, row joinRow, path string) (queryTruth, error) {
+	if condition == nil {
+		return queryTrue, nil
+	}
+	switch value := condition.(type) {
+	case ExistsCondition:
+		records, err := e.queryRecordsCappedAt(value.Query(), &row, 1, false, path+".query")
+		if err != nil {
+			return queryUnknown, err
+		}
+		present := queryFalse
+		if len(records) > 0 {
+			present = queryTrue
+		}
+		if value.Negated() {
+			if present == queryTrue {
+				present = queryFalse
+			} else {
+				present = queryTrue
+			}
+		}
+		return present, nil
+	case GroupCondition:
+		if value.Operator() == Or {
+			unknown := false
+			for i, child := range value.Conditions() {
+				truth, err := e.evalTruthAt(child, row, fmt.Sprintf("%s.conditions[%d]", path, i))
+				if err != nil || truth == queryTrue {
+					return truth, err
+				}
+				if truth == queryUnknown {
+					unknown = true
+				}
+			}
+			if unknown {
+				return queryUnknown, nil
+			}
+			return queryFalse, nil
+		}
+		unknown := false
+		for i, child := range value.Conditions() {
+			truth, err := e.evalTruthAt(child, row, fmt.Sprintf("%s.conditions[%d]", path, i))
+			if err != nil || truth == queryFalse {
+				return truth, err
+			}
+			if truth == queryUnknown {
+				unknown = true
+			}
+		}
+		if unknown {
+			return queryUnknown, nil
+		}
+		return queryTrue, nil
+	case Comparison:
+		left, err := e.evalExpressionAt(value.Left, row, path+".left")
+		if err != nil {
+			return queryUnknown, err
+		}
+		if value.Operator == In || value.Operator == NotIn {
+			var values []any
+			if subquery, ok := value.Right.(QueryExpression); ok {
+				records, err := e.queryRecordsAt(subquery.Query(), &row, path+".right.query")
+				if err != nil {
+					return queryUnknown, err
+				}
+				for _, rec := range records {
+					data, _ := rec.Data().(map[string]any)
+					if len(data) != 1 {
+						return queryUnknown, queryError("query_shape", path+".right.query", "membership query must return exactly one column")
+					}
+					for _, item := range data {
+						values = append(values, item)
+					}
+				}
+			} else {
+				right, err := e.evalExpressionAt(value.Right, row, path+".right")
+				if err != nil {
+					return queryUnknown, err
+				}
+				rv := reflect.ValueOf(right)
+				if !rv.IsValid() || (rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array) {
+					return queryUnknown, queryError("query_shape", path+".right", "IN requires an array or query")
+				}
+				for i := 0; i < rv.Len(); i++ {
+					values = append(values, rv.Index(i).Interface())
+				}
+			}
+			matched, hasNull := false, false
+			for _, item := range values {
+				if item == nil {
+					hasNull = true
+				}
+				if left != nil && item != nil && valuesEqual(left, item) {
+					matched = true
+				}
+			}
+			truth := queryFalse
+			if len(values) == 0 {
+				truth = queryFalse
+			} else if matched {
+				truth = queryTrue
+			} else if left == nil || hasNull {
+				truth = queryUnknown
+			}
+			if value.Operator == NotIn {
+				switch truth {
+				case queryTrue:
+					truth = queryFalse
+				case queryFalse:
+					truth = queryTrue
+				}
+			}
+			return truth, nil
+		}
+		right, err := e.evalExpressionAt(value.Right, row, path+".right")
+		if err != nil {
+			return queryUnknown, err
+		}
+		if left == nil || right == nil {
+			return queryUnknown, nil
+		}
+		cmp := compareAggregationValues(left, right)
+		switch value.Operator {
+		case Equal:
+			if valuesEqual(left, right) {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
+		case GreaterThen:
+			if cmp > 0 {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
+		case GreaterOrEqual:
+			if cmp >= 0 {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
+		case LessThen:
+			if cmp < 0 {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
+		case LessOrEqual:
+			if cmp <= 0 {
+				return queryTrue, nil
+			}
+			return queryFalse, nil
+		}
+	}
+	return queryUnknown, queryError("query_shape", "where", fmt.Sprintf("unsupported condition %T", condition))
+}
+
+func (e *joinExecution) project(columns []Column, row joinRow) (map[string]any, error) {
+	result := map[string]any{}
+	for i, column := range columns {
+		if column.Wildcard != nil {
+			for name, value := range row.sources[column.Wildcard.Source] {
+				if !column.Wildcard.Excludes(name) {
+					result[name] = value
+				}
+			}
+			continue
+		}
+		name := column.Alias
+		if name == "" {
+			if field, ok := column.Expression.(FieldRef); ok {
+				name = field.Name()
+			} else if query, ok := column.Expression.(QueryExpression); ok && query.As() != "" {
+				name = query.As()
+			} else {
+				name = fmt.Sprintf("column_%d", i)
+			}
+		}
+		value, err := e.evalExpressionAt(column.Expression, row, fmt.Sprintf("columns[%d]", i))
+		if err != nil {
+			return nil, err
+		}
+		result[name] = value
+	}
+	return result, nil
+}
+
+func queryError(category, path, message string) error {
+	return &QueryValidationError{Category: category, Path: path, Message: message}
+}
+
+// queryHasOuterReference finds free lexical bindings across the whole subtree.
+// A nested query may capture this query's aliases without making this query
+// dependent on its own caller.
+func queryHasOuterReference(q StructuredQuery) bool {
+	return len(queryFreeReferences(q, map[uintptr]bool{})) != 0
+}
+
+func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[string]bool {
+	free := map[string]bool{}
+	if q == nil {
+		free[""] = true
+		return free
+	}
+	if id := queryPointerID(q); id != 0 {
+		if visiting[id] {
+			free[""] = true
+			return free
+		}
+		visiting[id] = true
+		defer delete(visiting, id)
+	}
+	mergeChild := func(child StructuredQuery, visible map[string]bool) {
+		for alias := range queryFreeReferences(child, visiting) {
+			if !visible[alias] {
+				free[alias] = true
+			}
+		}
+	}
+	var expression func(Expression, map[string]bool)
+	expression = func(expr Expression, visible map[string]bool) {
+		switch value := expr.(type) {
+		case FieldRef:
+			if value.Source() == "" || !visible[value.Source()] {
+				free[value.Source()] = true
+			}
+		case BinaryExpression:
+			expression(value.Left, visible)
+			expression(value.Right, visible)
+		case QueryExpression:
+			mergeChild(value.Query(), visible)
+		case AggregateFunc:
+			for _, arg := range value.FuncArgs() {
+				expression(arg, visible)
+			}
+		}
+	}
+	var condition func(Condition, map[string]bool)
+	condition = func(value Condition, visible map[string]bool) {
+		switch item := value.(type) {
+		case ExistsCondition:
+			mergeChild(item.Query(), visible)
+		case Comparison:
+			expression(item.Left, visible)
+			expression(item.Right, visible)
+		case GroupCondition:
+			for _, child := range item.Conditions() {
+				condition(child, visible)
+			}
+		}
+	}
+	var inspectFrom func(FromSource, map[string]bool) map[string]bool
+	inspectFrom = func(from FromSource, visible map[string]bool) map[string]bool {
+		if from == nil || from.Base() == nil {
+			return visible
+		}
+		if source, ok := asQuerySource(from.Base()); ok {
+			mergeChild(source.Query(), visible)
+		}
+		visible = cloneQueryAliases(visible)
+		visible[joinAlias(from.Base())] = true
+		for _, join := range from.Joins() {
+			childVisible := inspectFrom(joinedFrom(join), visible)
+			for _, on := range join.On() {
+				condition(on, childVisible)
+			}
+			visible = childVisible
+		}
+		return visible
+	}
+	local := inspectFrom(q.From(), map[string]bool{})
+	condition(q.Where(), local)
+	condition(q.Having(), local)
+	for _, column := range q.Columns() {
+		expression(column.Expression, local)
+	}
+	for _, value := range q.GroupBy() {
+		expression(value, local)
+	}
+	for _, value := range q.OrderBy() {
+		expression(value.Expression(), local)
+	}
+	return free
 }
 
 func projectJoinRow(columns []Column, row joinRow, fields map[string][]string) (map[string]any, error) {

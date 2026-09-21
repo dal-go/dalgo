@@ -1,0 +1,4 @@
+[
+  {"CustomerId": 1, "TotalSpent": 100, "InvoiceCount": 2},
+  {"CustomerId": 2, "TotalSpent": 200, "InvoiceCount": 1}
+]

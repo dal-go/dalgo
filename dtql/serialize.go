@@ -56,8 +56,10 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 	if err := dal.ValidateJoinTree(from); err != nil {
 		return document{}, err
 	}
-	if err := validateJoinClauseFields(q); err != nil {
-		return document{}, err
+	if len(from.Joins()) > 0 && !dal.HasSubquery(q) {
+		if err := validateJoinClauseFields(q); err != nil {
+			return document{}, err
+		}
 	}
 	if err := dal.ValidateAggregation(q); err != nil {
 		return document{}, fmt.Errorf("invalid aggregation: %w", err)
@@ -134,8 +136,46 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 
 func fromToYAML(from dal.FromSource) (fromYAML, error) {
 	base, ok := from.Base().(dal.CollectionRef)
+	if source, isQuery := derivedQuerySource(from.Base()); isQuery {
+		if source.Query() == nil {
+			return fromYAML{}, fmt.Errorf("query_shape at source.query: query is required")
+		}
+		query, err := queryToDocument(source.Query())
+		if err != nil {
+			return fromYAML{}, fmt.Errorf("query source %q: %w", source.Alias(), err)
+		}
+		query.As = source.Alias()
+		if query.As == "" {
+			return fromYAML{}, fmt.Errorf("query_shape at source.query.as: as is required")
+		}
+		result := fromYAML{Query: &query}
+		for i, join := range from.Joins() {
+			child := join.From()
+			if child == nil {
+				child = dal.From(join.RecordsetSource)
+			}
+			childDoc, err := fromToYAML(child)
+			if err != nil {
+				return fromYAML{}, fmt.Errorf("from.joins[%d].from: %w", i, err)
+			}
+			on := make([]condYAML, 0, len(join.On()))
+			for _, condition := range join.On() {
+				encoded, err := condToYAML(condition)
+				if err != nil {
+					return fromYAML{}, err
+				}
+				on = append(on, *encoded)
+			}
+			joinDoc := joinYAML{From: &childDoc, On: on, Hints: algorithmsToYAML(join.Algorithms())}
+			if join.JoinType() == dal.JoinLeft {
+				joinDoc.Type = "left"
+			}
+			result.Joins = append(result.Joins, joinDoc)
+		}
+		return result, nil
+	}
 	if !ok {
-		return fromYAML{}, fmt.Errorf("unsupported From source %T (only root collection references are supported)", from.Base())
+		return fromYAML{}, fmt.Errorf("unsupported From source %T", from.Base())
 	}
 	if base.Parent() != nil {
 		return fromYAML{}, fmt.Errorf("parented collection reference %q is not supported by DTQL (only root collections)", base.Path())
@@ -165,6 +205,20 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 		result.Joins = append(result.Joins, joinDoc)
 	}
 	return result, nil
+}
+
+func derivedQuerySource(source dal.RecordsetSource) (dal.QuerySource, bool) {
+	switch value := source.(type) {
+	case dal.QuerySource:
+		return value, true
+	case *dal.QuerySource:
+		if value == nil {
+			return dal.QuerySource{}, true
+		}
+		return *value, true
+	default:
+		return dal.QuerySource{}, false
+	}
 }
 
 func exprToYAML(expr dal.Expression) (exprYAML, error) {
@@ -210,6 +264,16 @@ func exprToYAML(expr dal.Expression) (exprYAML, error) {
 			return exprYAML{}, fmt.Errorf("binary right: %w", err)
 		}
 		return exprYAML{Binary: &binaryYAML{Op: string(e.Operator), Left: &left, Right: &right}}, nil
+	case dal.QueryExpression:
+		if e.Query() == nil {
+			return exprYAML{}, fmt.Errorf("query_shape at query: query is required")
+		}
+		query, err := queryToDocument(e.Query())
+		if err != nil {
+			return exprYAML{}, fmt.Errorf("query: %w", err)
+		}
+		query.As = e.As()
+		return exprYAML{Query: &query}, nil
 	default:
 		return exprYAML{}, fmt.Errorf("unsupported expression %T", expr)
 	}
@@ -261,6 +325,18 @@ func condToYAML(cond dal.Condition) (*condYAML, error) {
 		return comparisonToYAML(c)
 	case dal.GroupCondition:
 		return groupToYAML(c)
+	case dal.ExistsCondition:
+		if c.Query() == nil {
+			return nil, fmt.Errorf("query_shape at query: query is required")
+		}
+		query, err := queryToDocument(c.Query())
+		if err != nil {
+			return nil, fmt.Errorf("query: %w", err)
+		}
+		if c.Negated() {
+			return &condYAML{NotExists: &existsYAML{Query: &query}}, nil
+		}
+		return &condYAML{Exists: &existsYAML{Query: &query}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported condition %T", cond)
 	}

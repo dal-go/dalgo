@@ -81,6 +81,9 @@ func (s securedReadSession) GetMulti(ctx context.Context, records []record.Recor
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
+	if structured, ok := query.(dal.StructuredQuery); ok && dal.HasSubquery(structured) {
+		return dal.ExecuteRecursiveQuery(ctx, s, structured)
+	}
 	query, requested, sets, err := s.authorizeQuery(ctx, query)
 	if err != nil {
 		return nil, err
@@ -103,6 +106,9 @@ func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, que
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
+	if structured, ok := query.(dal.StructuredQuery); ok && dal.HasSubquery(structured) {
+		return dal.ExecuteRecursiveRecordset(ctx, s, structured, options...)
+	}
 	query, requested, sets, err := s.authorizeQuery(ctx, query)
 	if err != nil {
 		return nil, err

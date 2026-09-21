@@ -1,0 +1,16 @@
+from:
+  name: Customer
+  alias: c
+  joins:
+    - from: {name: Ledger, alias: l}
+      on:
+        - left: {field: CustomerId, source: c}
+          op: '=='
+          right: {field: CustomerId, source: l}
+where:
+  exists:
+    query:
+      from: {name: Invoice, alias: i}
+      columns: [{field: InvoiceId, source: i}]
+limit: 1
+columns: [{field: CustomerId}]

@@ -7,6 +7,7 @@ import "github.com/dal-go/dalgo/dal"
 var inScopeComparisonOps = map[dal.Operator]bool{
 	dal.Equal:          true, // ==
 	dal.In:             true, // In
+	dal.NotIn:          true, // NotIn
 	dal.GreaterThen:    true, // >
 	dal.GreaterOrEqual: true, // >=
 	dal.LessThen:       true, // <

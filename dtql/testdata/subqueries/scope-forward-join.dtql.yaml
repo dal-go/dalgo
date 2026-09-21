@@ -1,0 +1,15 @@
+from:
+  name: Customer
+  alias: c
+  joins:
+    - from: {name: Ledger, alias: l}
+      on:
+        - left: {field: Country, source: ci}
+          op: '=='
+          right: {field: Flag, source: l}
+    - from: {name: CountryInfo, alias: ci}
+      on:
+        - left: {field: Country, source: c}
+          op: '=='
+          right: {field: Country, source: ci}
+limit: 1

@@ -31,13 +31,27 @@ func Deserialize(data []byte) (dal.StructuredQuery, error) {
 }
 
 func documentToQuery(doc document) (dal.StructuredQuery, error) {
-	if doc.From.Name == "" {
-		return nil, fmt.Errorf("invalid DTQL: from.name is required")
+	query, err := documentToQueryAt(doc, "")
+	if err != nil {
+		return nil, err
 	}
+	if dal.HasSubquery(query) {
+		if err := dal.ValidateQueryScope(query); err != nil {
+			return nil, fmt.Errorf("invalid DTQL: %w", err)
+		}
+	}
+	return query, nil
+}
+
+func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 	if doc.Limit < 0 || doc.Offset < 0 {
-		return nil, fmt.Errorf("invalid DTQL: limit and offset must be non-negative")
+		return nil, fmt.Errorf("invalid DTQL: query_shape at %slimit and offset must be non-negative", pathPrefix(path))
 	}
-	from, err := fromFromYAML(doc.From, "from")
+	fromPath := "from"
+	if path != "" {
+		fromPath = path + ".from"
+	}
+	from, err := fromFromYAML(doc.From, fromPath)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +61,7 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	qb := from.NewQuery()
 
 	if doc.Where != nil {
-		cond, err := condFromYAML(*doc.Where)
+		cond, err := condFromYAMLAt(*doc.Where, pathJoin(path, "where"))
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +70,7 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	if len(doc.GroupBy) > 0 {
 		groups := make([]dal.Expression, len(doc.GroupBy))
 		for i, encoded := range doc.GroupBy {
-			expr, err := exprFromYAML(encoded)
+			expr, err := exprFromYAMLAt(encoded, fmt.Sprintf("%s[%d]", pathJoin(path, "groupBy"), i))
 			if err != nil {
 				return nil, fmt.Errorf("invalid DTQL: groupBy #%d: %w", i, err)
 			}
@@ -65,14 +79,14 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 		qb.GroupBy(groups...)
 	}
 	if doc.Having != nil {
-		condition, err := condFromYAML(*doc.Having)
+		condition, err := condFromYAMLAt(*doc.Having, pathJoin(path, "having"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid DTQL: having: %w", err)
 		}
 		qb.Having(condition)
 	}
 
-	orderBy, err := orderFromYAML(doc.OrderBy)
+	orderBy, err := orderFromYAMLAt(doc.OrderBy, pathJoin(path, "orderBy"))
 	if err != nil {
 		return nil, err
 	}
@@ -82,14 +96,16 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	qb.Limit(doc.Limit)
 	qb.Offset(doc.Offset)
 
-	columns, err := columnsFromYAML(doc.Columns, doc.From)
+	columns, err := columnsFromYAMLAt(doc.Columns, doc.From, pathJoin(path, "columns"))
 	if err != nil {
 		return nil, err
 	}
 
 	base := reconstructedQuery{StructuredQuery: qb.SelectIntoRecordset(), columns: columns}
-	if err := validateJoinClauseFields(base); err != nil {
-		return nil, fmt.Errorf("invalid DTQL: %w", err)
+	if len(from.Joins()) > 0 && !dal.HasSubquery(base) {
+		if err := validateJoinClauseFields(base); err != nil {
+			return nil, fmt.Errorf("invalid DTQL: %w", err)
+		}
 	}
 	if err := dal.ValidateAggregation(base); err != nil {
 		return nil, fmt.Errorf("invalid DTQL: aggregation: %w", err)
@@ -98,11 +114,29 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 }
 
 func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
-	if encoded.Name == "" {
+	if encoded.Name == "" && encoded.Query == nil {
+		if path == "from" {
+			return nil, fmt.Errorf("invalid DTQL: from.name is required")
+		}
 		return nil, fmt.Errorf("invalid DTQL: join_shape at %s.name: name is required", path)
 	}
-	var source dal.CollectionRef
-	if encoded.Schema == nil {
+	if encoded.Name != "" && encoded.Query != nil {
+		return nil, fmt.Errorf("invalid DTQL: query_shape at %s: exactly one of name or query is required", path)
+	}
+	var source dal.RecordsetSource
+	if encoded.Query != nil {
+		if encoded.Schema != nil || encoded.Alias != "" {
+			return nil, fmt.Errorf("invalid DTQL: query_shape at %s: query source cannot set schema or alias", path)
+		}
+		if encoded.Query.As == "" {
+			return nil, fmt.Errorf("invalid DTQL: query_shape at %s.query.as: as is required", path)
+		}
+		query, err := documentToQueryAt(*encoded.Query, path+".query")
+		if err != nil {
+			return nil, err
+		}
+		source = dal.NewQuerySource(query, encoded.Query.As)
+	} else if encoded.Schema == nil {
 		source = dal.NewRootCollectionRef(encoded.Name, encoded.Alias)
 	} else {
 		if *encoded.Schema == "" {
@@ -159,6 +193,10 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 }
 
 func columnsFromYAML(cols []columnYAML, from fromYAML) ([]dal.Column, error) {
+	return columnsFromYAMLAt(cols, from, "columns")
+}
+
+func columnsFromYAMLAt(cols []columnYAML, from fromYAML, path string) ([]dal.Column, error) {
 	if len(cols) == 0 {
 		return nil, nil
 	}
@@ -177,7 +215,7 @@ func columnsFromYAML(cols []columnYAML, from fromYAML) ([]dal.Column, error) {
 			out = append(out, dal.AllColumnsExceptFrom(c.Wildcard.Source, c.Wildcard.Exclude...))
 			continue
 		}
-		expr, err := exprFromYAML(c.exprYAML)
+		expr, err := exprFromYAMLAt(c.exprYAML, fmt.Sprintf("%s[%d]", path, i))
 		if err != nil {
 			return nil, fmt.Errorf("invalid DTQL: column #%d: %w", i, err)
 		}
@@ -207,6 +245,9 @@ func expressionFieldsSet(e exprYAML) int {
 		set++
 	}
 	if e.Binary != nil {
+		set++
+	}
+	if e.Query != nil {
 		set++
 	}
 	return set
@@ -248,12 +289,16 @@ func fromHasAlias(from fromYAML, alias string) bool {
 }
 
 func orderFromYAML(orders []orderYAML) ([]dal.OrderExpression, error) {
+	return orderFromYAMLAt(orders, "orderBy")
+}
+
+func orderFromYAMLAt(orders []orderYAML, path string) ([]dal.OrderExpression, error) {
 	if len(orders) == 0 {
 		return nil, nil
 	}
 	out := make([]dal.OrderExpression, 0, len(orders))
 	for i, o := range orders {
-		expr, err := exprFromYAML(o.exprYAML)
+		expr, err := exprFromYAMLAt(o.exprYAML, fmt.Sprintf("%s[%d]", path, i))
 		if err != nil {
 			return nil, fmt.Errorf("invalid DTQL: orderBy #%d: %w", i, err)
 		}
@@ -267,6 +312,10 @@ func orderFromYAML(orders []orderYAML) ([]dal.OrderExpression, error) {
 }
 
 func exprFromYAML(e exprYAML) (dal.Expression, error) {
+	return exprFromYAMLAt(e, "expression")
+}
+
+func exprFromYAMLAt(e exprYAML, path string) (dal.Expression, error) {
 	if e.sourcePresent && e.Field == "" {
 		return nil, fmt.Errorf("source is valid only with field")
 	}
@@ -298,7 +347,7 @@ func exprFromYAML(e exprYAML) (dal.Expression, error) {
 		}
 		args := make([]dal.Expression, len(e.Aggregate.Args))
 		for i, encoded := range e.Aggregate.Args {
-			arg, err := exprFromYAML(encoded)
+			arg, err := exprFromYAMLAt(encoded, fmt.Sprintf("%s.aggregate.args[%d]", path, i))
 			if err != nil {
 				return nil, fmt.Errorf("aggregate argument #%d: %w", i, err)
 			}
@@ -310,15 +359,21 @@ func exprFromYAML(e exprYAML) (dal.Expression, error) {
 		if e.Binary.Left == nil || e.Binary.Right == nil {
 			return nil, fmt.Errorf("binary requires left and right")
 		}
-		left, err := exprFromYAML(*e.Binary.Left)
+		left, err := exprFromYAMLAt(*e.Binary.Left, path+".binary.left")
 		if err != nil {
 			return nil, fmt.Errorf("binary left: %w", err)
 		}
-		right, err := exprFromYAML(*e.Binary.Right)
+		right, err := exprFromYAMLAt(*e.Binary.Right, path+".binary.right")
 		if err != nil {
 			return nil, fmt.Errorf("binary right: %w", err)
 		}
 		return dal.Binary(left, dal.ArithmeticOperator(e.Binary.Op), right), nil
+	case e.Query != nil:
+		query, err := documentToQueryAt(*e.Query, path+".query")
+		if err != nil {
+			return nil, err
+		}
+		return dal.NewQueryExpression(query, e.Query.As), nil
 	default: // e.Values != nil
 		if !portableScalarArray(e.Values) {
 			return nil, fmt.Errorf("values must be an array of scalars")
@@ -328,9 +383,15 @@ func exprFromYAML(e exprYAML) (dal.Expression, error) {
 }
 
 func condFromYAML(c condYAML) (dal.Condition, error) {
+	return condFromYAMLAt(c, "condition")
+}
+
+func condFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	isComparison := c.Op != "" || c.Left != nil || c.Right != nil
 	hasAnd := c.And != nil
 	hasOr := c.Or != nil
+	hasExists := c.Exists != nil
+	hasNotExists := c.NotExists != nil
 
 	forms := 0
 	if isComparison {
@@ -342,6 +403,12 @@ func condFromYAML(c condYAML) (dal.Condition, error) {
 	if hasOr {
 		forms++
 	}
+	if hasExists {
+		forms++
+	}
+	if hasNotExists {
+		forms++
+	}
 	switch {
 	case forms == 0:
 		return nil, fmt.Errorf("invalid DTQL: condition must be a comparison (op/left/right) or a group (and/or)")
@@ -350,15 +417,38 @@ func condFromYAML(c condYAML) (dal.Condition, error) {
 	}
 
 	if isComparison {
-		return comparisonFromYAML(c)
+		return comparisonFromYAMLAt(c, path)
 	}
 	if hasAnd {
-		return groupFromYAML(dal.And, c.And)
+		return groupFromYAMLAt(dal.And, c.And, path+".and")
 	}
-	return groupFromYAML(dal.Or, c.Or)
+	if hasOr {
+		return groupFromYAMLAt(dal.Or, c.Or, path+".or")
+	}
+	if c.Exists != nil {
+		if c.Exists.Query == nil {
+			return nil, fmt.Errorf("invalid DTQL: query_shape at %s.exists.query: query is required", path)
+		}
+		query, err := documentToQueryAt(*c.Exists.Query, path+".exists.query")
+		if err != nil {
+			return nil, err
+		}
+		return dal.NewExistsCondition(query), nil
+	}
+	if c.NotExists.Query == nil {
+		return nil, fmt.Errorf("invalid DTQL: query_shape at %s.notExists.query: query is required", path)
+	}
+	query, err := documentToQueryAt(*c.NotExists.Query, path+".notExists.query")
+	if err != nil {
+		return nil, err
+	}
+	return dal.NewNotExistsCondition(query), nil
 }
 
 func comparisonFromYAML(c condYAML) (dal.Condition, error) {
+	return comparisonFromYAMLAt(c, "condition")
+}
+func comparisonFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	op := dal.Operator(c.Op)
 	if !inScopeComparisonOps[op] {
 		return nil, fmt.Errorf("invalid DTQL: unknown comparison operator %q", c.Op)
@@ -366,11 +456,11 @@ func comparisonFromYAML(c condYAML) (dal.Condition, error) {
 	if c.Left == nil || c.Right == nil {
 		return nil, fmt.Errorf("invalid DTQL: comparison requires both left and right")
 	}
-	left, err := exprFromYAML(*c.Left)
+	left, err := exprFromYAMLAt(*c.Left, path+".left")
 	if err != nil {
 		return nil, fmt.Errorf("invalid DTQL: comparison left: %w", err)
 	}
-	right, err := exprFromYAML(*c.Right)
+	right, err := exprFromYAMLAt(*c.Right, path+".right")
 	if err != nil {
 		return nil, fmt.Errorf("invalid DTQL: comparison right: %w", err)
 	}
@@ -378,16 +468,32 @@ func comparisonFromYAML(c condYAML) (dal.Condition, error) {
 }
 
 func groupFromYAML(op dal.Operator, subs []condYAML) (dal.Condition, error) {
+	return groupFromYAMLAt(op, subs, "condition")
+}
+func groupFromYAMLAt(op dal.Operator, subs []condYAML, path string) (dal.Condition, error) {
 	if len(subs) == 0 {
 		return nil, fmt.Errorf("invalid DTQL: %q group must have at least one condition", op)
 	}
 	conditions := make([]dal.Condition, 0, len(subs))
 	for i, sub := range subs {
-		cond, err := condFromYAML(sub)
+		cond, err := condFromYAMLAt(sub, fmt.Sprintf("%s[%d]", path, i))
 		if err != nil {
 			return nil, fmt.Errorf("group condition #%d: %w", i, err)
 		}
 		conditions = append(conditions, cond)
 	}
 	return dal.NewGroupCondition(op, conditions...), nil
+}
+
+func pathJoin(path, suffix string) string {
+	if path == "" {
+		return suffix
+	}
+	return path + "." + suffix
+}
+func pathPrefix(path string) string {
+	if path == "" {
+		return ""
+	}
+	return path + "."
 }

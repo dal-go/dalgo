@@ -1,0 +1,28 @@
+from:
+  query:
+    as: customers
+    from: {name: Customer, alias: c}
+    columns:
+      - {field: CustomerId, source: c}
+      - {field: FirstName, source: c}
+  joins:
+    - type: left
+      from:
+        query:
+          as: stats
+          from: {name: Invoice, alias: i}
+          groupBy: [{field: CustomerId, source: i}]
+          columns:
+            - {field: CustomerId, source: i}
+            - aggregate: {function: sum, args: [{field: Total, source: i}]}
+              as: TotalSpent
+      on:
+        - left: {field: CustomerId, source: customers}
+          op: '=='
+          right: {field: CustomerId, source: stats}
+orderBy: [{field: CustomerId, source: customers}]
+limit: 3
+columns:
+  - {field: CustomerId, source: customers}
+  - {field: FirstName, source: customers}
+  - {field: TotalSpent, source: stats}
