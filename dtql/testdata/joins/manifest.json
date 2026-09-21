@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "files": {
+    "chinook-hinted.dtql.yaml": "691b7456da751808f634b7b0fc8e4b1eb9e26b7b648af59376af2fcd00b189c4",
     "chinook-nested.dtql.yaml": "2eeef93ffb02a4272f06f6ab909b2db4cbbb9a2a1df280ae4c47851534f583b3",
     "chinook-nested.rows.json": "9f5b32d506541afd8f651d5474f87b44d2e8646d1410e3a03d03c70fccf4a757",
     "chinook-wildcard.dtql.yaml": "0101e5d1007dddccb7503524f4742b06462e2ab7f66fd623e6a449bb29ea2dce",

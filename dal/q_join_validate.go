@@ -53,6 +53,9 @@ func validateJoinFrom(from FromSource, path string, visible map[string]bool, vis
 
 	for i, join := range from.Joins() {
 		joinPath := fmt.Sprintf("%s.joins[%d]", path, i)
+		if err := validateJoinAlgorithms(join.Algorithms(), joinPath); err != nil {
+			return err
+		}
 		if join.JoinType() != JoinInner && join.JoinType() != JoinLeft {
 			return joinError("join_type", joinPath+".type", fmt.Sprintf("unsupported join type %q", join.JoinType()))
 		}
@@ -86,6 +89,30 @@ func validateJoinFrom(from FromSource, path string, visible map[string]bool, vis
 		for childAlias := range childAliases {
 			aliases[childAlias] = true
 		}
+	}
+	return nil
+}
+
+func validateJoinAlgorithms(algorithms []JoinAlgorithm, joinPath string) error {
+	if algorithms == nil {
+		return nil
+	}
+	path := joinPath + ".hints.algorithms"
+	if len(algorithms) == 0 {
+		return joinError("join_algorithm", path, "algorithms must be a nonempty list")
+	}
+	seen := map[JoinAlgorithm]bool{}
+	for i, algorithm := range algorithms {
+		itemPath := fmt.Sprintf("%s[%d]", path, i)
+		switch algorithm {
+		case JoinAlgorithmHash, JoinAlgorithmMerge, JoinAlgorithmLookup, JoinAlgorithmBatchedLookup, JoinAlgorithmNestedLoop:
+		default:
+			return joinError("join_algorithm", itemPath, fmt.Sprintf("unknown algorithm %q", algorithm))
+		}
+		if seen[algorithm] {
+			return joinError("join_algorithm", itemPath, fmt.Sprintf("duplicate algorithm %q", algorithm))
+		}
+		seen[algorithm] = true
 	}
 	return nil
 }

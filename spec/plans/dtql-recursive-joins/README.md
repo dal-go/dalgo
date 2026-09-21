@@ -13,11 +13,13 @@ status: Draft
 
 ## Summary
 
-Ship one recursive DTQL contract and equivalent Go/TypeScript executors, then release compatible packages in dependency order. The plan starts with the Chinook user journey and ends only after remote checks, native/generic acceptance, and WB landing receipts.
+The recursive JOIN base landed in DALgo Go at `d393914bf9f9fe4a09fbba3188219e24f86ea284` and was released as `v0.84.0`. Tasks 1–9 below preserve the original plan; their `planning` labels describe the plan when authored and are not a new work queue. At this follow-up's start, SQL PR #191 and DALgo-JS PR #3 were open, and SQLite integration was in progress. Task 10 is the new algorithm-hint scope. Land each remaining repository only after checking its current head, CI, and release artifacts; do not infer completion from this snapshot.
 
 ## Approach
 
 The user saves a nested Invoice/Customer/Employee DTQL document, validates it, runs it, filters/selects a joined field, and receives ordered invoices with Employee missing where the LEFT side did not match. Each step has an observable result: schema validation accepts the document; Go and JS parsers produce the same tree; both executors produce the same records; SQLite uses native JOIN only for representable trees; unsupported adapters reject clearly; the release publishes tested commits and package artifacts. The implementation follows model and fixture dependencies, then generic execution, clause composition, native translation, adapter guards, and coordinated release. Mixed native/generic subtrees and distributed sources remain explicit future work. Review gates occur after the spec/plan, after model/serialization, after generic execution, after native SQL, and after all code.
+
+For the algorithm-hint addition, the user adds ordered preferences to one JOIN, validates the query, serializes and reopens it, then runs it with the same rows as the unhinted query. A nested JOIN and a sibling JOIN keep their own preferences. An unavailable first preference proceeds to the next applicable strategy or the documented ordinary fallback; an invalid identifier fails at its exact JOIN path before source reads. The observable end-to-end result is unchanged rows and ordering through the existing Chinook fixture journey. The Go generic and JS generic tests exercise this whole journey; native SQLite acceptance proves that ignoring hints still preserves results.
 
 ## Repository and fixture contract
 
@@ -89,6 +91,15 @@ Build a generic relation executor over `QueryExecutor` scans with per-relation r
 **Status:** planning
 
 Have an independent reviewer try to break the code and SQL/null parity; fix or record each finding. Run focused checks and required CI, update public DTQL examples and changelogs, then use WB to land `dalgo`, `dalgo2sql`, `dalgo2sqlite`, and `dalgo-js` in dependency order, coordinating the parser branch. Inspect each module's own CI version/tag policy and npm provenance workflow, publish only by those workflows, and record exact version/tag, remote target SHA, required CI result, published Go module or npm artifact, canonical synchronization, and WB cleanup receipt per repository. A local green test or unlanded commit is not release evidence.
+
+### Task 10: Add ordered physical JOIN hints and release the follow-up
+
+**Verifies:** dtql-recursive-joins#ac:algorithm-hints, dtql-recursive-joins#ac:inner-left-recursion, dtql-recursive-joins#ac:chinook-journey
+**Status:** planning
+
+Update the canonical Feature and document the five case-sensitive identifiers, validation path, ordered fallback, and O(N × M) nested-loop cost. Add an optional, defensively copied hint list to each Go and JS JOIN model node without changing existing constructors or unhinted encoding. Parse and emit `hints.algorithms` in Go DTQL and DALgo-JS, regenerate Go JSON/YAML schemas, and add a public example. Validate direct-model and document queries at each recursive JOIN path before any provider read; reject malformed, duplicate, empty, and unknown preferences as `join_algorithm`. Add one canonical fixture with outer, nested, and sibling hints, then pin its digest in dependent fixture manifests.
+
+In Go and JS generic executors, select per JOIN from the ordered list: `hash` uses the existing direct-key index, `nestedLoop` bypasses it and uses the existing candidate cap, and currently unavailable `merge`, `lookup`, and `batchedLookup` are skipped. If no hint applies, use the unhinted strategy. Keep native SQL/SQLite eligible and allow it to ignore hints. Implement a deterministic, directly testable per-JOIN selection function so tests prove preference order (`nestedLoop, hash` versus `hash, nestedLoop`) and unavailable-first fallback rather than inferring strategy from identical output rows. Test independent recursive/sibling lists, direct-model validation, and equivalent ordered results under all executable preferences. Test that a selected nested loop exceeding the candidate cap returns `join_plan` before rows without retrying hash; this resource rejection may differ from a successful unhinted execution while successful result semantics remain equal. Add an end-to-end Chinook journey with hints and compare it with the original fixture. Run Go full tests and coverage, TypeScript lint/typecheck/build/tests, SpecScore lint, and SQL/SQLite dependency checks. Obtain independent adversarial review of spec, plan, code, and documentation; fix findings. Land and publish through WB and repository release workflows, verifying exact remote heads, CI, tags, Go proxy/npm artifacts, canonical sync, and worktree/branch cleanup.
 
 ## Open Questions
 

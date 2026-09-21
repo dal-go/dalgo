@@ -489,6 +489,23 @@ func TestGenericJoinCorrelatedNestedAndSiblings(t *testing.T) {
 	if backend.joined || !reflect.DeepEqual(backend.reads, map[string]int{"A": 1, "B": 1, "C": 1, "D": 1}) {
 		t.Fatalf("provider calls joined=%v reads=%v", backend.joined, backend.reads)
 	}
+	hintedChild := From(b).Join(NewJoinedSource(c, JoinInner, NewComparison(NewFieldRef("c", "aid"), Equal, NewFieldRef("a", "id"))).WithAlgorithms(JoinAlgorithmNestedLoop, JoinAlgorithmHash))
+	hintedRoot := From(a).Join(NewJoinedFrom(hintedChild, JoinLeft, NewComparison(NewFieldRef("a", "id"), Equal, NewFieldRef("b", "aid"))).WithAlgorithms(JoinAlgorithmMerge, JoinAlgorithmHash))
+	hintedRoot.Join(NewJoinedSource(d, JoinLeft, NewComparison(NewFieldRef("b", "id"), Equal, NewFieldRef("d", "bid"))).WithAlgorithms(JoinAlgorithmLookup, JoinAlgorithmHash))
+	hinted := hintedRoot.NewQuery().SelectColumns(q.Columns()...)
+	hintedReader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), hinted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hintedRows, err := ReadAllToRecords(context.Background(), hintedReader)
+	if err != nil || len(hintedRows) != len(rows) {
+		t.Fatalf("hinted recursive rows: %v, %v", hintedRows, err)
+	}
+	for i := range rows {
+		if !reflect.DeepEqual(rows[i].Data(), hintedRows[i].Data()) {
+			t.Fatalf("hinted row %d changed: %v vs %v", i, rows[i].Data(), hintedRows[i].Data())
+		}
+	}
 }
 
 func TestGenericJoinQualifiedWildcardAndCollision(t *testing.T) {

@@ -158,7 +158,7 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 			encoded, _ := condToYAML(condition) // ValidateJoinTree checked every ON shape and operator.
 			on = append(on, *encoded)
 		}
-		joinDoc := joinYAML{From: &childDoc, On: on}
+		joinDoc := joinYAML{From: &childDoc, On: on, Hints: algorithmsToYAML(join.Algorithms())}
 		if join.JoinType() == dal.JoinLeft {
 			joinDoc.Type = "left"
 		}

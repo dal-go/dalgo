@@ -526,6 +526,9 @@
         "from": {
           "$ref": "#/$defs/from"
         },
+        "hints": {
+          "$ref": "#/$defs/joinHints"
+        },
         "on": {
           "items": {
             "$ref": "#/$defs/joinComparison"
@@ -566,6 +569,29 @@
         "op",
         "left",
         "right"
+      ],
+      "type": "object"
+    },
+    "joinHints": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithms": {
+          "items": {
+            "enum": [
+              "hash",
+              "merge",
+              "lookup",
+              "batchedLookup",
+              "nestedLoop"
+            ]
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "algorithms"
       ],
       "type": "object"
     },

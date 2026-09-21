@@ -36,6 +36,7 @@ func (f *from) NewQuery() *QueryBuilder {
 			joinType:        join.joinType,
 			on:              make([]Condition, len(join.on)),
 			from:            cloneFrom(join.from),
+			algorithms:      cloneJoinAlgorithms(join.algorithms),
 		}
 		copy(f2.joins[i].on, join.on)
 	}
@@ -66,11 +67,23 @@ const (
 	JoinCross JoinType = "CROSS"
 )
 
+// JoinAlgorithm identifies a physical JOIN strategy preference.
+type JoinAlgorithm string
+
+const (
+	JoinAlgorithmHash          JoinAlgorithm = "hash"
+	JoinAlgorithmMerge         JoinAlgorithm = "merge"
+	JoinAlgorithmLookup        JoinAlgorithm = "lookup"
+	JoinAlgorithmBatchedLookup JoinAlgorithm = "batchedLookup"
+	JoinAlgorithmNestedLoop    JoinAlgorithm = "nestedLoop"
+)
+
 type JoinedSource struct {
 	RecordsetSource
-	joinType JoinType
-	on       []Condition
-	from     FromSource
+	joinType   JoinType
+	on         []Condition
+	from       FromSource
+	algorithms []JoinAlgorithm
 }
 
 // NewJoinedSource builds a JoinedSource of the given join type over src
@@ -118,6 +131,29 @@ func (j JoinedSource) From() FromSource {
 	return j.from
 }
 
+// WithAlgorithms sets this JOIN's ordered physical algorithm preferences.
+// An empty call preserves an explicit empty list so validation can reject it.
+func (j JoinedSource) WithAlgorithms(algorithms ...JoinAlgorithm) JoinedSource {
+	j.algorithms = make([]JoinAlgorithm, len(algorithms))
+	copy(j.algorithms, algorithms)
+	return j
+}
+
+// Algorithms returns an independent copy of this JOIN's preferences. Nil
+// means that no hint list was supplied.
+func (j JoinedSource) Algorithms() []JoinAlgorithm {
+	return cloneJoinAlgorithms(j.algorithms)
+}
+
+func cloneJoinAlgorithms(algorithms []JoinAlgorithm) []JoinAlgorithm {
+	if algorithms == nil {
+		return nil
+	}
+	cloned := make([]JoinAlgorithm, len(algorithms))
+	copy(cloned, algorithms)
+	return cloned
+}
+
 func cloneFrom(source FromSource) FromSource {
 	return cloneFromWithSeen(source, map[FromSource]FromSource{})
 }
@@ -137,6 +173,7 @@ func cloneFromWithSeen(source FromSource, seen map[FromSource]FromSource) FromSo
 			joinType:        join.joinType,
 			on:              append([]Condition(nil), join.on...),
 			from:            cloneFromWithSeen(join.from, seen),
+			algorithms:      cloneJoinAlgorithms(join.algorithms),
 		})
 	}
 	return clone

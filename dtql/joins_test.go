@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -102,6 +103,127 @@ func TestChinookJoinedWildcardFixture_RoundTrips(t *testing.T) {
 	}
 	if !Equal(q, got) {
 		t.Fatalf("joined wildcard roundtrip changed query:\n%s", encoded)
+	}
+}
+
+func TestChinookAlgorithmHints_RoundTripAndIndependentEdges(t *testing.T) {
+	data, err := os.ReadFile("testdata/joins/chinook-hinted.dtql.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateDTQL(compileSchema(t), data); err != nil {
+		t.Fatalf("schema: %v", err)
+	}
+	q, err := Deserialize(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joins := q.From().Joins()
+	if len(joins) != 2 || !reflect.DeepEqual(joins[0].Algorithms(), []dal.JoinAlgorithm{dal.JoinAlgorithmMerge, dal.JoinAlgorithmHash}) || !reflect.DeepEqual(joins[1].Algorithms(), []dal.JoinAlgorithm{dal.JoinAlgorithmLookup, dal.JoinAlgorithmHash}) {
+		t.Fatalf("outer/sibling hints: %#v", joins)
+	}
+	nested := joins[0].From().Joins()[0].Algorithms()
+	if !reflect.DeepEqual(nested, []dal.JoinAlgorithm{dal.JoinAlgorithmNestedLoop, dal.JoinAlgorithmHash}) {
+		t.Fatalf("nested hints: %v", nested)
+	}
+	for _, tt := range []struct{ document, path string }{
+		{strings.Replace(string(data), "[nestedLoop, hash]", "[unknown, hash]", 1), "from.joins[0].from.joins[0].hints.algorithms[0]"},
+		{strings.Replace(string(data), "[lookup, hash]", "[unknown, hash]", 1), "from.joins[1].hints.algorithms[0]"},
+	} {
+		_, err := Deserialize([]byte(tt.document))
+		var diagnostic *dal.JoinValidationError
+		if !errors.As(err, &diagnostic) || diagnostic.Category != "join_algorithm" || diagnostic.Path != tt.path {
+			t.Fatalf("recursive hint path %s: %v", tt.path, err)
+		}
+	}
+	encoded, err := Serialize(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reparsed, err := Deserialize(encoded)
+	if err != nil || !Equal(q, reparsed) {
+		t.Fatalf("hint roundtrip: %v\n%s", err, encoded)
+	}
+	reordered, err := Deserialize([]byte(strings.Replace(string(data), "[merge, hash]", "[hash, merge]", 1)))
+	if err != nil || Equal(q, reordered) {
+		t.Fatalf("hint preference order did not affect structural equality: %v", err)
+	}
+	legacy, err := os.ReadFile("testdata/joins/chinook-nested.dtql.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unhinted, err := Deserialize(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unhintedEncoded, err := Serialize(unhinted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(unhintedEncoded), "hints:") {
+		t.Fatalf("unhinted encoding changed:\n%s", unhintedEncoded)
+	}
+}
+
+func TestJoinAlgorithmHintYAMLDiagnostics(t *testing.T) {
+	const prefix = "from:\n  name: A\n  alias: a\n  joins:\n    - from: {name: B, alias: b}\n      on: [{left: {field: id, source: a}, op: '==', right: {field: aid, source: b}}]\n      hints: "
+	tests := []struct{ name, hints, path string }{
+		{"null", "null", "from.joins[0].hints.algorithms"},
+		{"list", "[]", "from.joins[0].hints.algorithms"},
+		{"missing list", "{other: [hash]}", "from.joins[0].hints.algorithms"},
+		{"empty list", "{algorithms: []}", "from.joins[0].hints.algorithms"},
+		{"scalar list", "{algorithms: hash}", "from.joins[0].hints.algorithms"},
+		{"duplicate", "{algorithms: [hash, hash]}", "from.joins[0].hints.algorithms[1]"},
+		{"unknown", "{algorithms: [bogus]}", "from.joins[0].hints.algorithms[0]"},
+		{"case", "{algorithms: [Hash]}", "from.joins[0].hints.algorithms[0]"},
+		{"empty entry", "{algorithms: ['']}", "from.joins[0].hints.algorithms[0]"},
+		{"number entry", "{algorithms: [7]}", "from.joins[0].hints.algorithms[0]"},
+		{"nested entry", "{algorithms: [[hash]]}", "from.joins[0].hints.algorithms[0]"},
+		{"extra key", "{algorithms: [hash], other: true}", "from.joins[0].hints.algorithms"},
+		{"duplicate algorithms key", "{algorithms: [hash], algorithms: [merge]}", "from.joins[0].hints.algorithms"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Deserialize([]byte(prefix + tt.hints + "\n"))
+			var diagnostic *dal.JoinValidationError
+			if !errors.As(err, &diagnostic) || diagnostic.Category != "join_algorithm" || diagnostic.Path != tt.path {
+				t.Fatalf("want join_algorithm at %s, got %v", tt.path, err)
+			}
+		})
+	}
+	_, err := Deserialize([]byte(prefix + "{algorithms: [hash]}\n      hints: {algorithms: [merge]}\n"))
+	var duplicate *dal.JoinValidationError
+	if !errors.As(err, &duplicate) || duplicate.Category != "join_algorithm" || duplicate.Path != "from.joins[0].hints.algorithms" {
+		t.Fatalf("repeated join hints: %v", err)
+	}
+}
+
+func TestJoinAlgorithmHintAliasResolutionIsCycleSafe(t *testing.T) {
+	first := &yaml.Node{Kind: yaml.AliasNode}
+	second := &yaml.Node{Kind: yaml.AliasNode, Alias: first}
+	first.Alias = second
+	for _, node := range []*yaml.Node{first, {Kind: yaml.AliasNode}} {
+		_, err := algorithmsFromYAML(node, "from.joins[0]")
+		var diagnostic *dal.JoinValidationError
+		if !errors.As(err, &diagnostic) || diagnostic.Category != "join_algorithm" || diagnostic.Path != "from.joins[0].hints.algorithms" {
+			t.Fatalf("cyclic/unresolved alias: %v", err)
+		}
+	}
+	valid := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{
+		{Kind: yaml.ScalarNode, Value: "algorithms"},
+		{Kind: yaml.SequenceNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Tag: "!!str", Value: "hash"}}},
+	}}
+	alias := &yaml.Node{Kind: yaml.AliasNode, Alias: valid}
+	if got, err := algorithmsFromYAML(alias, "from.joins[0]"); err != nil || !reflect.DeepEqual(got, []dal.JoinAlgorithm{dal.JoinAlgorithmHash}) {
+		t.Fatalf("valid hint alias: %v, %v", got, err)
+	}
+	badList := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "algorithms"}, first}}
+	if _, err := algorithmsFromYAML(badList, "from.joins[0]"); err == nil || !strings.Contains(err.Error(), "join_algorithm at from.joins[0].hints.algorithms") {
+		t.Fatalf("cyclic list alias: %v", err)
+	}
+	badItem := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "algorithms"}, {Kind: yaml.SequenceNode, Content: []*yaml.Node{first}}}}
+	if _, err := algorithmsFromYAML(badItem, "from.joins[0]"); err == nil || !strings.Contains(err.Error(), "join_algorithm at from.joins[0].hints.algorithms[0]") {
+		t.Fatalf("cyclic item alias: %v", err)
 	}
 }
 

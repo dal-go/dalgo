@@ -87,11 +87,22 @@ func schemaDocument() map[string]any {
 			"additionalProperties": false,
 			"required":             []any{"from", "on"},
 			"properties": map[string]any{
-				"type": map[string]any{"enum": []any{"inner", "left"}},
-				"from": map[string]any{"$ref": "#/$defs/from"},
+				"type":  map[string]any{"enum": []any{"inner", "left"}},
+				"from":  map[string]any{"$ref": "#/$defs/from"},
+				"hints": map[string]any{"$ref": "#/$defs/joinHints"},
 				"on": map[string]any{
 					"type": "array", "minItems": 1,
 					"items": map[string]any{"$ref": "#/$defs/joinComparison"},
+				},
+			},
+		},
+		"joinHints": map[string]any{
+			"type": "object", "additionalProperties": false,
+			"required": []any{"algorithms"},
+			"properties": map[string]any{
+				"algorithms": map[string]any{
+					"type": "array", "minItems": 1, "uniqueItems": true,
+					"items": map[string]any{"enum": []any{"hash", "merge", "lookup", "batchedLookup", "nestedLoop"}},
 				},
 			},
 		},
