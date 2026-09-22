@@ -7,7 +7,7 @@ toolchain go1.27.1
 require github.com/dal-go/record v0.1.3
 
 require (
-	github.com/RoaringBitmap/roaring/v2 v2.28.0
+	github.com/RoaringBitmap/roaring/v2 v2.29.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/stretchr/testify v1.12.1
 	github.com/strongo/random v0.0.2

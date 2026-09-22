@@ -4,6 +4,8 @@ github.com/RoaringBitmap/roaring/v2 v2.27.0 h1:rTzs+cuH9YBj6j4L9GF2DcK2NmOfdUvLI
 github.com/RoaringBitmap/roaring/v2 v2.27.0/go.mod h1:BZufmFbox589n3j5eOmyTaLSGXbRLc2LmQvjKjzSEGU=
 github.com/RoaringBitmap/roaring/v2 v2.28.0 h1:DgbDUowq/upwAdbVCuH+aDrQ3dHonkRcRqn1TkCp/Xg=
 github.com/RoaringBitmap/roaring/v2 v2.28.0/go.mod h1:BZufmFbox589n3j5eOmyTaLSGXbRLc2LmQvjKjzSEGU=
+github.com/RoaringBitmap/roaring/v2 v2.29.0 h1:jSjxqZEqiF9W5dHUFsemupb9bnLaQJwZVe5yMetbsZg=
+github.com/RoaringBitmap/roaring/v2 v2.29.0/go.mod h1:BZufmFbox589n3j5eOmyTaLSGXbRLc2LmQvjKjzSEGU=
 github.com/bits-and-blooms/bitset v1.24.4 h1:95H15Og1clikBrKr/DuzMXkQzECs1M6hhoGXLwLQOZE=
 github.com/bits-and-blooms/bitset v1.24.4/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/dal-go/record v0.1.3 h1:K85k/kSX08lTefMiMmPpC12nmCY2TVJk7+ZyC5PD9XU=
