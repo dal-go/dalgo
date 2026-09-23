@@ -122,7 +122,7 @@ func TestExecuteRecordLookupStreamLargeRecordset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	for i := range rows {
 		row, err := stream.Next()
 		if err != nil {

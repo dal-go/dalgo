@@ -122,12 +122,13 @@ type federatedProgressReader struct {
 
 func (r *federatedProgressReader) Next() (record.Record, error) {
 	row, err := r.RecordsReader.Next()
-	if err == nil {
+	switch err {
+	case nil:
 		r.count++
 		if r.count%1024 == 0 {
 			r.report(FederatedProgress{Phase: r.phase, Database: r.database, Rows: r.count})
 		}
-	} else if err == ErrNoMoreRecords {
+	case ErrNoMoreRecords:
 		r.report(FederatedProgress{Phase: r.phase, Database: r.database, Rows: r.count})
 	}
 	return row, err

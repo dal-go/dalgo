@@ -190,7 +190,7 @@ func TestFederatedJoinStreams120000OutputRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	count := 0
 	for {
 		row, err := reader.Next()
