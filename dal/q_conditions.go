@@ -20,9 +20,9 @@ func (v Comparison) Equal(b Comparison) bool {
 	return v.Operator == b.Operator && reflect.DeepEqual(v.Left, b.Left) && reflect.DeepEqual(v.Right, b.Right)
 }
 
-// IsGroupOperator says if an operator is a group operator
+// IsGroupOperator reports whether the operator tests membership in a group of values.
 func IsGroupOperator(o Operator) bool {
-	return o == In
+	return o == In || o == NotIn
 }
 
 // String returns string representation of a comparison

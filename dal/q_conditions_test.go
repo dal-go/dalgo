@@ -61,6 +61,7 @@ func TestIsGroupOperator(t *testing.T) {
 	}{
 		{input: Operator(""), want: false},
 		{input: In, want: true},
+		{input: NotIn, want: true},
 		{input: Equal, want: false},
 		{input: LessThen, want: false},
 		{input: LessOrEqual, want: false},

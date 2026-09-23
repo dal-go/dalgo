@@ -15,7 +15,7 @@ type Array struct {
 
 func NewArray(v any) Array {
 	switch value := v.(type) {
-	case []string, []int, []int64, []uint, []uint8, []uint16, []uint32, []uint64, []float32, []float64:
+	case []any, []string, []int, []int8, []int16, []int32, []int64, []uint, []uint8, []uint16, []uint32, []uint64, []float32, []float64:
 		return Array{Value: value}
 	default:
 		panic(fmt.Sprintf("unsupported type %T", v))
@@ -36,14 +36,8 @@ func (v Array) Equal(b Array) bool {
 
 	// Check if both are slices
 	if vVal.Kind() != reflect.Slice || bVal.Kind() != reflect.Slice {
-		// For non-slice values, use direct comparison
-		return v.Value == b.Value
+		return reflect.DeepEqual(v.Value, b.Value)
 	}
-
-	// Check if at least one is []any slice (requirement is satisfied)
-	vType := vVal.Type()
-	bType := bVal.Type()
-	_ = (vType.Elem().Kind() == reflect.Interface) || (bType.Elem().Kind() == reflect.Interface)
 
 	// For all slices (whether []any or not), we need to compare elements
 	// If lengths are different, slices are not equal
@@ -55,7 +49,7 @@ func (v Array) Equal(b Array) bool {
 	for i := 0; i < vVal.Len(); i++ {
 		vElem := vVal.Index(i).Interface()
 		bElem := bVal.Index(i).Interface()
-		if vElem != bElem {
+		if !reflect.DeepEqual(vElem, bElem) {
 			return false
 		}
 	}
@@ -90,6 +84,10 @@ func (v Array) String() string {
 			var elements []string
 			for i := 0; i < val.Len(); i++ {
 				elem := val.Index(i).Interface()
+				if elem == nil {
+					elements = append(elements, "NULL")
+					continue
+				}
 				if s, ok := elem.(string); ok {
 					elements = append(elements, quoteString(s))
 					continue

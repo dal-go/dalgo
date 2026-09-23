@@ -873,16 +873,50 @@ func TestRecursiveTruthTablesRetainUnknownUntilFilterBoundary(t *testing.T) {
 		condition Condition
 		want      queryTruth
 	}{
-		"comparison NULL":   {unknown, queryUnknown},
-		"unknown AND false": {NewGroupCondition(And, unknown, falseCondition), queryFalse},
-		"unknown OR false":  {NewGroupCondition(Or, unknown, falseCondition), queryUnknown},
-		"unknown OR true":   {NewGroupCondition(Or, unknown, trueCondition), queryTrue},
-		"NULL NOT IN empty": {NewComparison(NewFieldRef("t", "value"), NotIn, Array{Value: []int{}}), queryTrue},
+		"comparison NULL":          {unknown, queryUnknown},
+		"unknown AND false":        {NewGroupCondition(And, unknown, falseCondition), queryFalse},
+		"unknown OR false":         {NewGroupCondition(Or, unknown, falseCondition), queryUnknown},
+		"unknown OR true":          {NewGroupCondition(Or, unknown, trueCondition), queryTrue},
+		"NULL NOT IN empty":        {NewComparison(NewFieldRef("t", "value"), NotIn, Array{Value: []int{}}), queryTrue},
+		"builder NOT IN empty":     {WhereField("value", NotIn, []int{}), queryTrue},
+		"builder NOT IN null list": {WhereField("value", NotIn, []any{nil, 1}), queryUnknown},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got, err := e.evalTruth(testCase.condition, row)
 			if err != nil || got != testCase.want {
 				t.Fatalf("truth = %v, %v; want %v", got, err, testCase.want)
+			}
+		})
+	}
+}
+
+func TestWhereFieldNotInEvaluation(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+		list  any
+		want  queryTruth
+	}{
+		{"string excluded", "a", []string{"a", "b"}, queryFalse},
+		{"string allowed", "c", []string{"a", "b"}, queryTrue},
+		{"number excluded", 2, []int{1, 2}, queryFalse},
+		{"number allowed", 3, []int{1, 2}, queryTrue},
+		{"empty list", nil, []int{}, queryTrue},
+		{"null on left", nil, []int{1}, queryUnknown},
+		{"null in list", 2, []any{1, nil}, queryUnknown},
+		{"match before null", 1, []any{1, nil}, queryFalse},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			row := joinRow{base: "t", sources: map[string]map[string]any{"t": {"value": tc.value}}}
+			condition := WhereField("value", NotIn, tc.list)
+			got, err := (&joinExecution{}).evalTruth(condition, row)
+			if err != nil || got != tc.want {
+				t.Fatalf("truth = %v, %v; want %v", got, err, tc.want)
+			}
+			legacy, err := evalJoinCondition(condition, row)
+			if err != nil || legacy != (tc.want == queryTrue) {
+				t.Fatalf("legacy condition = %v, %v; want %v", legacy, err, tc.want == queryTrue)
 			}
 		})
 	}
