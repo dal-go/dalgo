@@ -479,7 +479,16 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		}
 		reader, err = executeGenericRecursiveBudget(e.ctx, e.executor, source.Query(), e.outer, e.budget)
 	} else {
-		query := From(node.Base()).NewQuery().SelectIntoRecord(nil)
+		builder := From(node.Base()).NewQuery()
+		if source, ok := node.Base().(CollectionRef); ok {
+			if orders := source.ScanOrders(); len(orders) > 0 {
+				builder.OrderBy(orders...)
+			}
+			if limit := source.ScanLimit(); limit > 0 {
+				builder.Limit(limit)
+			}
+		}
+		query := builder.SelectIntoRecord(nil)
 		reader, err = e.executor.ExecuteQueryToRecordsReader(e.ctx, query)
 	}
 	if err != nil {

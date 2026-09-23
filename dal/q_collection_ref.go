@@ -2,6 +2,7 @@ package dal
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/dal-go/record"
 )
@@ -36,6 +37,18 @@ func NewQualifiedRootCollectionRef(schema, name, alias string) CollectionRef {
 	return collectionRef
 }
 
+// NewDatabaseCollectionRef identifies a collection in a named database.
+// Database is a routing identifier; schema remains the provider's namespace.
+func NewDatabaseCollectionRef(database, schema, name, alias string) CollectionRef {
+	if database == "" {
+		panic("database is required parameter for NewDatabaseCollectionRef()")
+	}
+	ref := newCollectionRef(name, alias, nil)
+	ref.database = database
+	ref.schema = schema
+	return ref
+}
+
 func newCollectionRef(name, alias string, parent *record.Key) CollectionRef {
 	if name == "" {
 		panic("name is required parameter for NewCollectionRef()")
@@ -52,14 +65,40 @@ func newCollectionRef(name, alias string, parent *record.Key) CollectionRef {
 
 // CollectionRef points to a recordsetSource (e.g. table) in a database
 type CollectionRef struct {
-	schema string
-	name   string
-	alias  string
-	parent *record.Key
+	database string
+	scan     *collectionScan
+	schema   string
+	name     string
+	alias    string
+	parent   *record.Key
+}
+
+type collectionScan struct {
+	limit  int
+	orders []OrderExpression
+}
+
+// WithScan orders and bounds a relation before it participates in a JOIN.
+func (v CollectionRef) WithScan(limit int, orders ...OrderExpression) CollectionRef {
+	v.scan = &collectionScan{limit: limit, orders: append([]OrderExpression(nil), orders...)}
+	return v
+}
+
+func (v CollectionRef) ScanLimit() int {
+	if v.scan == nil {
+		return 0
+	}
+	return v.scan.limit
+}
+func (v CollectionRef) ScanOrders() []OrderExpression {
+	if v.scan == nil {
+		return nil
+	}
+	return append([]OrderExpression(nil), v.scan.orders...)
 }
 
 func (v CollectionRef) Equal(other CollectionRef, ignoreAlias bool) bool {
-	return v.schema == other.schema && v.name == other.name && v.parent == other.parent && (ignoreAlias || v.alias == other.alias)
+	return v.database == other.database && v.schema == other.schema && v.name == other.name && v.parent == other.parent && reflect.DeepEqual(v.scan, other.scan) && (ignoreAlias || v.alias == other.alias)
 }
 
 func (CollectionRef) recordsetSource() {
@@ -74,6 +113,9 @@ func (v CollectionRef) Name() string {
 func (v CollectionRef) Schema() string {
 	return v.schema
 }
+
+// Database returns the optional named database used by a federated executor.
+func (v CollectionRef) Database() string { return v.database }
 
 func (v CollectionRef) Alias() string {
 	return v.alias
