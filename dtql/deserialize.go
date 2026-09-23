@@ -102,6 +102,12 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 	}
 
 	base := reconstructedQuery{StructuredQuery: qb.SelectIntoRecordset(), columns: columns}
+	if doc.Money != nil {
+		if doc.Money.MinorUnitScale == nil || *doc.Money.MinorUnitScale < 0 || *doc.Money.MinorUnitScale > 18 || doc.Money.DivisionScale < 0 || doc.Money.DivisionScale > 18 || doc.Money.Rounding != "halfEven" {
+			return nil, fmt.Errorf("invalid DTQL: money requires minorUnitScale and divisionScale 0..18 and rounding halfEven")
+		}
+		base.money = &dal.MoneyConfig{MinorUnitScale: *doc.Money.MinorUnitScale, DivisionScale: doc.Money.DivisionScale, Rounding: doc.Money.Rounding}
+	}
 	if len(from.Joins()) > 0 && !dal.HasSubquery(base) {
 		if err := validateJoinClauseFields(base); err != nil {
 			return nil, fmt.Errorf("invalid DTQL: %w", err)

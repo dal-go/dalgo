@@ -57,7 +57,9 @@ func executeStreamingFederatedAggregate(ctx context.Context, q StructuredQuery, 
 		_ = stream.Close()
 		return nil, err
 	}
-	return newLocalAggregationReader(ctx, q, stream, plan), nil
+	reader := newLocalAggregationReader(ctx, q, stream, plan)
+	reader.money = options.Money
+	return reader, nil
 }
 
 func executeStreamingFederatedRows(ctx context.Context, q StructuredQuery, routed federatedQueryExecutor, options FederatedQueryOptions) (RecordsReader, error) {
@@ -74,7 +76,7 @@ func executeStreamingFederatedRows(ctx context.Context, q StructuredQuery, route
 func newFederatedJoinStream(ctx context.Context, q StructuredQuery, routed federatedQueryExecutor, options FederatedQueryOptions) (*federatedJoinStream, error) {
 	root := q.From()
 	child := joinedFrom(root.Joins()[0])
-	e := &joinExecution{ctx: ctx, q: q, executor: routed, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}}
+	e := &joinExecution{ctx: ctx, q: q, executor: routed, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}, money: options.Money != nil}
 	e.collectKeyRefs(root, "from")
 	e.aliases = append(e.aliases, joinAlias(root.Base()))
 	rootAlias := joinAlias(root.Base())
@@ -183,7 +185,7 @@ func (s *federatedJoinStream) Next() (record.Record, error) {
 				return nil, err
 			}
 		}
-		data, err := normalizedJoinRecordMap(rec)
+		data, err := normalizedJoinRecordMapForMode(rec, s.execution.money)
 		if err != nil {
 			return nil, err
 		}

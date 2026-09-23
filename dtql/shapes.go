@@ -13,6 +13,7 @@ type document struct {
 	From    fromYAML    `yaml:"from"`
 	Where   *condYAML   `yaml:"where,omitempty"`
 	GroupBy []exprYAML  `yaml:"groupBy,omitempty"`
+	Money   *moneyYAML  `yaml:"money,omitempty"`
 	Having  *condYAML   `yaml:"having,omitempty"`
 	OrderBy []orderYAML `yaml:"orderBy,omitempty"`
 	Limit   int         `yaml:"limit,omitempty"`
@@ -20,6 +21,12 @@ type document struct {
 	// Columns is deliberately last: DTQL's SELECT/projection stage remains at
 	// the end of the pipeline rather than inheriting SQL's textual order.
 	Columns []columnYAML `yaml:"columns,omitempty"`
+}
+
+type moneyYAML struct {
+	MinorUnitScale *int   `yaml:"minorUnitScale"`
+	DivisionScale  int    `yaml:"divisionScale"`
+	Rounding       string `yaml:"rounding"`
 }
 
 // fromYAML is the YAML representation of the root dal.CollectionRef source.

@@ -22,6 +22,7 @@ type FederatedProgress struct {
 
 type FederatedQueryOptions struct {
 	OnProgress func(FederatedProgress)
+	Money      *MoneyConfig
 }
 
 // ExecuteFederatedQuery evaluates a DTQL query across named databases. Joined
@@ -37,6 +38,17 @@ func ExecuteFederatedQuery(ctx context.Context, query StructuredQuery, resolve D
 func ExecuteFederatedQueryWithOptions(ctx context.Context, query StructuredQuery, resolve DatabaseResolver, options FederatedQueryOptions) (RecordsReader, error) {
 	if query == nil || query.From() == nil || resolve == nil {
 		return nil, fmt.Errorf("federated query requires a query and database resolver")
+	}
+	if options.Money == nil {
+		if declarative, ok := query.(interface{ Money() *MoneyConfig }); ok {
+			options.Money = declarative.Money()
+		}
+	}
+	if err := validateMoney(options.Money); err != nil {
+		return nil, err
+	}
+	if options.Money != nil && !canStreamFederatedAggregate(query) {
+		return nil, fmt.Errorf("money requires the federated streaming aggregate plan")
 	}
 	routed := federatedQueryExecutor{resolve: resolve}
 	if canStreamFederatedAggregate(query) {

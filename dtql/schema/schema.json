@@ -896,6 +896,30 @@
           "minimum": 0,
           "type": "integer"
         },
+        "money": {
+          "additionalProperties": false,
+          "properties": {
+            "divisionScale": {
+              "maximum": 18,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "minorUnitScale": {
+              "maximum": 18,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "rounding": {
+              "const": "halfEven"
+            }
+          },
+          "required": [
+            "minorUnitScale",
+            "divisionScale",
+            "rounding"
+          ],
+          "type": "object"
+        },
         "offset": {
           "minimum": 0,
           "type": "integer"
