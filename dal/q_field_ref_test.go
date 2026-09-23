@@ -202,6 +202,31 @@ func TestWhereField(t *testing.T) {
 			want: Comparison{Left: Field("f1"), Operator: Equal, Right: Constant{Value: nil}},
 		},
 		{
+			name: "not in strings",
+			args: args{name: "f1", operator: NotIn, v: []string{"a", "b"}},
+			want: Comparison{Left: Field("f1"), Operator: NotIn, Right: Array{Value: []string{"a", "b"}}},
+		},
+		{
+			name: "not in numbers",
+			args: args{name: "f1", operator: NotIn, v: []int64{1, 2}},
+			want: Comparison{Left: Field("f1"), Operator: NotIn, Right: Array{Value: []int64{1, 2}}},
+		},
+		{
+			name: "not in empty list",
+			args: args{name: "f1", operator: NotIn, v: []string{}},
+			want: Comparison{Left: Field("f1"), Operator: NotIn, Right: Array{Value: []string{}}},
+		},
+		{
+			name: "not in list containing null",
+			args: args{name: "f1", operator: NotIn, v: []any{nil, "a"}},
+			want: Comparison{Left: Field("f1"), Operator: NotIn, Right: Array{Value: []any{nil, "a"}}},
+		},
+		{
+			name: "not in array expression",
+			args: args{name: "f1", operator: NotIn, v: Array{Value: []int{1, 2}}},
+			want: Comparison{Left: Field("f1"), Operator: NotIn, Right: Array{Value: []int{1, 2}}},
+		},
+		{
 			name: "Constant",
 			args: args{
 				name:     "f1",

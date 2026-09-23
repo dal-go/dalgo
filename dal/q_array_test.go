@@ -80,6 +80,18 @@ func TestArray_Equal(t *testing.T) {
 			want:  false,
 		},
 		{
+			name:  "nested_slice_equal",
+			array: NewArray([]any{[]byte{1, 2}}),
+			input: NewArray([]any{[]byte{1, 2}}),
+			want:  true,
+		},
+		{
+			name:  "nested_slice_not_equal",
+			array: NewArray([]any{[]byte{1, 2}}),
+			input: NewArray([]any{[]byte{1, 3}}),
+			want:  false,
+		},
+		{
 			name:  "mixed_slice_types_equal",
 			array: Array{Value: []any{"a", "b", "c"}},
 			input: Array{Value: []string{"a", "b", "c"}},
@@ -109,6 +121,16 @@ func TestNewArray(t *testing.T) {
 		{
 			name:      "string_slice",
 			input:     []string{"a", "b", "c"},
+			wantPanic: false,
+		},
+		{
+			name:      "nullable_slice",
+			input:     []any{"a", nil},
+			wantPanic: false,
+		},
+		{
+			name:      "int32_slice",
+			input:     []int32{1, 2},
 			wantPanic: false,
 		},
 		{
@@ -164,7 +186,7 @@ func TestNewArray(t *testing.T) {
 		{
 			name:      "any_slice",
 			input:     []any{"a", 1, true},
-			wantPanic: true,
+			wantPanic: false,
 		},
 		{
 			name:      "non_slice_type",
@@ -220,6 +242,12 @@ func TestArray_String(t *testing.T) {
 			name:      "any_slice",
 			array:     Array{Value: []any{"a", 1, true}},
 			want:      "('a',1,true)",
+			wantPanic: false,
+		},
+		{
+			name:      "nullable_slice",
+			array:     Array{Value: []any{"a", nil}},
+			want:      "('a',NULL)",
 			wantPanic: false,
 		},
 		{

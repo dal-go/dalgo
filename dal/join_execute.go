@@ -956,15 +956,22 @@ func evalJoinCondition(condition Condition, row joinRow) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if c.Operator == In {
+		if c.Operator == In || c.Operator == NotIn {
 			items := reflect.ValueOf(right)
 			if !items.IsValid() || (items.Kind() != reflect.Slice && items.Kind() != reflect.Array) {
-				return false, joinError("join_plan", "where", "IN requires an array")
+				return false, joinError("join_plan", "where", "IN or NOT IN requires an array")
 			}
+			hasNull := false
 			for i := 0; i < items.Len(); i++ {
-				if left != nil && valuesEqual(left, items.Index(i).Interface()) {
-					return true, nil
+				item := items.Index(i).Interface()
+				if item == nil {
+					hasNull = true
+				} else if left != nil && valuesEqual(left, item) {
+					return c.Operator == In, nil
 				}
+			}
+			if c.Operator == NotIn {
+				return items.Len() == 0 || (left != nil && !hasNull), nil
 			}
 			return false, nil
 		}
