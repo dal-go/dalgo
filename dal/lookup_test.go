@@ -2,12 +2,81 @@ package dal
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/dal-go/record"
 )
+
+func TestLookupValidationAndFailures(t *testing.T) {
+	ctx := context.Background()
+	row := record.NewRecordWithData(record.NewKeyWithID("Invoice", 1), map[string]any{"id": 1})
+	good := func(context.Context, record.Record) (map[string]any, error) { return map[string]any{"ok": true}, nil }
+	if _, err := ExecuteRecordLookups(ctx, []record.Record{row}, nil, LookupOptions{}); err == nil {
+		t.Fatal("expected nil lookup error")
+	}
+	for _, concurrency := range []int{-1, 65} {
+		if _, err := ExecuteRecordLookups(ctx, []record.Record{row}, good, LookupOptions{Concurrency: concurrency}); err == nil {
+			t.Fatal("expected concurrency error")
+		}
+	}
+	if _, err := ExecuteRecordLookupStream(ctx, nil, good, LookupOptions{}); err == nil {
+		t.Fatal("expected nil source error")
+	}
+	if _, err := ExecuteRecordLookupStream(ctx, NewRecordsReader(nil), nil, LookupOptions{}); err == nil {
+		t.Fatal("expected nil stream lookup error")
+	}
+	stream, err := ExecuteRecordLookupStream(ctx, NewRecordsReader([]record.Record{}), good, LookupOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cursor, err := stream.Cursor(); err != nil || cursor != "" {
+		t.Fatalf("cursor=%q err=%v", cursor, err)
+	}
+	if _, err := stream.Next(); err != ErrNoMoreRecords {
+		t.Fatalf("empty stream err=%v", err)
+	}
+	_ = stream.Close()
+	boom := errors.New("lookup offline")
+	if _, err := ExecuteRecordLookups(ctx, []record.Record{row}, func(context.Context, record.Record) (map[string]any, error) { return nil, boom }, LookupOptions{}); !errors.Is(err, boom) {
+		t.Fatalf("lookup err=%v", err)
+	}
+	bad := record.NewRecordWithData(record.NewKeyWithID("Invoice", 2), "invalid")
+	if _, err := ExecuteRecordLookups(ctx, []record.Record{bad}, good, LookupOptions{}); err == nil {
+		t.Fatal("expected non-object error")
+	}
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := ExecuteRecordLookups(canceled, []record.Record{row}, good, LookupOptions{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancel err=%v", err)
+	}
+	stream, err = ExecuteRecordLookupStream(canceled, NewRecordsReader([]record.Record{row}), good, LookupOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stream.Next(); !errors.Is(err, context.Canceled) {
+		t.Fatalf("stream cancel err=%v", err)
+	}
+	_ = stream.Close()
+	stream, err = ExecuteRecordLookupStream(ctx, joinFailingReader{err: boom}, good, LookupOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stream.Next(); !errors.Is(err, boom) {
+		t.Fatalf("source err=%v", err)
+	}
+	_ = stream.Close()
+	stream, err = ExecuteRecordLookupStream(ctx, NewRecordsReader([]record.Record{row}), func(context.Context, record.Record) (map[string]any, error) { return nil, boom }, LookupOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stream.Next(); !errors.Is(err, boom) {
+		t.Fatalf("stream lookup err=%v", err)
+	}
+	_ = stream.Close()
+}
 
 func TestExecuteRecordLookupsProgressAndOrder(t *testing.T) {
 	rows := make([]record.Record, 100)
