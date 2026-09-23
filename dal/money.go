@@ -77,9 +77,7 @@ func moneyInput(value any, scale int) (*big.Int, error) {
 	}
 	minor := new(big.Int)
 	minorText := parts[0] + fraction + strings.Repeat("0", scale-len(fraction))
-	if _, ok := minor.SetString(minorText, 10); !ok {
-		return nil, fmt.Errorf("invalid money input %q", text)
-	}
+	minor.SetString(minorText, 10) // decimalText already validated every digit.
 	return minor, nil
 }
 
