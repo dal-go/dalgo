@@ -314,6 +314,9 @@ $defs:
         type: string
       as:
         type: string
+      database:
+        minLength: 1
+        type: string
       joins:
         items:
           $ref: '#/$defs/join'
@@ -323,6 +326,21 @@ $defs:
         type: string
       query:
         $ref: '#/$defs/queryDocument'
+      scan:
+        additionalProperties: false
+        properties:
+          limit:
+            minimum: 1
+            type: integer
+          orderBy:
+            items:
+              $ref: '#/$defs/order'
+            minItems: 1
+            type: array
+        required:
+          - orderBy
+          - limit
+        type: object
       schema:
         minLength: 1
         type: string

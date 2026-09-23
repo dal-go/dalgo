@@ -181,6 +181,20 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 		return fromYAML{}, fmt.Errorf("parented collection reference %q is not supported by DTQL (only root collections)", base.Path())
 	}
 	result := fromYAML{Name: base.Name(), Alias: base.Alias()}
+	if base.ScanLimit() > 0 {
+		scan := &scanYAML{Limit: base.ScanLimit()}
+		for _, order := range base.ScanOrders() {
+			expr, err := exprToYAML(order.Expression())
+			if err != nil {
+				return fromYAML{}, err
+			}
+			scan.OrderBy = append(scan.OrderBy, orderYAML{exprYAML: expr, Desc: order.Descending()})
+		}
+		result.Scan = scan
+	}
+	if database := base.Database(); database != "" {
+		result.Database = &database
+	}
 	if schema := base.Schema(); schema != "" {
 		result.Schema = &schema
 	}

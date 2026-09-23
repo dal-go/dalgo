@@ -24,11 +24,18 @@ type document struct {
 
 // fromYAML is the YAML representation of the root dal.CollectionRef source.
 type fromYAML struct {
-	Schema *string    `yaml:"schema,omitempty"`
-	Name   string     `yaml:"name,omitempty"`
-	Alias  string     `yaml:"alias,omitempty"`
-	Query  *document  `yaml:"query,omitempty"`
-	Joins  []joinYAML `yaml:"joins,omitempty"`
+	Database *string    `yaml:"database,omitempty"`
+	Scan     *scanYAML  `yaml:"scan,omitempty"`
+	Schema   *string    `yaml:"schema,omitempty"`
+	Name     string     `yaml:"name,omitempty"`
+	Alias    string     `yaml:"alias,omitempty"`
+	Query    *document  `yaml:"query,omitempty"`
+	Joins    []joinYAML `yaml:"joins,omitempty"`
+}
+
+type scanYAML struct {
+	OrderBy []orderYAML `yaml:"orderBy,omitempty"`
+	Limit   int         `yaml:"limit,omitempty"`
 }
 
 func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
@@ -36,12 +43,14 @@ func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	var decoded struct {
-		Schema *string    `yaml:"schema,omitempty"`
-		Name   string     `yaml:"name"`
-		Alias  *string    `yaml:"alias,omitempty"`
-		As     *string    `yaml:"as,omitempty"`
-		Query  *document  `yaml:"query,omitempty"`
-		Joins  []joinYAML `yaml:"joins,omitempty"`
+		Database *string    `yaml:"database,omitempty"`
+		Scan     *scanYAML  `yaml:"scan,omitempty"`
+		Schema   *string    `yaml:"schema,omitempty"`
+		Name     string     `yaml:"name"`
+		Alias    *string    `yaml:"alias,omitempty"`
+		As       *string    `yaml:"as,omitempty"`
+		Query    *document  `yaml:"query,omitempty"`
+		Joins    []joinYAML `yaml:"joins,omitempty"`
 	}
 	if err := node.Decode(&decoded); err != nil {
 		return err
@@ -55,7 +64,7 @@ func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
 	} else if decoded.As != nil {
 		alias = *decoded.As
 	}
-	*from = fromYAML{Schema: decoded.Schema, Name: decoded.Name, Alias: alias, Query: decoded.Query, Joins: decoded.Joins}
+	*from = fromYAML{Database: decoded.Database, Scan: decoded.Scan, Schema: decoded.Schema, Name: decoded.Name, Alias: alias, Query: decoded.Query, Joins: decoded.Joins}
 	return nil
 }
 
@@ -139,7 +148,7 @@ func validateFromYAMLNodeWithState(node *yaml.Node, visiting, validated map[*yam
 			if err := validateFromYAMLMerge(value, visiting, validated); err != nil {
 				return err
 			}
-		case "schema":
+		case "schema", "database":
 			value = resolvedYAMLAlias(value)
 			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
 				return &yaml.TypeError{Errors: []string{"from.schema must be a string"}}
@@ -148,6 +157,11 @@ func validateFromYAMLNodeWithState(node *yaml.Node, visiting, validated map[*yam
 			value = resolvedYAMLAlias(value)
 			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
 				return &yaml.TypeError{Errors: []string{"from." + key + " must be a string"}}
+			}
+		case "scan":
+			value = resolvedYAMLAlias(value)
+			if value.Kind != yaml.MappingNode {
+				return &yaml.TypeError{Errors: []string{"from.scan must be a mapping"}}
 			}
 		case "joins":
 			value = resolvedYAMLAlias(value)

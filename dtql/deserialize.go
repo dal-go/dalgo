@@ -125,8 +125,8 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 	}
 	var source dal.RecordsetSource
 	if encoded.Query != nil {
-		if encoded.Schema != nil || encoded.Alias != "" {
-			return nil, fmt.Errorf("invalid DTQL: query_shape at %s: query source cannot set schema or alias", path)
+		if encoded.Database != nil || encoded.Scan != nil || encoded.Schema != nil || encoded.Alias != "" {
+			return nil, fmt.Errorf("invalid DTQL: query_shape at %s: query source cannot set database, schema or alias", path)
 		}
 		if encoded.Query.As == "" {
 			return nil, fmt.Errorf("invalid DTQL: query_shape at %s.query.as: as is required", path)
@@ -136,6 +136,18 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 			return nil, err
 		}
 		source = dal.NewQuerySource(query, encoded.Query.As)
+	} else if encoded.Database != nil {
+		if *encoded.Database == "" {
+			return nil, fmt.Errorf("invalid DTQL: %s.database must not be empty", path)
+		}
+		schema := ""
+		if encoded.Schema != nil {
+			schema = *encoded.Schema
+			if schema == "" {
+				return nil, fmt.Errorf("invalid DTQL: %s.schema must not be empty", path)
+			}
+		}
+		source = dal.NewDatabaseCollectionRef(*encoded.Database, schema, encoded.Name, encoded.Alias)
 	} else if encoded.Schema == nil {
 		source = dal.NewRootCollectionRef(encoded.Name, encoded.Alias)
 	} else {
@@ -143,6 +155,19 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 			return nil, fmt.Errorf("invalid DTQL: %s.schema must not be empty (join_shape at %s.schema)", path, path)
 		}
 		source = dal.NewQualifiedRootCollectionRef(*encoded.Schema, encoded.Name, encoded.Alias)
+	}
+	if encoded.Scan != nil {
+		if encoded.Scan.Limit <= 0 {
+			return nil, fmt.Errorf("invalid DTQL: %s.scan.limit must be positive", path)
+		}
+		orders, err := orderFromYAMLAt(encoded.Scan.OrderBy, path+".scan.orderBy")
+		if err != nil {
+			return nil, err
+		}
+		if len(orders) == 0 {
+			return nil, fmt.Errorf("invalid DTQL: %s.scan.orderBy is required", path)
+		}
+		source = source.(dal.CollectionRef).WithScan(encoded.Scan.Limit, orders...)
 	}
 	from := dal.From(source)
 	for i, join := range encoded.Joins {
