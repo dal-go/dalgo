@@ -37,7 +37,17 @@ by `Serialize` with a descriptive error rather than silently dropped.
 | `GroupCondition` (Or) | `{ or: [ <condition>, ... ] }` |
 | `OrderExpression` | a sequence item under `orderBy:`, an expression plus optional `desc: true` |
 | `GroupBy` | `groupBy: [ <expression>, ... ]` |
+| money amount policy | `money: {minorUnitScale: 2, divisionScale: 4, rounding: halfEven}` |
 | `Having` | `having: <condition>` |
+
+The optional `money` policy applies to federated streaming aggregates. Amounts are
+canonical decimal strings or whole integers; fractional binary floats and amounts
+with more digits than `minorUnitScale` are rejected. `SUM` accumulates integer
+minor units and returns decimal text. `AVG` and binary per-capita division return
+decimal text rounded half-even to `divisionScale`; division by zero errors.
+Existing queries keep their numeric behavior. The `strongo/decimal` cents type
+cannot serve as this accumulator because its `int64` range excludes large sums
+and its current parser passes through binary floating point.
 | `FieldRef` | `{ field: <name>, source?: <alias> }` |
 | `Constant` | `{ value: <scalar> }` (inline string, bool, int or float) |
 | `Array` | `{ values: [ <scalar>, ... ] }` (inline, for `In` membership) |

@@ -82,6 +82,15 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 		Limit:  q.Limit(),
 		Offset: q.Offset(),
 	}
+	if exact, ok := q.(interface {
+		Money() *dal.MoneyConfig
+	}); ok && exact.Money() != nil {
+		config := exact.Money()
+		if config.MinorUnitScale < 0 || config.MinorUnitScale > 18 || config.DivisionScale < 0 || config.DivisionScale > 18 || config.Rounding != "halfEven" {
+			return document{}, fmt.Errorf("invalid money configuration")
+		}
+		doc.Money = &moneyYAML{MinorUnitScale: &config.MinorUnitScale, DivisionScale: config.DivisionScale, Rounding: config.Rounding}
+	}
 	for i, col := range q.Columns() {
 		if col.Wildcard != nil {
 			if col.Expression != nil {

@@ -50,6 +50,7 @@ type joinExecution struct {
 	recursive  bool
 	budget     *recursiveBudget
 	memo       map[string][]memoizedQuery
+	money      bool
 }
 
 type recursiveBudget struct {
@@ -518,7 +519,7 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 				return err
 			}
 		}
-		data, err := normalizedJoinRecordMap(rec)
+		data, err := normalizedJoinRecordMapForMode(rec, e.money)
 		if err != nil {
 			return joinError("join_plan", path, err.Error())
 		}
@@ -620,6 +621,10 @@ func rawJoinField(data any, path string) any {
 }
 
 func normalizedJoinRecordMap(rec record.Record) (map[string]any, error) {
+	return normalizedJoinRecordMapForMode(rec, false)
+}
+
+func normalizedJoinRecordMapForMode(rec record.Record, exactDecimal bool) (map[string]any, error) {
 	if rec.Data() == nil {
 		return map[string]any{}, nil
 	}
@@ -635,6 +640,9 @@ func normalizedJoinRecordMap(rec record.Record) (map[string]any, error) {
 	}
 	if data == nil {
 		return map[string]any{}, nil
+	}
+	if exactDecimal {
+		return data, nil
 	}
 	return normalizeJoinNumbers(data).(map[string]any), nil
 }
@@ -882,6 +890,15 @@ func joinValueKey(value any, path string) (string, error) {
 		return "s:" + strconv.Itoa(len(v)) + ":" + v, nil
 	case bool:
 		return "b:" + strconv.FormatBool(v), nil
+	case json.Number:
+		number, err := strconv.ParseFloat(string(v), 64)
+		if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
+			return "", joinError("join_key_type", path, "non-finite number")
+		}
+		if math.Trunc(number) == number && (number > 9007199254740991 || number < -9007199254740991) {
+			return "", joinError("join_key_type", path, "integer exceeds portable safe range")
+		}
+		return "n:" + strconv.FormatFloat(number, 'g', -1, 64), nil
 	default:
 		raw := reflect.ValueOf(value)
 		switch raw.Kind() {

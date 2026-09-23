@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -147,6 +148,7 @@ type aggregateState struct {
 	expression AggregateFunc
 	count      int64
 	sum        float64
+	exactSum   *big.Int
 	value      any
 	hasValue   bool
 	distinct   map[string]struct{}
@@ -177,6 +179,7 @@ type localAggregationReader struct {
 	closed        bool
 	totalDistinct int
 	retainedBytes int
+	money         *MoneyConfig
 }
 
 func newLocalAggregationReader(ctx context.Context, q StructuredQuery, raw RecordsReader, plan AggregationPlan) *localAggregationReader {
@@ -542,6 +545,21 @@ func (r *localAggregationReader) updateGroup(group *localGroup, row map[string]a
 			if value == nil {
 				continue
 			}
+			if r.money != nil {
+				minor, err := moneyInput(value, r.money.MinorUnitScale)
+				if err != nil {
+					return err
+				}
+				if state.exactSum == nil {
+					state.exactSum = new(big.Int)
+				}
+				state.exactSum.Add(state.exactSum, minor)
+				if state.count == math.MaxInt64 {
+					return fmt.Errorf("AVG input count overflow")
+				}
+				state.count++
+				continue
+			}
 			number, ok := aggregationNumber(value)
 			if !ok {
 				// Match the portable SQL path: non-numeric dynamic values are
@@ -649,10 +667,18 @@ func (r *localAggregationReader) resolveGroupExpression(expression Expression, g
 			if state.count == 0 {
 				return nil, nil
 			}
+			if r.money != nil {
+				return moneyMinorText(state.exactSum, r.money.MinorUnitScale), nil
+			}
 			return state.sum, nil
 		case AVERAGE:
 			if state.count == 0 {
 				return nil, nil
+			}
+			if r.money != nil {
+				denominator := new(big.Int).Mul(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(r.money.MinorUnitScale)), nil), big.NewInt(state.count))
+				mean := new(big.Rat).SetFrac(state.exactSum, denominator)
+				return moneyText(mean, r.money.DivisionScale), nil
 			}
 			return state.sum / float64(state.count), nil
 		case MIN, MAX, FIRST, LAST:
@@ -670,6 +696,9 @@ func (r *localAggregationReader) resolveGroupExpression(expression Expression, g
 		right, err := r.resolveGroupExpression(binary.Right, group, output)
 		if err != nil {
 			return nil, err
+		}
+		if r.money != nil {
+			return moneyPerCapita(binary.Operator, left, right, r.money.DivisionScale)
 		}
 		return evalArithmeticValues(binary.Operator, left, right)
 	}
@@ -890,6 +919,8 @@ func encodeTypedValue(value any) (string, error) {
 		return "f:" + strconv.FormatFloat(v, 'g', -1, 64), nil
 	case string:
 		return "s:" + strconv.Itoa(len(v)) + ":" + v, nil
+	case json.Number:
+		return "j:" + v.String(), nil
 	case []byte:
 		return "x:" + base64.StdEncoding.EncodeToString(v), nil
 	default:

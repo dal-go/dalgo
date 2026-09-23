@@ -222,6 +222,11 @@ func schemaDocument() map[string]any {
 		"from":    map[string]any{"$ref": "#/$defs/from"},
 		"where":   map[string]any{"$ref": "#/$defs/condition"},
 		"groupBy": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/expression"}},
+		"money": map[string]any{"type": "object", "additionalProperties": false, "required": []any{"minorUnitScale", "divisionScale", "rounding"}, "properties": map[string]any{
+			"minorUnitScale": map[string]any{"type": "integer", "minimum": 0, "maximum": 18},
+			"divisionScale":  map[string]any{"type": "integer", "minimum": 0, "maximum": 18},
+			"rounding":       map[string]any{"const": "halfEven"},
+		}},
 		"having":  map[string]any{"$ref": "#/$defs/condition"},
 		"orderBy": map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/order"}},
 		"limit":   map[string]any{"type": "integer", "minimum": 0},

@@ -9,6 +9,8 @@ import "github.com/dal-go/dalgo/dal"
 type reconstructedQuery struct {
 	dal.StructuredQuery
 	columns []dal.Column
+	money   *dal.MoneyConfig
 }
 
-func (q reconstructedQuery) Columns() []dal.Column { return q.columns }
+func (q reconstructedQuery) Columns() []dal.Column   { return q.columns }
+func (q reconstructedQuery) Money() *dal.MoneyConfig { return q.money }
