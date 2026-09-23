@@ -10,6 +10,16 @@ import (
 	"github.com/dal-go/record"
 )
 
+type federatedSchemaStub struct {
+	federatedStub
+	fields []string
+	err    error
+}
+
+func (s federatedSchemaStub) JoinFields(context.Context, RecordsetSource) ([]string, error) {
+	return s.fields, s.err
+}
+
 func testFederatedAggregate() StructuredQuery {
 	root := NewDatabaseCollectionRef("orders", "", "Invoice", "o")
 	child := NewDatabaseCollectionRef("countries", "", "Country", "c")
@@ -136,7 +146,7 @@ func TestFederatedStreamJoinKeyBuildAndWhereErrors(t *testing.T) {
 	}
 	base.scans["c"] = large
 	valid := record.NewRecordWithData(record.NewKeyWithID("Invoice", 2), map[string]any{"country_id": 1})
-	stream = &federatedJoinStream{source: NewRecordsReader([]record.Record{valid}), execution: base, root: root}
+	stream = &federatedJoinStream{source: NewRecordsReader([]record.Record{valid}), execution: base, root: root, validated: true}
 	if _, err := stream.Next(); err == nil {
 		t.Fatal("expected joined row bound")
 	}
@@ -206,6 +216,75 @@ func TestFederatedJoinStreams120000OutputRows(t *testing.T) {
 	got, err := ReadAllToRecords(ctx, reader)
 	if err != nil || len(got) != 2 {
 		t.Fatalf("bounded rows=%d err=%v", len(got), err)
+	}
+}
+
+func TestFederatedStreamingRootWildcardAndMissingField(t *testing.T) {
+	ctx := context.Background()
+	root := NewDatabaseCollectionRef("orders", "", "Invoice", "o")
+	child := NewDatabaseCollectionRef("countries", "", "Country", "c")
+	from := From(root).Join(NewJoinedSource(child, JoinInner, joinOn("o", "country_id", "c", "id")))
+	resolve := func(_ context.Context, database string) (QueryExecutor, error) {
+		if database == "orders" {
+			return federatedStub{rows: []record.Record{record.NewRecordWithData(record.NewKeyWithID("Invoice", 1), map[string]any{"id": 1, "country_id": 2, "amount": 10})}}, nil
+		}
+		return federatedStub{rows: []record.Record{record.NewRecordWithData(record.NewKeyWithID("Country", 2), map[string]any{"id": 2})}}, nil
+	}
+	query := from.NewQuery().SelectColumns(Column{Wildcard: &WildcardProjection{Source: "o"}})
+	reader, err := ExecuteFederatedQuery(ctx, query, resolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(ctx, reader)
+	if err != nil || len(rows) != 1 || fmt.Sprint(rows[0].Data().(map[string]any)["amount"]) != "10" {
+		t.Fatalf("root wildcard rows=%v err=%v", rows, err)
+	}
+	bad := from.NewQuery().SelectColumns(Column{Expression: NewFieldRef("o", "missing")})
+	reader, err = ExecuteFederatedQuery(ctx, bad, resolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = reader.Next()
+	if err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("missing root field err=%v", err)
+	}
+	_ = reader.Close()
+}
+
+func TestFederatedStreamingRootSchemaValidation(t *testing.T) {
+	ctx := context.Background()
+	root := NewDatabaseCollectionRef("orders", "", "Invoice", "o")
+	child := NewDatabaseCollectionRef("countries", "", "Country", "c")
+	from := From(root).Join(NewJoinedSource(child, JoinInner, joinOn("o", "country_id", "c", "id")))
+	rootRows := []record.Record{record.NewRecordWithData(record.NewKeyWithID("Invoice", 1), map[string]any{"id": 1, "country_id": 2})}
+	childRows := []record.Record{record.NewRecordWithData(record.NewKeyWithID("Country", 2), map[string]any{"id": 2})}
+	resolve := func(_ context.Context, database string) (QueryExecutor, error) {
+		if database == "orders" {
+			return federatedSchemaStub{federatedStub: federatedStub{rows: rootRows}, fields: []string{"id", "country_id"}}, nil
+		}
+		return federatedSchemaStub{federatedStub: federatedStub{rows: childRows}, fields: []string{"id"}}, nil
+	}
+	query := from.NewQuery().SelectColumns(Column{Wildcard: &WildcardProjection{Source: "o"}})
+	reader, err := ExecuteFederatedQuery(ctx, query, resolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(ctx, reader)
+	if err != nil || len(rows) != 1 || fmt.Sprint(rows[0].Data().(map[string]any)["country_id"]) != "2" {
+		t.Fatalf("schema wildcard rows=%v err=%v", rows, err)
+	}
+	bad := from.NewQuery().SelectColumns(Column{Expression: NewFieldRef("o", "missing")})
+	if _, err := ExecuteFederatedQuery(ctx, bad, resolve); err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("schema validation err=%v", err)
+	}
+	broken := func(ctx context.Context, database string) (QueryExecutor, error) {
+		if database == "orders" {
+			return federatedSchemaStub{err: errors.New("schema offline")}, nil
+		}
+		return resolve(ctx, database)
+	}
+	if _, err := ExecuteFederatedQuery(ctx, query, broken); err == nil || !strings.Contains(err.Error(), "schema offline") {
+		t.Fatalf("schema provider err=%v", err)
 	}
 }
 

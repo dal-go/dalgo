@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/dal-go/record"
 )
@@ -76,8 +77,21 @@ func newFederatedJoinStream(ctx context.Context, q StructuredQuery, routed feder
 	e := &joinExecution{ctx: ctx, q: q, executor: routed, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}}
 	e.collectKeyRefs(root, "from")
 	e.aliases = append(e.aliases, joinAlias(root.Base()))
+	rootAlias := joinAlias(root.Base())
+	if fields, err := routed.JoinFields(ctx, root.Base()); err != nil {
+		return nil, joinError("join_plan", "from", fmt.Sprintf("cannot load fields for %s: %v", rootAlias, err))
+	} else if fields != nil {
+		e.fields[rootAlias] = append(make([]string, 0, len(fields)), fields...)
+	}
 	if err := e.scanTree(child, "from.joins[0].from"); err != nil {
 		return nil, err
+	}
+	validated := false
+	if e.fields[rootAlias] != nil {
+		if err := e.validateQueryFields(); err != nil {
+			return nil, err
+		}
+		validated = true
 	}
 	if options.OnProgress != nil {
 		if ref, ok := child.Base().(CollectionRef); ok {
@@ -97,7 +111,7 @@ func newFederatedJoinStream(ctx context.Context, q StructuredQuery, routed feder
 	if err != nil {
 		return nil, fmt.Errorf("scan federated fact source: %w", err)
 	}
-	stream := &federatedJoinStream{source: source, execution: e, root: root, progress: options.OnProgress}
+	stream := &federatedJoinStream{source: source, execution: e, root: root, progress: options.OnProgress, validated: validated}
 	if ref, ok := root.Base().(CollectionRef); ok {
 		stream.database = ref.Database()
 	}
@@ -113,6 +127,7 @@ type federatedJoinStream struct {
 	read, processed  int64
 	pending          []record.Record
 	closed           bool
+	validated        bool
 	projectOutput    bool
 	offset, limit    int
 	emitted, skipped int
@@ -171,6 +186,22 @@ func (s *federatedJoinStream) Next() (record.Record, error) {
 		data, err := normalizedJoinRecordMap(rec)
 		if err != nil {
 			return nil, err
+		}
+		if !s.validated {
+			alias := joinAlias(s.root.Base())
+			if s.execution.fields == nil {
+				s.execution.fields = map[string][]string{}
+			}
+			fields := make([]string, 0, len(data))
+			for name := range data {
+				fields = append(fields, name)
+			}
+			sort.Strings(fields)
+			s.execution.fields[alias] = fields
+			if err := s.execution.validateQueryFields(); err != nil {
+				return nil, err
+			}
+			s.validated = true
 		}
 		s.execution.candidates = 0 // the work bound applies to one streamed fact row
 		rows, err := s.execution.build(s.root, "from", nil, []scannedJoinRow{{key: rec.Key(), data: data}})
