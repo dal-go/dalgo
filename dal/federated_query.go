@@ -42,6 +42,9 @@ func ExecuteFederatedQueryWithOptions(ctx context.Context, query StructuredQuery
 	if canStreamFederatedAggregate(query) {
 		return executeStreamingFederatedAggregate(ctx, query, routed, options)
 	}
+	if canStreamFederatedRows(query) {
+		return executeStreamingFederatedRows(ctx, query, routed, options)
+	}
 	if HasSubquery(query) || hasJoin(query) || HasAggregation(query) {
 		routed.progress = options.OnProgress
 		reader, err := executeGenericRecursive(ctx, routed, query, nil)

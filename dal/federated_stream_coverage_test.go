@@ -3,6 +3,7 @@ package dal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -149,4 +150,88 @@ func TestFederatedStreamJoinKeyBuildAndWhereErrors(t *testing.T) {
 		t.Fatal("expected where scope error")
 	}
 	_ = stream.Close()
+}
+
+func TestFederatedJoinStreams120000OutputRows(t *testing.T) {
+	ctx := context.Background()
+	root := NewDatabaseCollectionRef("orders", "", "Invoice", "o")
+	child := NewDatabaseCollectionRef("countries", "", "Country", "c")
+	from := From(root).Join(NewJoinedSource(child, JoinInner, joinOn("o", "country_id", "c", "id")))
+	query := from.NewQuery().SelectColumns(Column{Alias: "population", Expression: NewFieldRef("c", "population")})
+	if !canStreamFederatedRows(query) {
+		t.Fatal("expected streaming result plan")
+	}
+	rows := make([]record.Record, 120_000)
+	for i := range rows {
+		rows[i] = record.NewRecordWithData(record.NewKeyWithID("Invoice", i+1), map[string]any{"id": i + 1, "country_id": 1})
+	}
+	resolve := func(_ context.Context, database string) (QueryExecutor, error) {
+		if database == "orders" {
+			return federatedStub{rows: rows}, nil
+		}
+		return federatedStub{rows: []record.Record{record.NewRecordWithData(record.NewKeyWithID("Country", 1), map[string]any{"id": 1, "population": 100})}}, nil
+	}
+	var processed int64
+	reader, err := ExecuteFederatedQueryWithOptions(ctx, query, resolve, FederatedQueryOptions{OnProgress: func(item FederatedProgress) {
+		if item.Phase == "process" {
+			processed = item.Rows
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	count := 0
+	for {
+		row, err := reader.Next()
+		if err == ErrNoMoreRecords {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fmt.Sprint(row.Data().(map[string]any)["population"]) != "100" {
+			t.Fatalf("row %d: %v", count, row.Data())
+		}
+		count++
+	}
+	if count != 120_000 || processed != 120_000 {
+		t.Fatalf("count=%d processed=%d", count, processed)
+	}
+	bounded := from.NewQuery().Offset(1).Limit(2).SelectIntoRecord(nil)
+	reader, err = ExecuteFederatedQuery(ctx, bounded, resolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadAllToRecords(ctx, reader)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("bounded rows=%d err=%v", len(got), err)
+	}
+}
+
+func TestFederatedJoinStreamingOutputErrors(t *testing.T) {
+	ctx := context.Background()
+	root := NewDatabaseCollectionRef("orders", "", "Invoice", "o")
+	child := NewDatabaseCollectionRef("countries", "", "Country", "c")
+	from := From(root).Join(NewJoinedSource(child, JoinInner, joinOn("o", "country_id", "c", "id")))
+	resolve := func(_ context.Context, database string) (QueryExecutor, error) {
+		if database == "orders" {
+			return federatedStub{rows: []record.Record{record.NewRecordWithData(record.NewKeyWithID("Invoice", 1), map[string]any{"country_id": 1})}}, nil
+		}
+		return federatedStub{rows: []record.Record{record.NewRecordWithData(record.NewKeyWithID("Country", 1), map[string]any{"id": 1})}}, nil
+	}
+	queries := []StructuredQuery{
+		from.NewQuery().Where(NewComparison(NewFieldRef("o", "country_id"), In, NewConstant(1))).SelectIntoRecord(nil),
+		from.NewQuery().SelectColumns(Column{Alias: "bad", Expression: aggregationCoverageExpression{text: "unsupported"}}),
+	}
+	for i, query := range queries {
+		reader, err := ExecuteFederatedQuery(ctx, query, resolve)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := reader.Next(); err == nil {
+			t.Fatalf("query %d expected streamed where or projection error", i)
+		}
+		_ = reader.Close()
+	}
 }

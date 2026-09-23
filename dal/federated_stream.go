@@ -12,7 +12,15 @@ import (
 // The streaming plan keeps only the dimension and aggregate groups in memory.
 // Other query shapes use the existing bounded generic evaluator.
 func canStreamFederatedAggregate(q StructuredQuery) bool {
-	if !HasAggregation(q) || HasSubquery(q) || len(q.OrderBy()) != 0 || q.From() == nil || len(q.From().Joins()) != 1 {
+	return HasAggregation(q) && !HasSubquery(q) && len(q.OrderBy()) == 0 && hasFlatFederatedHashJoin(q)
+}
+
+func canStreamFederatedRows(q StructuredQuery) bool {
+	return !HasAggregation(q) && !HasSubquery(q) && len(q.OrderBy()) == 0 && hasFlatFederatedHashJoin(q)
+}
+
+func hasFlatFederatedHashJoin(q StructuredQuery) bool {
+	if q.From() == nil || len(q.From().Joins()) != 1 {
 		return false
 	}
 	child := joinedFrom(q.From().Joins()[0])
@@ -39,6 +47,30 @@ func canStreamFederatedAggregate(q StructuredQuery) bool {
 }
 
 func executeStreamingFederatedAggregate(ctx context.Context, q StructuredQuery, routed federatedQueryExecutor, options FederatedQueryOptions) (RecordsReader, error) {
+	stream, err := newFederatedJoinStream(ctx, q, routed, options)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := PlanAggregation(q, QueryCapabilities{StableRowOrder: true})
+	if err != nil {
+		_ = stream.Close()
+		return nil, err
+	}
+	return newLocalAggregationReader(ctx, q, stream, plan), nil
+}
+
+func executeStreamingFederatedRows(ctx context.Context, q StructuredQuery, routed federatedQueryExecutor, options FederatedQueryOptions) (RecordsReader, error) {
+	stream, err := newFederatedJoinStream(ctx, q, routed, options)
+	if err != nil {
+		return nil, err
+	}
+	stream.projectOutput = true
+	stream.offset = q.Offset()
+	stream.limit = q.Limit()
+	return stream, nil
+}
+
+func newFederatedJoinStream(ctx context.Context, q StructuredQuery, routed federatedQueryExecutor, options FederatedQueryOptions) (*federatedJoinStream, error) {
 	root := q.From()
 	child := joinedFrom(root.Joins()[0])
 	e := &joinExecution{ctx: ctx, q: q, executor: routed, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}}
@@ -69,23 +101,21 @@ func executeStreamingFederatedAggregate(ctx context.Context, q StructuredQuery, 
 	if ref, ok := root.Base().(CollectionRef); ok {
 		stream.database = ref.Database()
 	}
-	plan, err := PlanAggregation(q, QueryCapabilities{StableRowOrder: true})
-	if err != nil {
-		_ = source.Close()
-		return nil, err
-	}
-	return newLocalAggregationReader(ctx, q, stream, plan), nil
+	return stream, nil
 }
 
 type federatedJoinStream struct {
-	source          RecordsReader
-	execution       *joinExecution
-	root            FromSource
-	database        string
-	progress        func(FederatedProgress)
-	read, processed int64
-	pending         []record.Record
-	closed          bool
+	source           RecordsReader
+	execution        *joinExecution
+	root             FromSource
+	database         string
+	progress         func(FederatedProgress)
+	read, processed  int64
+	pending          []record.Record
+	closed           bool
+	projectOutput    bool
+	offset, limit    int
+	emitted, skipped int
 }
 
 func (s *federatedJoinStream) Cursor() (string, error) { return "", nil }
@@ -99,10 +129,20 @@ func (s *federatedJoinStream) Close() error {
 
 func (s *federatedJoinStream) Next() (record.Record, error) {
 	for {
+		if s.limit > 0 && s.emitted >= s.limit {
+			return nil, ErrNoMoreRecords
+		}
 		if len(s.pending) != 0 {
 			row := s.pending[0]
 			s.pending = s.pending[1:]
 			s.processed++
+			if s.projectOutput {
+				if s.skipped < s.offset {
+					s.skipped++
+					continue
+				}
+				s.emitted++
+			}
 			if s.progress != nil && s.processed%1024 == 0 {
 				s.progress(FederatedProgress{Phase: "process", Rows: s.processed})
 			}
@@ -143,7 +183,20 @@ func (s *federatedJoinStream) Next() (record.Record, error) {
 				return nil, err
 			}
 			if keep {
-				s.pending = append(s.pending, record.NewRecordWithData(row.key, flattenJoinRow(row, s.execution.aliases, true)))
+				var output map[string]any
+				if s.projectOutput {
+					if columns := s.execution.q.Columns(); len(columns) != 0 {
+						output, err = s.execution.projection(columns, row)
+						if err != nil {
+							return nil, err
+						}
+					} else {
+						output = flattenJoinRow(row, s.execution.aliases, false)
+					}
+				} else {
+					output = flattenJoinRow(row, s.execution.aliases, true)
+				}
+				s.pending = append(s.pending, record.NewRecordWithData(row.key, output))
 			}
 		}
 	}

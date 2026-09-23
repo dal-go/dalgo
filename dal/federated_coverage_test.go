@@ -117,7 +117,7 @@ func TestFederatedGenericJoinProgressAndError(t *testing.T) {
 	ctx := context.Background()
 	root := NewDatabaseCollectionRef("orders", "", "Invoice", "o")
 	child := NewDatabaseCollectionRef("countries", "", "Country", "c")
-	query := From(root).Join(NewJoinedSource(child, JoinInner, joinOn("o", "country_id", "c", "id"))).NewQuery().SelectIntoRecord(nil)
+	query := From(root).Join(NewJoinedSource(child, JoinInner, joinOn("o", "country_id", "c", "id"))).NewQuery().OrderBy(Ascending(NewFieldRef("o", "id"))).SelectIntoRecord(nil)
 	orders := []record.Record{record.NewRecordWithData(record.NewKeyWithID("Invoice", 1), map[string]any{"id": 1, "country_id": 1})}
 	countries := []record.Record{record.NewRecordWithData(record.NewKeyWithID("Country", 1), map[string]any{"id": 1})}
 	resolve := func(_ context.Context, database string) (QueryExecutor, error) {
