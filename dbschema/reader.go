@@ -32,8 +32,8 @@ type SchemaReader interface {
 	ListCollections(ctx context.Context, parent *record.Key) ([]dal.CollectionRef, error)
 
 	// DescribeCollection returns the structural definition of one
-	// collection, including its fields, primary key, and inline
-	// indexes.
+	// collection, including its fields, primary key, inline indexes,
+	// and any outgoing foreign keys the provider can discover.
 	DescribeCollection(ctx context.Context, ref *dal.CollectionRef) (*CollectionDef, error)
 
 	// ListIndexes returns the indexes on a collection. The returned
