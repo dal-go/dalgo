@@ -32,4 +32,7 @@ type CollectionDef struct {
 	// Indexes lists the secondary indexes declared inline with this
 	// collection definition.
 	Indexes []IndexDef
+	// ForeignKeys are the outgoing foreign keys declared by the backing database.
+	// They are metadata; CreateCollection does not create these constraints.
+	ForeignKeys []ForeignKeyDef
 }
