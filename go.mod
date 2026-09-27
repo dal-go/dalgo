@@ -4,7 +4,7 @@ go 1.26.0
 
 toolchain go1.27.1
 
-require github.com/dal-go/record v0.1.3
+require github.com/dal-go/record v0.1.4
 
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.29.0
