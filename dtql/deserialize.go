@@ -65,6 +65,9 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := validateNullTests(cond, pathJoin(path, "where"), false); err != nil {
+			return nil, err
+		}
 		qb.Where(cond)
 	}
 	if len(doc.GroupBy) > 0 {
@@ -82,6 +85,9 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 		condition, err := condFromYAMLAt(*doc.Having, pathJoin(path, "having"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid DTQL: having: %w", err)
+		}
+		if err := validateNullTests(condition, pathJoin(path, "having"), true); err != nil {
+			return nil, err
 		}
 		qb.Having(condition)
 	}
@@ -452,7 +458,7 @@ func condFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	case forms == 0:
 		return nil, fmt.Errorf("invalid DTQL: condition must be a comparison (op/left/right), a group (and/or), exists/notExists or isNull/isNotNull")
 	case forms > 1:
-		return nil, fmt.Errorf("invalid DTQL: condition mixes comparison and group forms")
+		return nil, fmt.Errorf("invalid DTQL: condition mixes forms: exactly one of comparison (op/left/right), and, or, exists, notExists, isNull or isNotNull is allowed")
 	}
 
 	if isComparison {

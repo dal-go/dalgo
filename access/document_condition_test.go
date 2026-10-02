@@ -148,3 +148,16 @@ func TestDocumentConditionErrors(t *testing.T) {
 type fakeExpr struct{}
 
 func (fakeExpr) String() string { return "fake" }
+
+// A policy predicate never learns to test for NULL: the layered-ACL rule is
+// that a missing field never matches, and IsNullCondition would break it.
+func TestDocumentConditionRejectsNullTests(t *testing.T) {
+	for _, condition := range []dal.Condition{
+		dal.NewIsNullCondition(dal.Field("owner")),
+		dal.NewGroupCondition(dal.Or, dal.NewIsNotNullCondition(dal.Field("owner"))),
+	} {
+		if _, err := documentFromCondition(condition); err == nil || !strings.Contains(err.Error(), "unsupported condition") {
+			t.Errorf("documentFromCondition(%s) = %v", condition, err)
+		}
+	}
+}

@@ -169,12 +169,50 @@ func (weirdExpr) String() string { return "weird" }
 
 // Edge cases for full branch coverage of the join executor.
 func TestExecuteJoin_EdgeCases(t *testing.T) {
-	t.Run("non-equality WHERE matches nothing", func(t *testing.T) {
+	t.Run("ordered WHERE operators are evaluated, not ignored", func(t *testing.T) {
 		db, ctx := seedUsersOrders(t)
 		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
-		where := dal.NewComparison(dal.NewFieldRef("o", "userId"), dal.GreaterThen, dal.Constant{Value: 0})
+		run := func(op dal.Operator, value int) int {
+			where := dal.NewComparison(dal.NewFieldRef("o", "userId"), op, dal.Constant{Value: value})
+			q := dal.From(usersAlias()).Join(join).NewQuery().Where(where).SelectIntoRecord(intoMapRecord())
+			return len(runJoinQuery(t, db, ctx, q))
+		}
+		require.Equal(t, 2, run(dal.GreaterThen, 0))
+		require.Equal(t, 2, run(dal.GreaterOrEqual, 1))
+		require.Equal(t, 0, run(dal.GreaterThen, 1))
+		require.Equal(t, 2, run(dal.LessThen, 2))
+		require.Equal(t, 0, run(dal.LessOrEqual, 0))
+	})
+
+	t.Run("an operator the join evaluator lacks fails the query", func(t *testing.T) {
+		db, ctx := seedUsersOrders(t)
+		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+		for _, op := range []dal.Operator{dal.In, dal.NotIn, dal.Operator("!=")} {
+			where := dal.NewComparison(dal.NewFieldRef("o", "userId"), op, dal.Constant{Value: 1})
+			q := dal.From(usersAlias()).Join(join).NewQuery().Where(where).SelectIntoRecord(intoMapRecord())
+			reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+			require.Nil(t, reader)
+			require.ErrorContains(t, err, "unsupported operator")
+		}
+	})
+
+	t.Run("a condition the join evaluator lacks fails the query", func(t *testing.T) {
+		db, ctx := seedUsersOrders(t)
+		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+		where := dal.NewGroupCondition(dal.Or, notComparison{}, dal.NewComparison(dal.NewFieldRef("o", "userId"), dal.Equal, dal.Constant{Value: 1}))
 		q := dal.From(usersAlias()).Join(join).NewQuery().Where(where).SelectIntoRecord(intoMapRecord())
-		require.Empty(t, runJoinQuery(t, db, ctx, q))
+		reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+		require.Nil(t, reader)
+		require.ErrorContains(t, err, "unsupported condition")
+	})
+
+	t.Run("an ON predicate that is not a comparison fails the query", func(t *testing.T) {
+		db, ctx := seedUsersOrders(t)
+		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, dal.NewGroupCondition(dal.And, onUserEqOrder()))
+		q := dal.From(usersAlias()).Join(join).NewQuery().SelectIntoRecord(intoMapRecord())
+		reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+		require.Nil(t, reader)
+		require.ErrorContains(t, err, "ON predicate must be a comparison")
 	})
 
 	t.Run("unsupported expression in WHERE errors", func(t *testing.T) {

@@ -35,6 +35,10 @@ The `dtql` package MUST provide serialization from an in-scope `dal.StructuredQu
 
 DTQL MUST represent the core relational read-only subset of `dal.StructuredQuery`: a single `From` whose `Joins()` is empty, over a **root** `dal.CollectionRef` base (a flat named recordset, `Parent() == nil`); the selected `Columns`; the `Where` `Condition` (both `Comparison` nodes and And/Or `GroupCondition` trees); `OrderBy` expressions; and `Limit`/`Offset`. The expression nodes in scope are field references (`FieldRef`), constants (`Constant`), and constant arrays (`Array`, for `In` membership). The comparison operators in scope are `==`, `In`, `>`, `>=`, `<`, `<=`; the group operators are `And`/`Or`. Literal values are carried **inline** as `Constant`/`Array` expressions — `dal.StructuredQuery` has no separate parameter list (`QueryArg` belongs to `dal.TextQuery`, which is out of scope). Each in-scope `dal` node MUST have a defined YAML representation.
 
+#### REQ: null-tests
+
+DTQL MUST represent `dal.IsNullCondition` as a condition form of its own: `isNull: <expression>` for `x IS NULL` and `isNotNull: <expression>` for `x IS NOT NULL`, each holding exactly one expression. A condition mapping contains exactly one of comparison (`op`/`left`/`right`), `and`, `or`, `exists`, `notExists`, `isNull` or `isNotNull`; a document that sets two of them MUST be rejected with an error that names the forms. A null test is valid wherever a condition is (`where`, `having`, inside `and`/`or`, inside a nested query) and MUST be rejected in a join's `on` list, which stays equality-only. Its operand is a field, a literal, arithmetic over those, or a scalar subquery; an aggregate is valid only in `having`, and a `values` list, `star` and `param` MUST be rejected at parse, with the path of the null test in the error, in both the Go and the TypeScript engine. Serialization and deserialization of a null test MUST round-trip structurally and canonically, and the generated schema MUST accept it.
+
 #### REQ: reject-out-of-scope
 
 Serialization MUST reject (with a clear, descriptive error) any `dal.StructuredQuery` outside the covered subset — a `From` with a non-empty `Joins()` (joins), a base that is a `CollectionGroupRef` or a parented `CollectionRef` (`Parent() != nil`), a `GroupBy`, an aggregate or scalar function, a cursor/`StartFrom`, or a comparison/group operator outside the in-scope set — rather than silently dropping it. DTQL MUST NOT emit a document that loses query semantics.
@@ -65,7 +69,7 @@ DTQL MUST live in a new top-level package `github.com/dal-go/dalgo/dtql` that im
 
 #### REQ: documented-shape
 
-The package MUST document the DTQL-YAML shape — the mapping from each in-scope `dal` node (`From` / root `CollectionRef`, `Column`, `Comparison`, `GroupCondition`, `OrderExpression`, `FieldRef`, `Constant`, `Array`, `Operator`) to its YAML representation — versioned in-repo alongside the code.
+The package MUST document the DTQL-YAML shape — the mapping from each in-scope `dal` node (`From` / root `CollectionRef`, `Column`, `Comparison`, `GroupCondition`, `IsNullCondition`, `OrderExpression`, `FieldRef`, `Constant`, `Array`, `Operator`) to its YAML representation — versioned in-repo alongside the code.
 
 ### Published schema and examples
 
@@ -100,6 +104,18 @@ The schema (both serializations), the example documents, and a human-readable, s
 **Given** a `StructuredQuery` with a single `From` (no joins) over a root `CollectionRef`, selected `Columns`, a `Where` combining `Comparison` (with inline `Constant`/`Array` values) and And/Or `GroupCondition`, `OrderBy`, `Limit`, and `Offset`
 **When** it is serialized to DTQL-YAML
 **Then** the YAML contains a defined representation for each of those nodes (source, columns, where tree with inline constants, order, limit, offset) with no node omitted.
+
+### AC: null-tests-round-trip (verifies REQ:null-tests, REQ:round-trip-canonical, REQ:schema-accepts-serializer-output)
+
+**Given** DTQL documents that use `isNull` and `isNotNull` in `where`, in `having`, inside `and`/`or` groups, over a field, an arithmetic expression and (in `having`) an aggregate
+**When** each is deserialized, serialized, and validated against the generated schema
+**Then** the output is byte-identical to the input, the schema accepts it, and the same document read as JSON gives a structurally equal query.
+
+### AC: null-test-operands-and-forms-rejected (verifies REQ:null-tests, REQ:invalid-input-errors)
+
+**Given** a null test whose operand is a `values` list, `star`, a `param`, or an aggregate in `where`, a null test inside a join's `on`, and a condition that sets `isNull` together with `isNotNull`, `op`, `and`, `or`, `exists` or `notExists`
+**When** each document is deserialized
+**Then** a descriptive error is returned (naming the null test's path, or the forms that were mixed) and no `StructuredQuery` is produced.
 
 ### AC: out-of-scope-rejected (verifies REQ:reject-out-of-scope)
 

@@ -220,3 +220,21 @@ func TestToMap(t *testing.T) {
 		t.Errorf("ToMap(nil struct pointer) = %v, %v", m, err)
 	}
 }
+
+// Policy predicates keep the layered-ACL rule that a missing field never
+// matches: IsNullCondition would make "missing" match, so the policy subset
+// rejects it (a query engine evaluates it; a policy predicate must not).
+func TestIsNullConditionIsOutsideThePolicySubset(t *testing.T) {
+	for _, condition := range []dal.Condition{
+		dal.NewIsNullCondition(dal.Field("owner")),
+		dal.NewIsNotNullCondition(dal.Field("owner")),
+		dal.NewGroupCondition(dal.And, dal.NewIsNullCondition(dal.Field("owner"))),
+	} {
+		if _, err := Validate(condition); err == nil || !strings.Contains(err.Error(), "unsupported condition") {
+			t.Errorf("Validate(%s) = %v", condition, err)
+		}
+		if _, err := Match(map[string]any{}, condition); err == nil || !strings.Contains(err.Error(), "unsupported condition") {
+			t.Errorf("Match(%s) = %v", condition, err)
+		}
+	}
+}

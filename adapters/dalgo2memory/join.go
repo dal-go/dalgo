@@ -167,7 +167,9 @@ func orderBySources[T any](rows []T, orderBy []dal.OrderExpression, sourcesOf fu
 			if f.IsID() {
 				c = compare(idOf(rows[i]), idOf(rows[j]))
 			} else {
-				c = compare(si[f.Source()][f.Name()], sj[f.Source()][f.Name()])
+				left, _ := fieldValue(si[f.Source()], f.Name())
+				right, _ := fieldValue(sj[f.Source()], f.Name())
+				c = compare(left, right)
 			}
 			if oe.Descending() {
 				c = -c
@@ -255,12 +257,12 @@ func resolveJoinExpr(e dal.Expression, sources map[string]map[string]any, known 
 		if !known[src] {
 			return nil, false, fmt.Errorf("dalgo2memory: field %q references unknown source %q", v.Name(), src)
 		}
-		val, present := sources[src][v.Name()]
+		val, present := fieldValue(sources[src], v.Name())
 		return val, present, nil
 	case dal.Constant:
 		return v.Value, true, nil
 	default:
-		return nil, false, fmt.Errorf("dalgo2memory: unsupported expression %T in join query", e)
+		return nil, false, fmt.Errorf("dalgo2memory: unsupported expression %T", e)
 	}
 }
 
@@ -276,57 +278,6 @@ func allConditionsMatch(conds []dal.Condition, sources map[string]map[string]any
 		}
 	}
 	return true, nil
-}
-
-// matchesJoinWhere evaluates a joined query's WHERE: an IS NULL / IS NOT NULL
-// test, an AND/OR group of such conditions, or a single equality Comparison
-// (see matchesJoinCondition). A null-extended LEFT JOIN side and an absent
-// field both read as null.
-func matchesJoinWhere(cond dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
-	switch c := cond.(type) {
-	case dal.IsNullCondition:
-		value, _, err := resolveJoinExpr(c.Operand(), sources, known)
-		if err != nil {
-			return false, err
-		}
-		return (value == nil) != c.Negated(), nil
-	case dal.GroupCondition:
-		isOr := c.Operator() == dal.Or
-		for _, child := range c.Conditions() {
-			ok, err := matchesJoinWhere(child, sources, known)
-			if err != nil {
-				return false, err
-			}
-			if ok == isOr {
-				return isOr, nil
-			}
-		}
-		return !isOr, nil
-	default:
-		return matchesJoinCondition(cond, sources, known)
-	}
-}
-
-// matchesJoinCondition evaluates a single equality Comparison over the
-// per-source data. A nil condition matches; any non-equality shape does not
-// (mirroring the in-memory adapter's single-source WHERE support).
-func matchesJoinCondition(cond dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
-	if cond == nil {
-		return true, nil
-	}
-	cmp, ok := cond.(dal.Comparison)
-	if !ok || cmp.Operator != dal.Equal {
-		return false, nil
-	}
-	l, lok, err := resolveJoinExpr(cmp.Left, sources, known)
-	if err != nil {
-		return false, err
-	}
-	r, rok, err := resolveJoinExpr(cmp.Right, sources, known)
-	if err != nil {
-		return false, err
-	}
-	return lok && rok && valuesEqual(l, r), nil
 }
 
 func valuesEqual(a, b any) bool {

@@ -355,7 +355,7 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 		{
 			name:    "mixed comparison and group",
 			yaml:    "from:\n  name: users\nwhere:\n  op: ==\n  left:\n    field: a\n  right:\n    value: 1\n  and:\n    - op: ==\n      left:\n        field: b\n      right:\n        value: 2\n",
-			wantErr: "mixes comparison and group",
+			wantErr: "mixes forms",
 		},
 		{
 			name:    "expression with no field/value/values",

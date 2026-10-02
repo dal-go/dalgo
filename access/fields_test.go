@@ -406,7 +406,6 @@ func TestQueryFieldValidationChecksNullTestOperands(t *testing.T) {
 		dal.NewIsNullCondition(dal.Field("name")),
 		dal.NewIsNotNullCondition(dal.Field("name")),
 		dal.NewIsNullCondition(dal.Constant{Value: nil}),
-		dal.NewIsNullCondition(dal.NewParam("who")),
 		dal.NewGroupCondition(dal.Or, dal.NewIsNullCondition(dal.Field("name")), dal.NewIsNotNullCondition(dal.Field("name"))),
 	} {
 		if err := where(allowed); err != nil {
@@ -420,6 +419,8 @@ func TestQueryFieldValidationChecksNullTestOperands(t *testing.T) {
 		dal.NewGroupCondition(dal.And, dal.NewIsNullCondition(dal.Field("name")), dal.NewIsNullCondition(dal.Field("secret"))),
 		dal.NewIsNullCondition(dal.Binary(dal.Field("name"), dal.Add, dal.Field("name"))),
 		dal.NewIsNullCondition(nil),
+		dal.NewIsNullCondition(dal.NewParam("who")),
+		dal.NewIsNotNullCondition(&dal.Param{Name: "who"}),
 	} {
 		if err := where(denied); !errors.Is(err, ErrAccessDenied) {
 			t.Fatalf("%s err=%v", denied, err)

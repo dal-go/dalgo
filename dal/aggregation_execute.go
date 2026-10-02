@@ -723,7 +723,7 @@ func (r *localAggregationReader) evalHaving(condition Condition, group *localGro
 		if err != nil {
 			return false, err
 		}
-		return (value == nil) != c.Negated(), nil
+		return IsNullValue(value) != c.Negated(), nil
 	case Comparison:
 		left, err := r.resolveGroupExpression(c.Left, group, group.out)
 		if err != nil {

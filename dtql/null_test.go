@@ -329,3 +329,64 @@ columns:
 		})
 	}
 }
+
+func TestNullTestOperandGrammar(t *testing.T) {
+	const flat = "from: {name: Sale}\n"
+	cases := []struct {
+		name    string
+		doc     string
+		wantErr string // empty: accepted
+	}{
+		{"field", flat + "where: {isNull: {field: a}}\n", ""},
+		{"literal", flat + "where: {isNotNull: {value: 1}}\n", ""},
+		{"arithmetic", flat + "where: {isNull: {binary: {op: +, left: {field: a}, right: {value: 1}}}}\n", ""},
+		{"scalar subquery", flat + "where: {isNull: {query: {as: t, from: {name: Other}, columns: [{field: x}]}}}\n", ""},
+		{"aggregate in having", flat + "groupBy: [{field: g}]\nhaving: {isNull: {aggregate: {function: max, args: [{field: a}]}}}\ncolumns: [{field: g}]\n", ""},
+		{"arithmetic over aggregates in having", flat + "groupBy: [{field: g}]\nhaving: {isNotNull: {binary: {op: /, left: {aggregate: {function: sum, args: [{field: a}]}}, right: {aggregate: {function: count, args: [{star: true}]}}}}}\ncolumns: [{field: g}]\n", ""},
+		{"values list", flat + "where: {isNull: {values: [1, 2]}}\n", "query_shape at where.isNull: a values list"},
+		{"star", flat + "where: {isNotNull: {star: true}}\n", "query_shape at where.isNotNull: star"},
+		{"param", flat + "where: {isNull: {param: who}}\n", "query_shape at where.isNull: a param"},
+		{"aggregate in where", flat + "where: {isNull: {aggregate: {function: max, args: [{field: a}]}}}\n", "query_shape at where.isNull: an aggregate has no value in where"},
+		{"aggregate inside arithmetic in where", flat + "where: {isNull: {binary: {op: +, left: {value: 1}, right: {aggregate: {function: max, args: [{field: a}]}}}}}\n", "an aggregate has no value in where"},
+		{"star inside arithmetic left", flat + "where: {isNull: {binary: {op: +, left: {star: true}, right: {value: 1}}}}\n", "star is not a value"},
+		{"values inside arithmetic", flat + "where: {isNull: {binary: {op: +, left: {value: 1}, right: {values: [1]}}}}\n", "a values list"},
+		{"deep in a group", flat + "where: {and: [{isNull: {field: a}}, {or: [{isNull: {field: b}}, {isNotNull: {param: p}}]}]}\n", "query_shape at where.and[1].or[1].isNotNull: a param"},
+		{"star in having", flat + "groupBy: [{field: g}]\nhaving: {isNull: {star: true}}\ncolumns: [{field: g}]\n", "query_shape at having.isNull: star"},
+		{"in a nested query", flat + "where: {exists: {query: {from: {name: X}, where: {isNull: {param: p}}}}}\n", "query_shape at where.exists.query.where.isNull: a param"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Deserialize([]byte(tc.doc))
+			switch {
+			case tc.wantErr == "" && err != nil:
+				t.Fatalf("rejected: %v", err)
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Fatalf("err = %v; want it to contain %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestNullTestOperandProblemFallback(t *testing.T) {
+	if got := nullOperandProblem(unsupportedExpr{}, false); !strings.Contains(got, "cannot be tested") {
+		t.Fatalf("unknown operand problem = %q", got)
+	}
+	if err := validateNullTests(dal.NewIsNullCondition(unsupportedExpr{}), "where", false); err == nil {
+		t.Fatal("unknown operand type accepted")
+	}
+	if err := validateNullTests(nil, "where", false); err != nil {
+		t.Fatalf("nil condition = %v", err)
+	}
+}
+
+func TestNullTestFormsMessageNamesEveryForm(t *testing.T) {
+	for name, doc := range map[string]string{
+		"isNull and isNotNull": "from: {name: Chat}\nwhere:\n  isNull: {field: a}\n  isNotNull: {field: a}\n",
+		"isNull and and":       "from: {name: Chat}\nwhere:\n  isNull: {field: a}\n  and: [{isNull: {field: b}}]\n",
+	} {
+		_, err := Deserialize([]byte(doc))
+		if err == nil || !strings.Contains(err.Error(), "mixes forms") || !strings.Contains(err.Error(), "isNull or isNotNull") || strings.Contains(err.Error(), "comparison and group forms") {
+			t.Fatalf("%s: err = %v", name, err)
+		}
+	}
+}

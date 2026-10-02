@@ -23,13 +23,14 @@ func TestMatchesWhereIsNull(t *testing.T) {
 		{"missing is not not-null", dal.NewIsNotNullCondition(dal.Field("Missing")), false},
 		{"value is not null", dal.NewIsNullCondition(dal.Field("Name")), false},
 		{"value is not-null", dal.NewIsNotNullCondition(dal.Field("Name")), true},
-		{"unsupported operand", dal.NewIsNullCondition(dal.Constant{Value: nil}), false},
+		{"null literal is null", dal.NewIsNullCondition(dal.Constant{Value: nil}), true},
+		{"literal is not null", dal.NewIsNullCondition(dal.Constant{Value: 1}), false},
 		{"in and group", dal.NewGroupCondition(dal.And, dal.NewIsNullCondition(dal.Field("Company")), dal.NewIsNotNullCondition(dal.Field("Name"))), true},
 		{"in and group false", dal.NewGroupCondition(dal.And, dal.NewIsNullCondition(dal.Field("Company")), dal.NewIsNullCondition(dal.Field("Name"))), false},
 		{"== nil matches null and missing, as before", dal.NewComparison(dal.Field("Missing"), dal.Equal, dal.Constant{Value: nil}), true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, matchesWhere(data, tt.condition))
+			require.Equal(t, tt.want, mustMatchWhere(t, data, tt.condition))
 		})
 	}
 }

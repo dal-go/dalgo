@@ -1046,7 +1046,7 @@ func evalJoinCondition(condition Condition, row joinRow) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		return (value == nil) != c.Negated(), nil
+		return IsNullValue(value) != c.Negated(), nil
 	default:
 		return false, joinError("join_plan", "where", fmt.Sprintf("unsupported condition %T", condition))
 	}
@@ -1331,7 +1331,7 @@ func (e *joinExecution) evalTruthAt(condition Condition, row joinRow, path strin
 		if err != nil {
 			return queryUnknown, err
 		}
-		if (operand == nil) != value.Negated() {
+		if IsNullValue(operand) != value.Negated() {
 			return queryTrue, nil
 		}
 		return queryFalse, nil

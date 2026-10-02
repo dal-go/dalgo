@@ -2,6 +2,7 @@ package dal
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -328,5 +329,113 @@ func TestIsNullHavingAggregatesReachPlanning(t *testing.T) {
 	}
 	if !nativeAggregationSupported(maxQuery, QueryCapabilities{GroupBy: true, Having: true, Aggregate: AggregateCapabilities{Max: true}}) {
 		t.Fatal("native aggregation rejected supported MAX inside HAVING ... IS NULL")
+	}
+}
+
+func TestIsNullValue(t *testing.T) {
+	var nilString *string
+	var nilStruct *struct{}
+	var nilIface fmt.Stringer
+	empty := ""
+	zero := 0
+	for _, tc := range []struct {
+		name  string
+		value any
+		want  bool
+	}{
+		{"nil", nil, true},
+		{"nil interface value", nilIface, true},
+		{"typed nil pointer", nilString, true},
+		{"typed nil struct pointer", nilStruct, true},
+		{"pointer to empty string", &empty, false},
+		{"pointer to zero", &zero, false},
+		{"empty string", "", false},
+		{"zero", 0, false},
+		{"false", false, false},
+		{"empty slice", []string{}, false},
+		{"nil slice is a value, not NULL", []string(nil), false},
+		{"empty map", map[string]any{}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsNullValue(tc.value); got != tc.want {
+				t.Fatalf("IsNullValue(%#v) = %v; want %v", tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
+// An adapter may hand the executor a nil pointer behind an interface (a typed
+// nil); that is NULL exactly like an untyped nil, in every evaluator.
+func TestIsNullCountsTypedNilAsNull(t *testing.T) {
+	var nilPointer *string
+	present := "x"
+	row := nullTestRow(map[string]any{"typed": nilPointer, "set": &present}, nil)
+	e := &joinExecution{recursive: true}
+	for _, tc := range []struct {
+		cond Condition
+		want bool
+	}{
+		{NewIsNullCondition(NewFieldRef("a", "typed")), true},
+		{NewIsNotNullCondition(NewFieldRef("a", "typed")), false},
+		{NewIsNullCondition(NewFieldRef("a", "set")), false},
+		{NewIsNullCondition(Constant{Value: nilPointer}), true},
+	} {
+		legacy, err := evalJoinCondition(tc.cond, row)
+		if err != nil || legacy != tc.want {
+			t.Fatalf("%s legacy = %v, %v; want %v", tc.cond, legacy, err, tc.want)
+		}
+		truth, err := e.evalTruthAt(tc.cond, row, "where")
+		if err != nil || (truth == queryTrue) != tc.want {
+			t.Fatalf("%s recursive = %v, %v; want %v", tc.cond, truth, err, tc.want)
+		}
+	}
+	r := newLocalAggregationReader(context.Background(), From(NewRootCollectionRef("sales", "")).NewQuery().SelectColumns(Column{Expression: Field("a")}), &aggregationCoverageReader{}, AggregationPlan{Strategy: AggregationHash})
+	group := &localGroup{keyValues: map[string]any{}, out: map[string]any{"top": nilPointer, "other": &present}}
+	for name, want := range map[string]bool{"top": true, "other": false} {
+		got, err := r.evalHaving(NewIsNullCondition(Field(name)), group)
+		if err != nil || got != want {
+			t.Fatalf("HAVING %s IS NULL = %v, %v; want %v", name, got, err, want)
+		}
+	}
+}
+
+// Without field metadata an executor cannot tell a misspelt field from one a
+// record simply lacks, so IS NULL on it matches every row. When the backend
+// reports its fields (JoinFieldsProvider) the same test is rejected before any
+// row is read, like a comparison on that field.
+func TestIsNullUnknownFieldNeedsSchemaToBeRejected(t *testing.T) {
+	run := func(fields map[string][]string, where Condition) ([]int, error) {
+		backend := nullJoinBackend()
+		backend.fields = fields
+		chat := NewRootCollectionRef("Chat", "c")
+		invoice := NewRootCollectionRef("Invoice", "i")
+		root := From(chat).Join(NewJoinedSource(invoice, JoinLeft, NewComparison(NewFieldRef("c", "id"), Equal, NewFieldRef("i", "chat"))))
+		q := root.NewQuery().Where(where).SelectColumns(Column{Expression: NewFieldRef("c", "id"), Alias: "id"})
+		reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), q)
+		if err != nil {
+			return nil, err
+		}
+		rows, err := ReadAllToRecords(context.Background(), reader)
+		if err != nil {
+			return nil, err
+		}
+		var ids []int
+		for _, row := range rows {
+			ids = append(ids, int(row.Data().(map[string]any)["id"].(float64)))
+		}
+		return ids, nil
+	}
+	typo := NewIsNullCondition(NewFieldRef("c", "compnay"))
+	ids, err := run(nil, typo)
+	if err != nil || len(ids) != 4 {
+		t.Fatalf("without metadata: ids = %v, err = %v; want every joined row", ids, err)
+	}
+	schema := map[string][]string{"Chat": {"id", "company"}, "Invoice": {"chat", "total"}}
+	_, err = run(schema, typo)
+	if err == nil || !strings.Contains(err.Error(), "join_field at where.operand.field") {
+		t.Fatalf("with metadata: err = %v; want a join_field error at where.operand.field", err)
+	}
+	if ids, err := run(schema, NewIsNullCondition(NewFieldRef("c", "company"))); err != nil || len(ids) != 3 {
+		t.Fatalf("known field with metadata: ids = %v, err = %v", ids, err)
 	}
 }

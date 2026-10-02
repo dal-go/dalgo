@@ -292,7 +292,7 @@ func matchesHaving(cond dal.Condition, g *aggGroup, known map[string]bool) (bool
 		if err != nil {
 			return false, err
 		}
-		return (value == nil) != c.Negated(), nil
+		return dal.IsNullValue(value) != c.Negated(), nil
 	case dal.Comparison:
 		l, err := resolveGroupValue(c.Left, g, known)
 		if err != nil {
