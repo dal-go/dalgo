@@ -90,6 +90,14 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 				}
 			}
 			return nil
+		case dal.IsNullCondition:
+			// An IS [NOT] NULL test reveals whether a field is set, so its
+			// operand is held to the same field allow-list as a comparison's.
+			switch condition.Operand().(type) {
+			case dal.Constant, *dal.Constant, dal.Param, *dal.Param:
+				return nil
+			}
+			return checkExpression(condition.Operand(), "filter")
 		case *dal.Comparison:
 			if condition == nil {
 				return nil

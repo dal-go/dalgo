@@ -41,6 +41,8 @@ func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool 
 			switch value := condition.(type) {
 			case ExistsCondition:
 				return found(value.Query()) || visitQuery(value.Query())
+			case IsNullCondition:
+				return visitExpr(value.Operand())
 			case Comparison:
 				return visitExpr(value.Left) || visitExpr(value.Right)
 			case GroupCondition:
@@ -219,6 +221,8 @@ func validateConditionScope(condition Condition, visible map[string]bool, path s
 	switch value := condition.(type) {
 	case ExistsCondition:
 		return validateQueryScope(value.Query(), visible, path+".query", visiting)
+	case IsNullCondition:
+		return validateExpressionScope(value.Operand(), visible, path+".operand", visiting)
 	case Comparison:
 		if err := validateExpressionScope(value.Left, visible, path+".left", visiting); err != nil {
 			return err

@@ -135,6 +135,9 @@ func condEqual(a, b dal.Condition) bool {
 		return comparisonEqual(ac, b)
 	case dal.GroupCondition:
 		return groupEqual(ac, b)
+	case dal.IsNullCondition:
+		bc, ok := b.(dal.IsNullCondition)
+		return ok && ac.Negated() == bc.Negated() && exprEqual(ac.Operand(), bc.Operand())
 	case dal.ExistsCondition:
 		bc, ok := b.(dal.ExistsCondition)
 		return ok && ac.Negated() == bc.Negated() && Equal(ac.Query(), bc.Query())

@@ -185,6 +185,10 @@ func validateAggregateCondition(condition Condition, groups map[string]bool, ali
 		return nil
 	}
 	switch c := condition.(type) {
+	case IsNullCondition:
+		if err := validateGroupedOperand(c.Operand(), groups, aliases); err != nil {
+			return fmt.Errorf("%s operand: %w", label, err)
+		}
 	case Comparison:
 		if err := validateGroupedOperand(c.Left, groups, aliases); err != nil {
 			return fmt.Errorf("%s left operand: %w", label, err)
@@ -372,6 +376,8 @@ func walkAggregates(q StructuredQuery, visit func(AggregateFunc)) {
 	var walkCondition func(Condition)
 	walkCondition = func(condition Condition) {
 		switch c := condition.(type) {
+		case IsNullCondition:
+			walkExpr(c.Operand())
 		case Comparison:
 			walkExpr(c.Left)
 			walkExpr(c.Right)

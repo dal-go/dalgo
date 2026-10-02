@@ -308,6 +308,25 @@ query := dal.From(dal.CollectionRef{Name: "posts"}).
     SelectIntoRecord(recordFactory)
 ```
 
+### Testing for NULL
+
+`IsNullCondition` is the portable way to select or exclude NULLs:
+
+```go
+dal.Field("company").IsNull()     // company IS NULL
+dal.Field("company").IsNotNull()  // company IS NOT NULL
+dal.NewIsNullCondition(dal.NewFieldRef("c", "company")) // qualified, usable in Having too
+```
+
+A field absent from a record counts as NULL. The test is never UNKNOWN, so it
+composes with AND/OR in joined, grouped and nested queries. The comparison
+operators keep their own semantics: a joined or recursive query evaluates
+`field == nil`, `In` and `<` with SQL's three-valued logic, where a comparison
+with NULL is UNKNOWN and matches nothing. Use `IsNullCondition`, not
+`== nil`, when the query may be joined. `IsNullCondition.String()` renders
+`field IS NULL` / `field IS NOT NULL`; an adapter that cannot translate it
+must fail the query rather than ignore it.
+
 ### Group Conditions (AND/OR)
 
 ```go

@@ -394,6 +394,30 @@
             "notExists"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "isNull": {
+              "$ref": "#/$defs/expression"
+            }
+          },
+          "required": [
+            "isNull"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "isNotNull": {
+              "$ref": "#/$defs/expression"
+            }
+          },
+          "required": [
+            "isNotNull"
+          ],
+          "type": "object"
         }
       ]
     },

@@ -35,6 +35,7 @@ by `Serialize` with a descriptive error rather than silently dropped.
 | `Comparison` | `{ op: <operator>, left: <expr>, right: <expr> }` |
 | `GroupCondition` (And) | `{ and: [ <condition>, ... ] }` |
 | `GroupCondition` (Or) | `{ or: [ <condition>, ... ] }` |
+| `IsNullCondition` | `{ isNull: <expression> }` / `{ isNotNull: <expression> }` |
 | `OrderExpression` | a sequence item under `orderBy:`, an expression plus optional `desc: true` |
 | `GroupBy` | `groupBy: [ <expression>, ... ]` |
 | money amount policy | `money: {minorUnitScale: 2, divisionScale: 4, rounding: halfEven}` |
@@ -63,6 +64,45 @@ expressions, so `SUM(quantity * unit_price)` needs no later AST redesign.
 Qualified fields keep the source structural, for example
 `{field: country, source: c}`; the source is never flattened into a dotted
 field name.
+
+## Null tests
+
+`isNull` and `isNotNull` take one expression (usually a field) and are true when
+it is, respectively is not, null. They are valid wherever a condition is: in
+`where`, in `having`, inside `and` / `or` groups, and in a nested query's
+conditions; they are not valid in a join's `on` list, which stays equality only.
+
+```yaml
+from: {name: Chat, alias: c, joins: [{type: left, from: {name: Invoice, alias: i}, on: [{left: {field: id, source: c}, op: '==', right: {field: chat, source: i}}]}]}
+where:
+  and:
+    - isNull: {field: Company, source: c}      # no company, or the column is absent
+    - isNotNull: {field: chat, source: i}       # ...and the chat has an invoice
+columns: [{field: id, source: c}]
+```
+
+```yaml
+from: {name: sales}
+groupBy: [{field: category}]
+having:
+  isNotNull: {aggregate: {function: max, args: [{field: amount}]}}
+columns: [{field: category}]
+```
+
+A field missing from a document counts as null, like an explicit `null`. A null
+test is never unknown, so `or` over it behaves as two-valued logic.
+
+**Why not `op: ==` with `{value: null}`.** A joined, aggregated or nested query
+evaluates comparisons with SQL's three-valued logic: `== null`, `In` with a null
+item, `<` and `>` against null are unknown and match nothing. A query on one
+source that is pushed down to a database keeps the adapter's meaning of
+`== null` (for example `IS NULL` in the SQLite emitter), so the same filter can
+match rows alone and none once the query is joined. Write `isNull` / `isNotNull`
+to mean the same thing everywhere. The serializer never rewrites an existing
+`== null` comparison, and `!=` does not exist in DTQL, so `isNotNull` is the only
+way to ask for non-null values. Rendered as SQL a null test is `x IS NULL` /
+`x IS NOT NULL`; an adapter that cannot translate it must reject the query
+instead of ignoring it.
 
 ## Recursive joins
 

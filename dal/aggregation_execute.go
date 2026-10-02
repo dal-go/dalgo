@@ -122,6 +122,8 @@ func collectSourceFields(q StructuredQuery) []FieldRef {
 	var walkCondition func(Condition)
 	walkCondition = func(condition Condition) {
 		switch c := condition.(type) {
+		case IsNullCondition:
+			walk(c.Operand())
 		case Comparison:
 			walk(c.Left)
 			walk(c.Right)
@@ -713,6 +715,15 @@ func (r *localAggregationReader) resolveGroupExpression(expression Expression, g
 
 func (r *localAggregationReader) evalHaving(condition Condition, group *localGroup) (bool, error) {
 	switch c := condition.(type) {
+	case IsNullCondition:
+		if c.Operand() == nil {
+			return false, fmt.Errorf("HAVING IS NULL requires an operand")
+		}
+		value, err := r.resolveGroupExpression(c.Operand(), group, group.out)
+		if err != nil {
+			return false, err
+		}
+		return (value == nil) != c.Negated(), nil
 	case Comparison:
 		left, err := r.resolveGroupExpression(c.Left, group, group.out)
 		if err != nil {
@@ -780,6 +791,8 @@ func uniqueAggregates(q StructuredQuery) []AggregateFunc {
 	var addCondition func(Condition)
 	addCondition = func(condition Condition) {
 		switch c := condition.(type) {
+		case IsNullCondition:
+			add(c.Operand())
 		case Comparison:
 			add(c.Left)
 			add(c.Right)

@@ -943,6 +943,7 @@ func isChildOf(key, parent *record.Key) bool {
 //   - Constant In FieldRef    → Firestore's "array-contains"
 //   - FieldRef op dal.Array   → Firestore's "array-contains-any"
 //   - GroupCondition with AND → all sub-conditions must match
+//   - IsNullCondition over a FieldRef (absent counts as null)
 //
 // Any other shape (including OR groups, which dalgo2firestore rejects) does
 // not match.
@@ -963,6 +964,14 @@ func matchesWhere(data map[string]any, condition dal.Condition) bool {
 		return true
 	case dal.Comparison:
 		return matchesComparison(data, cond)
+	case dal.IsNullCondition:
+		// IS NULL / IS NOT NULL over a field; an absent field counts as null.
+		// Any other operand shape does not match, like the shapes above.
+		field, ok := cond.Operand().(dal.FieldRef)
+		if !ok {
+			return false
+		}
+		return (data[field.Name()] == nil) != cond.Negated()
 	default:
 		return false
 	}

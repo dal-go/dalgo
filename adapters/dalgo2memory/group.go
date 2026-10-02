@@ -287,6 +287,12 @@ func evalAggregate(af dal.AggregateFunc, rows []rowSources, known map[string]boo
 // expression) and applies the operator; a GroupCondition composes AND/OR.
 func matchesHaving(cond dal.Condition, g *aggGroup, known map[string]bool) (bool, error) {
 	switch c := cond.(type) {
+	case dal.IsNullCondition:
+		value, err := resolveGroupValue(c.Operand(), g, known)
+		if err != nil {
+			return false, err
+		}
+		return (value == nil) != c.Negated(), nil
 	case dal.Comparison:
 		l, err := resolveGroupValue(c.Left, g, known)
 		if err != nil {

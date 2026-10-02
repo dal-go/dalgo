@@ -502,7 +502,8 @@ func validateExpressionObjectKeys(node *yaml.Node, label string, allowed map[str
 }
 
 // condYAML is the YAML representation of a dal.Condition.
-// A Comparison sets Op/Left/Right; a GroupCondition sets And or Or.
+// A Comparison sets Op/Left/Right; a GroupCondition sets And or Or; an
+// IsNullCondition sets IsNull or IsNotNull to its operand expression.
 type condYAML struct {
 	Op        string      `yaml:"op,omitempty"`    // dal.Comparison.Operator
 	Left      *exprYAML   `yaml:"left,omitempty"`  // dal.Comparison.Left
@@ -511,6 +512,8 @@ type condYAML struct {
 	Or        []condYAML  `yaml:"or,omitempty"`    // dal.GroupCondition (Or)
 	Exists    *existsYAML `yaml:"exists,omitempty"`
 	NotExists *existsYAML `yaml:"notExists,omitempty"`
+	IsNull    *exprYAML   `yaml:"isNull,omitempty"`    // dal.IsNullCondition
+	IsNotNull *exprYAML   `yaml:"isNotNull,omitempty"` // dal.IsNullCondition (negated)
 }
 
 type existsYAML struct {

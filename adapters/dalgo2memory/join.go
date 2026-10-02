@@ -84,7 +84,7 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 
 	filtered := make([]joinedRow, 0, len(combined))
 	for _, row := range combined {
-		ok, err := matchesJoinCondition(q.Where(), row.sources, known)
+		ok, err := matchesJoinWhere(q.Where(), row.sources, known)
 		if err != nil {
 			return nil, err
 		}
@@ -276,6 +276,35 @@ func allConditionsMatch(conds []dal.Condition, sources map[string]map[string]any
 		}
 	}
 	return true, nil
+}
+
+// matchesJoinWhere evaluates a joined query's WHERE: an IS NULL / IS NOT NULL
+// test, an AND/OR group of such conditions, or a single equality Comparison
+// (see matchesJoinCondition). A null-extended LEFT JOIN side and an absent
+// field both read as null.
+func matchesJoinWhere(cond dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
+	switch c := cond.(type) {
+	case dal.IsNullCondition:
+		value, _, err := resolveJoinExpr(c.Operand(), sources, known)
+		if err != nil {
+			return false, err
+		}
+		return (value == nil) != c.Negated(), nil
+	case dal.GroupCondition:
+		isOr := c.Operator() == dal.Or
+		for _, child := range c.Conditions() {
+			ok, err := matchesJoinWhere(child, sources, known)
+			if err != nil {
+				return false, err
+			}
+			if ok == isOr {
+				return isOr, nil
+			}
+		}
+		return !isOr, nil
+	default:
+		return matchesJoinCondition(cond, sources, known)
+	}
 }
 
 // matchesJoinCondition evaluates a single equality Comparison over the

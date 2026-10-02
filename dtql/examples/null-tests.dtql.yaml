@@ -1,0 +1,17 @@
+# isNull / isNotNull select or exclude NULLs. They are never UNKNOWN, so they
+# also work in joined and aggregated queries, where `op: ==` with a null value
+# matches nothing. A field absent from a record counts as null.
+from:
+  name: Customer
+  alias: c
+  joins:
+    - type: left
+      from: {name: Invoice, alias: i}
+      on:
+        - {left: {field: CustomerId, source: c}, op: '==', right: {field: CustomerId, source: i}}
+where:
+  and:
+    - isNull: {field: Company, source: c}
+    - isNull: {field: InvoiceId, source: i}
+columns:
+  - {field: CustomerId, source: c}
