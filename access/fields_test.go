@@ -391,6 +391,43 @@ func TestQueryFieldValidationHandlesPointerExpressionsAndConditions(t *testing.T
 	}
 }
 
+func TestQueryFieldValidationChecksNullTestOperands(t *testing.T) {
+	set, err := parseFieldPatterns([]string{"name"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sets := fieldSets{set}
+	from := dal.From(dal.NewRootCollectionRef("users", ""))
+	where := func(condition dal.Condition) error {
+		query := dal.NewQueryBuilder(from).Where(condition).SelectColumns(dal.Column{Expression: dal.Field("name")})
+		return validateRequestedQueryFields(query, sets)
+	}
+	for _, allowed := range []dal.Condition{
+		dal.NewIsNullCondition(dal.Field("name")),
+		dal.NewIsNotNullCondition(dal.Field("name")),
+		dal.NewIsNullCondition(dal.Constant{Value: nil}),
+		dal.NewGroupCondition(dal.Or, dal.NewIsNullCondition(dal.Field("name")), dal.NewIsNotNullCondition(dal.Field("name"))),
+	} {
+		if err := where(allowed); err != nil {
+			t.Fatalf("%s denied: %v", allowed, err)
+		}
+	}
+	// Probing a hidden field for NULL would reveal whether it is set.
+	for _, denied := range []dal.Condition{
+		dal.NewIsNullCondition(dal.Field("secret")),
+		dal.NewIsNotNullCondition(dal.Field("secret")),
+		dal.NewGroupCondition(dal.And, dal.NewIsNullCondition(dal.Field("name")), dal.NewIsNullCondition(dal.Field("secret"))),
+		dal.NewIsNullCondition(dal.Binary(dal.Field("name"), dal.Add, dal.Field("name"))),
+		dal.NewIsNullCondition(nil),
+		dal.NewIsNullCondition(dal.NewParam("who")),
+		dal.NewIsNotNullCondition(&dal.Param{Name: "who"}),
+	} {
+		if err := where(denied); !errors.Is(err, ErrAccessDenied) {
+			t.Fatalf("%s err=%v", denied, err)
+		}
+	}
+}
+
 func TestNestedQueryPoliciesPreserveCallerAndEffectiveQueries(t *testing.T) {
 	ctx := WithCurrentUser(context.Background(), "u1")
 	fieldPolicy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name")))

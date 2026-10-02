@@ -65,6 +65,9 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := validateNullTests(cond, pathJoin(path, "where"), false); err != nil {
+			return nil, err
+		}
 		qb.Where(cond)
 	}
 	if len(doc.GroupBy) > 0 {
@@ -82,6 +85,9 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 		condition, err := condFromYAMLAt(*doc.Having, pathJoin(path, "having"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid DTQL: having: %w", err)
+		}
+		if err := validateNullTests(condition, pathJoin(path, "having"), true); err != nil {
+			return nil, err
 		}
 		qb.Having(condition)
 	}
@@ -423,6 +429,8 @@ func condFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	hasOr := c.Or != nil
 	hasExists := c.Exists != nil
 	hasNotExists := c.NotExists != nil
+	hasIsNull := c.IsNull != nil
+	hasIsNotNull := c.IsNotNull != nil
 
 	forms := 0
 	if isComparison {
@@ -440,11 +448,17 @@ func condFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	if hasNotExists {
 		forms++
 	}
+	if hasIsNull {
+		forms++
+	}
+	if hasIsNotNull {
+		forms++
+	}
 	switch {
 	case forms == 0:
-		return nil, fmt.Errorf("invalid DTQL: condition must be a comparison (op/left/right) or a group (and/or)")
+		return nil, fmt.Errorf("invalid DTQL: condition must be a comparison (op/left/right), a group (and/or), exists/notExists or isNull/isNotNull")
 	case forms > 1:
-		return nil, fmt.Errorf("invalid DTQL: condition mixes comparison and group forms")
+		return nil, fmt.Errorf("invalid DTQL: condition mixes forms: exactly one of comparison (op/left/right), and, or, exists, notExists, isNull or isNotNull is allowed")
 	}
 
 	if isComparison {
@@ -455,6 +469,20 @@ func condFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	}
 	if hasOr {
 		return groupFromYAMLAt(dal.Or, c.Or, path+".or")
+	}
+	if hasIsNull {
+		operand, err := exprFromYAMLAt(*c.IsNull, path+".isNull")
+		if err != nil {
+			return nil, fmt.Errorf("invalid DTQL: isNull operand: %w", err)
+		}
+		return dal.NewIsNullCondition(operand), nil
+	}
+	if hasIsNotNull {
+		operand, err := exprFromYAMLAt(*c.IsNotNull, path+".isNotNull")
+		if err != nil {
+			return nil, fmt.Errorf("invalid DTQL: isNotNull operand: %w", err)
+		}
+		return dal.NewIsNotNullCondition(operand), nil
 	}
 	if c.Exists != nil {
 		if c.Exists.Query == nil {

@@ -90,6 +90,17 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 				}
 			}
 			return nil
+		case dal.IsNullCondition:
+			// An IS [NOT] NULL test reveals whether a field is set, so its
+			// operand is held to the field allow-list. Only a literal is
+			// waved through: unlike a comparison operand, a param here is not
+			// something a field is compared with, and DTQL does not accept one
+			// as a null-test operand, so it fails closed.
+			switch condition.Operand().(type) {
+			case dal.Constant, *dal.Constant:
+				return nil
+			}
+			return checkExpression(condition.Operand(), "filter")
 		case *dal.Comparison:
 			if condition == nil {
 				return nil

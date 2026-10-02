@@ -308,6 +308,43 @@ query := dal.From(dal.CollectionRef{Name: "posts"}).
     SelectIntoRecord(recordFactory)
 ```
 
+### Testing for NULL
+
+`IsNullCondition` is the portable way to select or exclude NULLs:
+
+```go
+dal.Field("company").IsNull()     // company IS NULL
+dal.Field("company").IsNotNull()  // company IS NOT NULL
+dal.NewIsNullCondition(dal.NewFieldRef("c", "company")) // qualified, usable in Having too
+```
+
+A field absent from a record, and a nil pointer, count as NULL. The test is
+never UNKNOWN, so it composes with AND/OR in joined, grouped and nested queries.
+`IsNullCondition.String()` renders `field IS NULL` / `field IS NOT NULL`.
+
+The comparison operators do not mean one thing against NULL, and
+`IsNullCondition` does not change that:
+
+- `Where` of a query the generic executor runs (any join, nested query or
+  federated aggregation) uses SQL three-valued logic: `field == nil`, `In` and
+  `<` against NULL are UNKNOWN and match no row.
+- `Having` of a local aggregation is two-valued: `field == nil` is true when the
+  value is NULL (`Having(g == nil)` returns the NULL group), `<`/`>` are false
+  against NULL, and `In`/`NotIn` are not supported.
+- `Where` of a single-source query handed whole to an adapter gets that
+  adapter's meaning (the SQLite emitter renders `IS NULL`; the in-memory adapter
+  also matches an absent field).
+
+That WHERE/HAVING difference predates `IsNullCondition` and is left as it was.
+Use `IsNullCondition` when the meaning must not depend on where the query runs.
+An adapter that cannot translate it must fail the query rather than ignore it;
+today only the generic executor and `dalgo2memory` evaluate it. Access-policy
+predicates (`access.DocumentCondition`, `condeval`) do not accept it: a missing
+field never matches there.
+
+Without field metadata (`dal.JoinFieldsProvider`) a misspelt field is
+indistinguishable from an absent one, so `IsNull` on it matches every row.
+
 ### Group Conditions (AND/OR)
 
 ```go

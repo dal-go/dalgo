@@ -383,13 +383,12 @@ func TestConcurrentReadonlyQueriesInitializeEnginesSafely(t *testing.T) {
 }
 
 func TestQueryHelperBranches(t *testing.T) {
-	require.False(t, matchesWhere(map[string]any{}, notComparison{}))
-	require.False(t, matchesWhere(map[string]any{}, dal.Comparison{Operator: dal.In}))
-	require.False(t, matchesWhere(map[string]any{}, dal.Comparison{
+	require.False(t, mustMatchWhere(t, map[string]any{}, dal.Comparison{Operator: dal.In}))
+	require.False(t, mustMatchWhere(t, map[string]any{}, dal.Comparison{
 		Operator: dal.Equal,
 		Left:     dal.Constant{Value: "not field"},
 	}))
-	require.False(t, matchesWhere(map[string]any{}, dal.Comparison{
+	require.False(t, mustMatchWhere(t, map[string]any{}, dal.Comparison{
 		Operator: dal.Equal,
 		Left:     dal.Field("Name"),
 		Right:    dal.Field("Other"),

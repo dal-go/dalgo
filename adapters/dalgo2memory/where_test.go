@@ -30,7 +30,6 @@ func TestMatchesWhere(t *testing.T) {
 		want      bool
 	}{
 		{"nil_condition", nil, true},
-		{"unsupported_condition_type", notComparison{}, false},
 
 		// FieldRef op Constant
 		{"equal_match", cmp(fieldRef("Name"), dal.Equal, dal.Constant{Value: "Alice"}), true},
@@ -79,12 +78,31 @@ func TestMatchesWhere(t *testing.T) {
 			cmp(fieldRef("Name"), dal.Equal, dal.Constant{Value: "Alice"}),
 			cmp(fieldRef("Age"), dal.Equal, dal.Constant{Value: 1}),
 		), false},
-		{"group_or_unsupported", dal.NewGroupCondition(dal.Or,
+		{"group_or_one_matches", dal.NewGroupCondition(dal.Or,
+			cmp(fieldRef("Name"), dal.Equal, dal.Constant{Value: "Bob"}),
 			cmp(fieldRef("Name"), dal.Equal, dal.Constant{Value: "Alice"}),
+		), true},
+		{"group_or_none_match", dal.NewGroupCondition(dal.Or,
+			cmp(fieldRef("Name"), dal.Equal, dal.Constant{Value: "Bob"}),
+			cmp(fieldRef("Age"), dal.Equal, dal.Constant{Value: 1}),
 		), false},
+		{"group_or_nested_in_and", dal.NewGroupCondition(dal.And,
+			cmp(fieldRef("Name"), dal.Equal, dal.Constant{Value: "Alice"}),
+			dal.NewGroupCondition(dal.Or,
+				cmp(fieldRef("Age"), dal.Equal, dal.Constant{Value: 1}),
+				cmp(dal.Constant{Value: "a"}, dal.In, fieldRef("Tags")),
+			),
+		), true},
+		{"group_and_nested_in_or", dal.NewGroupCondition(dal.Or,
+			dal.NewGroupCondition(dal.And,
+				cmp(fieldRef("Name"), dal.Equal, dal.Constant{Value: "Alice"}),
+				cmp(fieldRef("Age"), dal.Equal, dal.Constant{Value: 1}),
+			),
+			cmp(fieldRef("Age"), dal.GreaterThen, dal.Constant{Value: 40}),
+		), true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, matchesWhere(data, tt.condition))
+			require.Equal(t, tt.want, mustMatchWhere(t, data, tt.condition))
 		})
 	}
 }
@@ -312,4 +330,37 @@ func TestQueryWhereMultipleConditionsEndToEnd(t *testing.T) {
 			WhereField("Rank", dal.GreaterThen, 1)
 	})
 	require.Equal(t, []string{"t2"}, ids)
+}
+
+// mustMatchWhere runs a single-source WHERE over one record's data.
+func mustMatchWhere(t *testing.T, data map[string]any, condition dal.Condition) bool {
+	t.Helper()
+	ok, err := matchesWhere(condition, map[string]map[string]any{"": data}, map[string]bool{"": true})
+	require.NoError(t, err)
+	return ok
+}
+
+// A condition the adapter cannot evaluate fails the query: returning no rows
+// for it (as it once did for OR groups) would be a wrong answer.
+func TestMatchesWhereRejectsWhatItCannotEvaluate(t *testing.T) {
+	sources := map[string]map[string]any{"": {"Name": "Alice"}}
+	known := map[string]bool{"": true}
+	for name, condition := range map[string]dal.Condition{
+		"unsupported condition type":    notComparison{},
+		"exists":                        dal.NewExistsCondition(dal.From(dal.NewRootCollectionRef("x", "")).NewQuery().SelectIntoRecordset()),
+		"unsupported type in a group":   dal.NewGroupCondition(dal.And, notComparison{}),
+		"unsupported type in an or":     dal.NewGroupCondition(dal.Or, dal.NewComparison(dal.Field("Name"), dal.Equal, dal.Constant{Value: "Bob"}), notComparison{}),
+		"unknown group operator":        dal.NewGroupCondition(dal.Operator("xor"), dal.NewIsNullCondition(dal.Field("Name"))),
+		"null test on a values list":    dal.NewIsNullCondition(dal.Array{Value: []string{"a"}}),
+		"null test on a param":          dal.NewIsNullCondition(dal.NewParam("p")),
+		"null test on arithmetic":       dal.NewIsNullCondition(dal.Binary(dal.Field("Name"), dal.Add, dal.Constant{Value: 1})),
+		"null test with a nil operand":  dal.NewIsNullCondition(nil),
+		"null test on a foreign source": dal.NewIsNullCondition(dal.NewFieldRef("zzz", "Name")),
+	} {
+		t.Run(name, func(t *testing.T) {
+			ok, err := matchesWhere(condition, sources, known)
+			require.Error(t, err)
+			require.False(t, ok)
+		})
+	}
 }

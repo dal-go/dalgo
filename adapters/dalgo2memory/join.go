@@ -84,7 +84,7 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 
 	filtered := make([]joinedRow, 0, len(combined))
 	for _, row := range combined {
-		ok, err := matchesJoinCondition(q.Where(), row.sources, known)
+		ok, err := matchesJoinWhere(q.Where(), row.sources, known)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +167,9 @@ func orderBySources[T any](rows []T, orderBy []dal.OrderExpression, sourcesOf fu
 			if f.IsID() {
 				c = compare(idOf(rows[i]), idOf(rows[j]))
 			} else {
-				c = compare(si[f.Source()][f.Name()], sj[f.Source()][f.Name()])
+				left, _ := fieldValue(si[f.Source()], f.Name())
+				right, _ := fieldValue(sj[f.Source()], f.Name())
+				c = compare(left, right)
 			}
 			if oe.Descending() {
 				c = -c
@@ -255,12 +257,12 @@ func resolveJoinExpr(e dal.Expression, sources map[string]map[string]any, known 
 		if !known[src] {
 			return nil, false, fmt.Errorf("dalgo2memory: field %q references unknown source %q", v.Name(), src)
 		}
-		val, present := sources[src][v.Name()]
+		val, present := fieldValue(sources[src], v.Name())
 		return val, present, nil
 	case dal.Constant:
 		return v.Value, true, nil
 	default:
-		return nil, false, fmt.Errorf("dalgo2memory: unsupported expression %T in join query", e)
+		return nil, false, fmt.Errorf("dalgo2memory: unsupported expression %T", e)
 	}
 }
 
@@ -276,28 +278,6 @@ func allConditionsMatch(conds []dal.Condition, sources map[string]map[string]any
 		}
 	}
 	return true, nil
-}
-
-// matchesJoinCondition evaluates a single equality Comparison over the
-// per-source data. A nil condition matches; any non-equality shape does not
-// (mirroring the in-memory adapter's single-source WHERE support).
-func matchesJoinCondition(cond dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
-	if cond == nil {
-		return true, nil
-	}
-	cmp, ok := cond.(dal.Comparison)
-	if !ok || cmp.Operator != dal.Equal {
-		return false, nil
-	}
-	l, lok, err := resolveJoinExpr(cmp.Left, sources, known)
-	if err != nil {
-		return false, err
-	}
-	r, rok, err := resolveJoinExpr(cmp.Right, sources, known)
-	if err != nil {
-		return false, err
-	}
-	return lok && rok && valuesEqual(l, r), nil
 }
 
 func valuesEqual(a, b any) bool {

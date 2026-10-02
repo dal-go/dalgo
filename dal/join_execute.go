@@ -338,6 +338,8 @@ func (e *joinExecution) validateQueryFields() error {
 	var condition func(Condition, string) error
 	condition = func(value Condition, path string) error {
 		switch v := value.(type) {
+		case IsNullCondition:
+			return expression(v.Operand(), path+".operand")
 		case Comparison:
 			if err := expression(v.Left, path+".left"); err != nil {
 				return err
@@ -1036,6 +1038,15 @@ func evalJoinCondition(condition Condition, row joinRow) (bool, error) {
 			}
 		}
 		return true, nil
+	case IsNullCondition:
+		if c.Operand() == nil {
+			return false, joinError("join_plan", "where", "IS NULL requires an operand")
+		}
+		value, err := evalJoinExpression(c.Operand(), row)
+		if err != nil {
+			return false, err
+		}
+		return IsNullValue(value) != c.Negated(), nil
 	default:
 		return false, joinError("join_plan", "where", fmt.Sprintf("unsupported condition %T", condition))
 	}
@@ -1312,6 +1323,18 @@ func (e *joinExecution) evalTruthAt(condition Condition, row joinRow, path strin
 		return queryTrue, nil
 	}
 	switch value := condition.(type) {
+	case IsNullCondition:
+		if value.Operand() == nil {
+			return queryUnknown, queryError("query_shape", path+".operand", "IS NULL requires an operand")
+		}
+		operand, err := e.evalExpressionAt(value.Operand(), row, path+".operand")
+		if err != nil {
+			return queryUnknown, err
+		}
+		if IsNullValue(operand) != value.Negated() {
+			return queryTrue, nil
+		}
+		return queryFalse, nil
 	case ExistsCondition:
 		records, err := e.queryRecordsCappedAt(value.Query(), &row, 1, false, path+".query")
 		if err != nil {
@@ -1543,6 +1566,8 @@ func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[strin
 	var condition func(Condition, map[string]bool)
 	condition = func(value Condition, visible map[string]bool) {
 		switch item := value.(type) {
+		case IsNullCondition:
+			expression(item.Operand(), visible)
 		case ExistsCondition:
 			mergeChild(item.Query(), visible)
 		case Comparison:

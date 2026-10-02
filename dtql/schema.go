@@ -213,6 +213,8 @@ func schemaDocument() map[string]any {
 				map[string]any{"$ref": "#/$defs/group"},
 				map[string]any{"type": "object", "additionalProperties": false, "required": []any{"exists"}, "properties": map[string]any{"exists": map[string]any{"$ref": "#/$defs/exists"}}},
 				map[string]any{"type": "object", "additionalProperties": false, "required": []any{"notExists"}, "properties": map[string]any{"notExists": map[string]any{"$ref": "#/$defs/exists"}}},
+				map[string]any{"type": "object", "additionalProperties": false, "required": []any{"isNull"}, "properties": map[string]any{"isNull": map[string]any{"$ref": "#/$defs/expression"}}},
+				map[string]any{"type": "object", "additionalProperties": false, "required": []any{"isNotNull"}, "properties": map[string]any{"isNotNull": map[string]any{"$ref": "#/$defs/expression"}}},
 			},
 		},
 	}

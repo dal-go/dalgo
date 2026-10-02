@@ -57,6 +57,8 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 	var condition func(dal.Condition, string) error
 	condition = func(value dal.Condition, path string) error {
 		switch v := value.(type) {
+		case dal.IsNullCondition:
+			return expression(v.Operand(), path+".operand")
 		case dal.Comparison:
 			if err := expression(v.Left, path+".left"); err != nil {
 				return err

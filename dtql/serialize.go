@@ -348,6 +348,18 @@ func condToYAML(cond dal.Condition) (*condYAML, error) {
 		return comparisonToYAML(c)
 	case dal.GroupCondition:
 		return groupToYAML(c)
+	case dal.IsNullCondition:
+		if c.Operand() == nil {
+			return nil, fmt.Errorf("query_shape at condition: operand is required")
+		}
+		operand, err := exprToYAML(c.Operand())
+		if err != nil {
+			return nil, fmt.Errorf("null test operand: %w", err)
+		}
+		if c.Negated() {
+			return &condYAML{IsNotNull: &operand}, nil
+		}
+		return &condYAML{IsNull: &operand}, nil
 	case dal.ExistsCondition:
 		if c.Query() == nil {
 			return nil, fmt.Errorf("query_shape at query: query is required")

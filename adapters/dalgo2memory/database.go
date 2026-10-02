@@ -747,8 +747,14 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	}
 	rows := make([]memoryRow, 0, len(allRows))
 	for _, row := range allRows {
-		if !matchesWhere(row.data, q.Where()) {
-			continue
+		if where := q.Where(); where != nil {
+			matched, err := matchesWhere(where, baseSources(base, row.data), known)
+			if err != nil {
+				return nil, err
+			}
+			if !matched {
+				continue
+			}
 		}
 		// Parent-scoped query: keep only rows whose stored key is a direct child
 		// of the requested parent. A nil parent (root collection ref) is the
@@ -935,39 +941,6 @@ func isChildOf(key, parent *record.Key) bool {
 	return p.String() == parent.String()
 }
 
-// matchesWhere evaluates the WHERE condition shapes that dalgo2firestore
-// translates to native Firestore filters, so memory-backed tests behave like
-// the Firestore adapter:
-//
-//   - FieldRef op Constant for ==, >, >=, <, <=
-//   - Constant In FieldRef    → Firestore's "array-contains"
-//   - FieldRef op dal.Array   → Firestore's "array-contains-any"
-//   - GroupCondition with AND → all sub-conditions must match
-//
-// Any other shape (including OR groups, which dalgo2firestore rejects) does
-// not match.
-func matchesWhere(data map[string]any, condition dal.Condition) bool {
-	if condition == nil {
-		return true
-	}
-	switch cond := condition.(type) {
-	case dal.GroupCondition:
-		if cond.Operator() != dal.And {
-			return false
-		}
-		for _, c := range cond.Conditions() {
-			if !matchesWhere(data, c) {
-				return false
-			}
-		}
-		return true
-	case dal.Comparison:
-		return matchesComparison(data, cond)
-	default:
-		return false
-	}
-}
-
 func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 	switch left := comparison.Left.(type) {
 	case dal.FieldRef:
@@ -976,9 +949,10 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 			norm := normalizeConstant(right.Value)
 			switch comparison.Operator {
 			case dal.Equal:
-				return data[left.Name()] == norm
+				value, _ := fieldValue(data, left.Name())
+				return value == norm
 			case dal.GreaterThen, dal.GreaterOrEqual, dal.LessThen, dal.LessOrEqual:
-				value, ok := data[left.Name()]
+				value, ok := fieldValue(data, left.Name())
 				if !ok {
 					return false
 				}
@@ -989,7 +963,8 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 		case dal.Array:
 			// dalgo2firestore maps FieldRef vs dal.Array to "array-contains-any"
 			// regardless of the operator; mirror that.
-			return fieldContainsAny(data[left.Name()], right.Value)
+			value, _ := fieldValue(data, left.Name())
+			return fieldContainsAny(value, right.Value)
 		default:
 			return false
 		}
@@ -999,7 +974,8 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 		if !ok || comparison.Operator != dal.In {
 			return false
 		}
-		return fieldContains(data[right.Name()], normalizeConstant(left.Value))
+		value, _ := fieldValue(data, right.Name())
+		return fieldContains(value, normalizeConstant(left.Value))
 	default:
 		return false
 	}

@@ -33,7 +33,7 @@ Context determines query result shape. `from.query` and `join.from.query` provid
 
 #### REQ: wire-discriminators
 
-A query mapping orders keys as `as`, `from`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`, `columns`. A source mapping contains exactly one of `name` (table) or `query` (derived result), plus optional outer `joins`; `schema` and table `alias`/`as` are legal only with `name`. Derived result alias is `query.as`, not a sibling of `query`, and `query.as` must not collide with another alias in its enclosing scope. A column/expression mapping contains exactly one of its existing discriminators or `query`; a scalar column's output name is `query.as`, while a non-query column keeps its existing `as`. A predicate contains exactly one of comparison `op`+`left`+`right`, `and`, `or`, `exists`, or `notExists`. `exists` and `notExists` each contain only `query`. `In`/`NotIn` require one `right` discriminator: existing `values` or new `query`; other comparisons retain their existing RHS forms. Unknown keys, mixed discriminators, missing required parts, or recursive YAML aliases are errors at their exact path. JSON keys have the same spelling and shape.
+A query mapping orders keys as `as`, `from`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`, `columns`. A source mapping contains exactly one of `name` (table) or `query` (derived result), plus optional outer `joins`; `schema` and table `alias`/`as` are legal only with `name`. Derived result alias is `query.as`, not a sibling of `query`, and `query.as` must not collide with another alias in its enclosing scope. A column/expression mapping contains exactly one of its existing discriminators or `query`; a scalar column's output name is `query.as`, while a non-query column keeps its existing `as`. A predicate contains exactly one of comparison `op`+`left`+`right`, `and`, `or`, `exists`, `notExists`, `isNull`, or `isNotNull`; `isNull` and `isNotNull` each contain one expression. `exists` and `notExists` each contain only `query`. `In`/`NotIn` require one `right` discriminator: existing `values` or new `query`; other comparisons retain their existing RHS forms. Unknown keys, mixed discriminators, missing required parts, or recursive YAML aliases are errors at their exact path. JSON keys have the same spelling and shape.
 
 Canonical examples (additional normal clauses may appear inside every `query`):
 
@@ -97,6 +97,16 @@ Field resolution MUST search the innermost query scope first, then each enclosin
 
 `op: In` and `op: NotIn` MUST accept a `right.query` with exactly one selected column, including correlated and nested queries. Membership uses relational three-valued logic: a match is TRUE; no match with a NULL comparison is UNKNOWN; otherwise FALSE. Empty RHS makes IN FALSE and NOT IN TRUE, even for a NULL LHS. NOT IN negates the three-valued result, not a host-language boolean. The subquery evaluator uses one internal TRUE/FALSE/UNKNOWN value: NOT maps UNKNOWN to UNKNOWN; AND is FALSE if either input is FALSE, TRUE only if both are TRUE, otherwise UNKNOWN; OR is TRUE if either is TRUE, FALSE only if both are FALSE, otherwise UNKNOWN. Comparisons involving NULL yield UNKNOWN; `IN` follows the stated match/NULL/empty rules. JOIN ON, WHERE, and HAVING keep only TRUE. The new evaluator MUST use this truth model for all conditions in a query it executes, while pre-existing queries on their old execution route retain observed behavior. Shared fixtures cover every AND/OR/NOT combination used by nested predicates.
 
+#### REQ: null-tests
+
+`isNull: <expression>` and `isNotNull: <expression>` (Go `dal.IsNullCondition`) are the explicit null tests. A null test is TRUE or FALSE for every input and is never UNKNOWN, so under the three-valued model above it composes with AND, OR and every nested predicate without producing UNKNOWN. A field absent from a record, an explicit null, a null-extended LEFT JOIN side, and (in Go) a nil pointer all count as NULL. A null test is valid in `where`, in `having` (where its operand may be an aggregate or a SELECT alias) and inside a nested query, over a field, a literal, arithmetic or a scalar subquery; it is not valid in a JOIN `on` list. Its operand MUST NOT be a `values` list, `star` or `param`, nor an aggregate in `where`; Go and TypeScript reject those at parse. Both runtimes MUST evaluate a null test in the generic executors (flat and recursive) and in HAVING, and the TypeScript parser MUST accept a null test on a bare single source by parsing it into the relation model, because the legacy single-source filter cannot carry one.
+
+A null test does not change the comparison operators, which are not uniform: in WHERE and JOIN ON of the generic executor `x == null` is UNKNOWN and keeps no row, while in a local aggregation's HAVING `x == null` is true for a NULL value (HAVING `g == null` returns the NULL group), the ordering operators are false against NULL, and `In`/`NotIn` are not supported. That WHERE/HAVING inconsistency predates null tests and is documented, not changed, by this requirement. An adapter that evaluates a query itself (a single-source query, or one it claims natively) and cannot evaluate a null test MUST fail the query rather than ignore the condition.
+
+A misspelt field is the same as an absent one: without field metadata the executor cannot reject `isNull` on it, so Go matches every row for `isNull` and none for `isNotNull`; where the backend reports its fields (`JoinFieldsProvider`) Go rejects it before reading a row, and TypeScript, which always has a schema, rejects it at parse.
+
+POLICY predicates keep a different rule. Access-policy conditions (`access.DocumentCondition`, `condeval`) stay on the comparison and group subset and MUST reject a null test: the layered-ACL acceptance rule V02 (datatug/dtql `design/layered-acl/11-acceptance.md`: "Missing != null ... missing never matches") keeps winning there, and a null test would make a missing field match. In the QUERY engine a missing field reads as NULL, as it already does for every other operator; the two rules govern different evaluators and do not conflict.
+
 #### REQ: exists-not-exists
 
 `exists.query` and `notExists.query` MUST accept correlated and non-correlated queries. They test row presence irrespective of projection values, so a row containing NULL satisfies EXISTS. When `columns` is omitted, the executor MUST avoid projecting values, and generic execution MUST stop after the first qualifying row. NOT EXISTS is the logical complement of row existence.
@@ -150,6 +160,18 @@ Then each applies the inner pipeline before joining and returns the same ordered
 Given matching, missing, empty, NULL-left, NULL-right, and mixed-NULL one-column query results, including correlation and AND/OR compositions
 When IN and NOT IN are evaluated
 Then both runtimes implement the same TRUE/FALSE/UNKNOWN table and reject a multi-column query.
+
+### AC: null-test-semantics (verifies REQ:null-tests, REQ:in-not-in)
+
+Given rows with an explicit null, an absent field, a value, and a null-extended LEFT JOIN side, a typed nil pointer, and AND/OR/nested compositions that mix `== null` comparisons with null tests, and aggregated data with a null group
+When `isNull` and `isNotNull` are evaluated in WHERE, in HAVING, over arithmetic, an aggregate and a scalar subquery, in a bare single-source parse and in a joined query
+Then both runtimes agree row for row, a null test never yields UNKNOWN (an OR over `x == null` and `isNull x` keeps a null `x`), `== null` in joined WHERE keeps nothing while `isNull` keeps the null and absent rows, HAVING `g == null` returns the null group, and Go and TypeScript reject the same operand shapes at parse.
+
+### AC: null-test-adapters-and-policies (verifies REQ:null-tests, REQ:execution-routing)
+
+Given the in-memory adapter, an executor with field metadata, an access policy predicate, and an adapter that cannot translate a null test
+When a query with a null test runs against each
+Then the in-memory adapter returns the correct rows (including OR groups and nested fields), a misspelt field is rejected where metadata exists, a policy predicate rejects the null test, and the other adapter fails the query instead of returning a result that ignored it.
 
 ### AC: existence (verifies REQ:exists-not-exists)
 
