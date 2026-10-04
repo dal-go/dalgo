@@ -21,7 +21,7 @@ method that writes caller values into the SQL text. That is the design the
 PostgreSQL launch work must avoid: no caller value may ever be sent as SQL text.
 Bound parameters replace literal escaping.
 
-Where each hook goes instead (the plan's design, not a founder ruling):
+Where each hook goes instead (the PostgreSQL launch plan's design, not a founder ruling):
 
 - Dialects will live in `dal-go/dalgo2sql`, as one dialect-parameterised compiler for
   statically typed SQL engines, PostgreSQL first, selected by

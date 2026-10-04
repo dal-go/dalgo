@@ -21,7 +21,7 @@ DALgo provides official adapters for various databases:
 |---------|----------|---------|----------|
 | **dalgo2firestore** | Google Cloud Firestore | `github.com/dal-go/dalgo2firestore` | Serverless NoSQL, real-time sync |
 | **dalgo2datastore** | Google Cloud Datastore | `github.com/dal-go/dalgo2datastore` | Legacy Google NoSQL |
-| **dalgo2sql** | SQL databases | `github.com/dal-go/dalgo2sql` | SQLite (structured-query compiler); PostgreSQL, MySQL, SQL Server and other `database/sql` engines use the legacy text emitter (a PostgreSQL compiler is planned) |
+| **dalgo2sql** | SQL databases | `github.com/dal-go/dalgo2sql` | SQLite (structured-query compiler); PostgreSQL, MySQL, SQL Server and other `database/sql` engines use the legacy text emitter, which does not bind values (a PostgreSQL compiler is planned) |
 | **dalgo2fs** | File system | Built-in: `./dalgo2fs` | Local file storage |
 | **dalgo2memory** | Memory | Built-in: `./dalgo2memory` | Tests, examples, local development |
 | **dalgo2files** | File system | `github.com/dal-go/dalgo2files` | Simple file storage |

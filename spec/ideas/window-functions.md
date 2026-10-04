@@ -55,15 +55,16 @@ Delivery, in order (the plan's design):
    dalgo2sql compilers (SQLite and the typed one); an explicit "unsupported" error
    from the generic engine and the TypeScript engine; parity cases. 9 to 12
    agent-days across dalgo, dalgo2sql and dalgo-js.
-3. In memory: a window executor in the DALgo generic engine for providers without
-   native support, within the same row bounds as joins and aggregation. Not sized
-   separately; the plan sizes native plus in-memory together at three to four weeks.
+3. In memory: a window executor in the DALgo generic engine and in the TypeScript
+   engine (dalgo-js) for providers without native support, within the same row bounds
+   as joins and aggregation. Not sized separately; the plan sizes native plus
+   in-memory in both engines together at three to four weeks.
 
 ## Alternatives Considered
 
 - **Native only, no in-memory fallback.** Cheapest, but a provider without windows
-  would simply fail. Overruled by the founder's second sentence.
-- **Full support in both engines before launch.** Three to four weeks; the launch
+  would simply fail. Overruled by the founder's third sentence (window functions on the DALgo side for providers without native support).
+- **Full support (native plus in-memory in the Go and TypeScript engines) before launch.** Three to four weeks; the launch
   window is three weeks and focus is the priority. Rejected on schedule.
 - **No seam until later.** Costs a hook change in a compiler written weeks earlier.
 
@@ -89,6 +90,7 @@ plan).
 |------|------------|-----------------|
 | Must-be-true | The in-memory executor fits the generic engine's row bounds without a new bound. | Prototype ROW_NUMBER over the existing bounded row set. |
 | Must-be-true | Native results match in-memory results for the same query. | Shared parity fixtures run on both paths. |
+| Must-be-true | A window whose PARTITION BY, ORDER BY or argument names a field hidden by a field-restricted policy is denied on both the native and in-memory paths; otherwise ranking leaks the hidden field. | Negative cases in the access conformance suite before the first slice ships. |
 | Should-be-true | One dialect hook is enough for the SQL spelling differences. | Compare PostgreSQL and SQLite window syntax when the first slice starts. |
 
 ## SpecScore Integration

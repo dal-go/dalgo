@@ -389,7 +389,9 @@ DALgo supports production use through separate adapter modules:
   Go SQL drivers. SQLite has a structured-query compiler (opt in with
   `DbOptions.StructuredQueryDialect: "sqlite"`). PostgreSQL, MySQL, Microsoft
   SQL Server and Oracle have no compiler yet and use the legacy text emitter,
-  which is not dialect-aware; a PostgreSQL compiler is planned.
+  which is not dialect-aware and writes query values into the SQL text instead of
+  binding them; do not pass untrusted values through it. A PostgreSQL compiler is
+  planned.
 - [`dalgo2sqlite`](https://github.com/dal-go/dalgo2sqlite) for SQLite-specific
   schema, DDL, and concurrency-aware behavior on top of SQL support.
 
