@@ -20,10 +20,12 @@ memory for providers that do not?
 
 ## Context
 
-The founder's words, 2026-10-04: "Window furncrioms should be supported by DTQL" and
+The founder's words, 2026-10-04: "We also probably should add support for native
+analytical window functions", "Window furncrioms should be supported by DTQL" and
 "I'd also add window functions on dalgo side for providers that do not support them
-natively". These two sentences are the founder rulings in this idea. Everything else
-below is the PostgreSQL launch plan's design, marked as such.
+natively". These three sentences are the founder's words in this idea; the first is
+hedged ("probably"). Everything else below is the PostgreSQL launch plan's design or
+this idea's own proposal, marked as such.
 
 Today DTQL has no window functions, and `query-group-by-aggregation` lists them as out
 of scope. Every DTQL feature exists in two engines: native in the SQL compiler and in
@@ -33,8 +35,10 @@ natively on servers that support them."); windows follow the same rule.
 
 ## Recommended Direction
 
-Founder ruling: window functions are part of DTQL. They run natively where the server
-supports them, and in memory in DALgo otherwise.
+Founder rulings: window functions are part of DTQL, and DALgo computes them in memory
+for providers without native support. Native execution where the server supports
+windows rests on the founder's hedged "We also probably should add support for native
+analytical window functions" and on the aggregation rule; it is not an unhedged ruling.
 
 Sequencing (the plan's design, not a founder ruling): after PostgreSQL parity. The
 launch window ends 2026-10-25 and the document format is being frozen; adding
@@ -52,8 +56,8 @@ Delivery, in order (the plan's design):
    from the generic engine and the TypeScript engine; parity cases. 9 to 12
    agent-days across dalgo, dalgo2sql and dalgo-js.
 3. In memory: a window executor in the DALgo generic engine for providers without
-   native support, within the same row bounds as joins and aggregation. Three to four
-   weeks for both engines together.
+   native support, within the same row bounds as joins and aggregation. Not sized
+   separately; the plan sizes native plus in-memory together at three to four weeks.
 
 ## Alternatives Considered
 
@@ -67,15 +71,17 @@ Delivery, in order (the plan's design):
 
 The seam only: a reserved dialect method in dalgo2sql and this written idea. First
 useful slice after launch: ROW_NUMBER, RANK, SUM OVER and LAG over one partition and
-one ordering, native on PostgreSQL and SQLite.
+one ordering, native on PostgreSQL and SQLite (Proposal: this idea's own, not in the
+plan).
 
 ## Not Doing (and Why)
 
 - Window syntax in DTQL before the PostgreSQL launch — the format is being frozen and
   the work is sequenced after parity.
-- Frame clauses (ROWS or RANGE BETWEEN) in the first slice — most uses need only
-  partition and order.
-- Window functions inside access-policy conditions — policies are row-level filters.
+- Proposal: frame clauses (ROWS or RANGE BETWEEN) in the first slice — most uses need
+  only partition and order.
+- Proposal: window functions inside access-policy conditions — policies are row-level
+  filters.
 
 ## Key Assumptions to Validate
 

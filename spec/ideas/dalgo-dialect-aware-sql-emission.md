@@ -23,7 +23,7 @@ Bound parameters replace literal escaping.
 
 Where each hook goes instead (the plan's design, not a founder ruling):
 
-- Dialects live in `dal-go/dalgo2sql`, as one dialect-parameterised compiler for
+- Dialects will live in `dal-go/dalgo2sql`, as one dialect-parameterised compiler for
   statically typed SQL engines, PostgreSQL first, selected by
   `DbOptions.StructuredQueryDialect`. DALgo core gains no `dal/dialect` package and
   no exported API from this idea.
@@ -32,8 +32,7 @@ Where each hook goes instead (the plan's design, not a founder ruling):
 - Literal escaping is dropped. Values travel as bound parameters.
 - `String()` is unchanged; it stays a debugging aid, not a driver contract.
 
-Design record: the PostgreSQL launch plan, task DG-01 (2026-10-04). See also
-[window-functions](window-functions.md).
+See also [window-functions](window-functions.md).
 
 ## Problem Statement
 
