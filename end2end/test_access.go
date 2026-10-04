@@ -152,3 +152,86 @@ func accessConditionsTest(ctx context.Context, t *testing.T, db dal.DB) {
 		assert.NotEqual(t, country, other.Country, "the other country's city must be untouched")
 	})
 }
+
+// accessFieldListTest proves, on a real adapter, that a policy's field
+// allow-list holds when the caller reaches for a hidden field indirectly
+// (dalgo issue 148): under an alias that is itself allowed, in a selection
+// where every column is refused, or in a filter or order the result never
+// shows. Each case must be denied by the access layer before the adapter
+// runs, on both read paths, and it is run under both shapes of allow-list:
+// an enumerable one (the access layer projects the query) and one with a
+// wildcard (the access layer falls back to redacting the result). Population
+// and State are never in either list.
+func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
+	lists := map[string][]string{
+		"enumerable_list": {"Name", "Country"},
+		"wildcard_list":   {"Name", "Count*"},
+	}
+	cities := func() dal.IQueryBuilder {
+		return dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "")).NewQuery()
+	}
+	for name, fields := range lists {
+		t.Run(name, func(t *testing.T) {
+			secured := access.MustSecureDB(db, access.WithDatabasePolicies(access.MustPolicy("cities-fields",
+				access.Collection(models.CitiesCollection, access.Allow(access.Query, "query-allowed-fields").Fields(fields...)),
+			)))
+			// readers runs the query on both read paths; the adapter must not be
+			// reached, so a denial is the only acceptable answer.
+			assertDenied := func(t *testing.T, q dal.Query) {
+				t.Helper()
+				err := secured.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
+					_, err := tx.ExecuteQueryToRecordsReader(ctx, q)
+					return err
+				}, dal.TxWithMessage("access field list: records"))
+				assert.ErrorIs(t, err, access.ErrAccessDenied, "records reader")
+				err = secured.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
+					_, err := tx.ExecuteQueryToRecordsetReader(ctx, q)
+					return err
+				}, dal.TxWithMessage("access field list: recordset"))
+				assert.ErrorIs(t, err, access.ErrAccessDenied, "recordset reader")
+			}
+
+			t.Run("allowed_columns_still_read", func(t *testing.T) {
+				// Positive control: the policy is not simply denying everything.
+				q := cities().WhereField("Country", dal.Equal, "JP").OrderBy(dal.AscendingField("Name")).
+					SelectColumns(dal.Column{Expression: dal.Field("Name")})
+				rows, err := readMapRecords(ctx, secured, q, "access field list: allowed columns")
+				if errors.Is(err, dal.ErrNotSupported) {
+					t.Skip("column projection not supported by adapter:", err)
+				}
+				require.NoError(t, err)
+				require.NotEmpty(t, rows)
+				for _, row := range rows {
+					assert.Contains(t, row, "Name")
+					assert.NotContains(t, row, "Population")
+					assert.NotContains(t, row, "State")
+				}
+			})
+			t.Run("hidden_field_under_an_allowed_alias", func(t *testing.T) {
+				assertDenied(t, cities().SelectColumns(dal.Column{Alias: "Name", Expression: dal.Field("Population")}))
+				assertDenied(t, cities().SelectColumns(dal.Column{Alias: "Country", Expression: dal.Field("State")}))
+				assertDenied(t, cities().SelectColumns(
+					dal.Column{Expression: dal.Field("Name")},
+					dal.Column{Alias: "Count_hidden", Expression: dal.Field("Population")},
+				))
+			})
+			t.Run("every_selected_column_refused", func(t *testing.T) {
+				assertDenied(t, cities().SelectColumns(dal.Column{Expression: dal.Field("Population")}))
+				assertDenied(t, cities().SelectColumns(
+					dal.Column{Expression: dal.Field("Population")},
+					dal.Column{Alias: "where", Expression: dal.Field("State")},
+				))
+				// An aggregate over a hidden field is a selection of that field.
+				assertDenied(t, cities().SelectColumns(dal.SumAs(dal.Field("Population"), "total")))
+			})
+			t.Run("filter_or_order_on_a_hidden_field", func(t *testing.T) {
+				selectName := dal.Column{Expression: dal.Field("Name")}
+				assertDenied(t, cities().WhereField("Population", dal.GreaterThen, 1).SelectColumns(selectName))
+				assertDenied(t, cities().WhereField("Name", dal.Equal, "Tokyo").WhereField("State", dal.Equal, "Tokyo").SelectColumns(selectName))
+				assertDenied(t, cities().OrderBy(dal.DescendingField("Population")).SelectColumns(selectName))
+				assertDenied(t, cities().WhereField("Population", dal.GreaterThen, 1).SelectKeysOnly(reflect.String))
+				assertDenied(t, cities().GroupBy(dal.Field("State")).SelectColumns(selectName))
+			})
+		})
+	}
+}

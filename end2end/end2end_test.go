@@ -280,6 +280,13 @@ func TestEndToEnd(t *testing.T) {
 			// The replay adapter cannot execute a narrowed query; the access
 			// sub-tests must skip rather than fail.
 			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access field list: allowed columns":
+			// The replay adapter cannot project columns; the positive control
+			// must skip rather than fail.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access field list: records", "access field list: recordset":
+			// Every query in these transactions must be denied by the access
+			// layer; the adapter is never reached, so no call is expected.
 		case "":
 			panic("no RO tx name")
 		default:
