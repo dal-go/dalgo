@@ -15,7 +15,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [access-policies](access-policies.md) | Implemented | 2026-07-17 | alex | access-policies |
 | [concurrency-capability](concurrency-capability.md) | Approved | 2026-05-12 | alex | — |
 | [dal-records-reader-iter-seq](dal-records-reader-iter-seq.md) | Draft | 2026-05-15 | alex | — |
-| [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Draft | 2026-05-15 | alex | — |
+| [dalgo-dialect-aware-sql-emission](dalgo-dialect-aware-sql-emission.md) | Rejected | 2026-05-15 | alex | — |
 | [dalgo-schema-modification](dalgo-schema-modification.md) | Approved | 2026-05-12 | alex | — |
 | [dalgo2memory-storage-engines](dalgo2memory-storage-engines.md) | Implemented | 2026-06-06 | alex | columnar-mixed-mode-maps, columnar-storage, serialized-storage, storage-engine-seam |
 | [dalgo2namecheap](dalgo2namecheap.md) | Specified | 2026-06-26 | alexander.trakhimenok@gmail.com | dalgo2namecheap-namecheap-api-adapter |
@@ -31,6 +31,7 @@ The Idea format follows [SpecScore](https://specscore.md/idea-specification).
 | [row-level-access-conditions](row-level-access-conditions.md) | Implementing | 2026-09-02 | alex | access-policies/field-patterns, access-policies/principal-bindings, access-policies/row-level-conditions |
 | [transaction-message](transaction-message.md) | Approved | 2026-06-02 | alex | — |
 | [triggers-and-webhooks](triggers-and-webhooks.md) | Specifying | 2026-09-02 | alex | triggers |
+| [window-functions](window-functions.md) | Draft | 2026-10-04 | alex | — |
 
 ## Open Questions
 

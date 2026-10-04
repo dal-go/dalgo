@@ -1,16 +1,39 @@
 ---
 format: https://specscore.md/idea-specification
-status: Draft
+status: Rejected
 ---
 
 # Idea: DALgo dialect-aware SQL emission
 
-**Status:** Draft
+**Status:** Rejected
 **Date:** 2026-05-15
 **Owner:** alex
 **Promotes To:** —
 **Supersedes:** —
 **Related Ideas:** —
+
+## Resolution
+
+**Resolved:** 2026-10-04. Rejected as written; the useful part moves to dalgo2sql.
+
+This idea made `StructuredQuery.String()` dialect-aware, with an `EscapeStringLiteral`
+method that writes caller values into the SQL text. That is the design the
+PostgreSQL launch work must avoid: no caller value may ever be sent as SQL text.
+Bound parameters replace literal escaping.
+
+Where each hook goes instead (the plan's design, not a founder ruling):
+
+- Dialects live in `dal-go/dalgo2sql`, as one dialect-parameterised compiler for
+  statically typed SQL engines, PostgreSQL first, selected by
+  `DbOptions.StructuredQueryDialect`. DALgo core gains no `dal/dialect` package and
+  no exported API from this idea.
+- Identifier quoting, placeholder style, limit and offset syntax, NULL ordering and
+  boolean typing become methods of that dialect.
+- Literal escaping is dropped. Values travel as bound parameters.
+- `String()` is unchanged; it stays a debugging aid, not a driver contract.
+
+Design record: the PostgreSQL launch plan, task DG-01 (2026-10-04). See also
+[window-functions](window-functions.md).
 
 ## Problem Statement
 
