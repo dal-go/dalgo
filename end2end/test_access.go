@@ -152,3 +152,116 @@ func accessConditionsTest(ctx context.Context, t *testing.T, db dal.DB) {
 		assert.NotEqual(t, country, other.Country, "the other country's city must be untouched")
 	})
 }
+
+// accessFieldListTest proves, on a real adapter, that a policy's field
+// allow-list holds when the caller reaches for a hidden field indirectly
+// (dalgo issue 148): under an alias that is itself allowed, in a selection
+// where every column is refused, or in a filter or order the result never
+// shows. Each case must be denied by the access layer before the adapter
+// runs, on both read paths, and it is run under both shapes of allow-list:
+// an enumerable one (the access layer projects the query) and one with a
+// wildcard (the access layer falls back to redacting the result). Population
+// and State are never in either list.
+func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
+	lists := map[string][]string{
+		"enumerable_list": {"Name", "Country"},
+		"wildcard_list":   {"Name", "Count*"},
+	}
+	cities := func() dal.IQueryBuilder {
+		return dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "")).NewQuery()
+	}
+	for name, fields := range lists {
+		t.Run(name, func(t *testing.T) {
+			secured := access.MustSecureDB(db, access.WithDatabasePolicies(access.MustPolicy("cities-fields",
+				access.Collection(models.CitiesCollection, access.Allow(access.Query, "query-allowed-fields").Fields(fields...)),
+			)))
+			// assertDenied runs the query on both read paths; the adapter must not
+			// be reached, so a denial is the only acceptable answer. It pins the
+			// reason too: the decision's code, the slot it was found in and the
+			// columns it names (none when the expression cannot be checked).
+			assertDenied := func(t *testing.T, q dal.Query, code access.ReasonCode, slot access.DecisionSlot, columns [][]string) {
+				t.Helper()
+				check := func(path, msg string, run func(ctx context.Context, tx dal.ReadTransaction) error) {
+					err := secured.RunReadonlyTransaction(ctx, run, dal.TxWithMessage(msg))
+					assert.ErrorIs(t, err, access.ErrAccessDenied, path)
+					var denied *access.DeniedError
+					if assert.ErrorAs(t, err, &denied, path) {
+						assert.Equal(t, code, denied.Decision.Code, path)
+						assert.Equal(t, slot, denied.Decision.Slot, path)
+						assert.Equal(t, columns, denied.Decision.Columns, path)
+					}
+				}
+				check("records reader", "access field list: records", func(ctx context.Context, tx dal.ReadTransaction) error {
+					_, err := tx.ExecuteQueryToRecordsReader(ctx, q)
+					return err
+				})
+				check("recordset reader", "access field list: recordset", func(ctx context.Context, tx dal.ReadTransaction) error {
+					_, err := tx.ExecuteQueryToRecordsetReader(ctx, q)
+					return err
+				})
+			}
+			columnDenied := func(t *testing.T, q dal.Query, slot access.DecisionSlot, column string) {
+				t.Helper()
+				assertDenied(t, q, access.CodeColumnDenied, slot, [][]string{{column}})
+			}
+
+			t.Run("allowed_columns_still_read", func(t *testing.T) {
+				// Positive control: the policy is not simply denying everything.
+				q := cities().WhereField("Country", dal.Equal, "JP").OrderBy(dal.AscendingField("Name")).
+					SelectColumns(dal.Column{Expression: dal.Field("Name")})
+				rows, err := readMapRecords(ctx, secured, q, "access field list: allowed columns")
+				if errors.Is(err, dal.ErrNotSupported) {
+					t.Skip("column projection not supported by adapter:", err)
+				}
+				require.NoError(t, err)
+				require.NotEmpty(t, rows)
+				for _, row := range rows {
+					require.Len(t, row, 1, "only the requested column comes back")
+					assert.Contains(t, row, "Name")
+					assert.NotContains(t, row, "Population")
+					assert.NotContains(t, row, "State")
+				}
+			})
+			t.Run("hidden_field_under_an_allowed_alias", func(t *testing.T) {
+				columnDenied(t, cities().SelectColumns(dal.Column{Alias: "Name", Expression: dal.Field("Population")}), access.DecisionSlotFields, "Population")
+				columnDenied(t, cities().SelectColumns(dal.Column{Alias: "Country", Expression: dal.Field("State")}), access.DecisionSlotFields, "State")
+				columnDenied(t, cities().SelectColumns(
+					dal.Column{Expression: dal.Field("Name")},
+					dal.Column{Alias: "Count_hidden", Expression: dal.Field("Population")},
+				), access.DecisionSlotFields, "Population")
+			})
+			t.Run("every_selected_column_refused", func(t *testing.T) {
+				columnDenied(t, cities().SelectColumns(dal.Column{Expression: dal.Field("Population")}), access.DecisionSlotFields, "Population")
+				// Columns are checked in order, so the first refused one is named.
+				columnDenied(t, cities().SelectColumns(
+					dal.Column{Expression: dal.Field("Population")},
+					dal.Column{Alias: "where", Expression: dal.Field("State")},
+				), access.DecisionSlotFields, "Population")
+			})
+			t.Run("aggregate_cannot_be_checked", func(t *testing.T) {
+				// An aggregate is not a plain field, so its operand cannot be
+				// held to the allow-list and the selection fails closed. The
+				// same holds for an aggregate over an allowed field.
+				assertDenied(t, cities().SelectColumns(dal.SumAs(dal.Field("Population"), "total")), access.CodeEnforcementUnsupported, access.DecisionSlotFields, nil)
+				assertDenied(t, cities().SelectColumns(dal.CountAs(dal.Field("Name"), "n")), access.CodeEnforcementUnsupported, access.DecisionSlotFields, nil)
+			})
+			t.Run("filter_or_order_on_a_hidden_field", func(t *testing.T) {
+				selectName := dal.Column{Expression: dal.Field("Name")}
+				columnDenied(t, cities().WhereField("Population", dal.GreaterThen, 1).SelectColumns(selectName), access.DecisionSlotWhere, "Population")
+				columnDenied(t, cities().WhereField("Name", dal.Equal, "Tokyo").WhereField("State", dal.Equal, "Tokyo").SelectColumns(selectName), access.DecisionSlotWhere, "State")
+				columnDenied(t, cities().Where(dal.NewIsNullCondition(dal.Field("Population"))).SelectColumns(selectName), access.DecisionSlotWhere, "Population")
+				columnDenied(t, cities().Where(dal.NewIsNotNullCondition(dal.Field("State"))).SelectColumns(selectName), access.DecisionSlotWhere, "State")
+				columnDenied(t, cities().OrderBy(dal.DescendingField("Population")).SelectColumns(selectName), access.DecisionSlotFields, "Population")
+				columnDenied(t, cities().WhereField("Population", dal.GreaterThen, 1).SelectKeysOnly(reflect.String), access.DecisionSlotWhere, "Population")
+				columnDenied(t, cities().GroupBy(dal.Field("State")).SelectColumns(selectName), access.DecisionSlotFields, "State")
+			})
+			t.Run("having_on_a_hidden_field", func(t *testing.T) {
+				selectCountry := dal.Column{Expression: dal.Field("Country")}
+				columnDenied(t, cities().GroupBy(dal.Field("Country")).
+					Having(dal.WhereField("Population", dal.GreaterThen, 1)).SelectColumns(selectCountry), access.DecisionSlotWhere, "Population")
+				columnDenied(t, cities().GroupBy(dal.Field("Country")).
+					Having(dal.NewIsNullCondition(dal.Field("State"))).SelectColumns(selectCountry), access.DecisionSlotWhere, "State")
+			})
+		})
+	}
+}
