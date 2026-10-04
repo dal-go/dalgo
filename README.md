@@ -386,8 +386,10 @@ DALgo supports production use through separate adapter modules:
 - [`dalgo2firestore`](https://github.com/dal-go/dalgo2firestore) for Google
   Cloud Firestore.
 - [`dalgo2sql`](https://github.com/dal-go/dalgo2sql) for SQL databases through
-  Go SQL drivers, including SQLite, PostgreSQL, Oracle, and Microsoft SQL
-  Server.
+  Go SQL drivers. SQLite has a structured-query compiler (opt in with
+  `DbOptions.StructuredQueryDialect: "sqlite"`). PostgreSQL, MySQL, Microsoft
+  SQL Server and Oracle have no compiler yet and use the legacy text emitter,
+  which is not dialect-aware; a PostgreSQL compiler is planned.
 - [`dalgo2sqlite`](https://github.com/dal-go/dalgo2sqlite) for SQLite-specific
   schema, DDL, and concurrency-aware behavior on top of SQL support.
 
