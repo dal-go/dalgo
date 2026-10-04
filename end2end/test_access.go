@@ -156,8 +156,11 @@ func accessConditionsTest(ctx context.Context, t *testing.T, db dal.DB) {
 // accessFieldListTest proves, on a real adapter, that a policy's field
 // allow-list holds when the caller reaches for a hidden field indirectly
 // (dalgo issue 148): under an alias that is itself allowed, in a selection
-// where every column is refused, or in a filter or order the result never
-// shows. Each case must be denied by the access layer before the adapter
+// where every column is refused, or in a filter, order, HAVING or null test
+// the result never shows. Each denial pins the decision's code, slot and
+// column. An aggregate column is refused as ACL_ENFORCEMENT_UNSUPPORTED under
+// any field list, including over an allowed field (a known limitation, not the
+// intended contract). Each case must be denied by the access layer before the adapter
 // runs, on both read paths, and it is run under both shapes of allow-list:
 // an enumerable one (the access layer projects the query) and one with a
 // wildcard (the access layer falls back to redacting the result). Population
@@ -239,9 +242,13 @@ func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
 				), access.DecisionSlotFields, "Population")
 			})
 			t.Run("aggregate_cannot_be_checked", func(t *testing.T) {
-				// An aggregate is not a plain field, so its operand cannot be
-				// held to the allow-list and the selection fails closed. The
-				// same holds for an aggregate over an allowed field.
+				// Known limitation, not the intended contract: an aggregate is not
+				// a plain field, so today its operand cannot be held to the
+				// allow-list and the selection fails closed, even over an allowed
+				// field. When aggregates become checkable, SUM(Population) must
+				// turn into ACL_COLUMN_DENIED naming Population, and COUNT(Name)
+				// must move to the positive control. Tracking issue: to be opened
+				// by the lead (number pending).
 				assertDenied(t, cities().SelectColumns(dal.SumAs(dal.Field("Population"), "total")), access.CodeEnforcementUnsupported, access.DecisionSlotFields, nil)
 				assertDenied(t, cities().SelectColumns(dal.CountAs(dal.Field("Name"), "n")), access.CodeEnforcementUnsupported, access.DecisionSlotFields, nil)
 			})
