@@ -15,6 +15,7 @@ import (
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/end2end/models"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,6 +35,12 @@ import (
 //
 // The copy is a model in Go and not a second database because the shared suite
 // runs on adapters that cannot create a collection the suite does not name.
+//
+// The fields of the copy are compared by the whole-row cell, which reads rows
+// with no column named; every other cell reads Name, Country and AreaSqKm, which
+// every field list allows, and the fields outside the lists are proved hidden by
+// the denial cells. The fixture holds no NULL, so the null tests meet either every
+// row or none.
 
 const (
 	permittedCopyRecords   = "records"
@@ -56,10 +63,15 @@ type copyCaller struct {
 	identify func(context.Context) context.Context
 	readable func(models.City) bool
 	fields   []string // nil: every field
+	// wildcardList marks a field list that names a pattern: the access layer cannot
+	// enumerate the columns of a read that names none, so what such a read returns
+	// is the adapter's own. The denial cells hold the list; whole rows are not read.
+	wildcardList bool
 	// listRule marks a caller whose rule tests a field against a list. An adapter
 	// that does not evaluate that test (the in-memory adapter in its Firestore
 	// profile reads it as "the field is an array holding any of these") cannot
-	// answer the caller's reads, and its cells are skipped there.
+	// answer the caller's reads: the suite pins what it answers instead and skips
+	// the caller's cells there (see pinListRuleAnswer).
 	listRule bool
 }
 
@@ -112,10 +124,26 @@ func (c copyCaller) secure(db dal.DB, reads *atomic.Int64) dal.DB {
 	return access.MustSecureDB(readCounter{DB: db, reads: reads}, access.WithDatabasePolicies(c.policies...))
 }
 
-// readCounter counts the queries that reach the adapter below the access layer.
+// readCounter counts the reads that reach the adapter below the access layer: the
+// queries and the reads by key (Get, GetMulti and Exists).
 type readCounter struct {
 	dal.DB
 	reads *atomic.Int64
+}
+
+func (c readCounter) Get(ctx context.Context, rec record.Record) error {
+	c.reads.Add(1)
+	return c.DB.Get(ctx, rec)
+}
+
+func (c readCounter) GetMulti(ctx context.Context, records []record.Record) error {
+	c.reads.Add(1)
+	return c.DB.GetMulti(ctx, records)
+}
+
+func (c readCounter) Exists(ctx context.Context, key *record.Key) (bool, error) {
+	c.reads.Add(1)
+	return c.DB.Exists(ctx, key)
 }
 
 func (c readCounter) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
@@ -139,6 +167,21 @@ type readCountingTx struct {
 	reads *atomic.Int64
 }
 
+func (t readCountingTx) Get(ctx context.Context, rec record.Record) error {
+	t.reads.Add(1)
+	return t.ReadTransaction.Get(ctx, rec)
+}
+
+func (t readCountingTx) GetMulti(ctx context.Context, records []record.Record) error {
+	t.reads.Add(1)
+	return t.ReadTransaction.GetMulti(ctx, records)
+}
+
+func (t readCountingTx) Exists(ctx context.Context, key *record.Key) (bool, error) {
+	t.reads.Add(1)
+	return t.ReadTransaction.Exists(ctx, key)
+}
+
 func (t readCountingTx) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	t.reads.Add(1)
 	return t.ReadTransaction.ExecuteQueryToRecordsReader(ctx, query)
@@ -150,53 +193,72 @@ func (t readCountingTx) ExecuteQueryToRecordsetReader(ctx context.Context, query
 }
 
 // permittedEntry is a way into the secured database: its handle, or a read
-// transaction.
+// transaction. The read is handed the context to read with (the transaction's
+// own, in a transaction) and the query executor.
 type permittedEntry struct {
 	name string
-	run  func(ctx context.Context, db dal.DB, message string, read func(dal.QueryExecutor) error) error
+	run  func(ctx context.Context, db dal.DB, message string, read func(context.Context, dal.QueryExecutor) error) error
 }
 
 func permittedEntries() []permittedEntry {
 	return []permittedEntry{
-		{"handle", func(_ context.Context, db dal.DB, _ string, read func(dal.QueryExecutor) error) error {
-			return read(db)
+		{"handle", func(ctx context.Context, db dal.DB, _ string, read func(context.Context, dal.QueryExecutor) error) error {
+			return read(ctx, db)
 		}},
-		{"transaction", func(ctx context.Context, db dal.DB, message string, read func(dal.QueryExecutor) error) error {
-			return db.RunReadonlyTransaction(ctx, func(_ context.Context, tx dal.ReadTransaction) error {
-				return read(tx)
+		{"transaction", func(ctx context.Context, db dal.DB, message string, read func(context.Context, dal.QueryExecutor) error) error {
+			return db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
+				return read(ctx, tx)
 			}, dal.TxWithMessage(message))
 		}},
 	}
 }
 
 // readCopyRows runs a query on one reader and returns its rows by output column.
-// Rows read through the records reader come back as the adapter gives them; rows
-// read through the recordset reader hold the named columns.
-func readCopyRows(ctx context.Context, t *testing.T, qe dal.QueryExecutor, reader string, q dal.Query, columns []string) ([]copyRow, error) {
-	t.Helper()
-	var rows []copyRow
+// Rows read through the records reader come back as the adapter gives them, every
+// key of the map included; rows read through the recordset reader hold the named
+// columns, and a recordset that holds any other number of columns is an error.
+func readCopyRows(ctx context.Context, qe dal.QueryExecutor, reader string, q dal.Query, columns []string) ([]copyRow, error) {
 	if reader == permittedCopyRecordset {
 		rs, err := dal.ExecuteQueryAndReadAllToRecordset(ctx, q, qe)
 		if err != nil {
 			return nil, err
 		}
-		for i := 0; i < rs.RowsCount(); i++ {
-			row := copyRow{}
-			for _, column := range columns {
-				value, err := rs.GetRow(i).GetValueByName(column, rs)
-				require.NoError(t, err, "column %s of row %d", column, i)
-				row[column] = value
-			}
-			rows = append(rows, row)
-		}
-		return rows, nil
+		return recordsetRows(rs, columns)
 	}
 	records, err := dal.ExecuteQueryAndReadAllToRecords(ctx, q, qe)
 	if err != nil {
 		return nil, err
 	}
-	for _, rec := range records {
-		rows = append(rows, copyRow(rec.Data().(map[string]any)))
+	rows := make([]copyRow, len(records))
+	for i, rec := range records {
+		// A record that holds no map is a row with no field.
+		data, _ := rec.Data().(map[string]any)
+		rows[i] = data
+	}
+	return rows, nil
+}
+
+// recordsetRows is the rows of a recordset by the named columns. A recordset that
+// holds a column the read does not name (a hidden field, a generated alias) is
+// refused, as the records reader's extra key is a mismatch.
+func recordsetRows(rs recordset.Recordset, columns []string) ([]copyRow, error) {
+	if rs.ColumnsCount() != len(columns) {
+		held := make([]string, rs.ColumnsCount())
+		for i, column := range rs.Columns() {
+			held[i] = column.Name()
+		}
+		return nil, fmt.Errorf("the recordset holds the columns %v, the read names %v", held, columns)
+	}
+	rows := make([]copyRow, rs.RowsCount())
+	for i := range rows {
+		rows[i] = copyRow{}
+		for _, column := range columns {
+			value, err := rs.GetRow(i).GetValueByName(column, rs)
+			if err != nil {
+				return nil, fmt.Errorf("column %s of row %d: %w", column, i, err)
+			}
+			rows[i][column] = value
+		}
 	}
 	return rows, nil
 }
@@ -221,7 +283,9 @@ func answerValue(value any) string {
 	}
 }
 
-// floatOf is a number of any Go numeric type as a float64.
+// floatOf is a number of any Go numeric type as a float64. It is for the values of
+// the Go model and for values already known to be numbers; a value an adapter
+// returned is read with numberOf, which fails the cell instead of panicking.
 func floatOf(value any) float64 {
 	return reflect.ValueOf(value).Convert(reflect.TypeOf(0.0)).Float()
 }
@@ -379,8 +443,13 @@ type permittedCopyCell struct {
 	// reader sends the aggregate under the caller's own alias and refuses to
 	// pass such a name (see access_field_lists, having_over_the_alias_is_refused_on_the_recordset_path).
 	aliasRefs bool
-	query     func() dal.Query
-	answer    func(copy []copyRow) []copyRow
+	// recordsOnly marks a read of whole rows, which only the records reader serves.
+	recordsOnly bool
+	// fieldListOnly marks a read that an adapter runs only because the access layer
+	// turns it into a read of named columns: a caller with a list of named fields.
+	fieldListOnly bool
+	query         func() dal.Query
+	answer        func(copy []copyRow) []copyRow
 }
 
 func permittedCopyCells() []permittedCopyCell {
@@ -554,6 +623,13 @@ func permittedCopyCells() []permittedCopyCell {
 				kept := keepRows(rows, big)
 				return one(copyRow{"n": len(kept), "total": sumOf(areaOf(kept))})
 			}},
+		// A read that names no column: the rows the caller may read, with the fields the
+		// caller may read and no other. Under no field list an adapter reads the keys
+		// alone, so the cell is read for the callers with one, where the access layer
+		// turns it into a read of the fields the list allows.
+		{name: "whole_rows", recordsOnly: true, fieldListOnly: true,
+			query:  func() dal.Query { return cities().SelectKeysOnly(reflect.String) },
+			answer: func(rows []copyRow) []copyRow { return rows }},
 	}
 }
 
@@ -608,7 +684,7 @@ func permittedCopyCallers() []copyCaller {
 		{name: "field_list", policies: []access.Policy{policy("fields", allow("listed-fields").Fields(listed...))},
 			identify: identity, readable: everyone, fields: listed},
 		{name: "field_list_with_a_wildcard", policies: []access.Policy{policy("fields", allow("listed-fields").Fields("Name", "Count*", "AreaSqKm"))},
-			identify: identity, readable: everyone, fields: listed},
+			identify: identity, readable: everyone, fields: listed, wildcardList: true},
 		{name: "row_rule_and_field_list", policies: []access.Policy{policy("capitals", allow("listed-capitals").Where(capital).Fields(listed...))},
 			identify: identity, readable: func(city models.City) bool { return city.IsCapital }, fields: listed},
 		{name: "two_policies_on_one_source", policies: []access.Policy{
@@ -647,8 +723,64 @@ func evaluatesMembership(ctx context.Context, t *testing.T, db dal.DB) bool {
 		return dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "")).NewQuery().
 			Where(dal.NewComparison(dal.Field("Country"), dal.In, dal.NewArray([]string{"IN", "CN"}))).SelectColumns(count)
 	}}
-	rows, err := probe.read(ctx, t, db, permittedCopyRecords, permittedEntries()[1], permittedCopyProbeTx)
-	return err == nil && len(rows) == 1 && floatOf(rows[0]["n"]) == 4
+	rows, err := probe.read(ctx, db, permittedCopyRecords, permittedEntries()[1], permittedCopyProbeTx)
+	return err == nil && len(rows) == 1 && answerValue(rows[0]["n"]) == answerValue(4)
+}
+
+// listRuleStatement names the read that a caller whose rule tests a field against
+// a list is pinned with on an adapter that does not evaluate such a test.
+const listRuleStatement = "SELECT COUNT(*) FROM Cities, secured by Country IN $principal.roles"
+
+// listRuleAnswers reads COUNT(*) of the source through the secured database of a
+// caller whose rule tests a field against a list, on each entry, and returns the
+// answers. An adapter that does not evaluate the test cannot answer the caller's
+// cells; this is what it answers instead.
+func listRuleAnswers(ctx context.Context, t *testing.T, db dal.DB, caller copyCaller) ([]float64, error) {
+	t.Helper()
+	count := permittedCopyCells()[0]
+	require.Equal(t, "count_star", count.name)
+	// The same read without a policy tells whether the adapter runs it at all.
+	if _, err := count.read(caller.identify(ctx), db, permittedCopyRecords, permittedEntries()[1], permittedCopyProbeTx); err != nil {
+		return nil, err
+	}
+	var answers []float64
+	for _, entry := range permittedEntries() {
+		rows, err := count.read(caller.identify(ctx), caller.secure(db, &atomic.Int64{}), permittedCopyRecords, entry, permittedCopyReadTx)
+		if err != nil {
+			return nil, err
+		}
+		require.Len(t, rows, 1, "%s on the %s", listRuleStatement, entry.name)
+		answers = append(answers, numberOf(t, rows[0]["n"]))
+	}
+	return answers, nil
+}
+
+// pinListRuleAnswer is what the suite holds an adapter to when it does not
+// evaluate a test of a field against a list: the rule must not serve a row the
+// caller may not read. The answer it gives is named in the skip message.
+func pinListRuleAnswer(ctx context.Context, t *testing.T, db dal.DB, caller copyCaller) {
+	t.Helper()
+	answers, err := listRuleAnswers(ctx, t, db, caller)
+	if errors.Is(err, dal.ErrNotSupported) {
+		t.Skip("adapter does not run this read:", err)
+	}
+	require.NoError(t, err)
+	for _, answer := range answers {
+		assert.LessOrEqual(t, answer, float64(len(caller.permittedCopy())), "%s serves more rows than the caller may read", listRuleStatement)
+	}
+	t.Skipf("adapter does not evaluate a test of a field against a list: %s answers %v, the permitted copy holds %d rows",
+		listRuleStatement, answers, len(caller.permittedCopy()))
+}
+
+// runsOn reports whether the cell is read through the reader. A whole-row read
+// has no column names to read a recordset by.
+func (cell permittedCopyCell) runsOn(reader string) bool {
+	return !cell.recordsOnly || reader == permittedCopyRecords
+}
+
+// runsFor reports whether the cell is read for the caller.
+func (cell permittedCopyCell) runsFor(caller copyCaller) bool {
+	return !cell.fieldListOnly || (caller.hasFieldList() && !caller.wildcardList)
 }
 
 // verify runs the cell for one caller on one reader through one entry and
@@ -656,29 +788,32 @@ func evaluatesMembership(ctx context.Context, t *testing.T, db dal.DB) bool {
 func (cell permittedCopyCell) verify(ctx context.Context, t *testing.T, db dal.DB, caller copyCaller, reader string, entry permittedEntry) {
 	t.Helper()
 	if cell.aliasRefs && caller.hasFieldList() && reader == permittedCopyRecordset {
-		t.Skip("a field list does not let the recordset reader pass an aggregate's alias; pinned by access_field_lists")
+		// Under a field list the recordset reader sends the aggregate under the
+		// caller's own alias and refuses a read that names the alias in HAVING or
+		// ORDER BY (see access_field_lists, having_over_the_alias_is_refused_on_the_recordset_path).
+		verifyDenied(ctx, t, db, caller, cell.query(), reader, entry, access.CodeColumnDenied)
+		return
 	}
 	ctx = caller.identify(ctx)
 	// The same read without a policy tells whether the adapter runs it at all.
-	_, probe := cell.read(ctx, t, db, reader, permittedEntries()[1], permittedCopyProbeTx)
+	_, probe := cell.read(ctx, db, reader, permittedEntries()[1], permittedCopyProbeTx)
 	if errors.Is(probe, dal.ErrNotSupported) || (cell.aliasRefs && probe != nil) {
 		t.Skip("adapter does not run this read:", probe)
 	}
 	require.NoError(t, probe)
 
 	reads := &atomic.Int64{}
-	got, err := cell.read(ctx, t, caller.secure(db, reads), reader, entry, permittedCopyReadTx)
+	got, err := cell.read(ctx, caller.secure(db, reads), reader, entry, permittedCopyReadTx)
 	require.NoError(t, err)
 	assert.Empty(t, answerMismatch(got, cell.answer(caller.permittedCopy()), cell.ordered), "the secured read against the permitted copy")
 	assert.EqualValues(t, 1, reads.Load(), "the adapter is asked once")
 }
 
 // read runs the cell's query through one entry of db.
-func (cell permittedCopyCell) read(ctx context.Context, t *testing.T, db dal.DB, reader string, entry permittedEntry, message string) (rows []copyRow, err error) {
-	t.Helper()
-	err = entry.run(ctx, db, message, func(qe dal.QueryExecutor) error {
+func (cell permittedCopyCell) read(ctx context.Context, db dal.DB, reader string, entry permittedEntry, message string) (rows []copyRow, err error) {
+	err = entry.run(ctx, db, message, func(ctx context.Context, qe dal.QueryExecutor) error {
 		var readErr error
-		rows, readErr = readCopyRows(ctx, t, qe, reader, cell.query(), cell.columns)
+		rows, readErr = readCopyRows(ctx, qe, reader, cell.query(), cell.columns)
 		return readErr
 	})
 	return rows, err
@@ -752,10 +887,11 @@ func hiddenReads() []hiddenRead {
 // adapter is never asked.
 func verifyDenied(ctx context.Context, t *testing.T, db dal.DB, caller copyCaller, q dal.Query, reader string, entry permittedEntry, code access.ReasonCode) {
 	t.Helper()
+	ctx = caller.identify(ctx)
 	reads := &atomic.Int64{}
 	secured := caller.secure(db, reads)
-	err := entry.run(caller.identify(ctx), secured, permittedCopyDeniedTx, func(qe dal.QueryExecutor) error {
-		_, readErr := readCopyRows(ctx, t, qe, reader, q, []string{"n"})
+	err := entry.run(ctx, secured, permittedCopyDeniedTx, func(ctx context.Context, qe dal.QueryExecutor) error {
+		_, readErr := readCopyRows(ctx, qe, reader, q, []string{"n"})
 		return readErr
 	})
 	assert.ErrorIs(t, err, access.ErrAccessDenied)
@@ -763,7 +899,7 @@ func verifyDenied(ctx context.Context, t *testing.T, db dal.DB, caller copyCalle
 	if assert.ErrorAs(t, err, &denied) {
 		assert.Equal(t, code, denied.Decision.Code)
 	}
-	assert.Zero(t, reads.Load(), "the adapter is not asked")
+	assert.Zero(t, reads.Load(), "no query and no key read reaches the adapter")
 }
 
 // accessPermittedCopyTest proves that a secured read of one source equals the
@@ -784,11 +920,17 @@ func accessPermittedCopyTest(ctx context.Context, t *testing.T, db dal.DB) {
 		for _, caller := range callers {
 			t.Run(caller.name, func(t *testing.T) {
 				if caller.listRule && !membership {
-					t.Skip("adapter does not evaluate a test of a field against a list")
+					pinListRuleAnswer(ctx, t, db, caller)
 				}
 				for _, cell := range permittedCopyCells() {
+					if !cell.runsFor(caller) {
+						continue
+					}
 					t.Run(cell.name, func(t *testing.T) {
 						for _, reader := range readers {
+							if !cell.runsOn(reader) {
+								continue
+							}
 							for _, entry := range permittedEntries() {
 								t.Run(reader+"_"+entry.name, func(t *testing.T) {
 									cell.verify(ctx, t, db, caller, reader, entry)
@@ -827,6 +969,9 @@ func accessPermittedCopyTest(ctx context.Context, t *testing.T, db dal.DB) {
 		for _, cell := range permittedCopyCells() {
 			t.Run(cell.name, func(t *testing.T) {
 				for _, reader := range readers {
+					if !cell.runsOn(reader) {
+						continue
+					}
 					for _, entry := range permittedEntries() {
 						t.Run(reader+"_"+entry.name, func(t *testing.T) {
 							verifyDenied(ctx, t, db, nobody, cell.query(), reader, entry, access.CodeConfigurationInvalid)
@@ -844,16 +989,19 @@ func accessPermittedCopyTest(ctx context.Context, t *testing.T, db dal.DB) {
 		count := permittedCopyCells()[0]
 		require.Equal(t, "count_star", count.name)
 		reads := &atomic.Int64{}
-		got, err := count.read(ctx, t, control.secure(db, reads), permittedCopyRecords, permittedEntries()[1], permittedCopyReadTx)
+		got, err := count.read(ctx, control.secure(db, reads), permittedCopyRecords, permittedEntries()[1], permittedCopyReadTx)
 		if errors.Is(err, dal.ErrNotSupported) {
 			t.Skip("adapter does not run this read:", err)
 		}
 		require.NoError(t, err)
+		checked := 0
 		for _, caller := range callers {
 			if strings.HasPrefix(caller.name, "row_rule_") {
+				checked++
 				assert.NotEmpty(t, answerMismatch(got, count.answer(caller.permittedCopy()), count.ordered), caller.name)
 			}
 		}
+		assert.GreaterOrEqual(t, checked, 3, "the callers whose row rule the self-check removes")
 		assert.Empty(t, answerMismatch(got, count.answer(control.permittedCopy()), count.ordered), "the control reads every row")
 	})
 	t.Run("self_check_without_the_field_list_a_hidden_field_is_served", func(t *testing.T) {
@@ -861,8 +1009,8 @@ func accessPermittedCopyTest(ctx context.Context, t *testing.T, db dal.DB) {
 		require.Equal(t, "as_the_operand_of_sum", sum.name)
 		reads := &atomic.Int64{}
 		var served []copyRow
-		err := permittedEntries()[1].run(ctx, control.secure(db, reads), permittedCopyReadTx, func(qe dal.QueryExecutor) (readErr error) {
-			served, readErr = readCopyRows(ctx, t, qe, permittedCopyRecords, sum.query(), []string{"total"})
+		err := permittedEntries()[1].run(ctx, control.secure(db, reads), permittedCopyReadTx, func(ctx context.Context, qe dal.QueryExecutor) (readErr error) {
+			served, readErr = readCopyRows(ctx, qe, permittedCopyRecords, sum.query(), []string{"total"})
 			return readErr
 		})
 		if errors.Is(err, dal.ErrNotSupported) {
@@ -874,7 +1022,7 @@ func accessPermittedCopyTest(ctx context.Context, t *testing.T, db dal.DB) {
 		for _, city := range models.Cities {
 			total += city.Population
 		}
-		assert.InDelta(t, float64(total), floatOf(served[0]["total"]), 1, "the hidden field is summed")
+		assert.InDelta(t, float64(total), numberOf(t, served[0]["total"]), 1, "the hidden field is summed")
 		assert.EqualValues(t, 1, reads.Load())
 	})
 }

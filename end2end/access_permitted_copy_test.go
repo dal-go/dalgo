@@ -1,9 +1,16 @@
 package end2end
 
 import (
+	"context"
+	"sync/atomic"
 	"testing"
 
+	"github.com/dal-go/dalgo/adapters/dalgo2memory"
+	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/record"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAnswerValue(t *testing.T) {
@@ -75,4 +82,75 @@ func TestAnswersOnACopy(t *testing.T) {
 	assert.Equal(t, []int{2, 3}, pageOf([]int{1, 2, 3, 4}, 1, 2))
 	assert.Equal(t, []int{4}, pageOf([]int{1, 2, 3, 4}, 3, 2))
 	assert.Empty(t, pageOf([]int{1}, 5, 2))
+}
+
+func TestRecordsetRows(t *testing.T) {
+	build := func(names ...string) recordset.Recordset {
+		columns := make([]recordset.Column[any], len(names))
+		for i, name := range names {
+			columns[i] = recordset.NewColumn[int](name, 0)
+		}
+		rs := recordset.NewColumnarRecordset("rows", columns...)
+		row := rs.NewRow()
+		for i := range names {
+			require.NoError(t, row.SetValueByIndex(i, 7+i, rs))
+		}
+		return rs
+	}
+	t.Run("the_named_columns", func(t *testing.T) {
+		rows, err := recordsetRows(build("country", "n"), []string{"country", "n"})
+		require.NoError(t, err)
+		assert.Equal(t, []copyRow{{"country": 7, "n": 8}}, rows)
+	})
+	t.Run("an_extra_column_is_refused", func(t *testing.T) {
+		_, err := recordsetRows(build("n", "population"), []string{"n"})
+		assert.ErrorContains(t, err, "the recordset holds the columns [n population], the read names [n]")
+	})
+	t.Run("a_missing_column_is_refused", func(t *testing.T) {
+		_, err := recordsetRows(build("n"), []string{"total"})
+		assert.ErrorContains(t, err, "column total of row 0")
+	})
+}
+
+func TestReadCounterCountsEveryRead(t *testing.T) {
+	ctx := context.Background()
+	key := record.NewKeyWithID("Cities", "one")
+	query := dal.From(dal.NewRootCollectionRef("Cities", "")).NewQuery().SelectKeysOnly(0)
+	reads := &atomic.Int64{}
+	db := readCounter{DB: dalgo2memory.New(dalgo2memory.FirestoreProfile()), reads: reads}
+	calls := map[string]func(qe dal.QueryExecutor, getter dal.ReadSession) error{
+		"get": func(_ dal.QueryExecutor, getter dal.ReadSession) error {
+			return getter.Get(ctx, record.NewRecordWithData(key, map[string]any{}))
+		},
+		"get_multi": func(_ dal.QueryExecutor, getter dal.ReadSession) error {
+			return getter.GetMulti(ctx, []record.Record{record.NewRecordWithData(key, map[string]any{})})
+		},
+		"exists": func(_ dal.QueryExecutor, getter dal.ReadSession) error {
+			_, err := getter.Exists(ctx, key)
+			return err
+		},
+		"records_reader": func(qe dal.QueryExecutor, _ dal.ReadSession) error {
+			_, err := qe.ExecuteQueryToRecordsReader(ctx, query)
+			return err
+		},
+		"recordset_reader": func(qe dal.QueryExecutor, _ dal.ReadSession) error {
+			_, _ = qe.ExecuteQueryToRecordsetReader(ctx, query)
+			return nil
+		},
+	}
+	for name, call := range calls {
+		t.Run(name+"_on_the_handle", func(t *testing.T) {
+			reads.Store(0)
+			_ = call(db, db)
+			assert.EqualValues(t, 1, reads.Load())
+		})
+		t.Run(name+"_in_a_transaction", func(t *testing.T) {
+			reads.Store(0)
+			require.NoError(t, db.RunReadonlyTransaction(ctx, func(_ context.Context, tx dal.ReadTransaction) error {
+				_ = call(tx, tx)
+				return nil
+			}))
+			assert.EqualValues(t, 1, reads.Load())
+		})
+	}
 }
