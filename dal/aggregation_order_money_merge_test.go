@@ -95,6 +95,97 @@ func TestOrderedAggregateMoneyOrdersDecimalKeysNumerically(t *testing.T) {
 	}
 }
 
+func TestOrderedAggregateMoneyOrdersDecimalTextKeysNumerically(t *testing.T) {
+	query := From(NewRootCollectionRef("Invoice", "")).NewQuery().SelectColumns(
+		Column{Alias: "first", Expression: NewOrderedAggregate(FIRST, orderedBy(AscendingField("rank")), Field("amount"))},
+		Column{Alias: "last", Expression: NewOrderedAggregate(LAST, orderedBy(AscendingField("rank")), Field("amount"))},
+	)
+	config := &MoneyConfig{MinorUnitScale: 2, DivisionScale: 2, Rounding: "halfEven"}
+	for _, tc := range []struct {
+		name         string
+		lower, upper any
+	}{
+		{"text keys", "2", "10"},
+		{"text then number", "2", json.Number("10")},
+		{"number then text", json.Number("2"), "10"},
+		{"fractional text keys", "0.09", "0.1"},
+		{"precision beyond float64", "9007199254740992", "9007199254740993"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			lower := aggregationCoverageRecord("1", map[string]any{"rank": tc.lower, "amount": json.Number("1.01")})
+			upper := aggregationCoverageRecord("2", map[string]any{"rank": tc.upper, "amount": json.Number("2.02")})
+			for _, strategy := range []AggregationStrategy{AggregationHash, AggregationStreaming} {
+				for _, records := range [][]record.Record{{lower, upper}, {upper, lower}} {
+					reader := newLocalAggregationReader(context.Background(), query, &aggregationCoverageReader{records: records}, AggregationPlan{Strategy: strategy})
+					reader.money = config
+					row, err := reader.Next()
+					if err != nil {
+						t.Fatalf("strategy=%v: %v", strategy, err)
+					}
+					got := row.Data().(map[string]any)
+					if got["first"] != json.Number("1.01") || got["last"] != json.Number("2.02") {
+						t.Fatalf("strategy=%v lower=%v upper=%v row=%#v", strategy, tc.lower, tc.upper, got)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestOrderedAggregateMoneyOrdersDecimalTextTiesNumerically(t *testing.T) {
+	query := From(NewRootCollectionRef("Invoice", "")).NewQuery().SelectColumns(
+		Column{Alias: "first", Expression: NewOrderedAggregate(FIRST, orderedBy(AscendingField("rank")), Field("amount"))},
+		Column{Alias: "last", Expression: NewOrderedAggregate(LAST, orderedBy(AscendingField("rank")), Field("amount"))},
+	)
+	config := &MoneyConfig{MinorUnitScale: 2, DivisionScale: 2, Rounding: "halfEven"}
+	lower := aggregationCoverageRecord("1", map[string]any{"rank": "same", "amount": "2"})
+	upper := aggregationCoverageRecord("2", map[string]any{"rank": "same", "amount": "10"})
+	for _, strategy := range []AggregationStrategy{AggregationHash, AggregationStreaming} {
+		for _, records := range [][]record.Record{{lower, upper}, {upper, lower}} {
+			reader := newLocalAggregationReader(context.Background(), query, &aggregationCoverageReader{records: records}, AggregationPlan{Strategy: strategy})
+			reader.money = config
+			row, err := reader.Next()
+			if err != nil {
+				t.Fatalf("strategy=%v: %v", strategy, err)
+			}
+			got := row.Data().(map[string]any)
+			if got["first"] != "2" || got["last"] != "10" {
+				t.Fatalf("strategy=%v row=%#v", strategy, got)
+			}
+		}
+	}
+}
+
+func TestOrderedAggregateMoneyComparesKeysTiesAndAnswersExactly(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		a, b any
+		want int
+	}{
+		{"decimal strings", "2", "10", -1},
+		{"money text forms", "+0002", "10.", -1},
+		{"fractional text", ".09", "0.1", -1},
+		{"mixed exact values", json.Number("9007199254740993"), "9007199254740992", 1},
+		{"numeric before other text", "2", "word", -1},
+		{"other text after numeric", "word", "2", 1},
+		{"other text remains lexical", "word", "zebra", -1},
+		{"exponent text remains lexical", "2e1", "10", 1},
+		{"null remains first", nil, "2", -1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := compareOrderedValuesForMode(tc.a, tc.b, true); got != tc.want {
+				t.Fatalf("Money comparison of %v and %v = %d, want %d", tc.a, tc.b, got, tc.want)
+			}
+		})
+	}
+	if got := compareOrderedValuesForMode("2", "10", false); got <= 0 {
+		t.Fatalf("ordinary string order changed: %d", got)
+	}
+	if got := compareOrderedTuplesForMode(true, nil, nil, "same", "2", nil, "same", "10"); got >= 0 {
+		t.Fatalf("Money answer comparison = %d, want negative", got)
+	}
+}
+
 func TestOrderedDecimalComparisonKeepsPrecisionAndScale(t *testing.T) {
 	for _, tc := range []struct {
 		name string

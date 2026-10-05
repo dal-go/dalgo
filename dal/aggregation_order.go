@@ -189,8 +189,14 @@ func answerEncoding(answer any) string {
 // compares as equal by their JSON encodings, so the answer depends on the group's
 // data alone.
 func compareOrderedTuples(order []OrderExpression, a []any, aTie, aAnswer any, b []any, bTie, bAnswer any) int {
+	return compareOrderedTuplesForMode(false, order, a, aTie, aAnswer, b, bTie, bAnswer)
+}
+
+// compareOrderedTuplesForMode uses exact decimal ordering for Money-mode text
+// without changing the ordinary ordering of string keys, ties, or answers.
+func compareOrderedTuplesForMode(money bool, order []OrderExpression, a []any, aTie, aAnswer any, b []any, bTie, bAnswer any) int {
 	for i, key := range order {
-		comparison := compareOrderedValues(a[i], b[i])
+		comparison := compareOrderedValuesForMode(a[i], b[i], money)
 		if key.Descending() {
 			comparison = -comparison
 		}
@@ -198,16 +204,16 @@ func compareOrderedTuples(order []OrderExpression, a []any, aTie, aAnswer any, b
 			return comparison
 		}
 	}
-	if comparison := compareOrderedValues(aTie, bTie); comparison != 0 {
+	if comparison := compareOrderedValuesForMode(aTie, bTie, money); comparison != 0 {
 		return comparison
 	}
-	if comparison := compareOrderedValues(aAnswer, bAnswer); comparison != 0 {
+	if comparison := compareOrderedValuesForMode(aAnswer, bAnswer, money); comparison != 0 {
 		return comparison
 	}
 	return strings.Compare(answerEncoding(aAnswer), answerEncoding(bAnswer))
 }
 
-// orderedDecimal compares JSON numbers without converting them to float64. The
+// orderedDecimal compares JSON numbers and Money-mode decimal text without float64. The
 // magnitude is the exponent of the first significant digit; the remaining
 // digits can be compared with implicit trailing zeroes. Even a very large
 // exponent therefore needs no expanded decimal or unbounded power of ten.
@@ -217,11 +223,18 @@ type orderedDecimal struct {
 	digits    string
 }
 
-func orderedDecimalValue(value any) (orderedDecimal, bool) {
+func orderedDecimalValue(value any, moneyText bool) (orderedDecimal, bool) {
 	var number string
+	fromMoneyText := false
 	switch v := value.(type) {
 	case json.Number:
 		number = v.String()
+	case string:
+		if !moneyText || !moneyDecimalText.MatchString(v) {
+			return orderedDecimal{}, false
+		}
+		number = strings.TrimPrefix(v, "+")
+		fromMoneyText = true
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		number = fmt.Sprint(v)
 	default:
@@ -231,7 +244,7 @@ func orderedDecimalValue(value any) (orderedDecimal, bool) {
 		}
 		number = strconv.FormatFloat(float, 'g', -1, 64)
 	}
-	if len(number) == 0 || strings.TrimSpace(number) != number || !json.Valid([]byte(number)) || number[0] != '-' && (number[0] < '0' || number[0] > '9') {
+	if len(number) == 0 || strings.TrimSpace(number) != number || !fromMoneyText && !json.Valid([]byte(number)) || number[0] != '-' && (number[0] < '0' || number[0] > '9') && number[0] != '.' {
 		return orderedDecimal{}, false
 	}
 	result := orderedDecimal{sign: 1, magnitude: new(big.Int)}
@@ -295,13 +308,34 @@ func compareOrderedValues(a, b any) int {
 	_, aJSON := a.(json.Number)
 	_, bJSON := b.(json.Number)
 	if aJSON || bJSON {
-		left, leftOK := orderedDecimalValue(a)
-		right, rightOK := orderedDecimalValue(b)
+		left, leftOK := orderedDecimalValue(a, false)
+		right, rightOK := orderedDecimalValue(b, false)
 		if leftOK && rightOK {
 			return left.compare(right)
 		}
 	}
 	return compareAggregationValues(a, b)
+}
+
+func compareOrderedValuesForMode(a, b any, money bool) int {
+	if money {
+		left, leftOK := orderedDecimalValue(a, true)
+		right, rightOK := orderedDecimalValue(b, true)
+		if leftOK && rightOK {
+			return left.compare(right)
+		}
+		if leftOK {
+			if _, ok := b.(string); ok {
+				return -1
+			}
+		}
+		if rightOK {
+			if _, ok := a.(string); ok {
+				return 1
+			}
+		}
+	}
+	return compareOrderedValues(a, b)
 }
 
 // updateOrderedState lets one row compete for the answer of an ordered first or
@@ -323,7 +357,7 @@ func (r *localAggregationReader) updateOrderedState(group *localGroup, state *ag
 		tie = sortValue(field, row)
 	}
 	if state.hasValue {
-		comparison := compareOrderedTuples(order, keys, tie, value, state.orderKeys, state.orderTie, state.value)
+		comparison := compareOrderedTuplesForMode(r.money != nil, order, keys, tie, value, state.orderKeys, state.orderTie, state.value)
 		if strings.EqualFold(state.expression.FuncName(), LAST) {
 			if comparison <= 0 {
 				return nil
