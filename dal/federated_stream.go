@@ -16,6 +16,13 @@ func canStreamFederatedAggregate(q StructuredQuery) bool {
 	return HasAggregation(q) && !HasSubquery(q) && len(q.OrderBy()) == 0 && hasFlatFederatedHashJoin(q)
 }
 
+func canStreamMoneyAggregate(q StructuredQuery) bool {
+	if !HasAggregation(q) || HasSubquery(q) {
+		return false
+	}
+	return q.From() != nil && (len(q.From().Joins()) == 0 || hasFlatFederatedHashJoin(q))
+}
+
 func canStreamFederatedRows(q StructuredQuery) bool {
 	return !HasAggregation(q) && !HasSubquery(q) && len(q.OrderBy()) == 0 && hasFlatFederatedHashJoin(q)
 }
@@ -48,6 +55,21 @@ func hasFlatFederatedHashJoin(q StructuredQuery) bool {
 }
 
 func executeStreamingFederatedAggregate(ctx context.Context, q StructuredQuery, routed federatedQueryExecutor, options FederatedQueryOptions) (RecordsReader, error) {
+	if len(q.From().Joins()) == 0 {
+		source := newAggregationSourceQuery(q, false).(aggregationSourceQuery)
+		reader, err := routed.ExecuteQueryToRecordsReader(ctx, moneyAggregationSourceQuery{aggregationSourceQuery: source})
+		if err != nil {
+			return nil, err
+		}
+		plan, err := PlanAggregation(q, QueryCapabilities{StableRowOrder: true})
+		if err != nil {
+			_ = reader.Close()
+			return nil, err
+		}
+		result := newLocalAggregationReader(ctx, q, reader, plan)
+		result.money = options.Money
+		return result, nil
+	}
 	stream, err := newFederatedJoinStream(ctx, q, routed, options)
 	if err != nil {
 		return nil, err
@@ -76,7 +98,7 @@ func executeStreamingFederatedRows(ctx context.Context, q StructuredQuery, route
 func newFederatedJoinStream(ctx context.Context, q StructuredQuery, routed federatedQueryExecutor, options FederatedQueryOptions) (*federatedJoinStream, error) {
 	root := q.From()
 	child := joinedFrom(root.Joins()[0])
-	e := &joinExecution{ctx: ctx, q: q, executor: routed, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}, money: options.Money != nil}
+	e := &joinExecution{ctx: ctx, q: q, executor: routed, scans: map[string][]scannedJoinRow{}, indexes: map[string]map[string][]scannedJoinRow{}, fields: map[string][]string{}, keyRefs: map[string][]joinKeyReference{}, money: options.Money != nil, moneyConfig: options.Money}
 	e.collectKeyRefs(root, "from")
 	e.aliases = append(e.aliases, joinAlias(root.Base()))
 	rootAlias := joinAlias(root.Base())

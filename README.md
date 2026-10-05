@@ -55,6 +55,33 @@ DALgo does not try to hide every database difference. Adapters can return
 the core API honest while still giving applications a shared path for the common
 operations.
 
+### Exact decimal arithmetic for federated aggregates
+
+Federated queries can opt into exact decimal text arithmetic with the existing
+`MoneyConfig` option. In this mode, fractional values must arrive as decimal
+strings; fractional or unsafe binary floating-point values, exponent notation,
+malformed values,
+and values exceeding 38 significant digits are rejected. Source fields may
+contain at most `MinorUnitScale` fractional digits. Safe whole-number Go
+floating-point inputs remain accepted. Addition, subtraction,
+multiplication, and `SUM` preserve finite decimal precision; division and
+`AVG` round half-even to `DivisionScale`. Exact decimal ordering applies to
+numeric-looking values in money comparisons, while other text values remain
+lexical. The default query path is unchanged.
+
+Money mode supports aggregate queries over one source, and flat hash-join
+federated aggregates. For example, a line total can be aggregated without
+converting either operand to `float64`:
+
+```go
+options := dal.FederatedQueryOptions{Money: &dal.MoneyConfig{
+	MinorUnitScale: 2,
+	DivisionScale: 4,
+	Rounding: "halfEven",
+}}
+reader, err := dal.ExecuteFederatedQueryWithOptions(ctx, query, resolve, options)
+```
+
 ## 🛡️ Access Policies: Least Privilege at the DAL Boundary
 
 DALgo can wrap any adapter with a capability boundary that is enforced before

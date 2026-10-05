@@ -35,22 +35,23 @@ type scannedJoinRow struct {
 }
 
 type joinExecution struct {
-	ctx        context.Context
-	q          StructuredQuery
-	executor   QueryExecutor
-	scans      map[string][]scannedJoinRow
-	indexes    map[string]map[string][]scannedJoinRow
-	fields     map[string][]string
-	keyRefs    map[string][]joinKeyReference
-	aliases    []string
-	bytes      int
-	fetched    int
-	candidates int
-	outer      *joinRow
-	recursive  bool
-	budget     *recursiveBudget
-	memo       map[string][]memoizedQuery
-	money      bool
+	ctx         context.Context
+	q           StructuredQuery
+	executor    QueryExecutor
+	scans       map[string][]scannedJoinRow
+	indexes     map[string]map[string][]scannedJoinRow
+	fields      map[string][]string
+	keyRefs     map[string][]joinKeyReference
+	aliases     []string
+	bytes       int
+	fetched     int
+	candidates  int
+	outer       *joinRow
+	recursive   bool
+	budget      *recursiveBudget
+	memo        map[string][]memoizedQuery
+	money       bool
+	moneyConfig *MoneyConfig
 }
 
 type recursiveBudget struct {
@@ -521,6 +522,9 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 				return err
 			}
 		}
+		if e.money && hasUnsafeMoneyFloat(rec.Data()) {
+			return queryError("money_input", path, "fractional or unsafe binary floating-point input is not exact")
+		}
 		data, err := normalizedJoinRecordMapForMode(rec, e.money)
 		if err != nil {
 			return joinError("join_plan", path, err.Error())
@@ -549,6 +553,47 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		}
 	}
 	return nil
+}
+
+func hasUnsafeMoneyFloat(value any) bool {
+	var walk func(reflect.Value) bool
+	walk = func(v reflect.Value) bool {
+		if !v.IsValid() {
+			return false
+		}
+		if v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer {
+			if v.IsNil() {
+				return false
+			}
+			return walk(v.Elem())
+		}
+		switch v.Kind() {
+		case reflect.Float32, reflect.Float64:
+			f := v.Convert(reflect.TypeOf(float64(0))).Float()
+			return math.IsNaN(f) || math.IsInf(f, 0) || math.Trunc(f) != f || math.Abs(f) > 9007199254740991
+		case reflect.Map:
+			iter := v.MapRange()
+			for iter.Next() {
+				if walk(iter.Value()) {
+					return true
+				}
+			}
+		case reflect.Slice, reflect.Array:
+			for i := 0; i < v.Len(); i++ {
+				if walk(v.Index(i)) {
+					return true
+				}
+			}
+		case reflect.Struct:
+			for i := 0; i < v.NumField(); i++ {
+				if v.Type().Field(i).PkgPath == "" && walk(v.Field(i)) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return walk(reflect.ValueOf(value))
 }
 
 func (e *joinExecution) collectKeyRefs(node FromSource, path string) {
@@ -1090,6 +1135,9 @@ func (e *joinExecution) expression(expr Expression, row joinRow) (any, error) {
 
 func (e *joinExecution) expressionAt(expr Expression, row joinRow, path string) (any, error) {
 	if !e.recursive {
+		if e.money {
+			return e.evalMoneyJoinScalar(expr, row)
+		}
 		return evalJoinExpression(expr, row)
 	}
 	return e.evalExpressionAt(expr, row, path)
@@ -1101,9 +1149,113 @@ func (e *joinExecution) condition(condition Condition, row joinRow) (bool, error
 
 func (e *joinExecution) conditionAt(condition Condition, row joinRow, path string) (bool, error) {
 	if !e.recursive {
+		if e.money {
+			return e.evalMoneyCondition(condition, row)
+		}
 		return evalJoinCondition(condition, row)
 	}
 	return e.evalConditionAt(condition, row, path)
+}
+
+func (e *joinExecution) evalMoneyCondition(condition Condition, row joinRow) (bool, error) {
+	switch c := condition.(type) {
+	case Comparison:
+		left, err := e.evalMoneyJoinScalar(c.Left, row)
+		if err != nil {
+			return false, err
+		}
+		right, err := e.evalMoneyJoinScalar(c.Right, row)
+		if err != nil {
+			return false, err
+		}
+		if left == nil || right == nil {
+			return false, nil
+		}
+		cmp, err := compareMoneyValues(left, right)
+		if err != nil {
+			return false, err
+		}
+		switch c.Operator {
+		case Equal:
+			return cmp == 0, nil
+		case GreaterThen:
+			return cmp > 0, nil
+		case GreaterOrEqual:
+			return cmp >= 0, nil
+		case LessThen:
+			return cmp < 0, nil
+		case LessOrEqual:
+			return cmp <= 0, nil
+		}
+	case IsNullCondition:
+		value, err := e.evalMoneyJoinScalar(c.Operand(), row)
+		if err != nil {
+			return false, err
+		}
+		return IsNullValue(value) != c.Negated(), nil
+	case GroupCondition:
+		if c.Operator() == Or {
+			for _, child := range c.Conditions() {
+				ok, err := e.evalMoneyCondition(child, row)
+				if err != nil || ok {
+					return ok, err
+				}
+			}
+			return false, nil
+		}
+		for _, child := range c.Conditions() {
+			ok, err := e.evalMoneyCondition(child, row)
+			if err != nil || !ok {
+				return ok, err
+			}
+		}
+		return true, nil
+	default:
+		return evalJoinCondition(condition, row)
+	}
+	return false, fmt.Errorf("unsupported money condition %T", condition)
+}
+
+func (e *joinExecution) evalMoneyJoinScalar(expr Expression, row joinRow) (any, error) {
+	switch v := expr.(type) {
+	case FieldRef:
+		return e.field(row, v), nil
+	case Constant:
+		return normalizeAggregationValue(v.Value), nil
+	case BinaryExpression:
+		left, err := e.evalMoneyJoinNumericScalar(v.Left, row)
+		if err != nil {
+			return nil, err
+		}
+		right, err := e.evalMoneyJoinNumericScalar(v.Right, row)
+		if err != nil {
+			return nil, err
+		}
+		scale := 18
+		if e.moneyConfig != nil {
+			scale = e.moneyConfig.DivisionScale
+		}
+		return moneyArithmetic(v.Operator, left, right, scale)
+	default:
+		return nil, fmt.Errorf("unsupported money expression %T", expr)
+	}
+}
+
+func (e *joinExecution) evalMoneyJoinNumericScalar(expr Expression, row joinRow) (any, error) {
+	value, err := e.evalMoneyJoinScalar(expr, row)
+	if err != nil || value == nil {
+		return value, err
+	}
+	if _, err = moneyNumber(value); err != nil {
+		return nil, err
+	}
+	if field, ok := expr.(FieldRef); ok && e.moneyConfig != nil {
+		if err := validateMoneyField(value, e.moneyConfig); err != nil {
+			return nil, err
+		}
+		_ = field
+	}
+	return value, nil
 }
 
 func (e *joinExecution) projection(columns []Column, row joinRow) (map[string]any, error) {
@@ -1452,8 +1604,20 @@ func (e *joinExecution) evalTruthAt(condition Condition, row joinRow, path strin
 			return queryUnknown, nil
 		}
 		cmp := compareAggregationValues(left, right)
+		if e.money {
+			cmp, err = compareMoneyValues(left, right)
+			if err != nil {
+				return queryUnknown, err
+			}
+		}
 		switch value.Operator {
 		case Equal:
+			if e.money {
+				if cmp == 0 {
+					return queryTrue, nil
+				}
+				return queryFalse, nil
+			}
 			if valuesEqual(left, right) {
 				return queryTrue, nil
 			}
