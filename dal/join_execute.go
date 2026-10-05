@@ -82,6 +82,10 @@ type joinKeyReference struct{ field, path string }
 
 // executePlannedRecords is shared by DB and transaction entrypoints.
 func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, provider NativeJoinProvider) (RecordsReader, error) {
+	// Where an ordered aggregate may stand is held before any route is chosen, so no provider is asked about a query that breaks it.
+	if err := validateQueryPlacement(query); err != nil {
+		return nil, err
+	}
 	if q, ok := query.(StructuredQuery); ok && HasSubquery(q) {
 		return executeGenericRecursive(ctx, executor, q, nil)
 	}
@@ -152,6 +156,10 @@ func executeGenericJoin(ctx context.Context, executor QueryExecutor, q Structure
 func (e *joinExecution) execute() (RecordsReader, error) {
 	if e.q.StartFrom() != "" || e.q.StartAfter() != "" {
 		return nil, joinError("join_plan", "from", "generic JOIN does not support provider cursors")
+	}
+	// A nested query, a derived source and a subquery run here too, so each is held to the rule before any source is read.
+	if err := validateQueryPlacement(e.q); err != nil {
+		return nil, err
 	}
 	e.collectKeyRefs(e.q.From(), "from")
 	if err := e.scanTree(e.q.From(), "from"); err != nil {
@@ -605,10 +613,10 @@ func (e *joinExecution) holdsSortValues() bool {
 	return len(e.sortFields) > 0
 }
 
-// setSortValues makes the sort values of a scanned row the engine's own. A query
-// that holds an ordered aggregate reads them from the reserved key of the row, so
-// a value the provider's own row holds under that name is removed first and only
-// what the engine builds is left. A query that holds none leaves the row alone.
+// setSortValues sets the sort values of a scanned row. A query that holds an
+// ordered aggregate reads them from the reserved key of the row, so a field the
+// provider's own row holds under that name is removed first, and what the engine
+// built is set. A query that holds none leaves the row alone.
 func (e *joinExecution) setSortValues(data map[string]any, sortValues map[string]any) {
 	if !e.holdsSortValues() {
 		return
@@ -647,7 +655,8 @@ func rawJoinField(data any, path string) any { return rawField(data, path, false
 // rawField reads a field, or a dotted path of fields, of a provider's row before it
 // becomes JSON values. A field of a struct is found by its json tag or its name;
 // promoted says whether a field of an embedded struct is found as a field of the
-// struct that embeds it, as encoding/json writes it.
+// struct that embeds it, as encoding/json writes it, and whether a struct that
+// writes itself is left unread (see writesItself).
 func rawField(data any, path string, promoted bool) any {
 	current := reflect.ValueOf(data)
 	for _, part := range strings.Split(path, ".") {
@@ -670,6 +679,9 @@ func rawField(data any, path string, promoted bool) any {
 			var field reflect.Value
 			var found bool
 			if promoted {
+				if writesItself(current) {
+					return nil
+				}
 				field, found = promotedStructField(current, part)
 			} else {
 				field, found = ownStructField(current, part)
@@ -1332,6 +1344,10 @@ func simpleRecursiveQuery(q StructuredQuery) bool {
 }
 
 func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, cap int, project bool) (records []record.Record, resultErr error) {
+	// A subquery of one source is read here and does not run through execute, so it is held to the placement rule here.
+	if err := validateQueryPlacement(q); err != nil {
+		return nil, err
+	}
 	if limit := q.Limit(); limit > 0 && limit < cap {
 		cap = limit
 	}

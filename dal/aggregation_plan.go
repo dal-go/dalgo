@@ -354,13 +354,11 @@ type orderedAggregateScope struct {
 	order   []string
 }
 
-func newOrderedAggregateScope(from FromSource) orderedAggregateScope {
-	scope := orderedAggregateScope{stored: map[string]bool{}, derived: map[string]bool{}}
-	var visit func(FromSource)
-	visit = func(node FromSource) {
-		if node == nil || node.Base() == nil {
-			return
-		}
+// newOrderedAggregateScope lists the sources of a source tree. complete is false
+// when the walk of the tree stopped at maxQueryTreeDepth, and the list is partial.
+func newOrderedAggregateScope(from FromSource) (scope orderedAggregateScope, complete bool) {
+	scope = orderedAggregateScope{stored: map[string]bool{}, derived: map[string]bool{}}
+	complete = walkFromTree(from, func(node FromSource) {
 		alias := joinAlias(node.Base())
 		if _, derived := asQuerySource(node.Base()); derived {
 			scope.derived[alias] = true
@@ -368,12 +366,8 @@ func newOrderedAggregateScope(from FromSource) orderedAggregateScope {
 		} else {
 			scope.stored[alias] = true
 		}
-		for _, join := range node.Joins() {
-			visit(joinedFrom(join))
-		}
-	}
-	visit(from)
-	return scope
+	})
+	return scope, complete
 }
 
 // check refuses a field that is not a field of a stored source of the query: a
@@ -407,7 +401,11 @@ func validateOrderedAggregateSources(q StructuredQuery) error {
 			return
 		}
 		if scope == nil {
-			built := newOrderedAggregateScope(q.From())
+			built, complete := newOrderedAggregateScope(q.From())
+			if !complete {
+				refusal = queryTooDeepError()
+				return
+			}
 			scope = &built
 		}
 		var fields []FieldRef
@@ -500,15 +498,16 @@ func orderedAggregateNative(aggregate AggregateFunc, c AggregateCapabilities) bo
 }
 
 // providerRunsOrderedAggregates reports whether a provider runs every ordered
-// aggregate of q natively. It is true for a query that holds none.
+// aggregate of q natively. It is true for a query that holds none, and false for a
+// query the walk could not follow to its end.
 func providerRunsOrderedAggregates(q StructuredQuery, c QueryCapabilities) bool {
 	runs := true
-	walkAggregates(q, func(a AggregateFunc) {
+	complete := walkAggregates(q, func(a AggregateFunc) {
 		if len(aggregateOrder(a)) > 0 {
 			runs = runs && orderedAggregateNative(a, c.Aggregate)
 		}
 	})
-	return runs
+	return runs && complete
 }
 
 func nativeAggregationSupported(q StructuredQuery, c QueryCapabilities) bool {
@@ -516,7 +515,7 @@ func nativeAggregationSupported(q StructuredQuery, c QueryCapabilities) bool {
 		return false
 	}
 	ok := true
-	walkAggregates(q, func(a AggregateFunc) {
+	complete := walkAggregates(q, func(a AggregateFunc) {
 		distinct := aggregateDistinct(a)
 		switch strings.ToUpper(a.FuncName()) {
 		case COUNT:
@@ -537,95 +536,225 @@ func nativeAggregationSupported(q StructuredQuery, c QueryCapabilities) bool {
 			ok = false
 		}
 	})
-	return ok
+	return ok && complete
 }
 
-func walkAggregates(q StructuredQuery, visit func(AggregateFunc)) {
-	for _, c := range q.Columns() {
-		walkExpressionAggregates(c.Expression, visit)
-	}
-	for _, e := range q.GroupBy() {
-		walkExpressionAggregates(e, visit)
-	}
-	for _, o := range q.OrderBy() {
-		walkExpressionAggregates(o.Expression(), visit)
-	}
-	walkConditionAggregates(q.Having(), visit)
+// queryTooDeepError is the refusal of a query that holds an expression, a
+// condition or a source tree nested more than maxQueryTreeDepth levels deep. The
+// walks that look for where an aggregate stands stop there, so they cannot tell
+// whether an aggregate with an order stands beyond it.
+func queryTooDeepError() error {
+	return fmt.Errorf("the query is nested more than %d levels deep, too deep to be checked", maxQueryTreeDepth)
 }
 
-// walkExpressionAggregates visits every aggregate in an expression, outermost first.
-func walkExpressionAggregates(expression Expression, visit func(AggregateFunc)) {
+// aggregateWalk visits the aggregates in the expressions and conditions of a
+// query, outermost first. It keeps the path it is on as inspectQueryTree does
+// (queryTreePath): a node held by pointer that is already on the path is not
+// walked again, so a query that holds itself by pointer ends, and a path longer
+// than maxQueryTreeDepth nodes is not followed, which is where a query that holds
+// itself by value ends. truncated records that a path was cut at that bound; what
+// lies beyond it has not been seen.
+type aggregateWalk struct {
+	path      queryTreePath
+	visit     func(AggregateFunc)
+	truncated bool
+}
+
+// enter admits a node to the path and returns the function that leaves it, or nil
+// when the node is not to be walked.
+func (w *aggregateWalk) enter(node any) (leave func()) {
+	leave, exceeded := w.path.enter(nodePointerID(node))
+	if leave == nil && exceeded {
+		w.truncated = true
+	}
+	return leave
+}
+
+// expression visits every aggregate in an expression, in its arguments and in its
+// order.
+func (w *aggregateWalk) expression(expression Expression) {
+	leave := w.enter(expression)
+	if leave == nil {
+		return
+	}
+	defer leave()
 	switch e := expression.(type) {
 	case AggregateFunc:
-		visit(e)
+		w.visit(e)
 		for _, arg := range e.FuncArgs() {
-			walkExpressionAggregates(arg, visit)
+			w.expression(arg)
 		}
 		for _, key := range aggregateOrder(e) {
 			if key != nil {
-				walkExpressionAggregates(key.Expression(), visit)
+				w.expression(key.Expression())
 			}
 		}
 	case BinaryExpression:
-		walkExpressionAggregates(e.Left, visit)
-		walkExpressionAggregates(e.Right, visit)
+		w.expression(e.Left)
+		w.expression(e.Right)
 	}
 }
 
-// walkConditionAggregates visits every aggregate in the operands of a condition.
-// A condition held by pointer is read as the value it points to, as the scope
-// walk reads it.
-func walkConditionAggregates(condition Condition, visit func(AggregateFunc)) {
+// condition visits every aggregate in the operands of a condition. A condition
+// held by pointer is read as the value it points to, as the scope walk reads it.
+func (w *aggregateWalk) condition(condition Condition) {
+	leave := w.enter(condition)
+	if leave == nil {
+		return
+	}
+	defer leave()
 	switch c := condition.(type) {
 	case IsNullCondition:
-		walkExpressionAggregates(c.Operand(), visit)
+		w.expression(c.Operand())
 	case *IsNullCondition:
 		if c != nil {
-			walkConditionAggregates(*c, visit)
+			w.condition(*c)
 		}
 	case Comparison:
-		walkExpressionAggregates(c.Left, visit)
-		walkExpressionAggregates(c.Right, visit)
+		w.expression(c.Left)
+		w.expression(c.Right)
 	case *Comparison:
 		if c != nil {
-			walkConditionAggregates(*c, visit)
+			w.condition(*c)
 		}
 	case GroupCondition:
 		for _, child := range c.Conditions() {
-			walkConditionAggregates(child, visit)
+			w.condition(child)
 		}
 	case *GroupCondition:
 		if c != nil {
-			walkConditionAggregates(*c, visit)
+			w.condition(*c)
 		}
 	}
 }
 
-// validateOrderedAggregatePlacement refuses an aggregate with an order of its own
-// in WHERE. An ordered aggregate stands in the select list, in HAVING and in ORDER
-// BY, as an aggregate does; WHERE reads rows before they are grouped. A query
-// whose WHERE holds an aggregate with no order is not read here.
-func validateOrderedAggregatePlacement(q StructuredQuery) error {
-	found := false
-	walkConditionAggregates(q.Where(), func(a AggregateFunc) {
-		if len(aggregateOrder(a)) > 0 {
-			found = true
+// scanOrders visits every aggregate in the scan orders of the sources of a source
+// tree: the source of each tree, and the source each join names for itself.
+func (w *aggregateWalk) scanOrders(from FromSource) {
+	visitSource := func(source RecordsetSource) {
+		for _, order := range collectionScanOrders(source) {
+			if order != nil {
+				w.expression(order.Expression())
+			}
 		}
-	})
-	if found {
+	}
+	if !walkFromTree(from, func(node FromSource) {
+		visitSource(node.Base())
+		for _, join := range node.Joins() {
+			visitSource(join.RecordsetSource)
+		}
+	}) {
+		w.truncated = true
+	}
+}
+
+// walkFromTree calls visit for every tree of a source tree, a tree before the trees
+// of its joins. It keeps the path it is on as inspectQueryTree does, and complete
+// is false when a path was longer than maxQueryTreeDepth trees, which the walk did
+// not follow any further.
+func walkFromTree(from FromSource, visit func(FromSource)) (complete bool) {
+	var path queryTreePath
+	complete = true
+	var walk func(FromSource)
+	walk = func(node FromSource) {
+		if node == nil || node.Base() == nil {
+			return
+		}
+		leave, exceeded := path.enter(nodePointerID(node))
+		if leave == nil {
+			complete = complete && !exceeded
+			return
+		}
+		defer leave()
+		visit(node)
+		for _, join := range node.Joins() {
+			walk(joinedFrom(join))
+		}
+	}
+	walk(from)
+	return complete
+}
+
+// walkAggregates visits every aggregate the select list, GROUP BY, ORDER BY and
+// HAVING of a query hold. complete is false when a path was cut at
+// maxQueryTreeDepth nodes: an aggregate may stand beyond it.
+func walkAggregates(q StructuredQuery, visit func(AggregateFunc)) (complete bool) {
+	walk := aggregateWalk{visit: visit}
+	for _, c := range q.Columns() {
+		walk.expression(c.Expression)
+	}
+	for _, e := range q.GroupBy() {
+		walk.expression(e)
+	}
+	for _, o := range q.OrderBy() {
+		walk.expression(o.Expression())
+	}
+	walk.condition(q.Having())
+	return !walk.truncated
+}
+
+// validateOrderedAggregatePlacement refuses an aggregate with an order of its own
+// where it cannot stand: in WHERE, which reads rows before they are grouped, and in
+// the scan order of a source, which a provider reads as the ORDER BY of a plain
+// read. It stands in the select list, in HAVING and in ORDER BY, as an aggregate
+// does. A query whose WHERE or scan order holds an aggregate with no order is not
+// read here. A query nested more than maxQueryTreeDepth levels deep in either place
+// is refused, as the walk cannot see its end.
+func validateOrderedAggregatePlacement(q StructuredQuery) error {
+	var inWhere, inScanOrder bool
+	holdsOrder := func(found *bool) func(AggregateFunc) {
+		return func(a AggregateFunc) {
+			if len(aggregateOrder(a)) > 0 {
+				*found = true
+			}
+		}
+	}
+	where := aggregateWalk{visit: holdsOrder(&inWhere)}
+	where.condition(q.Where())
+	scans := aggregateWalk{visit: holdsOrder(&inScanOrder)}
+	scans.scanOrders(q.From())
+	switch {
+	case inWhere:
 		return errors.New("an aggregate with an order cannot stand in where")
+	case inScanOrder:
+		return errors.New("an aggregate with an order cannot stand in a scan order")
+	case where.truncated || scans.truncated:
+		return queryTooDeepError()
+	}
+	return nil
+}
+
+// validateQueryPlacement applies the placement rule to a query that is structured,
+// for the readers that hold every query to it before it is routed anywhere. The
+// error is worded as the aggregation errors of those readers are.
+func validateQueryPlacement(query Query) error {
+	q, ok := query.(StructuredQuery)
+	if !ok {
+		return nil
+	}
+	if err := validateOrderedAggregatePlacement(q); err != nil {
+		return fmt.Errorf("dalgo aggregation: %w", err)
 	}
 	return nil
 }
 
 // validateOrderedAggregatesForProvider holds a query that is about to be handed
-// to a provider unplanned to the rules of the ordered aggregate: where it stands,
-// and, when it holds one, every rule ValidateAggregation applies.
+// to a provider as a native join to the rules of the ordered aggregate: when it
+// holds one, every rule ValidateAggregation applies. The readers have held its
+// WHERE and its scan orders to the placement rule before they chose a route. A
+// query whose aggregates the walk cannot follow to their end is refused, as an
+// ordered aggregate may stand beyond the bound.
 func validateOrderedAggregatesForProvider(q StructuredQuery) error {
-	if err := validateOrderedAggregatePlacement(q); err != nil {
-		return err
-	}
-	if holdsOrderedAggregate(q) {
+	found := false
+	complete := walkAggregates(q, func(a AggregateFunc) {
+		if len(aggregateOrder(a)) > 0 {
+			found = true
+		}
+	})
+	switch {
+	case !complete:
+		return queryTooDeepError()
+	case found:
 		return ValidateAggregation(q)
 	}
 	return nil

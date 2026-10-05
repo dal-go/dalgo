@@ -99,6 +99,10 @@ func (db validatedDB) Select(ctx context.Context, query Query) (Reader, error) {
 	if q, ok := query.(StructuredQuery); ok && (hasJoin(query) || HasAggregation(q) || HasSubquery(q)) {
 		return db.ExecuteQueryToRecordsReader(ctx, query)
 	}
+	// A query that is not planned is handed to the adapter as it is, so where an ordered aggregate may stand is held first.
+	if err := validateQueryPlacement(query); err != nil {
+		return nil, err
+	}
 	if selector, ok := db.Backend.(interface {
 		Select(context.Context, Query) (Reader, error)
 	}); ok {
@@ -188,6 +192,10 @@ func (tx *validatedReadTx) Select(ctx context.Context, query Query) (Reader, err
 	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query) || HasSubquery(q)) {
 		return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 	}
+	// A query that is not planned is handed to the adapter as it is, so where an ordered aggregate may stand is held first.
+	if err := validateQueryPlacement(query); err != nil {
+		return nil, err
+	}
 	if selector, ok := tx.ReadTransaction.(interface {
 		Select(context.Context, Query) (Reader, error)
 	}); ok {
@@ -218,6 +226,10 @@ func (tx *validatedTx) ExecuteQueryToRecordsReader(ctx context.Context, query Qu
 func (tx *validatedTx) Select(ctx context.Context, query Query) (Reader, error) {
 	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query) || HasSubquery(q)) {
 		return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
+	}
+	// A query that is not planned is handed to the adapter as it is, so where an ordered aggregate may stand is held first.
+	if err := validateQueryPlacement(query); err != nil {
+		return nil, err
 	}
 	if selector, ok := tx.ReadTransaction.(interface {
 		Select(context.Context, Query) (Reader, error)

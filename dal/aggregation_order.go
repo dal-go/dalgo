@@ -2,6 +2,7 @@ package dal
 
 import (
 	"context"
+	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,7 +37,9 @@ func timestampSortValue(instant time.Time) (string, error) {
 // buildSortValues reads the fields of a provider's raw row, before it becomes
 // JSON values, and returns the sort value of each one that holds a timestamp.
 // It returns nil when no field does. A struct row is read as encoding/json writes
-// it, so a field of an embedded struct is a field of the row.
+// it: a field of an embedded struct is a field of the row, and a struct whose type
+// writes itself has no field to read, so a key in it is compared by the text the
+// row writes, as every other read of the row does.
 func buildSortValues(raw any, fields []string) (map[string]any, error) {
 	var values map[string]any
 	for _, name := range fields {
@@ -243,8 +246,8 @@ func (r *localAggregationReader) updateOrderedState(group *localGroup, state *ag
 
 // normalizedRow turns a provider's row into JSON values and, when the query
 // holds an ordered aggregate, adds the sort values of the timestamps in it. The
-// sort values are built first, from the raw row. Only the engine sets the key that
-// carries them: a value the provider's own row holds under that name is removed.
+// sort values are built first, from the raw row. A field the provider's own row
+// holds under the reserved name is removed from the row before they are added.
 func (r *localAggregationReader) normalizedRow(rec record.Record) (map[string]any, error) {
 	values, err := buildSortValues(rec.Data(), r.sortFields)
 	if err != nil {
@@ -295,6 +298,24 @@ func executeAggregationAfterRefusal(ctx context.Context, executor QueryExecutor,
 		return nil, refusal
 	}
 	return reader, nil
+}
+
+var (
+	jsonMarshalerType = reflect.TypeFor[json.Marshaler]()
+	textMarshalerType = reflect.TypeFor[encoding.TextMarshaler]()
+)
+
+// writesItself reports whether encoding/json writes a struct value by calling a
+// method of its type, MarshalJSON or MarshalText, and not field by field. The
+// method of the pointer type is called for a value that can be addressed (a row
+// given by pointer, a field of one) and not for another.
+func writesItself(value reflect.Value) bool {
+	valueType := value.Type()
+	if valueType.Implements(jsonMarshalerType) || valueType.Implements(textMarshalerType) {
+		return true
+	}
+	pointerType := reflect.PointerTo(valueType)
+	return value.CanAddr() && (pointerType.Implements(jsonMarshalerType) || pointerType.Implements(textMarshalerType))
 }
 
 // promotedStructField finds the field encoding/json writes under name in a struct,

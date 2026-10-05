@@ -100,11 +100,11 @@ func TestOrderedAggregateAnswerIsReturnedAsItIsAndBreaksTiesByInstant(t *testing
 	}
 }
 
-// Only the engine sets the key that carries sort values. A row a store with free field
-// names returns may hold a field of that name; a query that holds an ordered aggregate
-// does not read it as the engine's, on every in-memory path, and a query that holds none
-// returns the field as it always did.
-func TestOrderedAggregateSortValuesAreOnlyTheEnginesOwn(t *testing.T) {
+// A field a provider's row holds under the reserved name is removed from the row. A row a
+// store with free field names returns may hold one; a query that holds an ordered aggregate
+// does not read it, on every in-memory path, and a query that holds none returns the field
+// as it always did.
+func TestOrderedAggregateRemovesAFieldOfTheReservedNameFromAProvidersRow(t *testing.T) {
 	forged := func(id, customer, date, total int, forgedDate any) record.Record {
 		return joinTestRecord("Invoice", fmt.Sprint(id), map[string]any{
 			"CustomerId": customer, "InvoiceDate": date, "Total": total,

@@ -12,6 +12,41 @@ import (
 // smaller bound to a query's structure.
 const maxQueryTreeDepth = 10000
 
+// queryTreePath is the record a walk of a query tree keeps of the path it is on. It
+// is the guard of inspectQueryTree, and the walks of the aggregates of a query use
+// it as it is: a reference-typed node, given by its address, that is already on the
+// path is not walked again, so a graph of pointers that holds itself ends; and a
+// path of maxQueryTreeDepth nodes is not followed any further, which is where a
+// tree that holds itself by value ends.
+type queryTreePath struct {
+	seen  map[uintptr]bool
+	depth int
+}
+
+// enter admits a node to the current path and returns the function that leaves it.
+// It returns nil when the node must not be walked, and says whether that is
+// because the path is already maxQueryTreeDepth nodes long. A node held by value
+// has no address (0) and is always admitted.
+func (p *queryTreePath) enter(id uintptr) (leave func(), exceeded bool) {
+	if p.depth >= maxQueryTreeDepth {
+		return nil, true
+	}
+	if id != 0 {
+		if p.seen[id] {
+			return nil, false
+		}
+		if p.seen == nil {
+			p.seen = map[uintptr]bool{}
+		}
+		p.seen[id] = true
+	}
+	p.depth++
+	return func() {
+		p.depth--
+		delete(p.seen, id)
+	}, false
+}
+
 // inspectQueryTree reports whether found accepts a query nested anywhere in q:
 // a derived source, a subquery in any clause (the select list, WHERE, ON,
 // GROUP BY, HAVING, ORDER BY, an aggregate argument, an arithmetic operand or a
@@ -22,29 +57,11 @@ const maxQueryTreeDepth = 10000
 // maxQueryTreeDepth nodes along one path: there it reports a query, so that a
 // tree the walk cannot follow to its end is handled as one with nested queries.
 func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool {
-	seen := map[uintptr]bool{}
-	depth := 0
-	// enter admits a node to the current path and returns the function that leaves
-	// it. It returns nil when the node must not be walked, and says whether the
-	// walk reports a query instead: when the path is already maxQueryTreeDepth
-	// nodes long it does, and when a reference-typed node, given by its address, is
-	// already on the path it does not. A node held by value has no address (0).
-	enter := func(id uintptr) (leave func(), report bool) {
-		if depth >= maxQueryTreeDepth {
-			return nil, true
-		}
-		if id != 0 {
-			if seen[id] {
-				return nil, false
-			}
-			seen[id] = true
-		}
-		depth++
-		return func() {
-			depth--
-			delete(seen, id)
-		}, false
-	}
+	// enter says, when it returns no leave, whether the walk reports a query
+	// instead: when the path is already maxQueryTreeDepth nodes long it does, and
+	// when a node is already on the path it does not.
+	var path queryTreePath
+	enter := path.enter
 	var visitQuery func(StructuredQuery) bool
 	var visitExpr func(Expression) bool
 	var visitCondition func(Condition) bool
