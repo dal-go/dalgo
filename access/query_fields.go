@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/dal-go/dalgo/dal"
 )
@@ -67,6 +68,19 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			}
 		}
 		if !ok {
+			// An aggregate reads only the fields of its operands, so it is held
+			// to the allow-list operand by operand; the first refused field is
+			// the one named.
+			if aggregate, isAggregate := expression.(dal.AggregateFunc); isAggregate {
+				if fields, checkable := aggregateFields(aggregate, 0); checkable {
+					for _, name := range fields {
+						if !sets.allowsWhole(name) {
+							return deny(usage, name)
+						}
+					}
+					return nil
+				}
+			}
 			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotFields, Explanation: fmt.Sprintf("%s expression cannot be safely checked against allowed fields", usage)}}
 		}
 		if !sets.allowsWhole(field.Name()) {
@@ -181,4 +195,59 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 		}
 	}
 	return nil
+}
+
+// aggregateFields lists, left to right, the fields an aggregate reads. checkable
+// is false when an operand is something a field list cannot be applied to: a
+// param, an array, a subquery, an expression the check does not know, a star
+// anywhere but directly under COUNT, or nesting past maxQueryNesting. A
+// constant reads no field, and COUNT(*) reads no field value.
+func aggregateFields(aggregate dal.AggregateFunc, depth int) (fields []string, checkable bool) {
+	for _, argument := range aggregate.FuncArgs() {
+		if star, isStar := argument.(dal.StarExpression); isStar && star.IsStar() && strings.EqualFold(aggregate.FuncName(), dal.COUNT) {
+			continue
+		}
+		operand, ok := operandFields(argument, depth+1)
+		if !ok {
+			return nil, false
+		}
+		fields = append(fields, operand...)
+	}
+	return fields, true
+}
+
+// operandFields lists the fields an aggregate operand reads, in the order the
+// operand names them; ok is false for an operand that cannot be checked.
+func operandFields(expression dal.Expression, depth int) (fields []string, ok bool) {
+	if depth > maxQueryNesting {
+		return nil, false
+	}
+	switch expression := expression.(type) {
+	case dal.FieldRef:
+		return []string{expression.Name()}, true
+	case *dal.FieldRef:
+		if expression != nil {
+			return []string{expression.Name()}, true
+		}
+	case dal.Constant, *dal.Constant:
+		return nil, true
+	case dal.BinaryExpression:
+		return binaryFields(expression, depth)
+	case *dal.BinaryExpression:
+		if expression != nil {
+			return binaryFields(*expression, depth)
+		}
+	case dal.AggregateFunc:
+		return aggregateFields(expression, depth)
+	}
+	return nil, false
+}
+
+func binaryFields(expression dal.BinaryExpression, depth int) ([]string, bool) {
+	left, ok := operandFields(expression.Left, depth+1)
+	if !ok {
+		return nil, false
+	}
+	right, ok := operandFields(expression.Right, depth+1)
+	return append(left, right...), ok
 }

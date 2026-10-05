@@ -284,9 +284,31 @@ func TestEndToEnd(t *testing.T) {
 			// The replay adapter cannot project columns; the positive control
 			// must skip rather than fail.
 			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access field list: allowed recordset":
+			// Nor can it read a recordset; the control skips on either read.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+			tx.EXPECT().ExecuteQueryToRecordsetReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 		case "access field list: records", "access field list: recordset":
 			// Every query in these transactions must be denied by the access
 			// layer; the adapter is never reached, so no call is expected.
+		case "access sources: records", "access sources: recordset":
+			// A query that reads the denied collection is refused by the access
+			// layer; the adapter is never reached, so no call is expected.
+		case "access sources: allowed":
+			// The replay adapter cannot run a query with nested sources; the
+			// control only asserts that the access layer does not refuse it.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access sources: nested read":
+			// The access layer reads the outer and the nested source with one
+			// scan each; both scans return every city.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, dal.Query) (dal.RecordsReader, error) {
+				records := make([]record.Record, len(models.Cities))
+				for i, city := range models.Cities {
+					records[i] = record.NewRecordWithData(record.NewKeyWithID(models.CitiesCollection, models.CityID(city)), &city)
+					records[i].SetError(nil)
+				}
+				return dal.NewRecordsReader(records), nil
+			}).AnyTimes()
 		case "":
 			panic("no RO tx name")
 		default:

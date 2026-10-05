@@ -82,6 +82,9 @@ func (s securedReadSession) GetMulti(ctx context.Context, records []record.Recor
 
 func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	if structured, ok := query.(dal.StructuredQuery); ok && dal.HasSubquery(structured) {
+		if err := s.authorizeSources(ctx, structured); err != nil {
+			return nil, err
+		}
 		return dal.ExecuteRecursiveQuery(ctx, s, structured)
 	}
 	query, requested, sets, err := s.authorizeQuery(ctx, query)
@@ -102,11 +105,14 @@ func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, que
 	if err != nil || !sets.restrictive() {
 		return reader, err
 	}
-	return redactingReader{RecordsReader: reader, sets: sets}, nil
+	return redactingReader{RecordsReader: reader, sets: sets, outputs: outputNames(requested)}, nil
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	if structured, ok := query.(dal.StructuredQuery); ok && dal.HasSubquery(structured) {
+		if err := s.authorizeSources(ctx, structured); err != nil {
+			return nil, err
+		}
 		return dal.ExecuteRecursiveRecordset(ctx, s, structured, options...)
 	}
 	query, requested, sets, err := s.authorizeQuery(ctx, query)
@@ -130,6 +136,15 @@ func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, q
 
 func emptyProjectionDeniedError(query dal.Query) error {
 	return &DeniedError{Decision: Decision{Operation: Query, Resource: resourcesForQuery(query)[0], Policy: "fields", Effect: effectDeny.String(), Explanation: "no permitted columns remain after applying the query projection and field policy"}}
+}
+
+// authorizeSources authorizes every source a query with nested queries reads,
+// before any of them is read. Such a query is then executed one source at a
+// time through this session, so each read is authorized again with its own row
+// conditions and field lists; only the denial of a source matters here.
+func (s securedReadSession) authorizeSources(ctx context.Context, query dal.StructuredQuery) error {
+	_, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Query, Resources: resourcesForQuery(query), Query: query})
+	return err
 }
 
 // authorizeQuery authorizes every source of a query and returns the query to
@@ -423,20 +438,12 @@ func resourcesForKeys(keys []*record.Key) []Resource {
 	return resources
 }
 
-func resourcesForQuery(query dal.Query) []Resource {
-	structured, ok := query.(dal.StructuredQuery)
-	if !ok {
-		return []Resource{OpaqueQuery(query.String())}
-	}
-	from := structured.From()
-	resources := []Resource{resourceForRecordsetSource(from.Base())}
-	for _, join := range from.Joins() {
-		resources = append(resources, resourceForRecordsetSource(join.RecordsetSource))
-	}
-	return resources
-}
-
+// resourceForRecordsetSource is the resource of one stored source: a collection,
+// a collection group, or, for a source a path rule cannot name, an opaque query.
 func resourceForRecordsetSource(source dal.RecordsetSource) Resource {
+	if isNilNode(source) {
+		return OpaqueQuery(fmt.Sprint(source))
+	}
 	switch source := source.(type) {
 	case dal.CollectionRef:
 		if source.Schema() != "" {

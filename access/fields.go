@@ -271,6 +271,14 @@ func (sets fieldSets) redactMap(prefix string, data map[string]any) {
 // pruned in place; pointer data is round-tripped through JSON so nested
 // refusals apply, then written back into the zeroed target.
 func (sets fieldSets) redactRecord(rec record.Record) error {
+	return sets.redactRecordKeeping(rec, nil)
+}
+
+// redactRecordKeeping is redactRecord for the row of a query whose columns the
+// caller named: the top-level keys in keep are the names those columns come
+// back under, and each was already checked against the field list by its
+// source expression, so they stay whatever the list says of the name itself.
+func (sets fieldSets) redactRecordKeeping(rec record.Record, keep []string) error {
 	if !sets.restrictive() || !rec.Exists() {
 		return nil
 	}
@@ -278,13 +286,13 @@ func (sets fieldSets) redactRecord(rec record.Record) error {
 	switch {
 	case value.Kind() == reflect.Map:
 		if data, ok := rec.Data().(map[string]any); ok {
-			sets.redactMap("", data)
+			sets.redactMapKeeping(data, keep)
 			return nil
 		}
 		return fmt.Errorf("access: cannot redact map data of type %T", rec.Data())
 	case value.Kind() == reflect.Pointer && !value.IsNil():
 		if data, ok := rec.Data().(*map[string]any); ok {
-			sets.redactMap("", *data)
+			sets.redactMapKeeping(*data, keep)
 			return nil
 		}
 		data, err := condeval.ToMap(rec.Data())
@@ -300,10 +308,29 @@ func (sets fieldSets) redactRecord(rec record.Record) error {
 	}
 }
 
+// redactMapKeeping is redactMap for a row whose top-level keys in keep are
+// exempt from redaction.
+func (sets fieldSets) redactMapKeeping(data map[string]any, keep []string) {
+	kept := make(map[string]any, len(keep))
+	for _, name := range keep {
+		if value, ok := data[name]; ok {
+			kept[name] = value
+			delete(data, name)
+		}
+	}
+	sets.redactMap("", data)
+	for name, value := range kept {
+		data[name] = value
+	}
+}
+
 // redactingReader applies field redaction to every record a query returns.
+// outputs are the names the query's explicitly selected columns come back
+// under (see outputNames).
 type redactingReader struct {
 	dal.RecordsReader
-	sets fieldSets
+	sets    fieldSets
+	outputs []string
 }
 
 func (r redactingReader) Next() (record.Record, error) {
@@ -311,10 +338,35 @@ func (r redactingReader) Next() (record.Record, error) {
 	if err != nil || rec == nil {
 		return rec, err
 	}
-	if err := r.sets.redactRecord(rec); err != nil {
+	if err := r.sets.redactRecordKeeping(rec, r.outputs); err != nil {
 		return nil, err
 	}
 	return rec, nil
+}
+
+// outputNames lists the names the explicitly selected columns of a query come
+// back under, by DALgo's rule: the alias when there is one, otherwise the
+// field's own name, otherwise the text of the expression. A field under its own
+// name needs no entry; it is allowed by the list that allowed the column. A
+// wildcard names no output of its own.
+func outputNames(query dal.StructuredQuery) []string {
+	if query == nil {
+		return nil
+	}
+	var names []string
+	for _, column := range query.Columns() {
+		if column.Wildcard != nil || column.Expression == nil {
+			continue
+		}
+		if column.Alias != "" {
+			names = append(names, column.Alias)
+			continue
+		}
+		if _, plain := column.Expression.(dal.FieldRef); !plain {
+			names = append(names, column.Expression.String())
+		}
+	}
+	return names
 }
 
 // projectQuery narrows a structured query's columns to the enumerable
@@ -335,8 +387,7 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 				hasWildcard = true
 				continue
 			}
-			field, ok := column.Expression.(dal.FieldRef)
-			if !ok || !sets.allowsWhole(field.Name()) {
+			if !sets.readsOnlyAllowedFields(column.Expression) {
 				return queryProjection{query: query, status: queryProjectionUnavailable}
 			}
 		}
@@ -379,6 +430,22 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 }
 
 var _ = context.Background
+
+// readsOnlyAllowedFields reports whether a selected column is a plain field, or
+// an aggregate whose operands name only fields, that every set allows.
+func (sets fieldSets) readsOnlyAllowedFields(expression dal.Expression) bool {
+	switch expression := expression.(type) {
+	case dal.FieldRef:
+		return sets.allowsWhole(expression.Name())
+	case dal.AggregateFunc:
+		fields, checkable := aggregateFields(expression, 0)
+		for _, name := range fields {
+			checkable = checkable && sets.allowsWhole(name)
+		}
+		return checkable
+	}
+	return false
+}
 
 // allowsWhole prevents a whole-object query probe from observing masked leaves.
 // Masks may conservatively reject an object when subtree coverage is uncertain.

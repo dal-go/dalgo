@@ -210,10 +210,20 @@ responsibility.
 
 ## Query boundaries and future constraints
 
-The current boundary authorizes the base collection and every joined source.
-A filter cannot make an otherwise forbidden collection safe. Collection-group
-queries use `access.CollectionGroupScope`; non-structured queries use the
-deliberately broad `access.OpaqueQueryScope`.
+The current boundary authorizes every source a structured query reads before
+any of them is read: the base collection, every joined source at any depth,
+every source inside a derived source, and every source of a subquery (EXISTS,
+NOT EXISTS or scalar) in any clause. A filter cannot make an otherwise
+forbidden collection safe. Collection-group queries use
+`access.CollectionGroupScope`; non-structured queries use the deliberately
+broad `access.OpaqueQueryScope`. A part of a structured query that cannot be
+analysed (an unrecognised node, a query that refers to itself, nesting deeper
+than 64 levels) is an opaque query and needs the same explicit rule.
+
+Under a field allow-list, an aggregate is held to the list by its operands:
+`COUNT(*)` and an aggregate over allowed fields run, and an aggregate over a
+hidden field, alone or inside arithmetic, is denied as a column denial. A
+selected field or aggregate comes back under the name the caller gave it.
 
 Custom SQL text is always opaque. DALgo does not inspect or attempt to infer
 tables from the SQL string, so ordinary path/collection rules can never
