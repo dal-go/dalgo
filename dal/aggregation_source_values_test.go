@@ -29,7 +29,7 @@ func TestOrderedSourceTimestampValuesFollowGenericRawFieldPolicy(t *testing.T) {
 		{"custom map JSON", writtenMap{"at": instant, "text": "literal"}, "at"},
 		{"ambiguous embedded", promotedRow{promotedDupA: promotedDupA{Dup: instant}, promotedDupB: promotedDupB{Dup: instant}}, "Dup"},
 		{"invalid tag", struct {
-			Stamp time.Time `json:"bad\\name"`
+			Stamp time.Time `json:"bad name"`
 		}{instant}, "Stamp"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

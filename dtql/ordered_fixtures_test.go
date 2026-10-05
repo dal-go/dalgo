@@ -426,9 +426,10 @@ func TestOrderedAggregateDocumentFixtures(t *testing.T) {
 				if fixture.Name == "first-last-by-date" || fixture.Name == "timestamp-key" || fixture.Name == "timestamp-key-offsets" {
 					modes = append(modes, "memory-columnar")
 				}
-				if fixture.Name == "joined" {
+				switch fixture.Name {
+				case "joined":
 					modes = []string{"generic-join", "recursive", "federated"}
-				} else if fixture.Name == "with-subquery" {
+				case "with-subquery":
 					modes = []string{"recursive", "federated"}
 				}
 				for _, mode := range modes {
