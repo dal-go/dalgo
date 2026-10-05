@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -187,7 +190,7 @@ func answerEncoding(answer any) string {
 // data alone.
 func compareOrderedTuples(order []OrderExpression, a []any, aTie, aAnswer any, b []any, bTie, bAnswer any) int {
 	for i, key := range order {
-		comparison := compareAggregationValues(a[i], b[i])
+		comparison := compareOrderedValues(a[i], b[i])
 		if key.Descending() {
 			comparison = -comparison
 		}
@@ -195,13 +198,110 @@ func compareOrderedTuples(order []OrderExpression, a []any, aTie, aAnswer any, b
 			return comparison
 		}
 	}
-	if comparison := compareAggregationValues(aTie, bTie); comparison != 0 {
+	if comparison := compareOrderedValues(aTie, bTie); comparison != 0 {
 		return comparison
 	}
-	if comparison := compareAggregationValues(aAnswer, bAnswer); comparison != 0 {
+	if comparison := compareOrderedValues(aAnswer, bAnswer); comparison != 0 {
 		return comparison
 	}
 	return strings.Compare(answerEncoding(aAnswer), answerEncoding(bAnswer))
+}
+
+// orderedDecimal compares JSON numbers without converting them to float64. The
+// magnitude is the exponent of the first significant digit; the remaining
+// digits can be compared with implicit trailing zeroes. Even a very large
+// exponent therefore needs no expanded decimal or unbounded power of ten.
+type orderedDecimal struct {
+	sign      int
+	magnitude *big.Int
+	digits    string
+}
+
+func orderedDecimalValue(value any) (orderedDecimal, bool) {
+	var number string
+	switch v := value.(type) {
+	case json.Number:
+		number = v.String()
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		number = fmt.Sprint(v)
+	default:
+		float, ok := aggregationNumber(value)
+		if !ok || math.IsNaN(float) || math.IsInf(float, 0) {
+			return orderedDecimal{}, false
+		}
+		number = strconv.FormatFloat(float, 'g', -1, 64)
+	}
+	if len(number) == 0 || strings.TrimSpace(number) != number || !json.Valid([]byte(number)) || number[0] != '-' && (number[0] < '0' || number[0] > '9') {
+		return orderedDecimal{}, false
+	}
+	result := orderedDecimal{sign: 1, magnitude: new(big.Int)}
+	if number[0] == '-' {
+		result.sign = -1
+		number = number[1:]
+	}
+	if at := strings.IndexAny(number, "eE"); at >= 0 {
+		result.magnitude.SetString(number[at+1:], 10) // json.Valid checked the exponent.
+		number = number[:at]
+	}
+	wholeDigits := len(number)
+	if at := strings.IndexByte(number, '.'); at >= 0 {
+		wholeDigits = at
+		number = number[:at] + number[at+1:]
+	}
+	leadingZeroes := len(number) - len(strings.TrimLeft(number, "0"))
+	result.digits = strings.TrimRight(number[leadingZeroes:], "0")
+	if result.digits == "" {
+		result.sign = 0
+		return result, true
+	}
+	result.magnitude.Add(result.magnitude, big.NewInt(int64(wholeDigits-leadingZeroes-1)))
+	return result, true
+}
+
+func (a orderedDecimal) compare(b orderedDecimal) int {
+	if a.sign != b.sign {
+		if a.sign < b.sign {
+			return -1
+		}
+		return 1
+	}
+	if a.sign == 0 {
+		return 0
+	}
+	comparison := a.magnitude.Cmp(b.magnitude)
+	if comparison == 0 {
+		for i := 0; i < len(a.digits) || i < len(b.digits); i++ {
+			aDigit, bDigit := byte('0'), byte('0')
+			if i < len(a.digits) {
+				aDigit = a.digits[i]
+			}
+			if i < len(b.digits) {
+				bDigit = b.digits[i]
+			}
+			if aDigit < bDigit {
+				comparison = -1
+				break
+			}
+			if aDigit > bDigit {
+				comparison = 1
+				break
+			}
+		}
+	}
+	return a.sign * comparison
+}
+
+func compareOrderedValues(a, b any) int {
+	_, aJSON := a.(json.Number)
+	_, bJSON := b.(json.Number)
+	if aJSON || bJSON {
+		left, leftOK := orderedDecimalValue(a)
+		right, rightOK := orderedDecimalValue(b)
+		if leftOK && rightOK {
+			return left.compare(right)
+		}
+	}
+	return compareAggregationValues(a, b)
 }
 
 // updateOrderedState lets one row compete for the answer of an ordered first or
