@@ -185,9 +185,16 @@ func (s *federatedJoinStream) Next() (record.Record, error) {
 				return nil, err
 			}
 		}
+		sortValues, err := s.execution.sortValuesOf(rec, joinAlias(s.root.Base()))
+		if err != nil {
+			return nil, err
+		}
 		data, err := normalizedJoinRecordMapForMode(rec, s.execution.money)
 		if err != nil {
 			return nil, err
+		}
+		if sortValues != nil {
+			data[sortValuesKey] = sortValues
 		}
 		if !s.validated {
 			alias := joinAlias(s.root.Base())

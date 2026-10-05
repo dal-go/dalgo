@@ -51,6 +51,10 @@ type joinExecution struct {
 	budget     *recursiveBudget
 	memo       map[string][]memoizedQuery
 	money      bool
+	// sortFields names, for each source alias, the fields that need a sort value
+	// because an ordered aggregate of the query compares by them. It is built on
+	// first use and is empty for a query that holds no ordered aggregate.
+	sortFields map[string][]string
 }
 
 type recursiveBudget struct {
@@ -85,14 +89,30 @@ func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Qu
 		return executeAggregationRecords(ctx, executor, query, capabilities)
 	}
 	q := query.(StructuredQuery)
-	plan, err := PlanJoin(ctx, q, provider)
+	plan, err := PlanJoin(ctx, q, joinProviderFor(q, capabilities, provider))
 	if err != nil {
 		return nil, err
 	}
 	if plan.Strategy == JoinNative {
-		return executor.ExecuteQueryToRecordsReader(ctx, query)
+		reader, err := executor.ExecuteQueryToRecordsReader(ctx, query)
+		if refusedAsNotSupported(q, err) {
+			return executeGenericJoin(ctx, executor, q)
+		}
+		return reader, err
 	}
 	return executeGenericJoin(ctx, executor, q)
+}
+
+// joinProviderFor is the provider PlanJoin may ask to run a join. PlanJoin takes
+// no capabilities, and an adapter that accepts a join writes an aggregate from
+// its name and arguments, so it would drop the order of an ordered aggregate
+// without an error. A query whose ordered aggregates the provider does not run
+// natively is therefore planned without the provider, which makes it generic.
+func joinProviderFor(q StructuredQuery, capabilities QueryCapabilities, provider NativeJoinProvider) NativeJoinProvider {
+	if providerRunsOrderedAggregates(q, capabilities) {
+		return provider
+	}
+	return nil
 }
 
 // executeGenericRecursive materializes a recursive DTQL query through ordinary
@@ -332,6 +352,14 @@ func (e *joinExecution) validateQueryFields() error {
 					return err
 				}
 			}
+			for i, key := range aggregateOrder(v) {
+				if key == nil {
+					continue
+				}
+				if err := expression(key.Expression(), fmt.Sprintf("%s.orderBy[%d]", path, i)); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}
@@ -521,9 +549,16 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 				return err
 			}
 		}
+		sortValues, err := e.sortValuesOf(rec, alias)
+		if err != nil {
+			return joinError("join_plan", path, err.Error())
+		}
 		data, err := normalizedJoinRecordMapForMode(rec, e.money)
 		if err != nil {
 			return joinError("join_plan", path, err.Error())
+		}
+		if sortValues != nil {
+			data[sortValuesKey] = sortValues
 		}
 		encoded, _ := json.Marshal(data) // normalizedJoinRecordMap produced JSON data.
 		e.bytes += 128 + len(encoded)
@@ -549,6 +584,17 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		}
 	}
 	return nil
+}
+
+// sortValuesOf builds the sort values of the timestamps of a scanned row of source
+// alias, when an ordered aggregate of the query compares by them, and returns nil
+// otherwise. It is built from the provider's raw row, before the row is turned into
+// JSON values.
+func (e *joinExecution) sortValuesOf(rec record.Record, alias string) (map[string]any, error) {
+	if e.sortFields == nil {
+		e.sortFields = orderedAggregateSortFields(e.q)
+	}
+	return buildSortValues(rec.Data(), e.sortFields[alias])
 }
 
 func (e *joinExecution) collectKeyRefs(node FromSource, path string) {
@@ -933,7 +979,9 @@ func flattenJoinRow(row joinRow, aliases []string, includeSources bool) map[stri
 	data := map[string]any{}
 	for _, alias := range aliases {
 		for name, value := range row.sources[alias] {
-			data[name] = value
+			if name != sortValuesKey {
+				data[name] = value
+			}
 		}
 	}
 	if includeSources {
@@ -1560,6 +1608,11 @@ func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[strin
 		case AggregateFunc:
 			for _, arg := range value.FuncArgs() {
 				expression(arg, visible)
+			}
+			for _, key := range aggregateOrder(value) {
+				if key != nil {
+					expression(key.Expression(), visible)
+				}
 			}
 		}
 	}

@@ -118,12 +118,15 @@ func ExecuteRecursiveRecordset(ctx context.Context, executor QueryExecutor, quer
 
 func executeJoinRecordset(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, provider NativeJoinProvider, options ...recordset.Option) (RecordsetReader, error) {
 	q := query.(StructuredQuery)
-	plan, err := PlanJoin(ctx, q, provider)
+	plan, err := PlanJoin(ctx, q, joinProviderFor(q, capabilities, provider))
 	if err != nil {
 		return nil, err
 	}
 	if plan.Strategy == JoinNative {
-		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+		native, err := executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+		if !refusedAsNotSupported(q, err) {
+			return native, err
+		}
 	}
 	reader, err := executeGenericJoin(ctx, executor, q)
 	if err != nil {
@@ -207,10 +210,16 @@ func executeAggregationRecordset(ctx context.Context, executor QueryExecutor, qu
 	if err != nil {
 		return nil, fmt.Errorf("dalgo aggregation: %w", err)
 	}
+	var reader RecordsReader
 	if plan.Strategy == AggregationNative {
-		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+		native, nativeErr := executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+		if !refusedAsNotSupported(q, nativeErr) {
+			return native, nativeErr
+		}
+		reader, err = executeAggregationAfterRefusal(ctx, executor, q, nativeErr)
+	} else {
+		reader, err = executeAggregationLocal(ctx, executor, q, plan)
 	}
-	reader, err := executeAggregationRecords(ctx, executor, query, capabilities)
 	if err != nil {
 		return nil, err
 	}

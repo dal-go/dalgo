@@ -264,6 +264,11 @@ func exprToYAML(expr dal.Expression) (exprYAML, error) {
 	case dal.StarExpression:
 		return exprYAML{Star: true}, nil
 	case dal.AggregateFunc:
+		// The document format has no key for an aggregate's order, so an aggregate
+		// that has one cannot be written: it would come back as one without.
+		if ordered, ok := e.(dal.OrderedAggregateFunc); ok && len(ordered.AggregateOrder()) > 0 {
+			return exprYAML{}, fmt.Errorf("an aggregate with an order cannot be written by this version")
+		}
 		args := make([]exprYAML, len(e.FuncArgs()))
 		for i, arg := range e.FuncArgs() {
 			encoded, err := exprToYAML(arg)

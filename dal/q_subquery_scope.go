@@ -70,6 +70,11 @@ func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool 
 					return true
 				}
 			}
+			for _, key := range aggregateOrder(value) {
+				if key != nil && visitExpr(key.Expression()) {
+					return true
+				}
+			}
 		}
 		return false
 	}
@@ -354,6 +359,14 @@ func validateExpressionScope(expression Expression, visible map[string]bool, pat
 	case AggregateFunc:
 		for i, arg := range value.FuncArgs() {
 			if err := validateExpressionScope(arg, visible, fmt.Sprintf("%s.args[%d]", path, i), visiting); err != nil {
+				return err
+			}
+		}
+		for i, key := range aggregateOrder(value) {
+			if key == nil {
+				continue
+			}
+			if err := validateExpressionScope(key.Expression(), visible, fmt.Sprintf("%s.orderBy[%d]", path, i), visiting); err != nil {
 				return err
 			}
 		}

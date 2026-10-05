@@ -325,12 +325,14 @@ var aggregateFunctions = map[string]bool{
 	dal.COUNT: true, dal.SUM: true, dal.AVERAGE: true, dal.MIN: true, dal.MAX: true, dal.FIRST: true, dal.LAST: true,
 }
 
-// aggregateFields lists, left to right, the fields an aggregate reads. checkable
-// is false when the function is not one DALgo defines, or an operand is
-// something a field list cannot be applied to: a param, an array, a subquery,
-// an expression the check does not know, an arithmetic operator other than
-// + - * /, a star anywhere but directly under COUNT, or nesting past
-// maxQueryNesting. A constant reads no field, and COUNT(*) reads no field value.
+// aggregateFields lists, left to right, the fields an aggregate reads, then the
+// fields of its order, when it has one: an order key is read to sort the rows, so
+// it is held to the list as an operand is. checkable is false when the function is
+// not one DALgo defines, or an operand is something a field list cannot be applied
+// to: a param, an array, a subquery, an expression the check does not know, an
+// arithmetic operator other than + - * /, a star anywhere but directly under
+// COUNT, or nesting past maxQueryNesting; or when an order key is not a field. A
+// constant reads no field, and COUNT(*) reads no field value.
 func aggregateFields(aggregate dal.AggregateFunc, depth int) (fields []string, checkable bool) {
 	if !aggregateFunctions[strings.ToUpper(aggregate.FuncName())] {
 		return nil, false
@@ -345,7 +347,34 @@ func aggregateFields(aggregate dal.AggregateFunc, depth int) (fields []string, c
 		}
 		fields = append(fields, operand...)
 	}
+	if ordered, isOrdered := aggregate.(dal.OrderedAggregateFunc); isOrdered {
+		for _, key := range ordered.AggregateOrder() {
+			name, isField := orderKeyField(key)
+			if !isField {
+				return nil, false
+			}
+			fields = append(fields, name)
+		}
+	}
 	return fields, true
+}
+
+// orderKeyField returns the name of the field an order key sorts by; ok is false
+// for a key that is missing or is not a field (given by value or by non-nil
+// pointer), which a field list cannot be applied to.
+func orderKeyField(key dal.OrderExpression) (name string, ok bool) {
+	if isNilNode(key) {
+		return "", false
+	}
+	switch expression := key.Expression().(type) {
+	case dal.FieldRef:
+		return expression.Name(), true
+	case *dal.FieldRef:
+		if expression != nil {
+			return expression.Name(), true
+		}
+	}
+	return "", false
 }
 
 // operandFields lists the fields an aggregate operand reads, in the order the

@@ -115,6 +115,15 @@ func columnsEqual(a, b []dal.Column) bool {
 	return true
 }
 
+// aggregateOrderOf returns the order of an aggregate; none when it has no order of
+// its own or is not an ordered aggregate.
+func aggregateOrderOf(aggregate dal.AggregateFunc) []dal.OrderExpression {
+	if ordered, ok := aggregate.(dal.OrderedAggregateFunc); ok {
+		return ordered.AggregateOrder()
+	}
+	return nil
+}
+
 func orderEqual(a, b []dal.OrderExpression) bool {
 	if len(a) != len(b) {
 		return false
@@ -203,7 +212,7 @@ func exprEqual(a, b dal.Expression) bool {
 		if d, ok := bv.(dal.DistinctAggregateFunc); ok {
 			bd = d.IsDistinct()
 		}
-		return ad == bd && expressionsEqual(ae.FuncArgs(), bv.FuncArgs())
+		return ad == bd && expressionsEqual(ae.FuncArgs(), bv.FuncArgs()) && orderEqual(aggregateOrderOf(ae), aggregateOrderOf(bv))
 	case dal.BinaryExpression:
 		bv, ok := b.(dal.BinaryExpression)
 		return ok && ae.Operator == bv.Operator && exprEqual(ae.Left, bv.Left) && exprEqual(ae.Right, bv.Right)
