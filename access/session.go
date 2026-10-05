@@ -476,21 +476,17 @@ func resourcesForKeys(keys []*record.Key) []Resource {
 
 // resourceForRecordsetSource is the resource of one stored source: a collection,
 // a collection group, or, for a source a path rule cannot name, an opaque query.
+// A collection that writes a schema or a database also carries the identity of its
+// table, as written.
 func resourceForRecordsetSource(source dal.RecordsetSource) Resource {
 	if isNilNode(source) {
 		return OpaqueQuery(fmt.Sprint(source))
 	}
 	switch source := source.(type) {
 	case dal.CollectionRef:
-		if source.Schema() != "" {
-			return OpaqueQuery(source.Path())
-		}
-		return CollectionResourceFor(source.Parent(), source.Name())
+		return resourceForCollectionRef(source)
 	case *dal.CollectionRef:
-		if source.Schema() != "" {
-			return OpaqueQuery(source.Path())
-		}
-		return CollectionResourceFor(source.Parent(), source.Name())
+		return resourceForCollectionRef(*source)
 	case dal.CollectionGroupRef:
 		return CollectionGroup(source.Name())
 	case *dal.CollectionGroupRef:
@@ -498,4 +494,17 @@ func resourceForRecordsetSource(source dal.RecordsetSource) Resource {
 	default:
 		return OpaqueQuery(fmt.Sprint(source))
 	}
+}
+
+func resourceForCollectionRef(source dal.CollectionRef) Resource {
+	var resource Resource
+	if source.Schema() != "" {
+		resource = OpaqueQuery(source.Path())
+	} else {
+		resource = CollectionResourceFor(source.Parent(), source.Name())
+	}
+	if source.Schema() != "" || source.Database() != "" {
+		resource.table = &TableName{Database: source.Database(), Schema: source.Schema(), Name: source.Name()}
+	}
+	return resource
 }
