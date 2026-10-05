@@ -21,8 +21,9 @@ type walkGraph struct {
 	deep bool
 	// oneSource marks a query over one source.
 	oneSource bool
-	// validatedOnly marks a graph held by value in the columns of a join, which the readers hand to
-	// the scope validation that follows a graph held by value to no end.
+	// validatedOnly marks an aggregate held by value in the columns of a join: validation refuses
+	// it as a nested aggregate, and only validation is run on it, as the readers hand it to the scope
+	// validation, which follows a graph held by value to no end.
 	validatedOnly bool
 }
 
