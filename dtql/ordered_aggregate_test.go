@@ -131,4 +131,10 @@ func TestJoinClauseFieldsHoldTheOrderKeysOfAnAggregate(t *testing.T) {
 	if err := validateJoinClauseFields(nilKey); err != nil {
 		t.Fatal(err)
 	}
+	// A bad key after a missing one is named by its place in the order, which counts the missing key.
+	afterNil := fakeQuery{from: from, columns: []dal.Column{{Alias: "v", Expression: dal.NewOrderedAggregate(dal.LAST,
+		[]dal.OrderExpression{nil, dal.Ascending(dal.NewFieldRef("ghost", "InvoiceDate"))}, dal.NewFieldRef("i", "Total"))}}}
+	if err := validateJoinClauseFields(afterNil); err == nil || !strings.Contains(err.Error(), "columns[0].orderBy[1].source") {
+		t.Fatalf("error = %v", err)
+	}
 }

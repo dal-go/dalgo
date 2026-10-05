@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -51,17 +52,26 @@ func TestOrderedAggregateAnswerIsReturnedAsItIsAndBreaksTiesByInstant(t *testing
 	plus2 := time.FixedZone("plus2", 2*3600)
 	// X is a timestamp and every key ties, so X decides, by instant; rows of one instant are
 	// told apart by their text, so the answer does not depend on the order rows arrive in.
+	// Arrays and objects that DALgo prints alike are told apart by their JSON encoding.
 	for name, tc := range map[string]struct {
-		x           []time.Time
-		first, last string
+		x           []any
+		first, last any
 	}{
 		// 10:00+02:00 is 08:00Z, which is earlier than 09:00Z.
 		"two instants": {
-			[]time.Time{time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC), time.Date(2026, 1, 1, 10, 0, 0, 0, plus2)},
+			[]any{time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC), time.Date(2026, 1, 1, 10, 0, 0, 0, plus2)},
 			"2026-01-01T10:00:00+02:00", "2026-01-01T09:00:00Z"},
 		"one instant written two ways": {
-			[]time.Time{time.Date(2026, 1, 1, 10, 0, 0, 0, plus2), time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)},
+			[]any{time.Date(2026, 1, 1, 10, 0, 0, 0, plus2), time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)},
 			"2026-01-01T08:00:00Z", "2026-01-01T10:00:00+02:00"},
+		// Both print as [a b]; the encodings are ["a b"] and ["a","b"].
+		"two arrays that print alike": {
+			[]any{[]any{"a b"}, []any{"a", "b"}},
+			[]any{"a b"}, []any{"a", "b"}},
+		// Both print as map[a:1]; the encodings are {"a":"1"} and {"a":1}.
+		"two objects that print alike": {
+			[]any{map[string]any{"a": "1"}, map[string]any{"a": 1}},
+			map[string]any{"a": "1"}, map[string]any{"a": 1.0}},
 	} {
 		for _, reversed := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/reversed=%v", name, reversed), func(t *testing.T) {
@@ -87,6 +97,82 @@ func TestOrderedAggregateAnswerIsReturnedAsItIsAndBreaksTiesByInstant(t *testing
 				}
 			})
 		}
+	}
+}
+
+// Only the engine sets the key that carries sort values. A row a store with free field
+// names returns may hold a field of that name; a query that holds an ordered aggregate
+// does not read it as the engine's, on every in-memory path, and a query that holds none
+// returns the field as it always did.
+func TestOrderedAggregateSortValuesAreOnlyTheEnginesOwn(t *testing.T) {
+	forged := func(id, customer, date, total int, forgedDate any) record.Record {
+		return joinTestRecord("Invoice", fmt.Sprint(id), map[string]any{
+			"CustomerId": customer, "InvoiceDate": date, "Total": total,
+			sortValuesKey: map[string]any{"InvoiceDate": forgedDate, "Total": forgedDate},
+		})
+	}
+	// Left alone, the first row would sort last: its forged date is the largest of the group.
+	rows := []record.Record{forged(1, 1, 1, 10, 99), forged(2, 1, 2, 20, nil)}
+	for _, path := range timestampPaths([]string{"CustomerId", "last_total", "first_total"}, orderedLastAndFirstColumns) {
+		for _, reversed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/reversed=%v", path.name, reversed), func(t *testing.T) {
+				input := append([]record.Record(nil), rows...)
+				if reversed {
+					input[0], input[1] = input[1], input[0]
+				}
+				got := path.run(t, input)
+				if len(got) != 1 || got[0]["last_total"] != 20.0 || got[0]["first_total"] != 20.0 {
+					t.Fatalf("rows = %v, want the answers of the plain dates: last 20, first by date descending 20", got)
+				}
+			})
+		}
+	}
+}
+
+// A query that holds no ordered aggregate returns a field of the reserved name from a generic join as it
+// returns any other field.
+func TestJoinWithoutOrderedAggregateReturnsAFieldOfTheReservedName(t *testing.T) {
+	invoice, customer := NewRootCollectionRef("Invoice", "i"), NewRootCollectionRef("Customer", "c")
+	q := From(invoice).Join(NewJoinedSource(customer, JoinInner, joinOn("i", "CustomerId", "c", "Id"))).NewQuery().SelectIntoRecord(nil)
+	row := joinTestRecord("Invoice", "1", map[string]any{"CustomerId": 1, "Total": 10, sortValuesKey: "mine"})
+	stub := &orderedStub{rows: map[string][]record.Record{"Invoice": {row}, "Customer": customerRecords()}}
+	reader, err := NewDB(stub).ExecuteQueryToRecordsReader(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("records = %v, err = %v", records, err)
+	}
+	if got := records[0].Data().(map[string]any)[sortValuesKey]; got != "mine" {
+		t.Fatalf("the field of the reserved name = %v, want it returned as it always was", got)
+	}
+}
+
+// The last step of the comparison tells apart answers the engine's comparison ties.
+func TestCompareOrderedTuplesTellsApartAnswersThatCompareEqual(t *testing.T) {
+	negativeZero := math.Copysign(0, -1)
+	for name, tc := range map[string]struct {
+		a, b any
+		want int
+	}{
+		"-0 before 0":                          {negativeZero, 0.0, -1},
+		"0 after -0":                           {0.0, negativeZero, 1},
+		"the same array":                       {[]any{"a"}, []any{"a"}, 0},
+		"an array that prints like another":    {[]any{"a b"}, []any{"a", "b"}, -1},
+		"the other way round":                  {[]any{"a", "b"}, []any{"a b"}, 1},
+		"an object keyed in a different order": {map[string]any{"a": 1.0, "b": 2.0}, map[string]any{"b": 2.0, "a": 1.0}, 0},
+		// NaN cannot be encoded; its printed form and type tell it apart from a value that can.
+		"a value that cannot be encoded":      {math.NaN(), 1.0, 1},
+		"a value that cannot be encoded, too": {1.0, math.NaN(), -1},
+		"nothing and nothing":                 {nil, nil, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := compareOrderedTuples(nil, nil, nil, tc.a, nil, nil, tc.b)
+			if got != tc.want {
+				t.Fatalf("compareOrderedTuples = %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
 

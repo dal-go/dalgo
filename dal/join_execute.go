@@ -177,7 +177,7 @@ func (e *joinExecution) execute() (RecordsReader, error) {
 	if HasAggregation(e.q) {
 		records := make([]record.Record, len(filtered))
 		for i, row := range filtered {
-			data := flattenJoinRow(row, e.aliases, true)
+			data := flattenJoinRow(row, e.aliases, true, e.holdsSortValues())
 			if err := e.chargeOutput(data); err != nil {
 				return nil, err
 			}
@@ -245,7 +245,7 @@ func (e *joinExecution) execute() (RecordsReader, error) {
 	for i, row := range filtered {
 		var data map[string]any
 		if len(e.q.Columns()) == 0 {
-			data = flattenJoinRow(row, e.aliases, false)
+			data = flattenJoinRow(row, e.aliases, false, e.holdsSortValues())
 		} else {
 			data, err = e.projection(e.q.Columns(), row)
 			if err != nil {
@@ -560,9 +560,7 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		if err != nil {
 			return joinError("join_plan", path, err.Error())
 		}
-		if sortValues != nil {
-			data[sortValuesKey] = sortValues
-		}
+		e.setSortValues(data, sortValues)
 		encoded, _ := json.Marshal(data) // normalizedJoinRecordMap produced JSON data.
 		e.bytes += 128 + len(encoded)
 		e.fetched++
@@ -598,6 +596,27 @@ func (e *joinExecution) sortValuesOf(rec record.Record, alias string) (map[strin
 		e.sortFields = orderedAggregateSortFields(e.q)
 	}
 	return buildSortValues(rec.Data(), e.sortFields[alias])
+}
+
+// holdsSortValues reports whether the query of the execution holds an ordered
+// aggregate that compares by sort values. sortValuesOf builds the fields it reads
+// on first use, so the answer is final once a source row has been read.
+func (e *joinExecution) holdsSortValues() bool {
+	return len(e.sortFields) > 0
+}
+
+// setSortValues makes the sort values of a scanned row the engine's own. A query
+// that holds an ordered aggregate reads them from the reserved key of the row, so
+// a value the provider's own row holds under that name is removed first and only
+// what the engine builds is left. A query that holds none leaves the row alone.
+func (e *joinExecution) setSortValues(data map[string]any, sortValues map[string]any) {
+	if !e.holdsSortValues() {
+		return
+	}
+	delete(data, sortValuesKey)
+	if sortValues != nil {
+		data[sortValuesKey] = sortValues
+	}
 }
 
 func (e *joinExecution) collectKeyRefs(node FromSource, path string) {
@@ -995,11 +1014,15 @@ func joinValueKey(value any, path string) (string, error) {
 	}
 }
 
-func flattenJoinRow(row joinRow, aliases []string, includeSources bool) map[string]any {
+// flattenJoinRow merges the rows of the sources of a joined row. The sort values
+// of an ordered aggregate are not a field of a source, so they are left out when
+// the query holds one (dropSortValues); a query that holds none returns every
+// field of a source, including one a provider's row writes under that name.
+func flattenJoinRow(row joinRow, aliases []string, includeSources, dropSortValues bool) map[string]any {
 	data := map[string]any{}
 	for _, alias := range aliases {
 		for name, value := range row.sources[alias] {
-			if name != sortValuesKey {
+			if !dropSortValues || name != sortValuesKey {
 				data[name] = value
 			}
 		}

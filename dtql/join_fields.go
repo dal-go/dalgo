@@ -51,7 +51,11 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 					return err
 				}
 			}
-			for i, key := range orderedAggregateKeys(v) {
+			for i, key := range aggregateOrderOf(v) {
+				// A key that is missing is for validation to refuse; the walk passes over it and keeps counting.
+				if key == nil {
+					continue
+				}
 				if err := expression(key.Expression(), fmt.Sprintf("%s.orderBy[%d]", path, i)); err != nil {
 					return err
 				}
@@ -110,16 +114,4 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 		}
 	}
 	return nil
-}
-
-// orderedAggregateKeys lists the keys of an aggregate's own order that a walk can
-// look into: it leaves out a key that is missing, which validation refuses.
-func orderedAggregateKeys(aggregate dal.AggregateFunc) []dal.OrderExpression {
-	var keys []dal.OrderExpression
-	for _, key := range aggregateOrderOf(aggregate) {
-		if key != nil {
-			keys = append(keys, key)
-		}
-	}
-	return keys
 }

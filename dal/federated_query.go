@@ -39,6 +39,11 @@ func ExecuteFederatedQueryWithOptions(ctx context.Context, query StructuredQuery
 	if query == nil || query.From() == nil || resolve == nil {
 		return nil, fmt.Errorf("federated query requires a query and database resolver")
 	}
+	// A query of one source and nothing else reaches the resolved executor unplanned, so the rule for where an
+	// ordered aggregate may stand is applied here, before any database is resolved.
+	if err := validateOrderedAggregatePlacement(query); err != nil {
+		return nil, fmt.Errorf("dalgo aggregation: %w", err)
+	}
 	if options.Money == nil {
 		if declarative, ok := query.(interface{ Money() *MoneyConfig }); ok {
 			options.Money = declarative.Money()

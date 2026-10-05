@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dal-go/dalgo/recordset"
 	"github.com/dal-go/record"
 )
 
@@ -473,6 +474,11 @@ func TestOrderedAggregateIsRefusedOutsideTheSelectListHavingAndOrderByBeforeAnyt
 	invoice, customer := NewRootCollectionRef("Invoice", "i"), NewRootCollectionRef("Customer", "c")
 	onCustomer := joinOn("i", "CustomerId", "c", "Id")
 	plainColumns := []Column{{Alias: "n", Expression: Count().Expression}}
+	// where, held in the three forms a condition can take by pointer
+	inWherePointer := func(condition Condition) StructuredQuery {
+		return From(invoice).NewQuery().Where(condition).SelectColumns(Column{Expression: NewFieldRef("i", "Total")})
+	}
+	isNullInWhere, groupedInWhere := NewIsNullCondition(ordered), NewGroupCondition(And, inWhere)
 
 	oneSource := From(invoice).NewQuery().Where(inWhere).SelectColumns(Column{Expression: NewFieldRef("i", "Total")})
 	oneSourceGrouped := From(invoice).NewQuery().Where(inWhere).GroupBy(NewFieldRef("i", "CustomerId")).SelectColumns(
@@ -484,9 +490,13 @@ func TestOrderedAggregateIsRefusedOutsideTheSelectListHavingAndOrderByBeforeAnyt
 		Column{Alias: "CustomerId", Expression: NewFieldRef("c", "Id")}, Column{Alias: "v", Expression: badKey})
 
 	t.Run("ValidateAggregation", func(t *testing.T) {
-		for name, q := range map[string]StructuredQuery{"a grouped query": oneSourceGrouped} {
+		// A query with no other aggregation is held to the rule too: the exported validator and the planner refuse it.
+		for name, q := range map[string]StructuredQuery{"a grouped query": oneSourceGrouped, "a query with no other aggregation": oneSource, "a comparison held by pointer": inWherePointer(&inWhere)} {
 			if err := ValidateAggregation(q); err == nil || !strings.Contains(err.Error(), placement) {
 				t.Fatalf("%s: error = %v", name, err)
+			}
+			if _, err := PlanAggregation(q, orderedCapabilities); err == nil || !strings.Contains(err.Error(), placement) {
+				t.Fatalf("%s: PlanAggregation error = %v", name, err)
 			}
 		}
 		// An aggregate with no order stands in WHERE as it did: nothing is added for it.
@@ -504,6 +514,11 @@ func TestOrderedAggregateIsRefusedOutsideTheSelectListHavingAndOrderByBeforeAnyt
 		"one source, grouped":      {oneSourceGrouped, placement},
 		"a join, in where":         {joinedWhere, placement},
 		"a join, in its condition": {joinedOn, "only == is supported"},
+		// A condition held by pointer is read as the value it points to.
+		"a comparison held by pointer":       {inWherePointer(&inWhere), placement},
+		"a null test held by pointer":        {inWherePointer(&isNullInWhere), placement},
+		"a group held by pointer":            {inWherePointer(&groupedInWhere), placement},
+		"a comparison in a group by pointer": {inWherePointer(NewGroupCondition(And, &inWhere)), placement},
 	} {
 		for label, caps := range map[string]QueryCapabilities{"no capabilities": {}, "capabilities": orderedCapabilities} {
 			t.Run(name+"/"+label, func(t *testing.T) {
@@ -522,6 +537,34 @@ func TestOrderedAggregateIsRefusedOutsideTheSelectListHavingAndOrderByBeforeAnyt
 		}
 	}
 
+	// A federated query of one source and nothing else reaches the resolved executor unplanned; the rule is
+	// applied before a database is resolved, so nothing is read.
+	t.Run("a federated query of one database source", func(t *testing.T) {
+		reads, resolved := 0, 0
+		resolve := func(context.Context, string) (QueryExecutor, error) {
+			resolved++
+			return &readCountingExecutor{reads: &reads}, nil
+		}
+		federatedInvoice := NewDatabaseCollectionRef("orders", "", "Invoice", "i")
+		federatedWhere := NewComparison(NewOrderedAggregate(LAST, orderedBy(Ascending(NewFieldRef("i", "InvoiceDate"))), NewFieldRef("i", "Total")), GreaterThen, NewConstant(1))
+		for name, condition := range map[string]Condition{"a comparison": federatedWhere, "a comparison held by pointer": &federatedWhere} {
+			t.Run(name, func(t *testing.T) {
+				q := From(federatedInvoice).NewQuery().Where(condition).SelectColumns(Column{Expression: NewFieldRef("i", "Total")})
+				if _, err := ExecuteFederatedQuery(ctx, q, resolve); err == nil || !strings.Contains(err.Error(), placement) {
+					t.Fatalf("error = %v", err)
+				}
+			})
+		}
+		if reads != 0 || resolved != 0 {
+			t.Fatalf("reads = %d, databases resolved = %d, want 0", reads, resolved)
+		}
+		// The same query without an ordered aggregate in where is read as before.
+		plain := From(federatedInvoice).NewQuery().Where(NewComparison(NewFieldRef("i", "Total"), GreaterThen, NewConstant(1))).SelectColumns(Column{Expression: NewFieldRef("i", "Total")})
+		if _, err := ExecuteFederatedQuery(ctx, plain, resolve); err != nil || reads != 1 || resolved != 1 {
+			t.Fatalf("err = %v, reads = %d, databases resolved = %d", err, reads, resolved)
+		}
+	})
+
 	// A provider that accepts the join and runs the order is still not handed a key that is not a field.
 	t.Run("a join the provider would run natively, with a key that is not a field", func(t *testing.T) {
 		stub := &orderedJoinStub{orderedStub: &orderedStub{caps: orderedCapabilities, rows: map[string][]record.Record{"Invoice": instantRecords(timestampDatasets[0].rows, false), "Customer": customerRecords()}}}
@@ -536,4 +579,17 @@ func TestOrderedAggregateIsRefusedOutsideTheSelectListHavingAndOrderByBeforeAnyt
 			t.Fatalf("accepted = %d, native = %d, nativeSets = %d: the provider was asked to accept the join and must not be asked to read it", stub.accepted, stub.native, stub.nativeSets)
 		}
 	})
+}
+
+// readCountingExecutor counts the reads that reach it.
+type readCountingExecutor struct{ reads *int }
+
+func (e *readCountingExecutor) ExecuteQueryToRecordsReader(context.Context, Query) (RecordsReader, error) {
+	*e.reads++
+	return NewRecordsReader(nil), nil
+}
+
+func (e *readCountingExecutor) ExecuteQueryToRecordsetReader(context.Context, Query, ...recordset.Option) (RecordsetReader, error) {
+	*e.reads++
+	return nil, nil
 }

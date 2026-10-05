@@ -2,7 +2,9 @@ package dal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -159,11 +161,27 @@ func orderedAggregateSortFields(q StructuredQuery) map[string][]string {
 	return fields
 }
 
+// answerEncoding is the text that tells apart two answers DALgo's comparison puts
+// together: an array and an object are compared by their printed form there, so
+// ["a b"] and ["a","b"] tie, and so do 0 and -0. Their JSON encodings differ, and
+// encoding/json writes the keys of an object in sorted order, so the text is a
+// function of the value alone. A value that cannot be encoded is told apart by its
+// printed form and type.
+func answerEncoding(answer any) string {
+	encoded, err := json.Marshal(answer)
+	if err != nil {
+		return fmt.Sprintf("%T:%v", answer, answer)
+	}
+	return string(encoded)
+}
+
 // compareOrderedTuples orders two candidate rows of an ordered aggregate: by the
 // order keys in the stated directions, then by the argument ascending, then by the
 // answer each one returns. The argument's sort value is the instant of a timestamp,
-// so two rows of one instant written in two zones still tie on it; the last step
-// tells them apart by their text, and the answer depends on the group's data alone.
+// so two rows of one instant written in two zones still tie on it; the next step
+// tells them apart by their text. The last step tells apart two answers that DALgo
+// compares as equal by their JSON encodings, so the answer depends on the group's
+// data alone.
 func compareOrderedTuples(order []OrderExpression, a []any, aTie, aAnswer any, b []any, bTie, bAnswer any) int {
 	for i, key := range order {
 		comparison := compareAggregationValues(a[i], b[i])
@@ -177,7 +195,10 @@ func compareOrderedTuples(order []OrderExpression, a []any, aTie, aAnswer any, b
 	if comparison := compareAggregationValues(aTie, bTie); comparison != 0 {
 		return comparison
 	}
-	return compareAggregationValues(aAnswer, bAnswer)
+	if comparison := compareAggregationValues(aAnswer, bAnswer); comparison != 0 {
+		return comparison
+	}
+	return strings.Compare(answerEncoding(aAnswer), answerEncoding(bAnswer))
 }
 
 // updateOrderedState lets one row compete for the answer of an ordered first or
@@ -222,7 +243,8 @@ func (r *localAggregationReader) updateOrderedState(group *localGroup, state *ag
 
 // normalizedRow turns a provider's row into JSON values and, when the query
 // holds an ordered aggregate, adds the sort values of the timestamps in it. The
-// sort values are built first, from the raw row.
+// sort values are built first, from the raw row. Only the engine sets the key that
+// carries them: a value the provider's own row holds under that name is removed.
 func (r *localAggregationReader) normalizedRow(rec record.Record) (map[string]any, error) {
 	values, err := buildSortValues(rec.Data(), r.sortFields)
 	if err != nil {
@@ -231,6 +253,9 @@ func (r *localAggregationReader) normalizedRow(rec record.Record) (map[string]an
 	row, err := normalizedRecordMap(rec)
 	if err != nil {
 		return nil, err
+	}
+	if len(r.sortFields) > 0 {
+		delete(row, sortValuesKey)
 	}
 	if values != nil {
 		row[sortValuesKey] = values

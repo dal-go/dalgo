@@ -120,11 +120,15 @@ func HasAggregation(q StructuredQuery) bool {
 // ValidateAggregation applies SQL-compatible grouping rules without imposing
 // SQL syntax or alias restrictions on DTQL.
 func ValidateAggregation(q StructuredQuery) error {
-	if q == nil || !HasAggregation(q) {
+	if q == nil {
 		return nil
 	}
+	// Where an ordered aggregate may stand is a rule of the query, held even when nothing else in it aggregates.
 	if err := validateOrderedAggregatePlacement(q); err != nil {
 		return err
+	}
+	if !HasAggregation(q) {
+		return nil
 	}
 	groupKeys := map[string]bool{}
 	for i, expression := range q.GroupBy() {
@@ -569,16 +573,30 @@ func walkExpressionAggregates(expression Expression, visit func(AggregateFunc)) 
 }
 
 // walkConditionAggregates visits every aggregate in the operands of a condition.
+// A condition held by pointer is read as the value it points to, as the scope
+// walk reads it.
 func walkConditionAggregates(condition Condition, visit func(AggregateFunc)) {
 	switch c := condition.(type) {
 	case IsNullCondition:
 		walkExpressionAggregates(c.Operand(), visit)
+	case *IsNullCondition:
+		if c != nil {
+			walkConditionAggregates(*c, visit)
+		}
 	case Comparison:
 		walkExpressionAggregates(c.Left, visit)
 		walkExpressionAggregates(c.Right, visit)
+	case *Comparison:
+		if c != nil {
+			walkConditionAggregates(*c, visit)
+		}
 	case GroupCondition:
 		for _, child := range c.Conditions() {
 			walkConditionAggregates(child, visit)
+		}
+	case *GroupCondition:
+		if c != nil {
+			walkConditionAggregates(*c, visit)
 		}
 	}
 }
