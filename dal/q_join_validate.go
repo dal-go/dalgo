@@ -8,7 +8,15 @@ type JoinValidationError struct {
 	Category string
 	Path     string
 	Message  string
+
+	// cause is the error the diagnostic reports, when it reports one.
+	cause error
 }
+
+// Unwrap returns the error the diagnostic reports, if any: a scan that failed
+// is reported as a diagnostic of the join, and errors.Is and errors.As reach the
+// error the scan failed with.
+func (e *JoinValidationError) Unwrap() error { return e.cause }
 
 func (e *JoinValidationError) Error() string {
 	if e.Message == "" {
@@ -201,4 +209,10 @@ func cloneAliases(source map[string]bool) map[string]bool {
 
 func joinError(category, path, message string) error {
 	return &JoinValidationError{Category: category, Path: path, Message: message}
+}
+
+// joinErrorFrom is joinError for a diagnostic that reports cause; the message
+// carries the text of cause.
+func joinErrorFrom(cause error, category, path, message string) error {
+	return &JoinValidationError{Category: category, Path: path, Message: message, cause: cause}
 }

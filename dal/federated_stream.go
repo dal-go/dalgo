@@ -81,7 +81,7 @@ func newFederatedJoinStream(ctx context.Context, q StructuredQuery, routed feder
 	e.aliases = append(e.aliases, joinAlias(root.Base()))
 	rootAlias := joinAlias(root.Base())
 	if fields, err := routed.JoinFields(ctx, root.Base()); err != nil {
-		return nil, joinError("join_plan", "from", fmt.Sprintf("cannot load fields for %s: %v", rootAlias, err))
+		return nil, joinErrorFrom(err, "join_plan", "from", fmt.Sprintf("cannot load fields for %s: %v", rootAlias, err))
 	} else if fields != nil {
 		e.fields[rootAlias] = append(make([]string, 0, len(fields)), fields...)
 	}

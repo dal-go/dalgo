@@ -12,6 +12,9 @@ background jobs, ingestion endpoints, analytics, and technical-support tools.
 ## The model at a glance
 
 - Every access policy is default-deny.
+- A secured handle with no policy in force denies every request: a session built
+  with no policy, with a nil policy or with a list that holds a nil one, and a
+  database with no database, bound or context policy.
 - `Get`, `Exists`, and `Query` are separate read capabilities.
 - `Insert`, `Set`, `Update`, `Delete`, and reserved `Truncate` are separate
   write capabilities. Write does not imply read.
@@ -240,8 +243,84 @@ the result by that name; this is what bounds a secured session over another
 secured session to the fields both lists allow, for the columns the outer
 session adds to a query that names none or uses a wildcard.
 
+On the recordset path nothing can be redacted, so the inner session of two
+nested secured sessions refuses a query it cannot project onto columns its own
+list allows, before anything is read. With an inner list narrower than the outer
+one the query is denied; with an outer list narrower than the inner one, or the
+same, it is read once.
+
 A grouped query that names no columns selects its group keys, as DALgo defines
-it, and is sent with those keys as its columns.
+it, and is sent with those keys as its columns. A query that aggregates with no
+`GROUP BY` and no columns (only a `HAVING`, or an `ORDER BY` over an aggregate)
+has no group key to select and is not projected to the allowed fields: the
+records reader sends it as it is and redacts the result, and the recordset reader
+refuses it.
+
+`HAVING` and `ORDER BY` may name an aggregate of the select list by its alias.
+On the records reader, under a field list, that name is accepted when the alias
+belongs to one column of the query and that column is an aggregate over allowed
+fields. The same name for a plain field, for an aggregate over a hidden field,
+for a name two columns come back under, or for nothing is refused. When the
+access layer sends the aggregate under an alias of its own, it names that alias
+in `HAVING` and `ORDER BY` as well. The recordset reader renames nothing, so
+there an alias the field list does not allow is not a name `HAVING` or
+`ORDER BY` may use; the aggregate itself is. A plan (`access.AssessPlan`) is
+judged by the recordset rule, because it does not know which reader will run the
+query: it reports a denial for an alias the field list does not allow, including
+the alias of an allowed aggregate that the records reader would run.
+
+A field list applies to the base source of a query, and to every clause that
+reads its fields: the select list, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, the
+`ON` conditions of every join at any depth, and the scan order of every source.
+In a join condition a field belongs to the source its qualifier names. A field
+that names the base (by its name or its alias), or that has no qualifier, is held
+to the list; a field qualified with a joined source is that source's own and is
+not; a field whose qualifier names no source of the query, or names the base and a
+joined source alike, is refused. A qualifier is matched to the names and aliases
+of the sources of the query without regard to case, because an engine may match
+it that way: a qualifier that matches the base and a joined source alike names
+neither. A scan orders its own source alone, whatever qualifier a field of the
+scan order carries, so every field of the scan order of the base source is held
+to the list. In the scan order of a joined source a field is attributed as in a
+join condition, with an unqualified field belonging to that joined source. A
+joined source carries no field list of its own: a rule that lists fields for one
+is refused. A condition nested more than 64 levels deep cannot be checked, and
+a secured session refuses it as an unsupported enforcement. A condition that
+holds itself by value is not followed to its end by `dal.HasSubquery`, which
+reports it as a query with nested queries, so a secured session takes it to the
+nested route, where a policy with no rule for opaque queries denies it as a
+source it cannot analyse. Both are denied before anything is read.
+
+A query with nested queries is executed one source at a time through the same
+secured session, which authorises and narrows each scan. The nesting between the
+session and the query engine is bounded: a query with nested queries that is put
+to a session from inside more than four such routes is refused with an error that
+matches both `access.ErrNestingTooDeep` and `access.ErrAccessDenied`. A scan
+order that holds a query cannot be run together with nested queries, and is
+refused as an unsupported enforcement (`ACL_ENFORCEMENT_UNSUPPORTED`) before
+anything is read, after the sources of the query have been authorised.
+
+Three limits follow from how a source is matched to a rule.
+
+A source is matched to rules by the exact spelling of its collection name. On an
+engine that folds identifier case, one table can be named in several spellings,
+and a rule written for one spelling does not apply to another. A policy for such
+an engine should therefore be an allow-list written with the names the engine
+stores, not an allow-all with denials for particular names.
+
+A schema-qualified source (`schema.table`) is one opaque resource. Only a rule
+for opaque queries (`access.OpaqueQueryScope`) can allow it, that rule applies to
+every opaque resource, custom SQL text included, and a rule for opaque queries
+carries no field list and no row condition. A collection rule, a field list or a
+row condition cannot be applied to a schema-qualified source.
+
+A source that names a database (`CollectionRef.Database`, used by a federated
+executor) and no schema is matched to rules by its collection name alone: the
+database is not part of its resource, so one policy cannot tell the same
+collection name in two databases apart, and a rule for a collection applies to it
+in every database the wrapped executor reaches. Where an executor routes a query
+by the database a source names, write the policy for every database it reaches
+as one.
 
 Custom SQL text is always opaque. DALgo does not inspect or attempt to infer
 tables from the SQL string, so ordinary path/collection rules can never

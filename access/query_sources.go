@@ -38,6 +38,10 @@ func resourcesForQuery(query dal.Query) []Resource {
 type querySourceWalk struct {
 	resources []Resource
 	onPath    map[uintptr]bool
+	// queries counts the queries entered and scanQuery is set when a scan order
+	// of a source holds one.
+	queries   int
+	scanQuery bool
 }
 
 func (w *querySourceWalk) unknown(description string) {
@@ -75,6 +79,7 @@ func (w *querySourceWalk) query(query dal.StructuredQuery, depth int) {
 		return
 	}
 	defer leave()
+	w.queries++
 	w.from(query.From(), depth+1)
 	for _, column := range query.Columns() {
 		w.node(column.Expression, depth+1)
@@ -130,8 +135,20 @@ func (w *querySourceWalk) source(source dal.RecordsetSource, depth int) {
 	}
 	w.resources = append(w.resources, resourceForRecordsetSource(source))
 	for _, order := range scanOrders(source) {
+		before := w.queries
 		w.order(order, depth+1)
+		if w.queries != before {
+			w.scanQuery = true
+		}
 	}
+}
+
+// scanOrdersHoldQuery reports whether the scan order of any source of the query,
+// at any depth, holds a query.
+func scanOrdersHoldQuery(query dal.StructuredQuery) bool {
+	walk := querySourceWalk{onPath: map[uintptr]bool{}}
+	walk.query(query, 0)
+	return walk.scanQuery
 }
 
 func scanOrders(source dal.RecordsetSource) []dal.OrderExpression {

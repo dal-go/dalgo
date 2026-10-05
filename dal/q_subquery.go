@@ -95,7 +95,10 @@ func (c ExistsCondition) String() string {
 
 // HasSubquery reports whether q contains any derived source, scalar query,
 // EXISTS predicate, or query-valued comparison operand. It is safe for the
-// pointer-backed recursive graphs callers can construct with these nodes.
+// pointer-backed recursive graphs callers can construct with these nodes. A tree
+// nested more than 10000 nodes deep along one path, which in practice is a node
+// held by value that holds itself, is not followed to its end: it is reported as
+// holding a query.
 func HasSubquery(q StructuredQuery) bool {
 	return inspectQueryTree(q, func(StructuredQuery) bool { return true })
 }

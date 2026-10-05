@@ -151,7 +151,7 @@ func executeJoinRecordset(ctx context.Context, executor QueryExecutor, query Que
 			fieldProvider := executor.(JoinFieldsProvider) // executeGenericJoin already required schema metadata.
 			fields, err := fieldProvider.JoinFields(ctx, sources[column.Wildcard.Source])
 			if err != nil {
-				return nil, joinError("join_plan", "columns", fmt.Sprintf("cannot load wildcard fields: %v", err))
+				return nil, joinErrorFrom(err, "join_plan", "columns", fmt.Sprintf("cannot load wildcard fields: %v", err))
 			}
 			for _, name := range fields {
 				if !column.Wildcard.Excludes(name) && !seen[name] {

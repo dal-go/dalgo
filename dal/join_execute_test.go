@@ -17,6 +17,8 @@ import (
 
 // This provider deliberately ignores joins. The framework must only send it
 // single-relation scans, never the original joined query.
+var errUnscannableRelation = errors.New("unscannable relation")
+
 type ignoringJoinBackend struct {
 	Backend
 	data     map[string][]record.Record
@@ -81,10 +83,13 @@ type joinBackendWithoutSelect struct {
 func (b joinBackendWithoutSelect) ExecuteQueryToRecordsReader(ctx context.Context, q Query) (RecordsReader, error) {
 	return b.base.ExecuteQueryToRecordsReader(ctx, q)
 }
+
+var errSchemaChanged = errors.New("schema changed")
+
 func (b *changingJoinFieldsBackend) JoinFields(_ context.Context, source RecordsetSource) ([]string, error) {
 	b.calls++
 	if b.calls > 2 {
-		return nil, errors.New("schema changed")
+		return nil, errSchemaChanged
 	}
 	return b.fields[source.Name()], nil
 }
@@ -192,7 +197,7 @@ func (b *ignoringJoinBackend) ExecuteQueryToRecordsReader(_ context.Context, que
 	name := q.From().Base().Name()
 	b.reads[name]++
 	if _, ok := b.data[name]; !ok {
-		return nil, errors.New("unscannable relation")
+		return nil, errUnscannableRelation
 	}
 	return NewRecordsReader(b.data[name]), nil
 }
@@ -446,8 +451,9 @@ func TestGenericJoinWrappedEOFAndCloseFailure(t *testing.T) {
 	if _, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), root.NewQuery().SelectIntoRecord(nil)); err != nil {
 		t.Fatalf("wrapped EOF rejected: %v", err)
 	}
-	backend.closeErr = errors.New("close failed")
-	if _, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), root.NewQuery().SelectIntoRecord(nil)); err == nil || !strings.Contains(err.Error(), "close scan a") {
+	errCloseFailed := errors.New("close failed")
+	backend.closeErr = errCloseFailed
+	if _, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), root.NewQuery().SelectIntoRecord(nil)); !errors.Is(err, errCloseFailed) {
 		t.Fatalf("close failure swallowed: %v", err)
 	}
 }
@@ -544,7 +550,7 @@ func TestGenericJoinQualifiedWildcardAndCollision(t *testing.T) {
 		t.Fatalf("mixed projection schema order = %v", names)
 	}
 	changing := &changingJoinFieldsBackend{ignoringJoinBackend: backend}
-	if _, err := NewDB(changing).ExecuteQueryToRecordsetReader(context.Background(), q); err == nil || !strings.Contains(err.Error(), "cannot load wildcard fields") {
+	if _, err := NewDB(changing).ExecuteQueryToRecordsetReader(context.Background(), q); !errors.Is(err, errSchemaChanged) {
 		t.Fatalf("schema changed after scan: %v", err)
 	}
 	q = root.NewQuery().SelectColumns(AllColumnsExceptFrom("a"), AllColumnsExceptFrom("b"))
@@ -1098,7 +1104,7 @@ func TestGenericJoinRecordsetErrorsAndFlatColumns(t *testing.T) {
 		t.Fatalf("invalid recordset plan: %v", err)
 	}
 	missing := &ignoringJoinBackend{data: map[string][]record.Record{}, reads: map[string]int{}}
-	if _, err := NewDB(missing).ExecuteQueryToRecordsetReader(context.Background(), root.NewQuery().SelectIntoRecordset()); err == nil || !strings.Contains(err.Error(), "cannot scan") {
+	if _, err := NewDB(missing).ExecuteQueryToRecordsetReader(context.Background(), root.NewQuery().SelectIntoRecordset()); !errors.Is(err, errUnscannableRelation) {
 		t.Fatalf("recordset scan failure: %v", err)
 	}
 }

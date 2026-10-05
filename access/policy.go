@@ -204,7 +204,7 @@ func (p declaredInspectionPurePolicy) PolicyMetadata() PolicyMetadata {
 // DeclareInspectionPure explicitly opts a custom policy into plan and
 // inspection evaluation. The caller is responsible for the purity claim.
 func DeclareInspectionPure(policy Policy) (Policy, error) {
-	if policy == nil {
+	if isNilNode(policy) {
 		return nil, fmt.Errorf("access: inspection-pure policy is nil")
 	}
 	return declaredInspectionPurePolicy{Policy: policy}, nil

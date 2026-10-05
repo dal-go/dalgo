@@ -284,7 +284,11 @@ func TestEndToEnd(t *testing.T) {
 			// The replay adapter cannot project columns; the positive control
 			// must skip rather than fail.
 			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
-		case "access field list: allowed recordset":
+		case "access field list: aggregate alias", "access field list: aggregate alias probe", "access field list: joined source field":
+			// The replay adapter cannot group or join; the controls skip, or only
+			// assert that the field list does not refuse the query.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access field list: allowed recordset", "access field list: aggregate alias recordset":
 			// Nor can it read a recordset; the control skips on either read.
 			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 			tx.EXPECT().ExecuteQueryToRecordsetReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()

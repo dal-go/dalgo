@@ -393,6 +393,7 @@ func aliasRefusedOutputs(query dal.StructuredQuery, sets fieldSets) (dal.Structu
 	columns := query.Columns()
 	var renames []outputRename
 	var rewritten []dal.Column
+	renamedAliases := map[string]string{}
 	token := ""
 	for i, column := range columns {
 		if !sets.readsOnlyAllowedFields(column.Expression) {
@@ -409,11 +410,120 @@ func aliasRefusedOutputs(query dal.StructuredQuery, sets fieldSets) (dal.Structu
 		generated := fmt.Sprintf("access_%s_%d", token, i)
 		rewritten[i].Alias = generated
 		renames = append(renames, outputRename{generated: generated, name: name})
+		if column.Alias != "" {
+			renamedAliases[column.Alias] = generated
+		}
 	}
 	if renames == nil {
 		return query, nil
 	}
-	return dal.WithColumns(query, rewritten), renames
+	renamed := dal.WithColumns(query, rewritten)
+	if len(renamedAliases) > 0 && (query.Having() != nil || len(query.OrderBy()) > 0) {
+		// HAVING and ORDER BY may name a column by its alias; they name the
+		// alias it is sent under now.
+		renamed = renamedAliasQuery{
+			StructuredQuery: renamed,
+			having:          rewriteAliasReferences(query.Having(), renamedAliases),
+			orderBy:         rewriteAliasReferencesInOrders(query.OrderBy(), renamedAliases),
+		}
+	}
+	return renamed, renames
+}
+
+// renamedAliasQuery is a query whose HAVING and ORDER BY name the aliases the
+// access layer sent in place of the caller's (see aliasRefusedOutputs). Like the
+// other wrappers of a query it hands itself, not the query it wraps, to the
+// executor.
+type renamedAliasQuery struct {
+	dal.StructuredQuery
+	having  dal.Condition
+	orderBy []dal.OrderExpression
+}
+
+func (q renamedAliasQuery) Having() dal.Condition          { return q.having }
+func (q renamedAliasQuery) OrderBy() []dal.OrderExpression { return q.orderBy }
+func (q renamedAliasQuery) String() string                 { return dal.QueryString(q) }
+func (q renamedAliasQuery) GetRecordsReader(ctx context.Context, executor dal.QueryExecutor) (dal.RecordsReader, error) {
+	return executor.ExecuteQueryToRecordsReader(ctx, q)
+}
+func (q renamedAliasQuery) GetRecordsetReader(ctx context.Context, executor dal.QueryExecutor) (dal.RecordsetReader, error) {
+	return executor.ExecuteQueryToRecordsetReader(ctx, q)
+}
+
+// rewriteAliasReferences returns the condition with each unqualified field that
+// names a key of renamed replaced by the field named by its value. The caller's
+// own condition is never changed.
+func rewriteAliasReferences(condition dal.Condition, renamed map[string]string) dal.Condition {
+	switch condition := condition.(type) {
+	case dal.Comparison:
+		condition.Left, _ = renameAliasReference(condition.Left, renamed)
+		condition.Right, _ = renameAliasReference(condition.Right, renamed)
+		return condition
+	case *dal.Comparison:
+		if condition == nil {
+			return condition
+		}
+		return rewriteAliasReferences(*condition, renamed)
+	case dal.IsNullCondition:
+		operand, _ := renameAliasReference(condition.Operand(), renamed)
+		if condition.Negated() {
+			return dal.NewIsNotNullCondition(operand)
+		}
+		return dal.NewIsNullCondition(operand)
+	case *dal.IsNullCondition:
+		if condition == nil {
+			return condition
+		}
+		return rewriteAliasReferences(*condition, renamed)
+	case dal.GroupCondition:
+		children := make([]dal.Condition, len(condition.Conditions()))
+		for i, child := range condition.Conditions() {
+			children[i] = rewriteAliasReferences(child, renamed)
+		}
+		return dal.NewGroupCondition(condition.Operator(), children...)
+	case *dal.GroupCondition:
+		if condition == nil {
+			return condition
+		}
+		return rewriteAliasReferences(*condition, renamed)
+	}
+	return condition
+}
+
+// rewriteAliasReferencesInOrders is rewriteAliasReferences for an ORDER BY.
+func rewriteAliasReferencesInOrders(orders []dal.OrderExpression, renamed map[string]string) []dal.OrderExpression {
+	rewritten := make([]dal.OrderExpression, len(orders))
+	for i, order := range orders {
+		rewritten[i] = order
+		if order == nil {
+			continue
+		}
+		expression, changed := renameAliasReference(order.Expression(), renamed)
+		switch {
+		case !changed:
+		case order.Descending():
+			rewritten[i] = dal.Descending(expression)
+		default:
+			rewritten[i] = dal.Ascending(expression)
+		}
+	}
+	return rewritten
+}
+
+// renameAliasReference replaces an unqualified field that names a key of renamed.
+func renameAliasReference(expression dal.Expression, renamed map[string]string) (dal.Expression, bool) {
+	field, ok := expression.(dal.FieldRef)
+	if pointer, isPointer := expression.(*dal.FieldRef); isPointer && pointer != nil {
+		field, ok = *pointer, true
+	}
+	if !ok || field.Source() != "" {
+		return expression, false
+	}
+	generated, isRenamed := renamed[field.Name()]
+	if !isRenamed {
+		return expression, false
+	}
+	return dal.Field(generated), true
 }
 
 // outputToken returns 128 random bits as lower-case hexadecimal, so an alias
@@ -481,6 +591,12 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 			}
 		}
 		return queryProjection{query: dal.WithColumns(query, columns), status: queryProjectionApplied}
+	}
+	if dal.HasAggregation(query) {
+		// An aggregate with no GROUP BY and no columns has no group key to select,
+		// and the allowed fields cannot be added to it: a column that is neither
+		// aggregated nor a group key makes the aggregation invalid.
+		return queryProjection{query: query, status: queryProjectionUnavailable}
 	}
 	allowed, ok := sets.enumerable()
 	if !ok {

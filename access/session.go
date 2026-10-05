@@ -82,12 +82,13 @@ func (s securedReadSession) GetMulti(ctx context.Context, records []record.Recor
 
 func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	if structured, ok := query.(dal.StructuredQuery); ok && dal.HasSubquery(structured) {
-		if err := s.authorizeSources(ctx, structured); err != nil {
+		nested, err := s.enterNestedRoute(ctx, structured)
+		if err != nil {
 			return nil, err
 		}
-		return dal.ExecuteRecursiveQuery(ctx, s, structured)
+		return dal.ExecuteRecursiveQuery(nested, s, structured)
 	}
-	query, requested, sets, err := s.authorizeQuery(ctx, query)
+	query, requested, sets, err := s.authorizeQuery(ctx, query, true)
 	if err != nil {
 		return nil, err
 	}
@@ -112,12 +113,13 @@ func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, que
 
 func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	if structured, ok := query.(dal.StructuredQuery); ok && dal.HasSubquery(structured) {
-		if err := s.authorizeSources(ctx, structured); err != nil {
+		nested, err := s.enterNestedRoute(ctx, structured)
+		if err != nil {
 			return nil, err
 		}
-		return dal.ExecuteRecursiveRecordset(ctx, s, structured, options...)
+		return dal.ExecuteRecursiveRecordset(nested, s, structured, options...)
 	}
-	query, requested, sets, err := s.authorizeQuery(ctx, query)
+	query, requested, sets, err := s.authorizeQuery(ctx, query, false)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +142,26 @@ func emptyProjectionDeniedError(query dal.Query) error {
 	return &DeniedError{Decision: Decision{Operation: Query, Resource: resourcesForQuery(query)[0], Policy: "fields", Effect: effectDeny.String(), Explanation: "no permitted columns remain after applying the query projection and field policy"}}
 }
 
+// enterNestedRoute readies a query with nested queries for the generic engine,
+// which runs it through this session one source at a time. It refuses the query
+// when it is put to the session from inside too many nested routes, then
+// authorizes every source it reads, then refuses a scan order that holds a query
+// (a denied source comes before a query that cannot be run). It returns the
+// context the engine runs in, which carries the depth of the nesting.
+func (s securedReadSession) enterNestedRoute(ctx context.Context, query dal.StructuredQuery) (context.Context, error) {
+	nested, err := enterNesting(ctx, query)
+	if err != nil {
+		return ctx, err
+	}
+	if err := s.authorizeSources(ctx, query); err != nil {
+		return ctx, err
+	}
+	if err := refuseScanOrderQueries(query); err != nil {
+		return ctx, err
+	}
+	return nested, nil
+}
+
 // authorizeSources authorizes every source a query with nested queries reads,
 // before any of them is read. Such a query is then executed one source at a
 // time through this session, so each read is authorized again with its own row
@@ -152,8 +174,10 @@ func (s securedReadSession) authorizeSources(ctx context.Context, query dal.Stru
 // authorizeQuery authorizes every source of a query and returns the query to
 // execute — the caller's own when no residual applies, otherwise a copy whose
 // Where carries the residual row condition — and the field allow-lists that
-// bound its rows.
-func (s securedReadSession) authorizeQuery(ctx context.Context, query dal.Query) (dal.Query, dal.StructuredQuery, fieldSets, error) {
+// bound its rows. aliasReferences is true for a reader that sends an allowed
+// aggregate under an alias of the access layer's own: only there may HAVING and
+// ORDER BY name the aggregate by the alias the caller gave it.
+func (s securedReadSession) authorizeQuery(ctx context.Context, query dal.Query, aliasReferences bool) (dal.Query, dal.StructuredQuery, fieldSets, error) {
 	effective, requested := splitRequestedQuery(query)
 	resources := resourcesForQuery(query)
 	requestQuery := query
@@ -175,7 +199,11 @@ func (s securedReadSession) authorizeQuery(ctx context.Context, query dal.Query)
 	}
 	sets := queryFields(first(writes))
 	if requested != nil && sets.restrictive() {
-		if err := validateRequestedQueryFields(requested, sets); err != nil {
+		validate := validateRequestedQueryFields
+		if aliasReferences {
+			validate = validateRequestedQueryFieldsWithAliases
+		}
+		if err := validate(requested, sets); err != nil {
 			return nil, nil, nil, err
 		}
 	}
@@ -405,17 +433,23 @@ type securedReadwriteSession struct {
 	securedWriteSession
 }
 
-// SecureReadSession wraps a read session with database-bound policies.
+// SecureReadSession wraps a read session with database-bound policies. A session
+// built with no policy, with a nil policy (an interface holding nothing, or a nil
+// pointer) or with a list that holds one denies every request.
 func SecureReadSession(session dal.ReadSession, policies ...Policy) dal.ReadSession {
 	return securedReadSession{session: session, guard: guard{databasePolicies: append([]Policy(nil), policies...)}}
 }
 
-// SecureWriteSession wraps a write session with database-bound policies.
+// SecureWriteSession wraps a write session with database-bound policies. A session
+// built with no policy, with a nil policy (an interface holding nothing, or a nil
+// pointer) or with a list that holds one denies every request.
 func SecureWriteSession(session dal.WriteSession, policies ...Policy) dal.WriteSession {
 	return securedWriteSession{session: session, guard: guard{databasePolicies: append([]Policy(nil), policies...)}}
 }
 
-// SecureReadwriteSession wraps a combined session with database-bound policies.
+// SecureReadwriteSession wraps a combined session with database-bound policies. A
+// session built with no policy, with a nil policy (an interface holding nothing,
+// or a nil pointer) or with a list that holds one denies every request.
 func SecureReadwriteSession(session dal.ReadwriteSession, policies ...Policy) dal.ReadwriteSession {
 	g := guard{databasePolicies: append([]Policy(nil), policies...)}
 	return securedReadwriteSession{

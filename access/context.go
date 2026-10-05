@@ -122,7 +122,7 @@ func WithPolicy(ctx context.Context, policies ...Policy) context.Context {
 	}
 	combined := append(policiesFromContext(ctx), policies...)
 	for i, policy := range combined {
-		if policy == nil {
+		if isNilNode(policy) {
 			panic(fmt.Sprintf("access: nil context policy at index %d", i))
 		}
 	}
@@ -168,7 +168,9 @@ func (g guard) authorizeWrite(ctx context.Context, operation Operations, resourc
 // authorizeRequest evaluates every applicable policy and returns, per request
 // resource, the read residuals and the write residuals the caller must still
 // enforce. Every mandatory policy is evaluated independently before a denial
-// is returned so trusted callers can reduce complete internal diagnostics.
+// is returned so trusted callers can reduce complete internal diagnostics. A
+// request is allowed only by at least one policy in force: with none, it is
+// denied.
 func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]residual, [][]writeResidual, error) {
 	var err error
 	g, err = g.pinDatabasePolicies(ctx)
@@ -184,24 +186,41 @@ func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]resid
 	policies = append(policies, g.databasePolicies...)
 	policies = append(policies, g.boundPolicies...)
 	policies = append(policies, dynamicPolicies...)
-	assessment := assessPolicies(ctx, request, policies)
-	if assessment.firstDenial != nil {
-		decisions := make([]Decision, len(assessment.assessment.Policies))
-		for i := range assessment.assessment.Policies {
-			decisions[i] = cloneDecision(assessment.assessment.Policies[i].Decision)
-		}
+	if len(policies) == 0 {
+		return nil, nil, &DeniedError{Decision: requestDecision(request, CodeConfigurationInvalid, "no access policy is in force")}
+	}
+	return settleAssessment(request, assessPolicies(ctx, request, policies))
+}
+
+// settleAssessment turns the assessment of a request into the residuals the
+// caller must enforce, or into a denial. An assessment that is incomplete is a
+// denial even when no policy gave a decision: a policy that could not be
+// evaluated never lets a request through.
+func settleAssessment(request Request, assessment policyAssessment) ([][]residual, [][]writeResidual, error) {
+	if assessment.firstDenial == nil && assessment.assessment.Complete {
+		return assessment.residuals, assessment.writes, nil
+	}
+	decisions := make([]Decision, len(assessment.assessment.Policies))
+	for i := range assessment.assessment.Policies {
+		decisions[i] = cloneDecision(assessment.assessment.Policies[i].Decision)
+	}
+	switch {
+	case assessment.firstDenial != nil:
 		return nil, nil, &DeniedError{Decision: *assessment.firstDenial, Decisions: decisions}
+	case assessment.firstIndeterminate != nil:
+		return nil, nil, &DeniedError{Decision: *assessment.firstIndeterminate, Decisions: decisions}
+	default:
+		return nil, nil, &DeniedError{Decision: requestDecision(request, CodeEvaluationFailed, "an access policy could not be evaluated"), Decisions: decisions}
 	}
-	if !assessment.assessment.Complete {
-		decisions := make([]Decision, len(assessment.assessment.Policies))
-		for i := range assessment.assessment.Policies {
-			decisions[i] = cloneDecision(assessment.assessment.Policies[i].Decision)
-		}
-		if assessment.firstIndeterminate != nil {
-			return nil, nil, &DeniedError{Decision: *assessment.firstIndeterminate, Decisions: decisions}
-		}
+}
+
+// requestDecision is the denial of a request that no policy decided.
+func requestDecision(request Request, code ReasonCode, explanation string) Decision {
+	decision := Decision{Operation: request.Operation, Effect: effectDeny.String(), Code: code, Scope: DecisionScopeConfiguration, Explanation: explanation}
+	if len(request.Resources) > 0 {
+		decision.Resource = request.Resources[0]
 	}
-	return assessment.residuals, assessment.writes, nil
+	return decision
 }
 
 func (g guard) pinDatabasePolicies(ctx context.Context) (guard, error) {
@@ -216,7 +235,7 @@ func (g guard) pinDatabasePolicies(ctx context.Context) (guard, error) {
 		return guard{}, &PolicyProviderError{Err: fmt.Errorf("enabled provider returned no policies")}
 	}
 	for i, policy := range policies {
-		if policy == nil {
+		if isNilNode(policy) {
 			return guard{}, &PolicyProviderError{Err: fmt.Errorf("nil policy at index %d", i)}
 		}
 	}
