@@ -337,24 +337,16 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 	}
 
 	matching, verdict := selectRules(p.compiled, operation, resource)
-	if verdict == tableAmbiguous {
+	switch verdict {
+	case tableAmbiguous:
 		return p.denyAmbiguousTable(operation, resource)
+	case tableNoRule:
+		return p.denyNoMatch(operation, resource, "no table rule names this table")
+	case tableDatabaseUnchecked:
+		return p.denyNoMatch(operation, resource, "a table rule has this schema and name, but this session cannot check the database a source or a rule names")
 	}
 	if len(matching) == 0 {
-		explanation := "no matching allow rule"
-		if verdict == tableNoRule {
-			explanation = "no table rule names this table"
-		}
-		return Decision{
-			Operation:    operation,
-			Resource:     resource,
-			Policy:       p.name,
-			PolicySource: p.source,
-			Effect:       effectDeny.String(),
-			Code:         CodeNoMatch,
-			Scope:        DecisionScopeOperation,
-			Explanation:  explanation,
-		}
+		return p.denyNoMatch(operation, resource, "no matching allow rule")
 	}
 	// Walk matches in precedence order: conditional allows met before the first
 	// unconditional rule apply to the rows their conditions select; the first
@@ -453,6 +445,20 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 		decision.ResidualDocuments = []*DocumentCondition{document}
 	}
 	return decision
+}
+
+// denyNoMatch is the decision for a resource that no rule allows.
+func (p *AccessPolicy) denyNoMatch(operation Operations, resource Resource, explanation string) Decision {
+	return Decision{
+		Operation:    operation,
+		Resource:     resource,
+		Policy:       p.name,
+		PolicySource: p.source,
+		Effect:       effectDeny.String(),
+		Code:         CodeNoMatch,
+		Scope:        DecisionScopeOperation,
+		Explanation:  explanation,
+	}
 }
 
 func ruleSourceCondition(rules []compiledRule) dal.Condition {
@@ -634,7 +640,9 @@ func (p *AuditPolicy) Classify(_ context.Context, request Request) AuditDecision
 	var last AuditDecision
 	for _, resource := range request.Resources {
 		// An audit policy refuses nothing, so it has no use for the verdict: a name
-		// that could be a table of a table rule is classified by the path rules.
+		// that could be a table of a table rule is classified by the path rules, and a
+		// source that writes a schema which no table rule names, by the rules for
+		// opaque queries, as it was before the policy held a table rule.
 		matching, _ := selectRules(p.compiled, request.Operation, resource)
 		if len(matching) == 0 {
 			last = AuditDecision{Operation: request.Operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectIgnoreAudit.String(), Explanation: "no matching audit rule"}

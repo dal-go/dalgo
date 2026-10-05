@@ -96,7 +96,7 @@ func clonePatterns(patterns []string) []string {
 // may be parameters such as dal.NewParam("currentUser"), resolved from the
 // operation context (see WithVariables and WithCurrentUser).
 //
-// Conditions are valid on allow rules under path scopes only. A conditional
+// Conditions are valid on allow rules under path scopes and table scopes only. A conditional
 // rule never authorises Truncate: naming it explicitly fails compilation, while
 // the write and readwrite groups simply drop it.
 func (r Rule) Where(condition dal.Condition) Rule {
@@ -172,7 +172,9 @@ func CollectionGroupScope(name string, rules ...Rule) Rule {
 
 // OpaqueQueryScope attaches rules to queries that cannot safely match a
 // structural path, including non-structured and schema-qualified queries. It
-// is an intentionally explicit and potentially broad capability.
+// is an intentionally explicit and potentially broad capability. An access
+// policy that holds a table rule does not consult it for a source that writes a
+// schema; see TableScope.
 func OpaqueQueryScope(rules ...Rule) Rule {
 	return Rule{kind: opaqueQueryRule, children: append([]Rule(nil), rules...)}
 }

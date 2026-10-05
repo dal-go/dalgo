@@ -41,7 +41,7 @@ const tableDocumentYAML = tableDocumentHeader + `scopes:
 func TestTableScopesDecodeFromADocument(t *testing.T) {
 	policy, err := UnmarshalAccessPolicyYAML([]byte(tableDocumentYAML))
 	require.NoError(t, err)
-	for _, source := range []dal.RecordsetSource{salesCustomer, salesOrders, publicCustomer, plainCustomer} {
+	for _, source := range []dal.RecordsetSource{salesCustomer, publicCustomer, plainCustomer} {
 		require.Equal(t, summarizeDecision(decideRead(workedExamplePolicy(), source)), summarizeDecision(decideRead(policy, source)))
 	}
 	// The document also has a table rule for a table named Orders, so that bare name is ambiguous too.
@@ -50,7 +50,13 @@ func TestTableScopesDecodeFromADocument(t *testing.T) {
 	require.True(t, allowed.Allowed)
 	require.Equal(t, "sales-customers-gb", allowed.Rule)
 	require.Equal(t, []string{"id", "company", "country"}, allowed.Writes[0].Alternatives[0].Fields)
-	requireDenied(t, decideRead(policy, salesOrders), CodeNoMatch)
+	// The document has a table rule for sales.Orders that names a database, which a session that
+	// resolves no name cannot check; the worked example has none for that table.
+	requireDenied(t, decideRead(workedExamplePolicy(), salesOrders), CodeNoMatch)
+	require.Equal(t, "no table rule names this table", decideRead(workedExamplePolicy(), salesOrders).Explanation)
+	unchecked := decideRead(policy, salesOrders)
+	requireDenied(t, unchecked, CodeNoMatch)
+	require.Contains(t, unchecked.Explanation, "cannot check the database")
 	requireDenied(t, decideRead(policy, plainCustomer), CodeEnforcementUnsupported)
 	// A table rule that names a database never matches on a session that resolves no name.
 	requireDenied(t, decideRead(policy, appSalesCustomer), CodeNoMatch)

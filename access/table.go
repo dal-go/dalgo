@@ -27,8 +27,10 @@ type TableName struct {
 // the resource are the same as they are for a source that carries no identity, so
 // a policy that does not read the identity decides as it always did. A resource
 // built by RecordResourceForKey, CollectionResourceFor, CollectionGroup or
-// OpaqueQuery, a collection source with neither a schema nor a database, a
-// collection-group source and a part of a query that cannot be read carry none.
+// OpaqueQuery, a collection-group source and a part of a query that cannot be
+// read carry none. A session that resolves no name, which is every session of this
+// version, gives none to a collection source with neither a schema nor a database,
+// and none to a key.
 func (r Resource) Table() (TableName, bool) {
 	if r.table == nil {
 		return TableName{}, false
@@ -42,10 +44,13 @@ func (r Resource) Table() (TableName, bool) {
 // scope do. A condition that uses $path.x is refused, because a table scope
 // captures nothing.
 //
-// A policy that holds a table rule decides a source that writes a schema by its
-// table rules alone: a rule for opaque queries is not consulted for it, and a
-// source that writes a schema which no table rule names is denied. A policy that
-// holds no table rule decides every source as it always did.
+// An access policy that holds a table rule decides a source that writes a schema
+// by its table rules alone: a rule for opaque queries is not consulted for it, and
+// a source that writes a schema which no table rule names is denied. An audit
+// policy that holds a table rule classifies such a source by the table rule that
+// names it, an ignore-audit rule included, and otherwise by its rule for opaque
+// queries, as it did before it held a table rule. A policy that holds no table
+// rule decides every source as it always did.
 func TableScope(table TableName, rules ...Rule) Rule {
 	return Rule{kind: tableScopeRule, table: table, children: append([]Rule(nil), rules...)}
 }
@@ -113,8 +118,12 @@ const (
 	// tableDecided: the rules returned decide the resource.
 	tableDecided tableVerdict = iota
 	// tableNoRule: the source writes a schema, the policy holds table rules and none
-	// of them names this table. No rule decides it.
+	// of them names this table. No table rule decides it.
 	tableNoRule
+	// tableDatabaseUnchecked: as tableNoRule, and a table rule has the schema and the
+	// name of the source, but the source or the rule names a database, which this
+	// session cannot check.
+	tableDatabaseUnchecked
 	// tableAmbiguous: the resource names a collection that a table rule also names a
 	// table of, and says no schema, so one name could denote either table.
 	tableAmbiguous
@@ -126,11 +135,16 @@ const (
 //
 //   - A policy that holds no table rule: the rules that match the resource, as
 //     they always were.
-//   - A resource that carries the identity of a table with a schema: if the rule
-//     that would win among the path rules is a deny that names the collection, the
-//     path rules are returned, so the deny stands. Otherwise the table rules that
-//     match decide; a source that writes a schema is decided by them alone, and a
-//     path resource falls back to the path rules when no table rule matches.
+//   - A resource that carries the identity of a table with a schema: if the first
+//     unconditional path rule, the one that settles what the conditional rules
+//     before it do not, is a deny that names the collection, the path rules are
+//     returned, so the deny stands. Otherwise the table rules that match decide; a
+//     source that writes a schema is decided by them alone, and a path resource
+//     falls back to the path rules when no table rule matches. A source that writes
+//     a schema and that no table rule matches is returned with the rules for opaque
+//     queries and the verdict tableNoRule or tableDatabaseUnchecked: an access
+//     policy refuses it, and an audit policy classifies it by those rules, as it
+//     did before it held a table rule.
 //   - Any other resource, when a table rule names a table of the same name as the
 //     collection it reads, without regard to case: tableAmbiguous. The path rules
 //     are returned with it, for a caller that has nothing to refuse.
@@ -147,7 +161,7 @@ func selectRules(rules []compiledRule, operation Operations, resource Resource) 
 		}
 		return path, tableDecided
 	}
-	if resource.kind == PathResource && len(path) > 0 && path[0].depth > 0 && effectIsRestrictive(path[0].effect) {
+	if resource.kind == PathResource && denyNamesTheCollection(path) {
 		return path, tableDecided
 	}
 	if matches := matchingTableRules(tables, operation, identity); len(matches) > 0 {
@@ -156,7 +170,36 @@ func selectRules(rules []compiledRule, operation Operations, resource Resource) 
 	if resource.kind == PathResource {
 		return path, tableDecided
 	}
-	return nil, tableNoRule
+	if namesADatabaseTheSessionCannotCheck(tables, operation, identity) {
+		return path, tableDatabaseUnchecked
+	}
+	return path, tableNoRule
+}
+
+// denyNamesTheCollection reports whether the path rule that settles a resource,
+// the first one that carries no row condition, is a deny written for a collection:
+// a deny at the root names none. Conditional allows before it grant the rows their
+// conditions select, as they do without table rules.
+func denyNamesTheCollection(path []compiledRule) bool {
+	for _, rule := range path {
+		if rule.where == nil {
+			return rule.depth > 0 && effectIsRestrictive(rule.effect)
+		}
+	}
+	return false
+}
+
+// namesADatabaseTheSessionCannotCheck reports whether a table rule for the operation
+// has the schema and the name of the identity and would be the rule that decides
+// it, but for a database that the rule or the identity names.
+func namesADatabaseTheSessionCannotCheck(tables []compiledRule, operation Operations, identity TableName) bool {
+	for _, rule := range tables {
+		if rule.operations.contains(operation) && rule.table.Schema == identity.Schema && rule.table.Name == identity.Name &&
+			(rule.table.Database != "" || identity.Database != "") {
+			return true
+		}
+	}
+	return false
 }
 
 func tableRulesOf(rules []compiledRule) []compiledRule {

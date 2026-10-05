@@ -1765,3 +1765,1173 @@ access policy wrapped by the caller | key of another collection | insert | decid
 access policy wrapped by the caller | key of another collection | set | decide: allowed=true code= scope=request slot= rule="all" effect=allow explanation="matched rule \"all\" (allow)" condition="" resource=path|/Order/1
 access policy wrapped by the caller | key of another collection | update | decide: allowed=true code= scope=request slot= rule="all" effect=allow explanation="matched rule \"all\" (allow)" condition="" resource=path|/Order/1
 access policy wrapped by the caller | key of another collection | delete | decide: allowed=true code= scope=request slot= rule="all" effect=allow explanation="matched rule \"all\" (allow)" condition="" resource=path|/Order/1
+root allow | unqualified @ base | recordset: allowed reads=1
+root allow | unqualified @ join direct | recordset: allowed reads=1
+root allow | unqualified @ join tree | recordset: allowed reads=1
+root allow | unqualified @ derived source | recordset: allowed reads=1
+root allow | unqualified @ subquery in WHERE | recordset: allowed reads=1
+root allow | unqualified @ subquery in HAVING | recordset: error reads=1
+root allow | unqualified @ subquery in ON | recordset: allowed reads=2
+root allow | unqualified @ subquery in a column | recordset: allowed reads=1
+root allow | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+root allow | unqualified pointer @ base | recordset: allowed reads=1
+root allow | unqualified pointer @ join direct | recordset: allowed reads=1
+root allow | unqualified aliased @ base | recordset: allowed reads=1
+root allow | unqualified aliased @ join direct | recordset: allowed reads=1
+root allow | unqualified scan-bounded @ base | recordset: allowed reads=1
+root allow | unqualified scan-bounded @ join direct | recordset: allowed reads=1
+root allow | schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database @ base | recordset: allowed reads=1
+root allow | database @ join direct | recordset: allowed reads=1
+root allow | database @ join tree | recordset: allowed reads=1
+root allow | database @ derived source | recordset: allowed reads=1
+root allow | database @ subquery in WHERE | recordset: allowed reads=1
+root allow | database @ subquery in HAVING | recordset: error reads=1
+root allow | database @ subquery in ON | recordset: allowed reads=2
+root allow | database @ subquery in a column | recordset: allowed reads=1
+root allow | database @ subquery in ORDER BY | recordset: allowed reads=1
+root allow | database pointer @ base | recordset: allowed reads=1
+root allow | database pointer @ join direct | recordset: allowed reads=1
+root allow | database aliased @ base | recordset: allowed reads=1
+root allow | database aliased @ join direct | recordset: allowed reads=1
+root allow | database and schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | unqualified @ base | recordset: allowed reads=1
+collection allow | unqualified @ join direct | recordset: allowed reads=1
+collection allow | unqualified @ join tree | recordset: allowed reads=1
+collection allow | unqualified @ derived source | recordset: allowed reads=1
+collection allow | unqualified @ subquery in WHERE | recordset: allowed reads=1
+collection allow | unqualified @ subquery in HAVING | recordset: error reads=1
+collection allow | unqualified @ subquery in ON | recordset: allowed reads=2
+collection allow | unqualified @ subquery in a column | recordset: allowed reads=1
+collection allow | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+collection allow | unqualified pointer @ base | recordset: allowed reads=1
+collection allow | unqualified pointer @ join direct | recordset: allowed reads=1
+collection allow | unqualified aliased @ base | recordset: allowed reads=1
+collection allow | unqualified aliased @ join direct | recordset: allowed reads=1
+collection allow | unqualified scan-bounded @ base | recordset: allowed reads=1
+collection allow | unqualified scan-bounded @ join direct | recordset: allowed reads=1
+collection allow | schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database @ base | recordset: allowed reads=1
+collection allow | database @ join direct | recordset: allowed reads=1
+collection allow | database @ join tree | recordset: allowed reads=1
+collection allow | database @ derived source | recordset: allowed reads=1
+collection allow | database @ subquery in WHERE | recordset: allowed reads=1
+collection allow | database @ subquery in HAVING | recordset: error reads=1
+collection allow | database @ subquery in ON | recordset: allowed reads=2
+collection allow | database @ subquery in a column | recordset: allowed reads=1
+collection allow | database @ subquery in ORDER BY | recordset: allowed reads=1
+collection allow | database pointer @ base | recordset: allowed reads=1
+collection allow | database pointer @ join direct | recordset: allowed reads=1
+collection allow | database aliased @ base | recordset: allowed reads=1
+collection allow | database aliased @ join direct | recordset: allowed reads=1
+collection allow | database and schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+collection allow | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | unqualified @ base | recordset: allowed reads=1
+field list | unqualified @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | unqualified @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | unqualified @ derived source | recordset: allowed reads=1
+field list | unqualified @ subquery in WHERE | recordset: allowed reads=1
+field list | unqualified @ subquery in HAVING | recordset: error reads=1
+field list | unqualified @ subquery in ON | recordset: allowed reads=2
+field list | unqualified @ subquery in a column | recordset: allowed reads=1
+field list | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+field list | unqualified pointer @ base | recordset: allowed reads=1
+field list | unqualified pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | unqualified aliased @ base | recordset: allowed reads=1
+field list | unqualified aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | unqualified scan-bounded @ base | recordset: allowed reads=1
+field list | unqualified scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database @ base | recordset: allowed reads=1
+field list | database @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | database @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | database @ derived source | recordset: allowed reads=1
+field list | database @ subquery in WHERE | recordset: allowed reads=1
+field list | database @ subquery in HAVING | recordset: error reads=1
+field list | database @ subquery in ON | recordset: allowed reads=2
+field list | database @ subquery in a column | recordset: allowed reads=1
+field list | database @ subquery in ORDER BY | recordset: allowed reads=1
+field list | database pointer @ base | recordset: allowed reads=1
+field list | database pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | database aliased @ base | recordset: allowed reads=1
+field list | database aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: field rules on a joined source are not supported in this version reads=0
+field list | database and schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+field list | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | unqualified @ base | recordset: allowed reads=1
+row condition | unqualified @ join direct | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | unqualified @ join tree | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | unqualified @ derived source | recordset: allowed reads=1
+row condition | unqualified @ subquery in WHERE | recordset: allowed reads=1
+row condition | unqualified @ subquery in HAVING | recordset: error reads=1
+row condition | unqualified @ subquery in ON | recordset: allowed reads=2
+row condition | unqualified @ subquery in a column | recordset: allowed reads=1
+row condition | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+row condition | unqualified pointer @ base | recordset: allowed reads=1
+row condition | unqualified pointer @ join direct | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | unqualified aliased @ base | recordset: allowed reads=1
+row condition | unqualified aliased @ join direct | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | unqualified scan-bounded @ base | recordset: allowed reads=1
+row condition | unqualified scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database @ base | recordset: allowed reads=1
+row condition | database @ join direct | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | database @ join tree | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | database @ derived source | recordset: allowed reads=1
+row condition | database @ subquery in WHERE | recordset: allowed reads=1
+row condition | database @ subquery in HAVING | recordset: error reads=1
+row condition | database @ subquery in ON | recordset: allowed reads=2
+row condition | database @ subquery in a column | recordset: allowed reads=1
+row condition | database @ subquery in ORDER BY | recordset: allowed reads=1
+row condition | database pointer @ base | recordset: allowed reads=1
+row condition | database pointer @ join direct | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | database aliased @ base | recordset: allowed reads=1
+row condition | database aliased @ join direct | recordset: denied: dalgo access denied: policy="p" rule="gb" operation=query resource=/Customer: conditional rule "gb" applies to a joined source; conditional rules on joins are not supported in this version reads=0
+row condition | database and schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+row condition | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | unqualified @ base | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified @ join direct | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified @ join tree | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified @ derived source | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified @ subquery in ON | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified @ subquery in a column | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified pointer @ base | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified pointer @ join direct | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified aliased @ base | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified aliased @ join direct | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | unqualified scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database @ base | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database @ join direct | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database @ join tree | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database @ derived source | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database @ subquery in ON | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database @ subquery in a column | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database pointer @ base | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database pointer @ join direct | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database aliased @ base | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database aliased @ join direct | recordset: denied: dalgo access denied: policy="p" rule="no-customers" operation=query resource=/Customer: matched rule "no-customers" (deny) reads=0
+root allow, collection denied | database and schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+root allow, collection denied | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+opaque allow | unqualified @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | unqualified @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | unqualified @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | unqualified pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | unqualified aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | unqualified scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | unqualified scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema @ base | recordset: allowed reads=1
+opaque allow | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema @ derived source | recordset: allowed reads=1
+opaque allow | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema pointer @ base | recordset: allowed reads=1
+opaque allow | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema aliased @ base | recordset: allowed reads=1
+opaque allow | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | schema scan-bounded @ base | recordset: allowed reads=1
+opaque allow | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | database @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | database @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | database pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+opaque allow | database aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database and schema @ base | recordset: allowed reads=1
+opaque allow | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database and schema @ derived source | recordset: allowed reads=1
+opaque allow | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque allow | database and schema pointer @ base | recordset: allowed reads=1
+opaque allow | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+opaque and collection allow | unqualified @ base | recordset: allowed reads=1
+opaque and collection allow | unqualified @ join direct | recordset: allowed reads=1
+opaque and collection allow | unqualified @ join tree | recordset: allowed reads=1
+opaque and collection allow | unqualified @ derived source | recordset: allowed reads=1
+opaque and collection allow | unqualified @ subquery in WHERE | recordset: allowed reads=1
+opaque and collection allow | unqualified @ subquery in HAVING | recordset: error reads=1
+opaque and collection allow | unqualified @ subquery in ON | recordset: allowed reads=2
+opaque and collection allow | unqualified @ subquery in a column | recordset: allowed reads=1
+opaque and collection allow | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+opaque and collection allow | unqualified pointer @ base | recordset: allowed reads=1
+opaque and collection allow | unqualified pointer @ join direct | recordset: allowed reads=1
+opaque and collection allow | unqualified aliased @ base | recordset: allowed reads=1
+opaque and collection allow | unqualified aliased @ join direct | recordset: allowed reads=1
+opaque and collection allow | unqualified scan-bounded @ base | recordset: allowed reads=1
+opaque and collection allow | unqualified scan-bounded @ join direct | recordset: allowed reads=1
+opaque and collection allow | schema @ base | recordset: allowed reads=1
+opaque and collection allow | schema @ join direct | recordset: allowed reads=1
+opaque and collection allow | schema @ join tree | recordset: allowed reads=1
+opaque and collection allow | schema @ derived source | recordset: allowed reads=1
+opaque and collection allow | schema @ subquery in WHERE | recordset: allowed reads=1
+opaque and collection allow | schema @ subquery in HAVING | recordset: error reads=1
+opaque and collection allow | schema @ subquery in ON | recordset: allowed reads=2
+opaque and collection allow | schema @ subquery in a column | recordset: allowed reads=1
+opaque and collection allow | schema @ subquery in ORDER BY | recordset: allowed reads=1
+opaque and collection allow | schema pointer @ base | recordset: allowed reads=1
+opaque and collection allow | schema pointer @ join direct | recordset: allowed reads=1
+opaque and collection allow | schema aliased @ base | recordset: allowed reads=1
+opaque and collection allow | schema aliased @ join direct | recordset: allowed reads=1
+opaque and collection allow | schema scan-bounded @ base | recordset: allowed reads=1
+opaque and collection allow | schema scan-bounded @ join direct | recordset: allowed reads=1
+opaque and collection allow | database @ base | recordset: allowed reads=1
+opaque and collection allow | database @ join direct | recordset: allowed reads=1
+opaque and collection allow | database @ join tree | recordset: allowed reads=1
+opaque and collection allow | database @ derived source | recordset: allowed reads=1
+opaque and collection allow | database @ subquery in WHERE | recordset: allowed reads=1
+opaque and collection allow | database @ subquery in HAVING | recordset: error reads=1
+opaque and collection allow | database @ subquery in ON | recordset: allowed reads=2
+opaque and collection allow | database @ subquery in a column | recordset: allowed reads=1
+opaque and collection allow | database @ subquery in ORDER BY | recordset: allowed reads=1
+opaque and collection allow | database pointer @ base | recordset: allowed reads=1
+opaque and collection allow | database pointer @ join direct | recordset: allowed reads=1
+opaque and collection allow | database aliased @ base | recordset: allowed reads=1
+opaque and collection allow | database aliased @ join direct | recordset: allowed reads=1
+opaque and collection allow | database and schema @ base | recordset: allowed reads=1
+opaque and collection allow | database and schema @ join direct | recordset: allowed reads=1
+opaque and collection allow | database and schema @ join tree | recordset: allowed reads=1
+opaque and collection allow | database and schema @ derived source | recordset: allowed reads=1
+opaque and collection allow | database and schema @ subquery in WHERE | recordset: allowed reads=1
+opaque and collection allow | database and schema @ subquery in HAVING | recordset: error reads=1
+opaque and collection allow | database and schema @ subquery in ON | recordset: allowed reads=2
+opaque and collection allow | database and schema @ subquery in a column | recordset: allowed reads=1
+opaque and collection allow | database and schema @ subquery in ORDER BY | recordset: allowed reads=1
+opaque and collection allow | database and schema pointer @ base | recordset: allowed reads=1
+opaque and collection allow | database and schema pointer @ join direct | recordset: allowed reads=1
+record scope | unqualified @ base | recordset: allowed reads=1
+record scope | unqualified @ join direct | recordset: allowed reads=1
+record scope | unqualified @ join tree | recordset: allowed reads=1
+record scope | unqualified @ derived source | recordset: allowed reads=1
+record scope | unqualified @ subquery in WHERE | recordset: allowed reads=1
+record scope | unqualified @ subquery in HAVING | recordset: error reads=1
+record scope | unqualified @ subquery in ON | recordset: allowed reads=2
+record scope | unqualified @ subquery in a column | recordset: allowed reads=1
+record scope | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+record scope | unqualified pointer @ base | recordset: allowed reads=1
+record scope | unqualified pointer @ join direct | recordset: allowed reads=1
+record scope | unqualified aliased @ base | recordset: allowed reads=1
+record scope | unqualified aliased @ join direct | recordset: allowed reads=1
+record scope | unqualified scan-bounded @ base | recordset: allowed reads=1
+record scope | unqualified scan-bounded @ join direct | recordset: allowed reads=1
+record scope | schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database @ base | recordset: allowed reads=1
+record scope | database @ join direct | recordset: allowed reads=1
+record scope | database @ join tree | recordset: allowed reads=1
+record scope | database @ derived source | recordset: allowed reads=1
+record scope | database @ subquery in WHERE | recordset: allowed reads=1
+record scope | database @ subquery in HAVING | recordset: error reads=1
+record scope | database @ subquery in ON | recordset: allowed reads=2
+record scope | database @ subquery in a column | recordset: allowed reads=1
+record scope | database @ subquery in ORDER BY | recordset: allowed reads=1
+record scope | database pointer @ base | recordset: allowed reads=1
+record scope | database pointer @ join direct | recordset: allowed reads=1
+record scope | database aliased @ base | recordset: allowed reads=1
+record scope | database aliased @ join direct | recordset: allowed reads=1
+record scope | database and schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+record scope | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | unqualified @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | unqualified @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | unqualified @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | unqualified pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | unqualified aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | unqualified scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | unqualified scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | database @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | database @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | database pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Customer: no matching allow rule reads=0
+unrelated rule | database aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database and schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database and schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+unrelated rule | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+unrelated rule | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=/Order: no matching allow rule reads=0
+collection mask | unqualified @ base | recordset: allowed reads=1
+collection mask | unqualified @ join direct | recordset: allowed reads=1
+collection mask | unqualified @ join tree | recordset: allowed reads=1
+collection mask | unqualified @ derived source | recordset: allowed reads=1
+collection mask | unqualified @ subquery in WHERE | recordset: allowed reads=1
+collection mask | unqualified @ subquery in HAVING | recordset: error reads=1
+collection mask | unqualified @ subquery in ON | recordset: allowed reads=2
+collection mask | unqualified @ subquery in a column | recordset: allowed reads=1
+collection mask | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+collection mask | unqualified pointer @ base | recordset: allowed reads=1
+collection mask | unqualified pointer @ join direct | recordset: allowed reads=1
+collection mask | unqualified aliased @ base | recordset: allowed reads=1
+collection mask | unqualified aliased @ join direct | recordset: allowed reads=1
+collection mask | unqualified scan-bounded @ base | recordset: allowed reads=1
+collection mask | unqualified scan-bounded @ join direct | recordset: allowed reads=1
+collection mask | schema @ base | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema @ join direct | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema @ join tree | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema @ derived source | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema pointer @ base | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema aliased @ base | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database @ base | recordset: allowed reads=1
+collection mask | database @ join direct | recordset: allowed reads=1
+collection mask | database @ join tree | recordset: allowed reads=1
+collection mask | database @ derived source | recordset: allowed reads=1
+collection mask | database @ subquery in WHERE | recordset: allowed reads=1
+collection mask | database @ subquery in HAVING | recordset: error reads=1
+collection mask | database @ subquery in ON | recordset: allowed reads=2
+collection mask | database @ subquery in a column | recordset: allowed reads=1
+collection mask | database @ subquery in ORDER BY | recordset: allowed reads=1
+collection mask | database pointer @ base | recordset: allowed reads=1
+collection mask | database pointer @ join direct | recordset: allowed reads=1
+collection mask | database aliased @ base | recordset: allowed reads=1
+collection mask | database aliased @ join direct | recordset: allowed reads=1
+collection mask | database and schema @ base | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema @ join direct | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema @ join tree | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema @ derived source | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+collection mask | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="masked" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set | unqualified @ base | recordset: allowed reads=1
+principal set | unqualified @ join direct | recordset: allowed reads=1
+principal set | unqualified @ join tree | recordset: allowed reads=1
+principal set | unqualified @ derived source | recordset: allowed reads=1
+principal set | unqualified @ subquery in WHERE | recordset: allowed reads=1
+principal set | unqualified @ subquery in HAVING | recordset: error reads=1
+principal set | unqualified @ subquery in ON | recordset: allowed reads=2
+principal set | unqualified @ subquery in a column | recordset: allowed reads=1
+principal set | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+principal set | unqualified pointer @ base | recordset: allowed reads=1
+principal set | unqualified pointer @ join direct | recordset: allowed reads=1
+principal set | unqualified aliased @ base | recordset: allowed reads=1
+principal set | unqualified aliased @ join direct | recordset: allowed reads=1
+principal set | unqualified scan-bounded @ base | recordset: allowed reads=1
+principal set | unqualified scan-bounded @ join direct | recordset: allowed reads=1
+principal set | schema @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema @ join tree | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema @ derived source | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema pointer @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema aliased @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database @ base | recordset: allowed reads=1
+principal set | database @ join direct | recordset: allowed reads=1
+principal set | database @ join tree | recordset: allowed reads=1
+principal set | database @ derived source | recordset: allowed reads=1
+principal set | database @ subquery in WHERE | recordset: allowed reads=1
+principal set | database @ subquery in HAVING | recordset: error reads=1
+principal set | database @ subquery in ON | recordset: allowed reads=2
+principal set | database @ subquery in a column | recordset: allowed reads=1
+principal set | database @ subquery in ORDER BY | recordset: allowed reads=1
+principal set | database pointer @ base | recordset: allowed reads=1
+principal set | database pointer @ join direct | recordset: allowed reads=1
+principal set | database aliased @ base | recordset: allowed reads=1
+principal set | database aliased @ join direct | recordset: allowed reads=1
+principal set | database and schema @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema @ join tree | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema @ derived source | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+principal set with a collection mask | unqualified @ base | recordset: allowed reads=1
+principal set with a collection mask | unqualified @ join direct | recordset: allowed reads=1
+principal set with a collection mask | unqualified @ join tree | recordset: allowed reads=1
+principal set with a collection mask | unqualified @ derived source | recordset: allowed reads=1
+principal set with a collection mask | unqualified @ subquery in WHERE | recordset: allowed reads=1
+principal set with a collection mask | unqualified @ subquery in HAVING | recordset: error reads=1
+principal set with a collection mask | unqualified @ subquery in ON | recordset: allowed reads=2
+principal set with a collection mask | unqualified @ subquery in a column | recordset: allowed reads=1
+principal set with a collection mask | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+principal set with a collection mask | unqualified pointer @ base | recordset: allowed reads=1
+principal set with a collection mask | unqualified pointer @ join direct | recordset: allowed reads=1
+principal set with a collection mask | unqualified aliased @ base | recordset: allowed reads=1
+principal set with a collection mask | unqualified aliased @ join direct | recordset: allowed reads=1
+principal set with a collection mask | unqualified scan-bounded @ base | recordset: allowed reads=1
+principal set with a collection mask | unqualified scan-bounded @ join direct | recordset: allowed reads=1
+principal set with a collection mask | schema @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema @ join tree | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema @ derived source | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema pointer @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema aliased @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database @ base | recordset: allowed reads=1
+principal set with a collection mask | database @ join direct | recordset: allowed reads=1
+principal set with a collection mask | database @ join tree | recordset: allowed reads=1
+principal set with a collection mask | database @ derived source | recordset: allowed reads=1
+principal set with a collection mask | database @ subquery in WHERE | recordset: allowed reads=1
+principal set with a collection mask | database @ subquery in HAVING | recordset: error reads=1
+principal set with a collection mask | database @ subquery in ON | recordset: allowed reads=2
+principal set with a collection mask | database @ subquery in a column | recordset: allowed reads=1
+principal set with a collection mask | database @ subquery in ORDER BY | recordset: allowed reads=1
+principal set with a collection mask | database pointer @ base | recordset: allowed reads=1
+principal set with a collection mask | database pointer @ join direct | recordset: allowed reads=1
+principal set with a collection mask | database aliased @ base | recordset: allowed reads=1
+principal set with a collection mask | database aliased @ join direct | recordset: allowed reads=1
+principal set with a collection mask | database and schema @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema @ join tree | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema @ derived source | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+principal set with a collection mask | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="principals" operation=query resource=opaque-query:sales.Customer: collection mask denies resource reads=0
+recording policy of the caller | unqualified @ base | recordset: allowed reads=1 seen=[path|/Customer]
+recording policy of the caller | unqualified @ join direct | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | unqualified @ join tree | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | unqualified @ derived source | recordset: allowed reads=1 seen=[path|/Customer ; path|/Customer]
+recording policy of the caller | unqualified @ subquery in WHERE | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer ; path|/Order]
+recording policy of the caller | unqualified @ subquery in HAVING | recordset: error reads=1 seen=[path|/Order ; path|/Customer ; path|/Order]
+recording policy of the caller | unqualified @ subquery in ON | recordset: allowed reads=2 seen=[path|/Order ; path|/Line ; path|/Customer ; path|/Order ; path|/Line]
+recording policy of the caller | unqualified @ subquery in a column | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer ; path|/Order]
+recording policy of the caller | unqualified @ subquery in ORDER BY | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer ; path|/Order]
+recording policy of the caller | unqualified pointer @ base | recordset: allowed reads=1 seen=[path|/Customer]
+recording policy of the caller | unqualified pointer @ join direct | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | unqualified aliased @ base | recordset: allowed reads=1 seen=[path|/Customer]
+recording policy of the caller | unqualified aliased @ join direct | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | unqualified scan-bounded @ base | recordset: allowed reads=1 seen=[path|/Customer]
+recording policy of the caller | unqualified scan-bounded @ join direct | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | schema @ base | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema @ join direct | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema @ join tree | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema @ derived source | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; path|/Line ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema pointer @ base | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema aliased @ base | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database @ base | recordset: allowed reads=1 seen=[path|/Customer]
+recording policy of the caller | database @ join direct | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | database @ join tree | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | database @ derived source | recordset: allowed reads=1 seen=[path|/Customer ; path|/Customer]
+recording policy of the caller | database @ subquery in WHERE | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer ; path|/Order]
+recording policy of the caller | database @ subquery in HAVING | recordset: error reads=1 seen=[path|/Order ; path|/Customer ; path|/Order]
+recording policy of the caller | database @ subquery in ON | recordset: allowed reads=2 seen=[path|/Order ; path|/Line ; path|/Customer ; path|/Order ; path|/Line]
+recording policy of the caller | database @ subquery in a column | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer ; path|/Order]
+recording policy of the caller | database @ subquery in ORDER BY | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer ; path|/Order]
+recording policy of the caller | database pointer @ base | recordset: allowed reads=1 seen=[path|/Customer]
+recording policy of the caller | database pointer @ join direct | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | database aliased @ base | recordset: allowed reads=1 seen=[path|/Customer]
+recording policy of the caller | database aliased @ join direct | recordset: allowed reads=1 seen=[path|/Order ; path|/Customer]
+recording policy of the caller | database and schema @ base | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema @ join direct | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema @ join tree | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema @ derived source | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; path|/Line ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[opaque-query|opaque-query:sales.Customer]
+recording policy of the caller | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="recording" operation=query resource=opaque-query:sales.Customer: opaque queries are not allowed reads=0 seen=[path|/Order ; opaque-query|opaque-query:sales.Customer]
+access policy wrapped by the caller | unqualified @ base | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified @ join direct | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified @ join tree | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified @ derived source | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified @ subquery in WHERE | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified @ subquery in HAVING | recordset: error reads=1
+access policy wrapped by the caller | unqualified @ subquery in ON | recordset: allowed reads=2
+access policy wrapped by the caller | unqualified @ subquery in a column | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified @ subquery in ORDER BY | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified pointer @ base | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified pointer @ join direct | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified aliased @ base | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified aliased @ join direct | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified scan-bounded @ base | recordset: allowed reads=1
+access policy wrapped by the caller | unqualified scan-bounded @ join direct | recordset: allowed reads=1
+access policy wrapped by the caller | schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema aliased @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema aliased @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema scan-bounded @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | schema scan-bounded @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database @ base | recordset: allowed reads=1
+access policy wrapped by the caller | database @ join direct | recordset: allowed reads=1
+access policy wrapped by the caller | database @ join tree | recordset: allowed reads=1
+access policy wrapped by the caller | database @ derived source | recordset: allowed reads=1
+access policy wrapped by the caller | database @ subquery in WHERE | recordset: allowed reads=1
+access policy wrapped by the caller | database @ subquery in HAVING | recordset: error reads=1
+access policy wrapped by the caller | database @ subquery in ON | recordset: allowed reads=2
+access policy wrapped by the caller | database @ subquery in a column | recordset: allowed reads=1
+access policy wrapped by the caller | database @ subquery in ORDER BY | recordset: allowed reads=1
+access policy wrapped by the caller | database pointer @ base | recordset: allowed reads=1
+access policy wrapped by the caller | database pointer @ join direct | recordset: allowed reads=1
+access policy wrapped by the caller | database aliased @ base | recordset: allowed reads=1
+access policy wrapped by the caller | database aliased @ join direct | recordset: allowed reads=1
+access policy wrapped by the caller | database and schema @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema @ join tree | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema @ derived source | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema @ subquery in WHERE | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema @ subquery in HAVING | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema @ subquery in ON | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema @ subquery in a column | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema @ subquery in ORDER BY | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema pointer @ base | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+access policy wrapped by the caller | database and schema pointer @ join direct | recordset: denied: dalgo access denied: policy="p" operation=query resource=opaque-query:sales.Customer: no matching allow rule reads=0
+audit root | unqualified @ base | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | unqualified @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified @ join tree | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified @ derived source | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | unqualified @ subquery in WHERE | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified @ subquery in HAVING | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified @ subquery in ON | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified @ subquery in a column | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified pointer @ base | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | unqualified pointer @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified aliased @ base | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | unqualified aliased @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | unqualified scan-bounded @ base | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | unqualified scan-bounded @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root | schema @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema @ join tree | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root | schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema @ subquery in ON | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema @ subquery in a column | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root | schema pointer @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema aliased @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root | schema aliased @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | schema scan-bounded @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root | schema scan-bounded @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database @ base | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | database @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database @ join tree | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database @ derived source | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | database @ subquery in WHERE | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database @ subquery in HAVING | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database @ subquery in ON | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database @ subquery in a column | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database pointer @ base | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | database pointer @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database aliased @ base | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer
+audit root | database aliased @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database and schema @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root | database and schema @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database and schema @ join tree | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database and schema @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root | database and schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database and schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database and schema @ subquery in ON | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database and schema @ subquery in a column | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database and schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | database and schema pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root | database and schema pointer @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root | key | get | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer/1
+audit root | key | insert | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer/1
+audit root | key | set | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer/1
+audit root | key | update | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer/1
+audit root | key | delete | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Customer/1
+audit root | key with a parent | get | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root | key with a parent | insert | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root | key with a parent | set | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root | key with a parent | update | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root | key with a parent | delete | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root | key of another collection | get | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit root | key of another collection | insert | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit root | key of another collection | set | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit root | key of another collection | update | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit root | key of another collection | delete | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit collection | unqualified @ base | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | unqualified @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified @ join tree | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified @ derived source | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | unqualified @ subquery in WHERE | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified @ subquery in HAVING | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified @ subquery in ON | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified @ subquery in a column | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified pointer @ base | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | unqualified pointer @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified aliased @ base | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | unqualified aliased @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | unqualified scan-bounded @ base | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | unqualified scan-bounded @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit collection | schema @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema @ join tree | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit collection | schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema @ subquery in ON | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema @ subquery in a column | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit collection | schema pointer @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema aliased @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit collection | schema aliased @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | schema scan-bounded @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit collection | schema scan-bounded @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database @ base | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | database @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database @ join tree | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database @ derived source | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | database @ subquery in WHERE | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database @ subquery in HAVING | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database @ subquery in ON | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database @ subquery in a column | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database pointer @ base | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | database pointer @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database aliased @ base | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer
+audit collection | database aliased @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database and schema @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit collection | database and schema @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database and schema @ join tree | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database and schema @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit collection | database and schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database and schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database and schema @ subquery in ON | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database and schema @ subquery in a column | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database and schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | database and schema pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit collection | database and schema pointer @ join direct | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order
+audit collection | key | get | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer/1
+audit collection | key | insert | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer/1
+audit collection | key | set | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer/1
+audit collection | key | update | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer/1
+audit collection | key | delete | classify: audit=true effect=audit rule="audit-customers" explanation="matched rule \"audit-customers\" (audit)" resource=path|/Customer/1
+audit collection | key with a parent | get | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/7/Customer/1
+audit collection | key with a parent | insert | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/7/Customer/1
+audit collection | key with a parent | set | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/7/Customer/1
+audit collection | key with a parent | update | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/7/Customer/1
+audit collection | key with a parent | delete | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/7/Customer/1
+audit collection | key of another collection | get | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/1
+audit collection | key of another collection | insert | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/1
+audit collection | key of another collection | set | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/1
+audit collection | key of another collection | update | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/1
+audit collection | key of another collection | delete | classify: audit=true effect=audit rule="audit-orders" explanation="matched rule \"audit-orders\" (audit)" resource=path|/Order/1
+audit opaque | unqualified @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified @ join tree | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified @ subquery in WHERE | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified @ subquery in HAVING | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified @ subquery in ON | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified @ subquery in a column | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified @ subquery in ORDER BY | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified pointer @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified aliased @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified aliased @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified scan-bounded @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | unqualified scan-bounded @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | schema @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema @ join tree | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema @ derived source | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema @ subquery in ON | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema @ subquery in a column | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema pointer @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema pointer @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema aliased @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema aliased @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema scan-bounded @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | schema scan-bounded @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database @ join tree | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database @ subquery in WHERE | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database @ subquery in HAVING | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database @ subquery in ON | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database @ subquery in a column | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database @ subquery in ORDER BY | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database pointer @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database aliased @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database aliased @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit opaque | database and schema @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema @ join tree | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema @ derived source | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema @ subquery in ON | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema @ subquery in a column | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema pointer @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | database and schema pointer @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque | key | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque | key | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque | key | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque | key | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque | key | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque | key with a parent | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque | key with a parent | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque | key with a parent | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque | key with a parent | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque | key with a parent | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque | key of another collection | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit opaque | key of another collection | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit opaque | key of another collection | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit opaque | key of another collection | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit opaque | key of another collection | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit root, collection ignored | unqualified @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | unqualified @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified @ join tree | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified @ derived source | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | unqualified @ subquery in WHERE | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified @ subquery in HAVING | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified @ subquery in ON | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified @ subquery in a column | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified pointer @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | unqualified pointer @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified aliased @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | unqualified aliased @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | unqualified scan-bounded @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | unqualified scan-bounded @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root, collection ignored | schema @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema @ join tree | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root, collection ignored | schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema @ subquery in ON | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema @ subquery in a column | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root, collection ignored | schema pointer @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema aliased @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root, collection ignored | schema aliased @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | schema scan-bounded @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root, collection ignored | schema scan-bounded @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | database @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database @ join tree | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database @ derived source | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | database @ subquery in WHERE | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database @ subquery in HAVING | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database @ subquery in ON | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database @ subquery in a column | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database pointer @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | database pointer @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database aliased @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit root, collection ignored | database aliased @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database and schema @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root, collection ignored | database and schema @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database and schema @ join tree | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database and schema @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root, collection ignored | database and schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database and schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database and schema @ subquery in ON | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database and schema @ subquery in a column | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database and schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | database and schema pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit root, collection ignored | database and schema pointer @ join direct | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order
+audit root, collection ignored | key | get | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer/1
+audit root, collection ignored | key | insert | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer/1
+audit root, collection ignored | key | set | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer/1
+audit root, collection ignored | key | update | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer/1
+audit root, collection ignored | key | delete | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer/1
+audit root, collection ignored | key with a parent | get | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root, collection ignored | key with a parent | insert | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root, collection ignored | key with a parent | set | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root, collection ignored | key with a parent | update | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root, collection ignored | key with a parent | delete | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/7/Customer/1
+audit root, collection ignored | key of another collection | get | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit root, collection ignored | key of another collection | insert | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit root, collection ignored | key of another collection | set | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit root, collection ignored | key of another collection | update | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit root, collection ignored | key of another collection | delete | classify: audit=true effect=audit rule="audit-all" explanation="matched rule \"audit-all\" (audit)" resource=path|/Order/1
+audit opaque and collection | unqualified @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified @ join direct | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified @ join tree | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified @ derived source | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified @ subquery in WHERE | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified @ subquery in HAVING | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified @ subquery in ON | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified @ subquery in a column | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified @ subquery in ORDER BY | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified pointer @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified pointer @ join direct | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified aliased @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified aliased @ join direct | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified scan-bounded @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | unqualified scan-bounded @ join direct | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | schema @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema @ join tree | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema @ derived source | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema @ subquery in ON | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema @ subquery in a column | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema pointer @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema pointer @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema aliased @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema aliased @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema scan-bounded @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | schema scan-bounded @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database @ join direct | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database @ join tree | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database @ derived source | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database @ subquery in WHERE | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database @ subquery in HAVING | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database @ subquery in ON | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database @ subquery in a column | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database @ subquery in ORDER BY | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database pointer @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database pointer @ join direct | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database aliased @ base | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database aliased @ join direct | classify: audit=false effect=ignore-audit rule="ignore-customers" explanation="matched rule \"ignore-customers\" (ignore-audit)" resource=path|/Customer
+audit opaque and collection | database and schema @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema @ join tree | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema @ derived source | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema @ subquery in WHERE | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema @ subquery in HAVING | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema @ subquery in ON | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema @ subquery in a column | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema @ subquery in ORDER BY | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema pointer @ base | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | database and schema pointer @ join direct | classify: audit=true effect=audit rule="audit-opaque" explanation="matched rule \"audit-opaque\" (audit)" resource=opaque-query|opaque-query:sales.Customer
+audit opaque and collection | key | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque and collection | key | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque and collection | key | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque and collection | key | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque and collection | key | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit opaque and collection | key with a parent | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque and collection | key with a parent | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque and collection | key with a parent | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque and collection | key with a parent | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque and collection | key with a parent | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit opaque and collection | key of another collection | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit opaque and collection | key of another collection | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit opaque and collection | key of another collection | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit opaque and collection | key of another collection | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit opaque and collection | key of another collection | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit unrelated rule | unqualified @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified @ join tree | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified @ subquery in WHERE | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified @ subquery in HAVING | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified @ subquery in ON | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified @ subquery in a column | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified @ subquery in ORDER BY | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified pointer @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified aliased @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified aliased @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified scan-bounded @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | unqualified scan-bounded @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | schema @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema @ join tree | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema @ subquery in WHERE | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema @ subquery in HAVING | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema @ subquery in ON | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema @ subquery in a column | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema @ subquery in ORDER BY | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema pointer @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema aliased @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema aliased @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema scan-bounded @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | schema scan-bounded @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database @ join tree | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database @ subquery in WHERE | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database @ subquery in HAVING | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database @ subquery in ON | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database @ subquery in a column | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database @ subquery in ORDER BY | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database pointer @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database aliased @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database aliased @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer
+audit unrelated rule | database and schema @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema @ join tree | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema @ derived source | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema @ subquery in WHERE | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema @ subquery in HAVING | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema @ subquery in ON | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema @ subquery in a column | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema @ subquery in ORDER BY | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema pointer @ base | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | database and schema pointer @ join direct | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=opaque-query|opaque-query:sales.Customer
+audit unrelated rule | key | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit unrelated rule | key | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit unrelated rule | key | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit unrelated rule | key | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit unrelated rule | key | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Customer/1
+audit unrelated rule | key with a parent | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit unrelated rule | key with a parent | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit unrelated rule | key with a parent | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit unrelated rule | key with a parent | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit unrelated rule | key with a parent | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/7/Customer/1
+audit unrelated rule | key of another collection | get | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit unrelated rule | key of another collection | insert | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit unrelated rule | key of another collection | set | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit unrelated rule | key of another collection | update | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1
+audit unrelated rule | key of another collection | delete | classify: audit=false effect=ignore-audit rule="" explanation="no matching audit rule" resource=path|/Order/1

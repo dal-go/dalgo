@@ -248,7 +248,8 @@ scopes:
         where: {op: "==", left: {field: country}, right: {value: GB}}
 ```
 
-A table scope is top-level and holds rules, not scopes. The `name` is required and
+A table scope is top-level, or directly under the root scope, and holds rules, not
+scopes. The `name` is required and
 at least one of `schema` and `database` is required; a table with neither is an
 ordinary collection, which a path rule names. A rule under a table scope may carry
 `fields`, a field mask, a row condition and a post-image check, as a rule under a
@@ -259,7 +260,7 @@ name `c`. The portable file format of the DTQL policy loader keeps path scopes o
 
 A rule written for a collection (`/Customer`) keeps its meaning: it governs the
 source that writes no schema, and nothing else. It never applies to
-`sales.Customer`. How a policy that holds table rules decides a request:
+`sales.Customer`. How an access policy that holds table rules decides a request:
 
 - A source that writes a schema is decided by the table rules that match it, and
   by them alone. When none does, the request is denied (`ACL_NO_MATCH`). A rule for
@@ -270,8 +271,9 @@ source that writes no schema, and nothing else. It never applies to
   when none does. A deny rule written for the collection's bare name is never
   overridden by a table rule. A deny at the root does not name the collection, so
   a table rule allows beside it. No adapter of this repository says which schema
-  an unqualified name is read from, so in this version a source that writes no
-  schema carries no identity.
+  an unqualified name is read from, so in this version a source that writes neither
+  a schema nor a database carries no identity, and one that writes a database and no
+  schema carries an identity with no schema.
 - A source that writes no schema, a key and a root collection are decided by the
   path rules as before, with one exception that only refuses: when the policy holds
   a table rule for a table of the same name, compared without regard to case, the
@@ -280,16 +282,23 @@ source that writes no schema, and nothing else. It never applies to
   is read from. A key with a parent is decided by the path rules.
 - A table rule matches a source when schema and name are equal byte for byte and
   neither the rule nor the source names a database. A database cannot be checked,
-  so a rule or a source that names one never matches; the source is denied as above.
+  so a rule or a source that names one never matches. A source that writes a schema
+  is then denied (`ACL_NO_MATCH`); one that writes none is denied when a table rule
+  has its name, and is otherwise decided by its path rules.
 - The collection mask is checked first, as it is for every resource, and it denies a
   schema-qualified source.
 
 A policy that holds no table rule is decided exactly as before. Several policies
 intersect, so every policy in force must allow every resource: a table in another
-schema is readable only when each applied policy has a table rule for it.
+schema is readable only when each applied policy allows it, by a table rule in a
+policy that holds table rules and by a rule for opaque queries in one that holds
+none.
 
 An audit policy takes table scopes too, with audit effects. It refuses nothing, so
-a name that a table rule makes ambiguous is classified by its path rules.
+a name that a table rule makes ambiguous is classified by its path rules. A source
+that writes a schema is classified by the table rule that names it, an
+ignore-audit rule included; when no table rule names it, the policy's rule for
+opaque queries classifies it, as it did before the policy held a table rule.
 
 ## Query boundaries and future constraints
 
@@ -393,7 +402,7 @@ A schema-qualified source (`schema.table`) is one opaque resource in a policy th
 holds no table rule: only a rule for opaque queries (`access.OpaqueQueryScope`)
 can allow it, that rule applies to every opaque resource, custom SQL text
 included, and a rule for opaque queries carries no field list and no row
-condition. In a policy that holds table rules a schema-qualified source is decided
+condition. In an access policy that holds table rules a schema-qualified source is decided
 by the table rules, which carry a field list and a row condition (see
 [Tables in schemas and databases](#tables-in-schemas-and-databases)), and a rule
 for opaque queries is not consulted for it.

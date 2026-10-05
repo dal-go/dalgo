@@ -318,6 +318,78 @@ func compatGolden() []string {
 			}
 		}
 	}
+	return append(lines, compatGoldenRecordsetAndAudit()...)
+}
+
+// matrixAuditPolicy is an audit policy of the corpus.
+type matrixAuditPolicy struct {
+	name   string
+	policy *AuditPolicy
+}
+
+// matrixAuditPolicies are audit policies that carry no table rule.
+func matrixAuditPolicies() []matrixAuditPolicy {
+	return []matrixAuditPolicy{
+		{"audit root", MustAuditPolicy("a", Root(Audit(ReadWrite, "audit-all")))},
+		{"audit collection", MustAuditPolicy("a", Collection("Customer", Audit(ReadWrite, "audit-customers")), Collection("Order", Audit(ReadWrite, "audit-orders")))},
+		{"audit opaque", MustAuditPolicy("a", OpaqueQueryScope(Audit(Query, "audit-opaque")))},
+		{"audit root, collection ignored", MustAuditPolicy("a", Root(Audit(ReadWrite, "audit-all")), Collection("Customer", IgnoreAudit(ReadWrite, "ignore-customers")))},
+		{"audit opaque and collection", MustAuditPolicy("a", OpaqueQueryScope(Audit(Query, "audit-opaque")), Collection("Customer", IgnoreAudit(Query, "ignore-customers")))},
+		{"audit unrelated rule", MustAuditPolicy("a", Collection("Other", Audit(ReadWrite, "audit-other")))},
+	}
+}
+
+func summarizeAudit(decision AuditDecision) string {
+	return fmt.Sprintf("audit=%t effect=%s rule=%q explanation=%q resource=%s|%s", decision.Audit, decision.Effect, decision.Rule, decision.Explanation, decision.Resource.Kind(), decision.Resource.String())
+}
+
+// compatGoldenRecordsetAndAudit lists the lines that follow the rest of the golden:
+// the outcome of the recordset reader of a secured session for every policy and
+// cell, which shares its authorization with the records reader, and the
+// classification of every audit policy of the corpus over every cell and key. They
+// come after the other lines so that those keep their places.
+func compatGoldenRecordsetAndAudit() []string {
+	var lines []string
+	add := func(format string, args ...any) { lines = append(lines, fmt.Sprintf(format, args...)) }
+	for _, policy := range matrixPolicies() {
+		for _, cell := range matrixCells() {
+			sessionPolicy, seen := policy.build()
+			wrapped := &countingSession{}
+			_, err := SecureReadSession(wrapped, sessionPolicy).ExecuteQueryToRecordsetReader(policy.ctx(), cell.position.build(cell.source.source))
+			outcome := "allowed"
+			switch {
+			case errors.Is(err, ErrAccessDenied):
+				outcome = "denied: " + err.Error()
+			case err != nil:
+				outcome = "error"
+			}
+			recorded := ""
+			if seen != nil {
+				recorded = " seen=[" + strings.Join(*seen, " ; ") + "]"
+			}
+			add("%s | %s | recordset: %s reads=%d%s", policy.name, cell, outcome, wrapped.reads, recorded)
+		}
+	}
+	for _, audit := range matrixAuditPolicies() {
+		for _, cell := range matrixCells() {
+			query := cell.position.build(cell.source.source)
+			decision := audit.policy.Classify(context.Background(), Request{Operation: Query, Resources: resourcesForQuery(query), Query: query})
+			add("%s | %s | classify: %s", audit.name, cell, summarizeAudit(decision))
+		}
+		for _, key := range []struct {
+			name string
+			key  *record.Key
+		}{
+			{"key", record.NewKeyWithID("Customer", "1")},
+			{"key with a parent", record.NewKeyWithParentAndID(record.NewKeyWithID("Order", "7"), "Customer", "1")},
+			{"key of another collection", record.NewKeyWithID("Order", "1")},
+		} {
+			for _, operation := range []Operations{Get, Insert, Set, Update, Delete} {
+				decision := audit.policy.Classify(context.Background(), Request{Operation: operation, Resources: []Resource{RecordResourceForKey(key.key)}})
+				add("%s | %s | %s | classify: %s", audit.name, key.name, operation, summarizeAudit(decision))
+			}
+		}
+	}
 	return lines
 }
 

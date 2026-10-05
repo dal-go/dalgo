@@ -280,18 +280,40 @@ func TestTableRulesOnASessionThatResolvesNoName(t *testing.T) {
 }
 
 func TestTableRuleNeverMatchesASourceThatNamesADatabaseOnASessionThatResolvesNoName(t *testing.T) {
+	const cannotCheck = "a table rule has this schema and name, but this session cannot check the database a source or a rule names"
 	for name, table := range map[string]TableName{
 		"schema only":         {Schema: "sales", Name: "Customer"},
 		"database and schema": {Database: "app", Schema: "sales", Name: "Customer"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			policy := MustPolicy("p", TableScope(table, Allow(Query, "t")))
-			requireDenied(t, decideRead(policy, appSalesCustomer), CodeNoMatch)
+			// The source writes a database, so the session cannot say that it is the one
+			// the rule means, even when the rule names exactly the three parts written.
+			decision := decideRead(policy, appSalesCustomer)
+			requireDenied(t, decision, CodeNoMatch)
+			require.Equal(t, cannotCheck, decision.Explanation)
 		})
 	}
+	// A rule that names a database cannot be checked against a source that names none.
+	policy := MustPolicy("p", TableScope(TableName{Database: "app", Schema: "sales", Name: "Customer"}, Allow(Query, "t")))
+	decision := decideRead(policy, salesCustomer)
+	requireDenied(t, decision, CodeNoMatch)
+	require.Equal(t, cannotCheck, decision.Explanation)
+	// ... unless the rule is for another operation, or the source is another table.
+	other := MustPolicy("p", TableScope(TableName{Database: "app", Schema: "sales", Name: "Customer"}, Allow(Get, "t")))
+	decision = decideRead(other, salesCustomer)
+	requireDenied(t, decision, CodeNoMatch)
+	require.Equal(t, "no table rule names this table", decision.Explanation)
+	decision = decideRead(policy, salesOrders)
+	requireDenied(t, decision, CodeNoMatch)
+	require.Equal(t, "no table rule names this table", decision.Explanation)
+	decision = decideRead(policy, dal.NewDatabaseCollectionRef("app", "sales", "Orders", ""))
+	requireDenied(t, decision, CodeNoMatch)
+	require.Equal(t, "no table rule names this table", decision.Explanation)
+
 	// A rule that names a database and no schema never matches either; the name is still
 	// ambiguous, so a source that writes no schema is refused as such.
-	policy := MustPolicy("p", TableScope(TableName{Database: "app", Name: "Customer"}, Allow(Query, "t")))
+	policy = MustPolicy("p", TableScope(TableName{Database: "app", Name: "Customer"}, Allow(Query, "t")))
 	requireDenied(t, decideRead(policy, appCustomer), CodeEnforcementUnsupported)
 	requireDenied(t, decideRead(policy, plainCustomer), CodeEnforcementUnsupported)
 	requireDenied(t, decideRead(policy, salesCustomer), CodeNoMatch)
@@ -419,6 +441,32 @@ func TestTableRulesAndPathRulesOnAResourceWithAnIdentity(t *testing.T) {
 			"table": {tableAllow},
 		}, Bindings{Everyone: []string{"table"}})
 		require.True(t, decide(only, Query, secret).Allowed)
+	})
+	t.Run("a deny for the bare name stands behind a conditional allow of a deeper scope", func(t *testing.T) {
+		// The path rules grant the rows the condition selects and deny the rest; a table
+		// allow does not widen that.
+		policy := MustPolicy("p",
+			Scope("Secret", AnyID, Allow(Get, "own").Where(dal.WhereField("owner", dal.Equal, "alice"))),
+			Collection("Secret", Deny(Get, "no-secret")),
+			TableScope(tablePublicSecret, Allow(Get, "table-allow")),
+		)
+		key := RecordResourceForKey(record.NewKeyWithID("Secret", "1"))
+		key.table = &tablePublicSecret
+		decision := decide(policy, Get, key)
+		require.True(t, decision.Allowed, decision.Explanation)
+		require.Contains(t, decision.Rule, "own")
+		require.NotContains(t, decision.Rule, "table-allow")
+		require.Len(t, decision.Residuals, 1)
+		require.Nil(t, decision.Writes[0].Terminal)
+		// Without the deny, the table rule is the unconditional allow.
+		open := MustPolicy("p",
+			Scope("Secret", AnyID, Allow(Get, "own").Where(dal.WhereField("owner", dal.Equal, "alice"))),
+			TableScope(tablePublicSecret, Allow(Get, "table-allow")),
+		)
+		decision = decide(open, Get, key)
+		require.True(t, decision.Allowed, decision.Explanation)
+		require.Equal(t, "table-allow", decision.Rule)
+		require.Empty(t, decision.Residuals)
 	})
 	t.Run("a deny at the root does not name the collection", func(t *testing.T) {
 		policy := MustPolicy("p", Root(Deny(Query, "deny-all")), tableAllow)
@@ -555,6 +603,58 @@ func TestAuditPolicyTableRules(t *testing.T) {
 	// An audit policy with no table rule classifies as before.
 	plain := MustAuditPolicy("plain", Collection("Customer", Audit(Write, "customer-writes")))
 	require.True(t, plain.Classify(context.Background(), Request{Operation: Insert, Resources: []Resource{pathResourceOf("Customer", tableSalesNamed)}}).Audit)
+}
+
+// A source that writes a schema and that no table rule names is classified by the
+// audit policy's rule for opaque queries, as it was before the table rule was added
+// to the policy. A table rule that names the source decides it, an ignore-audit
+// rule included.
+func TestAuditPolicyKeepsItsRuleForOpaqueQueriesBesideTableRules(t *testing.T) {
+	opaque := OpaqueQueryScope(Audit(Query, "all-opaque"))
+	withTables := MustAuditPolicy("audit", opaque,
+		TableScope(TableName{Schema: "hr", Name: "Salary"}, Audit(Query, "salary")),
+		TableScope(TableName{Schema: "sales", Name: "Log"}, IgnoreAudit(Query, "ignore-log")),
+		TableScope(TableName{Database: "app", Schema: "sales", Name: "Audited"}, IgnoreAudit(Query, "ignore-audited")),
+	)
+	opaqueOnly := MustAuditPolicy("audit", opaque)
+	classify := func(policy *AuditPolicy, source dal.RecordsetSource) AuditDecision {
+		return policy.Classify(context.Background(), Request{Operation: Query, Resources: []Resource{resourceForRecordsetSource(source)}})
+	}
+
+	for name, source := range map[string]dal.RecordsetSource{
+		"a schema and a table no table rule names":                dal.NewQualifiedRootCollectionRef("sales", "Customer", ""),
+		"a table of another schema":                               dal.NewQualifiedRootCollectionRef("other", "Salary", ""),
+		"a database and a schema":                                 appSalesCustomer,
+		"a database and a schema, a rule that names the database": dal.NewDatabaseCollectionRef("app", "sales", "Audited", ""),
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := classify(withTables, source)
+			require.True(t, got.Audit, "decision = %+v", got)
+			require.Equal(t, "all-opaque", got.Rule)
+			// The same as before the table rules were added to the policy.
+			require.Equal(t, classify(opaqueOnly, source).Rule, got.Rule)
+		})
+	}
+
+	// A table rule that names the source decides it.
+	salary := classify(withTables, dal.NewQualifiedRootCollectionRef("hr", "Salary", ""))
+	require.True(t, salary.Audit)
+	require.Equal(t, "salary", salary.Rule)
+	ignored := classify(withTables, dal.NewQualifiedRootCollectionRef("sales", "Log", ""))
+	require.False(t, ignored.Audit)
+	require.Equal(t, "ignore-log", ignored.Rule)
+	require.Equal(t, effectIgnoreAudit.String(), ignored.Effect)
+
+	// Custom SQL text and a part of a query that cannot be read keep the rule.
+	require.True(t, withTables.Classify(context.Background(), Request{Operation: Query, Resources: []Resource{OpaqueQuery("select 1")}}).Audit)
+
+	// A policy with table rules and no rule for opaque queries audits what its table
+	// rules say, and nothing else.
+	tablesOnly := MustAuditPolicy("audit", TableScope(TableName{Schema: "hr", Name: "Salary"}, Audit(Query, "salary")))
+	require.True(t, classify(tablesOnly, dal.NewQualifiedRootCollectionRef("hr", "Salary", "")).Audit)
+	none := classify(tablesOnly, dal.NewQualifiedRootCollectionRef("sales", "Customer", ""))
+	require.False(t, none.Audit)
+	require.Equal(t, "no matching audit rule", none.Explanation)
 }
 
 func TestTableRuleNeverMatchesAPathResource(t *testing.T) {
