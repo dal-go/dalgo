@@ -163,6 +163,11 @@ func TestMoneyDecimalBoundsAndTextFallback(t *testing.T) {
 			t.Errorf("exact fixed-point %q rejected: %v", text, err)
 		}
 	}
+	for _, text := range []string{"+" + strings.Repeat("0", 40) + "1", "-" + strings.Repeat("0", 40) + "1"} {
+		if _, err := moneyNumber(text); err != nil {
+			t.Errorf("signed leading-zero value %q rejected: %v", text, err)
+		}
+	}
 	for _, text := range []string{" 1", "1e2", "1.01.2", strings.Repeat("1", 81)} {
 		if _, err := moneyNumber(text); err == nil {
 			t.Errorf("malformed/bounded input %q accepted", text)
@@ -367,6 +372,28 @@ func TestMoneyConditionEvaluators(t *testing.T) {
 	}
 	if _, err := compareMoneyValues(true, "1"); err == nil {
 		t.Fatal("accepted boolean in decimal comparison")
+	}
+}
+
+func TestMoneyAverageRoundedPrecision(t *testing.T) {
+	config := &MoneyConfig{MinorUnitScale: 2, DivisionScale: 6, Rounding: "halfEven"}
+	aggregate := NewAggregate(AVERAGE, false, Field("amount"))
+	state := &aggregateState{expression: aggregate, count: 2, exactSum: new(big.Rat).SetFrac64(3, 10)}
+	group := &localGroup{states: map[string]*aggregateState{aggregate.String(): state}}
+	reader := &localAggregationReader{money: config}
+	got, err := reader.resolveGroupExpression(aggregate, group, nil)
+	if err != nil || got != "0.15" {
+		t.Fatalf("exact Money AVG=%v err=%v", got, err)
+	}
+
+	max38, ok := new(big.Int).SetString(strings.Repeat("9", 37)+"8", 10)
+	if !ok {
+		t.Fatal("could not construct 38-digit AVG input")
+	}
+	state.exactSum.SetInt(max38)
+	state.count = 3
+	if got, err := reader.resolveGroupExpression(aggregate, group, nil); err == nil {
+		t.Fatalf("accepted rounded AVG result exceeding 38 coefficient digits: %v", got)
 	}
 }
 

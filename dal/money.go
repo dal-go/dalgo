@@ -112,8 +112,7 @@ func moneyNumber(value any) (*big.Rat, error) {
 	if len(text) > 80 || strings.Count(text, ".") == 1 && len(text)-strings.IndexByte(text, '.')-1 > 38 {
 		return nil, fmt.Errorf("money operand exceeds 38 digits or fractional digits")
 	}
-	coefficient := strings.TrimLeft(strings.ReplaceAll(strings.TrimPrefix(text, "-"), ".", ""), "0")
-	coefficient = strings.TrimLeft(coefficient, "+")
+	coefficient := strings.TrimLeft(strings.TrimLeft(strings.ReplaceAll(text, ".", ""), "+-"), "0")
 	if len(coefficient) > 38 {
 		return nil, fmt.Errorf("money operand exceeds 38 significant digits")
 	}

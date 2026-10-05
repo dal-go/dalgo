@@ -771,7 +771,11 @@ func (r *localAggregationReader) resolveGroupExpression(expression Expression, g
 			}
 			if r.money != nil {
 				mean := new(big.Rat).Quo(state.exactSum, new(big.Rat).SetInt64(state.count))
-				return moneyText(mean, r.money.DivisionScale), nil
+				rounded := moneyText(mean, r.money.DivisionScale)
+				if _, err := moneyNumber(rounded); err != nil {
+					return nil, fmt.Errorf("money AVG result: %w", err)
+				}
+				return rounded, nil
 			}
 			return state.sum / float64(state.count), nil
 		case MIN, MAX, FIRST, LAST:
