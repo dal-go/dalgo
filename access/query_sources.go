@@ -190,6 +190,12 @@ func (w *querySourceWalk) node(node fmt.Stringer, depth int) {
 		for _, argument := range node.FuncArgs() {
 			w.node(argument, depth+1)
 		}
+		// The order of an ordered aggregate holds expressions too.
+		if ordered, isOrdered := node.(dal.OrderedAggregateFunc); isOrdered {
+			for _, key := range ordered.AggregateOrder() {
+				w.order(key, depth+1)
+			}
+		}
 	case dal.FieldRef, *dal.FieldRef, dal.FieldName, dal.Constant, *dal.Constant, dal.Param, *dal.Param, dal.Array, *dal.Array, dal.StarExpression:
 	case dal.BinaryExpression:
 		w.node(node.Left, depth+1)

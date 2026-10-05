@@ -49,14 +49,13 @@ func executeAggregationRecords(ctx context.Context, executor QueryExecutor, quer
 		return nil, fmt.Errorf("dalgo aggregation: %w", err)
 	}
 	if plan.Strategy == AggregationNative {
-		return executor.ExecuteQueryToRecordsReader(ctx, query)
+		reader, err := executor.ExecuteQueryToRecordsReader(ctx, query)
+		if refusedAsNotSupported(q, err) {
+			return executeAggregationAfterRefusal(ctx, executor, q, err)
+		}
+		return reader, err
 	}
-	rawQuery := newAggregationSourceQuery(q, plan.Strategy == AggregationStreaming)
-	raw, err := executor.ExecuteQueryToRecordsReader(ctx, rawQuery)
-	if err != nil {
-		return nil, err
-	}
-	return newLocalAggregationReader(ctx, q, raw, plan), nil
+	return executeAggregationLocal(ctx, executor, q, plan)
 }
 
 func queryCapabilitiesOf(value any) QueryCapabilities {
@@ -118,6 +117,11 @@ func collectSourceFields(q StructuredQuery) []FieldRef {
 			for _, arg := range e.FuncArgs() {
 				walk(arg)
 			}
+			for _, key := range aggregateOrder(e) {
+				if key != nil {
+					walk(key.Expression())
+				}
+			}
 		case BinaryExpression:
 			walk(e.Left)
 			walk(e.Right)
@@ -160,6 +164,11 @@ type aggregateState struct {
 	hasValue   bool
 	distinct   map[string]struct{}
 	valueBytes int
+	// An ordered first or last keeps the best row seen so far as the sort
+	// values of its order keys and of its argument, which breaks ties; value is
+	// the answer of that row.
+	orderKeys []any
+	orderTie  any
 }
 
 type localGroup struct {
@@ -187,11 +196,14 @@ type localAggregationReader struct {
 	totalDistinct int
 	retainedBytes int
 	money         *MoneyConfig
+	// sortFields names the fields of a raw row that need a sort value because an
+	// ordered aggregate of the query compares by them.
+	sortFields []string
 }
 
 func newLocalAggregationReader(ctx context.Context, q StructuredQuery, raw RecordsReader, plan AggregationPlan) *localAggregationReader {
 	aggregates := uniqueAggregates(q)
-	return &localAggregationReader{ctx: ctx, query: q, raw: raw, plan: plan, aggregates: aggregates}
+	return &localAggregationReader{ctx: ctx, query: q, raw: raw, plan: plan, aggregates: aggregates, sortFields: orderedAggregateSortNames(q)}
 }
 
 func (r *localAggregationReader) Cursor() (string, error) { return "", nil }
@@ -261,15 +273,7 @@ func (r *localAggregationReader) nextStreaming() (result record.Record, resultEr
 		if err != nil {
 			return nil, err
 		}
-		var row map[string]any
-		if r.money != nil {
-			if hasUnsafeMoneyFloat(rec.Data()) {
-				return nil, fmt.Errorf("money input contains a fractional or unsafe binary floating-point value")
-			}
-			row, err = normalizedJoinRecordMapForMode(rec, true)
-		} else {
-			row, err = normalizedRecordMap(rec)
-		}
+		row, err := r.normalizedRow(rec)
 		if err != nil {
 			return nil, err
 		}
@@ -353,15 +357,7 @@ func (r *localAggregationReader) loadMaterialized() (resultErr error) {
 		if err != nil {
 			return err
 		}
-		var row map[string]any
-		if r.money != nil {
-			if hasUnsafeMoneyFloat(rec.Data()) {
-				return fmt.Errorf("money input contains a fractional or unsafe binary floating-point value")
-			}
-			row, err = normalizedJoinRecordMapForMode(rec, true)
-		} else {
-			row, err = normalizedRecordMap(rec)
-		}
+		row, err := r.normalizedRow(rec)
 		if err != nil {
 			return err
 		}
@@ -597,6 +593,12 @@ func (r *localAggregationReader) updateGroup(group *localGroup, row map[string]a
 			group.bytes += distinctBytes
 			r.totalDistinct++
 		}
+		if order := aggregateOrder(aggregate); len(order) > 0 {
+			if err := r.updateOrderedState(group, state, order, arg, row, value); err != nil {
+				return err
+			}
+			continue
+		}
 		switch strings.ToUpper(aggregate.FuncName()) {
 		case COUNT:
 			if isStar || value != nil {
@@ -696,7 +698,12 @@ func validateMoneyField(value any, config *MoneyConfig) error {
 }
 
 func (r *localAggregationReader) setAggregateStateValue(group *localGroup, state *aggregateState, value any) error {
-	bytes := aggregationValueBytes(value)
+	return r.setAggregateState(group, state, value, aggregationValueBytes(value))
+}
+
+// setAggregateState replaces what a state keeps with value, charging the
+// difference between the bytes it now holds and the bytes it held before.
+func (r *localAggregationReader) setAggregateState(group *localGroup, state *aggregateState, value any, bytes int) error {
 	delta := bytes - state.valueBytes
 	if delta > 0 {
 		if err := r.reserveAggregationBytes(delta); err != nil {
@@ -916,21 +923,30 @@ func uniqueAggregates(q StructuredQuery) []AggregateFunc {
 	return result
 }
 
+// fieldHolder finds the map that holds a field's value: the row itself, or the
+// row of the field's source when the row is a join row. ok is false for a join
+// row that has no row for that source.
+func fieldHolder(field FieldRef, row map[string]any) (holder map[string]any, ok bool) {
+	sources, joined := row[joinSourcesKey].(map[string]any)
+	if !joined {
+		return row, true
+	}
+	sourceName := field.Source()
+	if sourceName == "" {
+		sourceName, _ = row[joinBaseKey].(string)
+	}
+	holder, ok = sources[sourceName].(map[string]any)
+	return holder, ok
+}
+
 func evalScalar(expression Expression, row map[string]any) (any, error) {
 	switch e := expression.(type) {
 	case FieldRef:
-		if sources, ok := row[joinSourcesKey].(map[string]any); ok {
-			sourceName := e.Source()
-			if sourceName == "" {
-				sourceName, _ = row[joinBaseKey].(string)
-			}
-			if source, ok := sources[sourceName].(map[string]any); ok {
-				value, _ := lookupAggregationField(source, e.Name())
-				return value, nil
-			}
+		holder, ok := fieldHolder(e, row)
+		if !ok {
 			return nil, nil
 		}
-		value, _ := lookupAggregationField(row, e.Name())
+		value, _ := lookupAggregationField(holder, e.Name())
 		return value, nil
 	case Constant:
 		return normalizeAggregationValue(e.Value), nil

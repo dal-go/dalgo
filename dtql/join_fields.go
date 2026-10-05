@@ -51,6 +51,15 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 					return err
 				}
 			}
+			for i, key := range aggregateOrderOf(v) {
+				// A key that is missing is for validation to refuse; the walk passes over it and keeps counting.
+				if key == nil {
+					continue
+				}
+				if err := expression(key.Expression(), fmt.Sprintf("%s.orderBy[%d]", path, i)); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}

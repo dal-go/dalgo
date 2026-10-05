@@ -52,6 +52,10 @@ type joinExecution struct {
 	memo        map[string][]memoizedQuery
 	money       bool
 	moneyConfig *MoneyConfig
+	// sortFields names, for each source alias, the fields that need a sort value
+	// because an ordered aggregate of the query compares by them. It is built on
+	// first use and is empty for a query that holds no ordered aggregate.
+	sortFields map[string][]string
 }
 
 type recursiveBudget struct {
@@ -79,6 +83,10 @@ type joinKeyReference struct{ field, path string }
 
 // executePlannedRecords is shared by DB and transaction entrypoints.
 func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, provider NativeJoinProvider) (RecordsReader, error) {
+	// Where an ordered aggregate may stand is held before any route is chosen, so no provider is asked about a query that breaks it.
+	if err := validateQueryPlacement(query); err != nil {
+		return nil, err
+	}
 	if q, ok := query.(StructuredQuery); ok && HasSubquery(q) {
 		return executeGenericRecursive(ctx, executor, q, nil)
 	}
@@ -86,14 +94,33 @@ func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Qu
 		return executeAggregationRecords(ctx, executor, query, capabilities)
 	}
 	q := query.(StructuredQuery)
-	plan, err := PlanJoin(ctx, q, provider)
+	plan, err := PlanJoin(ctx, q, joinProviderFor(q, capabilities, provider))
 	if err != nil {
 		return nil, err
 	}
 	if plan.Strategy == JoinNative {
-		return executor.ExecuteQueryToRecordsReader(ctx, query)
+		if err := validateOrderedAggregatesForProvider(q); err != nil {
+			return nil, err
+		}
+		reader, err := executor.ExecuteQueryToRecordsReader(ctx, query)
+		if refusedAsNotSupported(q, err) {
+			return executeGenericJoin(ctx, executor, q)
+		}
+		return reader, err
 	}
 	return executeGenericJoin(ctx, executor, q)
+}
+
+// joinProviderFor is the provider PlanJoin may ask to run a join. PlanJoin takes
+// no capabilities, and an adapter that accepts a join writes an aggregate from
+// its name and arguments, so it would drop the order of an ordered aggregate
+// without an error. A query whose ordered aggregates the provider does not run
+// natively is therefore planned without the provider, which makes it generic.
+func joinProviderFor(q StructuredQuery, capabilities QueryCapabilities, provider NativeJoinProvider) NativeJoinProvider {
+	if providerRunsOrderedAggregates(q, capabilities) {
+		return provider
+	}
+	return nil
 }
 
 // executeGenericRecursive materializes a recursive DTQL query through ordinary
@@ -131,6 +158,10 @@ func (e *joinExecution) execute() (RecordsReader, error) {
 	if e.q.StartFrom() != "" || e.q.StartAfter() != "" {
 		return nil, joinError("join_plan", "from", "generic JOIN does not support provider cursors")
 	}
+	// A nested query, a derived source and a subquery run here too, so each is held to the rule before any source is read.
+	if err := validateQueryPlacement(e.q); err != nil {
+		return nil, err
+	}
 	e.collectKeyRefs(e.q.From(), "from")
 	if err := e.scanTree(e.q.From(), "from"); err != nil {
 		return nil, err
@@ -155,7 +186,7 @@ func (e *joinExecution) execute() (RecordsReader, error) {
 	if HasAggregation(e.q) {
 		records := make([]record.Record, len(filtered))
 		for i, row := range filtered {
-			data := flattenJoinRow(row, e.aliases, true)
+			data := flattenJoinRow(row, e.aliases, true, e.holdsSortValues())
 			if err := e.chargeOutput(data); err != nil {
 				return nil, err
 			}
@@ -223,7 +254,7 @@ func (e *joinExecution) execute() (RecordsReader, error) {
 	for i, row := range filtered {
 		var data map[string]any
 		if len(e.q.Columns()) == 0 {
-			data = flattenJoinRow(row, e.aliases, false)
+			data = flattenJoinRow(row, e.aliases, false, e.holdsSortValues())
 		} else {
 			data, err = e.projection(e.q.Columns(), row)
 			if err != nil {
@@ -330,6 +361,14 @@ func (e *joinExecution) validateQueryFields() error {
 		case AggregateFunc:
 			for i, arg := range v.FuncArgs() {
 				if err := expression(arg, fmt.Sprintf("%s.args[%d]", path, i)); err != nil {
+					return err
+				}
+			}
+			for i, key := range aggregateOrder(v) {
+				if key == nil {
+					continue
+				}
+				if err := expression(key.Expression(), fmt.Sprintf("%s.orderBy[%d]", path, i)); err != nil {
 					return err
 				}
 			}
@@ -525,10 +564,15 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		if e.money && hasUnsafeMoneyFloat(rec.Data()) {
 			return queryError("money_input", path, "fractional or unsafe binary floating-point input is not exact")
 		}
+		sortValues, err := e.sortValuesOf(rec, alias)
+		if err != nil {
+			return joinError("join_plan", path, err.Error())
+		}
 		data, err := normalizedJoinRecordMapForMode(rec, e.money)
 		if err != nil {
 			return joinError("join_plan", path, err.Error())
 		}
+		e.setSortValues(data, sortValues)
 		encoded, _ := json.Marshal(data) // normalizedJoinRecordMap produced JSON data.
 		e.bytes += 128 + len(encoded)
 		e.fetched++
@@ -553,6 +597,38 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		}
 	}
 	return nil
+}
+
+// sortValuesOf builds the sort values of the timestamps of a scanned row of source
+// alias, when an ordered aggregate of the query compares by them, and returns nil
+// otherwise. It is built from the provider's raw row, before the row is turned into
+// JSON values.
+func (e *joinExecution) sortValuesOf(rec record.Record, alias string) (map[string]any, error) {
+	if e.sortFields == nil {
+		e.sortFields = orderedAggregateSortFields(e.q)
+	}
+	return buildSortValues(rec.Data(), e.sortFields[alias])
+}
+
+// holdsSortValues reports whether the query of the execution holds an ordered
+// aggregate that compares by sort values. sortValuesOf builds the fields it reads
+// on first use, so the answer is final once a source row has been read.
+func (e *joinExecution) holdsSortValues() bool {
+	return len(e.sortFields) > 0
+}
+
+// setSortValues sets the sort values of a scanned row. A query that holds an
+// ordered aggregate reads them from the reserved key of the row, so a field the
+// provider's own row holds under that name is removed first, and what the engine
+// built is set. A query that holds none leaves the row alone.
+func (e *joinExecution) setSortValues(data map[string]any, sortValues map[string]any) {
+	if !e.holdsSortValues() {
+		return
+	}
+	delete(data, sortValuesKey)
+	if sortValues != nil {
+		data[sortValuesKey] = sortValues
+	}
 }
 
 func hasUnsafeMoneyFloat(value any) bool {
@@ -619,7 +695,14 @@ func (e *joinExecution) collectKeyRefs(node FromSource, path string) {
 	}
 }
 
-func rawJoinField(data any, path string) any {
+func rawJoinField(data any, path string) any { return rawField(data, path, false) }
+
+// rawField reads a field, or a dotted path of fields, of a provider's row before it
+// becomes JSON values. A field of a struct is found by its json tag or its name;
+// promoted says whether a field of an embedded struct is found as a field of the
+// struct that embeds it, as encoding/json writes it, and whether a struct that
+// writes itself is left unread (see writesItself).
+func rawField(data any, path string, promoted bool) any {
 	current := reflect.ValueOf(data)
 	for _, part := range strings.Split(path, ".") {
 		for current.IsValid() && (current.Kind() == reflect.Interface || current.Kind() == reflect.Pointer) {
@@ -638,25 +721,20 @@ func rawJoinField(data any, path string) any {
 			}
 			current = current.MapIndex(reflect.ValueOf(part))
 		case reflect.Struct:
-			found := false
-			for i := 0; i < current.NumField(); i++ {
-				field := current.Type().Field(i)
-				if field.PkgPath != "" {
-					continue
+			var field reflect.Value
+			var found bool
+			if promoted {
+				if writesItself(current) {
+					return nil
 				}
-				name := strings.Split(field.Tag.Get("json"), ",")[0]
-				if name == "" {
-					name = field.Name
-				}
-				if name == part {
-					current = current.Field(i)
-					found = true
-					break
-				}
+				field, found = promotedStructField(current, part)
+			} else {
+				field, found = ownStructField(current, part)
 			}
 			if !found {
 				return nil
 			}
+			current = field
 		default:
 			return nil
 		}
@@ -665,6 +743,25 @@ func rawJoinField(data any, path string) any {
 		return nil
 	}
 	return current.Interface()
+}
+
+// ownStructField finds an exported field of a struct by its json tag or its name,
+// among the fields the struct itself declares.
+func ownStructField(current reflect.Value, part string) (reflect.Value, bool) {
+	for i := 0; i < current.NumField(); i++ {
+		field := current.Type().Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+		name := strings.Split(field.Tag.Get("json"), ",")[0]
+		if name == "" {
+			name = field.Name
+		}
+		if name == part {
+			return current.Field(i), true
+		}
+	}
+	return reflect.Value{}, false
 }
 
 func normalizedJoinRecordMap(rec record.Record) (map[string]any, error) {
@@ -974,11 +1071,17 @@ func joinValueKey(value any, path string) (string, error) {
 	}
 }
 
-func flattenJoinRow(row joinRow, aliases []string, includeSources bool) map[string]any {
+// flattenJoinRow merges the rows of the sources of a joined row. The sort values
+// of an ordered aggregate are not a field of a source, so they are left out when
+// the query holds one (dropSortValues); a query that holds none returns every
+// field of a source, including one a provider's row writes under that name.
+func flattenJoinRow(row joinRow, aliases []string, includeSources, dropSortValues bool) map[string]any {
 	data := map[string]any{}
 	for _, alias := range aliases {
 		for name, value := range row.sources[alias] {
-			data[name] = value
+			if !dropSortValues || name != sortValuesKey {
+				data[name] = value
+			}
 		}
 	}
 	if includeSources {
@@ -1393,6 +1496,10 @@ func simpleRecursiveQuery(q StructuredQuery) bool {
 }
 
 func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, cap int, project bool) (records []record.Record, resultErr error) {
+	// A subquery of one source is read here and does not run through execute, so it is held to the placement rule here.
+	if err := validateQueryPlacement(q); err != nil {
+		return nil, err
+	}
 	if limit := q.Limit(); limit > 0 && limit < cap {
 		cap = limit
 	}
@@ -1724,6 +1831,11 @@ func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[strin
 		case AggregateFunc:
 			for _, arg := range value.FuncArgs() {
 				expression(arg, visible)
+			}
+			for _, key := range aggregateOrder(value) {
+				if key != nil {
+					expression(key.Expression(), visible)
+				}
 			}
 		}
 	}

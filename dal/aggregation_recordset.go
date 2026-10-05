@@ -12,34 +12,32 @@ import (
 // aggregation fallback as RecordsReader. Native aggregate queries still pass
 // straight through to the provider.
 func (db validatedDB) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
-	if q, ok := query.(StructuredQuery); ok && HasSubquery(q) {
-		return executeRecursiveRecordset(ctx, db.Backend, q, options...)
-	}
-	if hasJoin(query) {
-		provider, _ := db.Backend.(NativeJoinProvider)
-		return executeJoinRecordset(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend), provider, options...)
-	}
-	return executeAggregationRecordset(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend), options...)
+	provider, _ := db.Backend.(NativeJoinProvider)
+	return executePlannedRecordset(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend), provider, options...)
 }
 
 func (tx *validatedReadTx) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
-	if q, ok := query.(StructuredQuery); ok && HasSubquery(q) {
-		return executeRecursiveRecordset(ctx, tx.ReadTransaction, q, options...)
-	}
-	if hasJoin(query) {
-		return executeJoinRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider, options...)
-	}
-	return executeAggregationRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, options...)
+	return executePlannedRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider, options...)
 }
 
 func (tx *validatedTx) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
+	return executePlannedRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider, options...)
+}
+
+// executePlannedRecordset is shared by the DB and transaction entrypoints of the
+// recordset reader, as executePlannedRecords is for the records reader.
+func executePlannedRecordset(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, provider NativeJoinProvider, options ...recordset.Option) (RecordsetReader, error) {
+	// Where an ordered aggregate may stand is held before any route is chosen, so no provider is asked about a query that breaks it.
+	if err := validateQueryPlacement(query); err != nil {
+		return nil, err
+	}
 	if q, ok := query.(StructuredQuery); ok && HasSubquery(q) {
-		return executeRecursiveRecordset(ctx, tx.ReadTransaction, q, options...)
+		return executeRecursiveRecordset(ctx, executor, q, options...)
 	}
 	if hasJoin(query) {
-		return executeJoinRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider, options...)
+		return executeJoinRecordset(ctx, executor, query, capabilities, provider, options...)
 	}
-	return executeAggregationRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, options...)
+	return executeAggregationRecordset(ctx, executor, query, capabilities, options...)
 }
 
 func executeRecursiveRecordset(ctx context.Context, executor QueryExecutor, query StructuredQuery, options ...recordset.Option) (RecordsetReader, error) {
@@ -118,12 +116,18 @@ func ExecuteRecursiveRecordset(ctx context.Context, executor QueryExecutor, quer
 
 func executeJoinRecordset(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, provider NativeJoinProvider, options ...recordset.Option) (RecordsetReader, error) {
 	q := query.(StructuredQuery)
-	plan, err := PlanJoin(ctx, q, provider)
+	plan, err := PlanJoin(ctx, q, joinProviderFor(q, capabilities, provider))
 	if err != nil {
 		return nil, err
 	}
 	if plan.Strategy == JoinNative {
-		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+		if err := validateOrderedAggregatesForProvider(q); err != nil {
+			return nil, err
+		}
+		native, err := executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+		if !refusedAsNotSupported(q, err) {
+			return native, err
+		}
 	}
 	reader, err := executeGenericJoin(ctx, executor, q)
 	if err != nil {
@@ -207,10 +211,16 @@ func executeAggregationRecordset(ctx context.Context, executor QueryExecutor, qu
 	if err != nil {
 		return nil, fmt.Errorf("dalgo aggregation: %w", err)
 	}
+	var reader RecordsReader
 	if plan.Strategy == AggregationNative {
-		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+		native, nativeErr := executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+		if !refusedAsNotSupported(q, nativeErr) {
+			return native, nativeErr
+		}
+		reader, err = executeAggregationAfterRefusal(ctx, executor, q, nativeErr)
+	} else {
+		reader, err = executeAggregationLocal(ctx, executor, q, plan)
 	}
-	reader, err := executeAggregationRecords(ctx, executor, query, capabilities)
 	if err != nil {
 		return nil, err
 	}
