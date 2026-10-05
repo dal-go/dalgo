@@ -2,6 +2,7 @@ package end2end
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"testing"
 
@@ -12,6 +13,59 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPermittedCopyRefusal(t *testing.T) {
+	tests := []struct {
+		name         string
+		caller       string
+		err          error
+		adapterCalls int64
+		ok           bool
+	}{
+		{"field list server authorization refusal", "row_rule_and_field_list", fmt.Errorf("%w: authorization_unsupported", dal.ErrNotSupported), 1, true},
+		{"multiple policies server authorization refusal", "two_policies_on_one_source", fmt.Errorf("%w: authorization_unsupported", dal.ErrNotSupported), 1, true},
+		{"OR adapter refusal", "two_alternatives", fmt.Errorf("%w: query OR group conditions", dal.ErrNotSupported), 1, true},
+		{"unlisted caller", "rule_over_a_list_of_many", fmt.Errorf("%w: authorization_unsupported", dal.ErrNotSupported), 0, false},
+		{"unexpected authorization error", "row_rule_and_field_list", fmt.Errorf("%w: authorization denied", dal.ErrNotSupported), 1, false},
+		{"wrong OR refusal", "two_alternatives", fmt.Errorf("%w: authorization_unsupported", dal.ErrNotSupported), 1, false},
+		{"ordinary error", "two_alternatives", fmt.Errorf("query OR group conditions"), 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls, ok := permittedCopyRefusal(tt.caller, tt.err)
+			if calls != tt.adapterCalls || ok != tt.ok {
+				t.Fatalf("permittedCopyRefusal() = (%d, %t), want (%d, %t)", calls, ok, tt.adapterCalls, tt.ok)
+			}
+		})
+	}
+}
+
+// This adapter runs the unprotected capability probe, then refuses the OR
+// predicate introduced by the secured caller. Exercise the full conformance
+// path rather than treating the unprotected probe as proof of policy support.
+type permittedCopyRefusingDB struct {
+	dal.DB
+	queries int
+}
+
+func (d *permittedCopyRefusingDB) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
+	d.queries++
+	return nil, fmt.Errorf("%w: query OR group conditions", dal.ErrNotSupported)
+}
+
+func TestPermittedCopySecuredRefusalAfterSupportedProbe(t *testing.T) {
+	db := &permittedCopyRefusingDB{DB: dalgo2memory.New(dalgo2memory.FirestoreProfile())}
+	var caller copyCaller
+	for _, candidate := range permittedCopyCallers() {
+		if candidate.name == "two_alternatives" {
+			caller = candidate
+			break
+		}
+	}
+	require.Equal(t, "two_alternatives", caller.name)
+	permittedCopyCells()[0].verify(context.Background(), t, db, caller, permittedCopyRecords, permittedEntries()[0])
+	assert.Equal(t, 1, db.queries, "the unprotected probe uses the supported transaction; the secured handle calls the refusing adapter once")
+}
 
 func TestAnswerValue(t *testing.T) {
 	assert.Equal(t, "<nothing>", answerValue(nil))
