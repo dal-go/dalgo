@@ -804,9 +804,31 @@ func (cell permittedCopyCell) verify(ctx context.Context, t *testing.T, db dal.D
 
 	reads := &atomic.Int64{}
 	got, err := cell.read(ctx, caller.secure(db, reads), reader, entry, permittedCopyReadTx)
+	if adapterCalls, unsupported := permittedCopyRefusal(caller.name, err); unsupported {
+		assert.Empty(t, got, "an unsupported secured read must not return rows")
+		assert.EqualValues(t, adapterCalls, reads.Load(), "unsupported secured read adapter-call count")
+		return
+	}
 	require.NoError(t, err)
 	assert.Empty(t, answerMismatch(got, cell.answer(caller.permittedCopy()), cell.ordered), "the secured read against the permitted copy")
 	assert.EqualValues(t, 1, reads.Load(), "the adapter is asked once")
+}
+
+// permittedCopyRefusal recognizes the server's authorization refusals and the
+// adapter's fail-closed refusal of an OR policy. Keep this list explicit: an
+// arbitrary authorization error must remain a conformance failure.
+func permittedCopyRefusal(caller string, err error) (adapterCalls int64, ok bool) {
+	if !errors.Is(err, dal.ErrNotSupported) {
+		return 0, false
+	}
+	switch caller {
+	case "row_rule_and_field_list", "two_policies_on_one_source":
+		return 1, strings.Contains(err.Error(), "authorization_unsupported")
+	case "two_alternatives":
+		return 1, strings.Contains(err.Error(), "query OR group conditions")
+	default:
+		return 0, false
+	}
 }
 
 // read runs the cell's query through one entry of db.
