@@ -230,7 +230,10 @@ func orderedDecimalValue(value any, moneyText bool) (orderedDecimal, bool) {
 	case json.Number:
 		number = v.String()
 	case string:
-		if !moneyText || !moneyDecimalText.MatchString(v) {
+		if !moneyText {
+			return orderedDecimal{}, false
+		}
+		if _, err := moneyNumber(v); err != nil {
 			return orderedDecimal{}, false
 		}
 		number = strings.TrimPrefix(v, "+")

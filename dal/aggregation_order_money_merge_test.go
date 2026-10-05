@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,6 +171,7 @@ func TestOrderedAggregateMoneyComparesKeysTiesAndAnswersExactly(t *testing.T) {
 		{"other text after numeric", "word", "2", 1},
 		{"other text remains lexical", "word", "zebra", -1},
 		{"exponent text remains lexical", "2e1", "10", 1},
+		{"over-bound text remains lexical", strings.Repeat("9", 39), "1" + strings.Repeat("0", 39), 1},
 		{"null remains first", nil, "2", -1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
