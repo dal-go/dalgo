@@ -123,6 +123,9 @@ func executeJoinRecordset(ctx context.Context, executor QueryExecutor, query Que
 		return nil, err
 	}
 	if plan.Strategy == JoinNative {
+		if err := validateOrderedAggregatesForProvider(q); err != nil {
+			return nil, err
+		}
 		native, err := executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
 		if !refusedAsNotSupported(q, err) {
 			return native, err
@@ -203,7 +206,13 @@ func executeJoinRecordset(ctx context.Context, executor QueryExecutor, query Que
 
 func executeAggregationRecordset(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities, options ...recordset.Option) (RecordsetReader, error) {
 	q, ok := query.(StructuredQuery)
-	if !ok || !HasAggregation(q) {
+	if !ok {
+		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
+	}
+	if !HasAggregation(q) {
+		if err := validateOrderedAggregatePlacement(q); err != nil {
+			return nil, fmt.Errorf("dalgo aggregation: %w", err)
+		}
 		return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
 	}
 	plan, err := PlanAggregation(q, capabilities)

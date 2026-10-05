@@ -41,7 +41,13 @@ func (db validatedDB) ExecuteQueryToRecordsReader(ctx context.Context, query Que
 
 func executeAggregationRecords(ctx context.Context, executor QueryExecutor, query Query, capabilities QueryCapabilities) (RecordsReader, error) {
 	q, ok := query.(StructuredQuery)
-	if !ok || !HasAggregation(q) {
+	if !ok {
+		return executor.ExecuteQueryToRecordsReader(ctx, query)
+	}
+	if !HasAggregation(q) {
+		if err := validateOrderedAggregatePlacement(q); err != nil {
+			return nil, fmt.Errorf("dalgo aggregation: %w", err)
+		}
 		return executor.ExecuteQueryToRecordsReader(ctx, query)
 	}
 	plan, err := PlanAggregation(q, capabilities)

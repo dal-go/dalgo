@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -121,6 +122,9 @@ func HasAggregation(q StructuredQuery) bool {
 func ValidateAggregation(q StructuredQuery) error {
 	if q == nil || !HasAggregation(q) {
 		return nil
+	}
+	if err := validateOrderedAggregatePlacement(q); err != nil {
+		return err
 	}
 	groupKeys := map[string]bool{}
 	for i, expression := range q.GroupBy() {
@@ -533,46 +537,78 @@ func nativeAggregationSupported(q StructuredQuery, c QueryCapabilities) bool {
 }
 
 func walkAggregates(q StructuredQuery, visit func(AggregateFunc)) {
-	var walkExpr func(Expression)
-	walkExpr = func(expression Expression) {
-		switch e := expression.(type) {
-		case AggregateFunc:
-			visit(e)
-			for _, arg := range e.FuncArgs() {
-				walkExpr(arg)
-			}
-			for _, key := range aggregateOrder(e) {
-				if key != nil {
-					walkExpr(key.Expression())
-				}
-			}
-		case BinaryExpression:
-			walkExpr(e.Left)
-			walkExpr(e.Right)
-		}
-	}
-	var walkCondition func(Condition)
-	walkCondition = func(condition Condition) {
-		switch c := condition.(type) {
-		case IsNullCondition:
-			walkExpr(c.Operand())
-		case Comparison:
-			walkExpr(c.Left)
-			walkExpr(c.Right)
-		case GroupCondition:
-			for _, child := range c.Conditions() {
-				walkCondition(child)
-			}
-		}
-	}
 	for _, c := range q.Columns() {
-		walkExpr(c.Expression)
+		walkExpressionAggregates(c.Expression, visit)
 	}
 	for _, e := range q.GroupBy() {
-		walkExpr(e)
+		walkExpressionAggregates(e, visit)
 	}
 	for _, o := range q.OrderBy() {
-		walkExpr(o.Expression())
+		walkExpressionAggregates(o.Expression(), visit)
 	}
-	walkCondition(q.Having())
+	walkConditionAggregates(q.Having(), visit)
+}
+
+// walkExpressionAggregates visits every aggregate in an expression, outermost first.
+func walkExpressionAggregates(expression Expression, visit func(AggregateFunc)) {
+	switch e := expression.(type) {
+	case AggregateFunc:
+		visit(e)
+		for _, arg := range e.FuncArgs() {
+			walkExpressionAggregates(arg, visit)
+		}
+		for _, key := range aggregateOrder(e) {
+			if key != nil {
+				walkExpressionAggregates(key.Expression(), visit)
+			}
+		}
+	case BinaryExpression:
+		walkExpressionAggregates(e.Left, visit)
+		walkExpressionAggregates(e.Right, visit)
+	}
+}
+
+// walkConditionAggregates visits every aggregate in the operands of a condition.
+func walkConditionAggregates(condition Condition, visit func(AggregateFunc)) {
+	switch c := condition.(type) {
+	case IsNullCondition:
+		walkExpressionAggregates(c.Operand(), visit)
+	case Comparison:
+		walkExpressionAggregates(c.Left, visit)
+		walkExpressionAggregates(c.Right, visit)
+	case GroupCondition:
+		for _, child := range c.Conditions() {
+			walkConditionAggregates(child, visit)
+		}
+	}
+}
+
+// validateOrderedAggregatePlacement refuses an aggregate with an order of its own
+// in WHERE. An ordered aggregate stands in the select list, in HAVING and in ORDER
+// BY, as an aggregate does; WHERE reads rows before they are grouped. A query
+// whose WHERE holds an aggregate with no order is not read here.
+func validateOrderedAggregatePlacement(q StructuredQuery) error {
+	found := false
+	walkConditionAggregates(q.Where(), func(a AggregateFunc) {
+		if len(aggregateOrder(a)) > 0 {
+			found = true
+		}
+	})
+	if found {
+		return errors.New("an aggregate with an order cannot stand in where")
+	}
+	return nil
+}
+
+// validateOrderedAggregatesForProvider holds a query that is about to be handed
+// to a provider unplanned to the rules of the ordered aggregate: where it stands,
+// and, when it holds one, every rule ValidateAggregation applies.
+func validateOrderedAggregatesForProvider(q StructuredQuery) error {
+	if err := validateOrderedAggregatePlacement(q); err != nil {
+		return err
+	}
+	if holdsOrderedAggregate(q) {
+		return ValidateAggregation(q)
+	}
+	return nil
 }

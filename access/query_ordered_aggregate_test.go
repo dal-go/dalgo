@@ -1,6 +1,7 @@
 package access
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -154,6 +155,89 @@ func TestOrderKeysOfAnAggregateAreWalkedForTheirSources(t *testing.T) {
 			walk.query(tc.query, 0)
 			if got, want := dal.HasSubquery(tc.query), walk.queries > 1; got != want {
 				t.Fatalf("HasSubquery = %v, but the walk entered %d queries", got, walk.queries)
+			}
+		})
+	}
+}
+
+// Through a secured session, on every read path, a query whose aggregate sorts by a
+// field the list leaves out is denied before anything is read, wherever the
+// aggregate stands, and the same query over an allowed key is read once.
+func TestAnOrderKeyOutsideTheFieldListIsDeniedOnEverySecuredReadPathBeforeAnythingIsRead(t *testing.T) {
+	ctx := context.Background()
+	name := dal.Field("name")
+	selectName := dal.Column{Expression: name}
+	grouped := func() dal.IQueryBuilder { return customerQuery().GroupBy(name) }
+	shapes := []struct {
+		name  string
+		slot  DecisionSlot
+		build func(key dal.Expression) dal.StructuredQuery
+	}{
+		{"the select list", DecisionSlotFields, func(key dal.Expression) dal.StructuredQuery {
+			return customerQuery().SelectColumns(dal.Column{Expression: lastBy(name, key)})
+		}},
+		{"the select list, under an alias", DecisionSlotFields, func(key dal.Expression) dal.StructuredQuery {
+			return customerQuery().SelectColumns(dal.Column{Alias: "v", Expression: lastBy(name, key)})
+		}},
+		{"HAVING", DecisionSlotWhere, func(key dal.Expression) dal.StructuredQuery {
+			return grouped().Having(dal.NewComparison(lastBy(name, key), dal.GreaterThen, dal.Constant{Value: 1})).SelectColumns(selectName)
+		}},
+		{"ORDER BY", DecisionSlotFields, func(key dal.Expression) dal.StructuredQuery {
+			return grouped().OrderBy(dal.Ascending(lastBy(name, key))).SelectColumns(selectName)
+		}},
+	}
+	for path, run := range sourcePaths {
+		t.Run(path, func(t *testing.T) {
+			for _, shape := range shapes {
+				t.Run(shape.name, func(t *testing.T) {
+					wrapped := &countingSession{}
+					err := run(ctx, wrapped, customerFields(), shape.build(dal.Field("secret")))
+					var denied *DeniedError
+					if !errors.As(err, &denied) {
+						t.Fatalf("error = %v, want an access denial", err)
+					}
+					if denied.Decision.Code != CodeColumnDenied || denied.Decision.Slot != shape.slot || !reflect.DeepEqual(denied.Decision.Columns, [][]string{{"secret"}}) {
+						t.Fatalf("decision = code %s slot %s columns %v", denied.Decision.Code, denied.Decision.Slot, denied.Decision.Columns)
+					}
+					if wrapped.reads != 0 {
+						t.Fatalf("%d reads reached the wrapped session, want 0", wrapped.reads)
+					}
+
+					wrapped = &countingSession{}
+					if err := run(ctx, wrapped, customerFields(), shape.build(dal.Field("id"))); err != nil || wrapped.reads != 1 {
+						t.Fatalf("an allowed key: error = %v, reads = %d, want none and 1", err, wrapped.reads)
+					}
+				})
+			}
+		})
+	}
+}
+
+// An aggregate whose order has a key that is missing, or has no expression, is a
+// query the field check cannot follow; it is denied as unsupported when the column
+// is not under an alias too, where the column is named by the text of its
+// expression, and nothing is read.
+func TestAnOrderKeyThatIsNotThereIsDeniedOnEverySecuredReadPathWhateverTheColumnIsCalled(t *testing.T) {
+	ctx := context.Background()
+	name := dal.Field("name")
+	orders := map[string][]dal.OrderExpression{
+		"a missing key":            {nil},
+		"a key with no expression": {dal.Ascending(nil)},
+	}
+	for path, run := range sourcePaths {
+		t.Run(path, func(t *testing.T) {
+			for label, order := range orders {
+				for _, alias := range []string{"", "v"} {
+					t.Run(label+"/alias="+alias, func(t *testing.T) {
+						query := customerQuery().SelectColumns(dal.Column{Alias: alias, Expression: dal.NewOrderedAggregate(dal.LAST, order, name)})
+						wrapped := &countingSession{}
+						err := run(ctx, wrapped, customerFields(), query)
+						var denied *DeniedError
+						if !errors.As(err, &denied) || denied.Decision.Code != CodeEnforcementUnsupported || wrapped.reads != 0 {
+							t.Fatalf("error = %v, reads = %d, want an unsupported-expression denial and 0 reads", err, wrapped.reads)
+						}
+					})
+				}
 			}
 		})
 	}

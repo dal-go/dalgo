@@ -154,8 +154,14 @@ func TestOrderedAggregateRulesOfTheOrder(t *testing.T) {
 		check(t, first, last, "no", "yes")
 	})
 	t.Run("numbers compare as float64, so two whole numbers past 2^53 tie and X decides", func(t *testing.T) {
-		first, last := run(t, false, pair{int64(9007199254740993), "b"}, pair{int64(9007199254740992), "a"})
+		// Compared exactly, 2^53 (X b) would come before 2^53+1 (X a): first b, last a.
+		first, last := run(t, false, pair{int64(9007199254740993), "a"}, pair{int64(9007199254740992), "b"})
 		check(t, first, last, "a", "b")
+	})
+	t.Run("numbers compare as numbers and not as text", func(t *testing.T) {
+		// As text, "10" would come before "9".
+		first, last := run(t, false, pair{10, "ten"}, pair{9, "nine"})
+		check(t, first, last, "nine", "ten")
 	})
 	t.Run("a number key of mixed kinds", func(t *testing.T) {
 		first, last := run(t, false, pair{int8(3), "c"}, pair{2.5, "b"}, pair{uint16(1), "a"})

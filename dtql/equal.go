@@ -129,6 +129,13 @@ func orderEqual(a, b []dal.OrderExpression) bool {
 		return false
 	}
 	for i := range a {
+		if a[i] == nil || b[i] == nil {
+			// A key that is missing is equal to another that is missing.
+			if a[i] != nil || b[i] != nil {
+				return false
+			}
+			continue
+		}
 		if a[i].Descending() != b[i].Descending() || !exprEqual(a[i].Expression(), b[i].Expression()) {
 			return false
 		}

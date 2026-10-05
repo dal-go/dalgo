@@ -222,6 +222,37 @@ func TestOrderedAggregateWalkersToleratANilKey(t *testing.T) {
 	}
 }
 
+// An aggregate is named by its text before validation refuses it, for an output
+// column that has no alias, so the text of one whose order holds a key that is
+// missing, or has no expression, is written and the query is refused as invalid.
+func TestOrderedAggregateWithAMissingKeyHasATextAndIsRefusedWhenItIsRead(t *testing.T) {
+	total := NewFieldRef("i", "Total")
+	for name, tc := range map[string]struct {
+		order []OrderExpression
+		want  string
+	}{
+		"a missing key":                        {[]OrderExpression{nil}, "LAST(i.Total ORDER BY <missing key>)"},
+		"a key with no expression":             {[]OrderExpression{Ascending(nil)}, "LAST(i.Total ORDER BY <missing key>)"},
+		"a key with no expression, descending": {[]OrderExpression{Descending(nil)}, "LAST(i.Total ORDER BY <missing key>)"},
+		"a good key after a missing one":       {[]OrderExpression{nil, DescendingField("InvoiceDate")}, "LAST(i.Total ORDER BY <missing key>, InvoiceDate DESC)"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			aggregate := NewOrderedAggregate(LAST, tc.order, total)
+			if got := aggregate.String(); got != tc.want {
+				t.Fatalf("String() = %q, want %q", got, tc.want)
+			}
+			from := From(NewRootCollectionRef("Invoice", "i")).Join(NewJoinedSource(NewRootCollectionRef("Customer", "c"), JoinInner, joinOn("i", "CustomerId", "c", "Id")))
+			q := from.NewQuery().GroupBy(NewFieldRef("c", "Id")).SelectColumns(
+				Column{Alias: "CustomerId", Expression: NewFieldRef("c", "Id")},
+				Column{Expression: aggregate})
+			_, err := NewDB(joinedStub(QueryCapabilities{}, nil)).ExecuteQueryToRecordsReader(context.Background(), q)
+			if err == nil || !strings.Contains(err.Error(), "an aggregate order key must be a field") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
 func TestOrderedAggregateSortValueHelpers(t *testing.T) {
 	early := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -334,20 +365,22 @@ func TestOrderedAggregateSortValueHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("tuples are compared by the keys in their directions, then by the argument", func(t *testing.T) {
+	t.Run("tuples are compared by the keys in their directions, then by the argument, then by the answer", func(t *testing.T) {
 		order := orderedBy(AscendingField("a"), DescendingField("b"))
 		for name, tc := range map[string]struct {
-			a, b       []any
-			aTie, bTie any
-			want       int
+			a, b             []any
+			aTie, bTie       any
+			aAnswer, bAnswer any
+			want             int
 		}{
-			"first key decides":      {[]any{1.0, 1.0}, []any{2.0, 0.0}, "x", "y", -1},
-			"second key is reversed": {[]any{1.0, 1.0}, []any{1.0, 2.0}, "x", "y", 1},
-			"the argument decides":   {[]any{1.0, 1.0}, []any{1.0, 1.0}, "x", "y", -1},
-			"NULL argument is first": {[]any{1.0, 1.0}, []any{1.0, 1.0}, nil, "y", -1},
-			"equal":                  {[]any{1.0, 1.0}, []any{1.0, 1.0}, "x", "x", 0},
+			"first key decides":      {[]any{1.0, 1.0}, []any{2.0, 0.0}, "x", "y", "p", "q", -1},
+			"second key is reversed": {[]any{1.0, 1.0}, []any{1.0, 2.0}, "x", "y", "p", "q", 1},
+			"the argument decides":   {[]any{1.0, 1.0}, []any{1.0, 1.0}, "x", "y", "q", "p", -1},
+			"NULL argument is first": {[]any{1.0, 1.0}, []any{1.0, 1.0}, nil, "y", "q", "p", -1},
+			"the answer decides":     {[]any{1.0, 1.0}, []any{1.0, 1.0}, "x", "x", "b", "a", 1},
+			"equal":                  {[]any{1.0, 1.0}, []any{1.0, 1.0}, "x", "x", "a", "a", 0},
 		} {
-			if got := compareOrderedTuples(order, tc.a, tc.aTie, tc.b, tc.bTie); got != tc.want {
+			if got := compareOrderedTuples(order, tc.a, tc.aTie, tc.aAnswer, tc.b, tc.bTie, tc.bAnswer); got != tc.want {
 				t.Fatalf("%s: got %d, want %d", name, got, tc.want)
 			}
 		}
@@ -425,4 +458,82 @@ func TestOrderedAggregateNormalizedRowErrors(t *testing.T) {
 	if _, err = r.normalizedRow(joinTestRecord("T", "1", map[string]any{"at": make(chan int)})); err == nil {
 		t.Fatal("a row that is not JSON was accepted")
 	}
+}
+
+// An ordered aggregate stands where an aggregate stands: the select list, HAVING
+// and ORDER BY. In WHERE it is refused, and a key that is not a field is refused on
+// a join a provider would run natively, before any provider is asked to read. A
+// join condition holds field comparisons only, so it cannot hold one at all.
+func TestOrderedAggregateIsRefusedOutsideTheSelectListHavingAndOrderByBeforeAnythingIsRead(t *testing.T) {
+	ctx := context.Background()
+	const placement = "an aggregate with an order cannot stand in where"
+	byDate := orderedBy(Ascending(NewFieldRef("i", "InvoiceDate")))
+	ordered := NewOrderedAggregate(LAST, byDate, NewFieldRef("i", "Total"))
+	inWhere := NewComparison(ordered, GreaterThen, NewConstant(1))
+	invoice, customer := NewRootCollectionRef("Invoice", "i"), NewRootCollectionRef("Customer", "c")
+	onCustomer := joinOn("i", "CustomerId", "c", "Id")
+	plainColumns := []Column{{Alias: "n", Expression: Count().Expression}}
+
+	oneSource := From(invoice).NewQuery().Where(inWhere).SelectColumns(Column{Expression: NewFieldRef("i", "Total")})
+	oneSourceGrouped := From(invoice).NewQuery().Where(inWhere).GroupBy(NewFieldRef("i", "CustomerId")).SelectColumns(
+		Column{Expression: NewFieldRef("i", "CustomerId")}, Column{Alias: "v", Expression: ordered})
+	joinedWhere := From(invoice).Join(NewJoinedSource(customer, JoinInner, onCustomer)).NewQuery().Where(inWhere).SelectColumns(plainColumns...)
+	joinedOn := From(invoice).Join(NewJoinedSource(customer, JoinInner, onCustomer, inWhere)).NewQuery().SelectColumns(plainColumns...)
+	badKey := NewOrderedAggregate(LAST, orderedBy(Ascending(NewConstant(1))), NewFieldRef("i", "Total"))
+	joinedBadKey := From(invoice).Join(NewJoinedSource(customer, JoinInner, onCustomer)).NewQuery().GroupBy(NewFieldRef("c", "Id")).SelectColumns(
+		Column{Alias: "CustomerId", Expression: NewFieldRef("c", "Id")}, Column{Alias: "v", Expression: badKey})
+
+	t.Run("ValidateAggregation", func(t *testing.T) {
+		for name, q := range map[string]StructuredQuery{"a grouped query": oneSourceGrouped} {
+			if err := ValidateAggregation(q); err == nil || !strings.Contains(err.Error(), placement) {
+				t.Fatalf("%s: error = %v", name, err)
+			}
+		}
+		// An aggregate with no order stands in WHERE as it did: nothing is added for it.
+		plain := From(invoice).NewQuery().Where(NewComparison(NewAggregate(LAST, false, NewFieldRef("i", "Total")), GreaterThen, NewConstant(1))).SelectColumns(Column{Expression: NewFieldRef("i", "Total")})
+		if err := ValidateAggregation(plain); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	for name, tc := range map[string]struct {
+		q    StructuredQuery
+		want string
+	}{
+		"one source":               {oneSource, placement},
+		"one source, grouped":      {oneSourceGrouped, placement},
+		"a join, in where":         {joinedWhere, placement},
+		"a join, in its condition": {joinedOn, "only == is supported"},
+	} {
+		for label, caps := range map[string]QueryCapabilities{"no capabilities": {}, "capabilities": orderedCapabilities} {
+			t.Run(name+"/"+label, func(t *testing.T) {
+				stub := &orderedJoinStub{orderedStub: &orderedStub{caps: caps, rows: map[string][]record.Record{"Invoice": instantRecords(timestampDatasets[0].rows, false), "Customer": customerRecords()}}}
+				db := NewDB(stub)
+				if _, err := db.ExecuteQueryToRecordsReader(ctx, tc.q); err == nil || !strings.Contains(err.Error(), tc.want) {
+					t.Fatalf("records reader: error = %v", err)
+				}
+				if _, err := db.ExecuteQueryToRecordsetReader(ctx, tc.q); err == nil || !strings.Contains(err.Error(), tc.want) {
+					t.Fatalf("recordset reader: error = %v", err)
+				}
+				if stub.native+stub.plain+stub.nativeSets != 0 {
+					t.Fatalf("native = %d, plain = %d, nativeSets = %d reads reached the provider, want 0", stub.native, stub.plain, stub.nativeSets)
+				}
+			})
+		}
+	}
+
+	// A provider that accepts the join and runs the order is still not handed a key that is not a field.
+	t.Run("a join the provider would run natively, with a key that is not a field", func(t *testing.T) {
+		stub := &orderedJoinStub{orderedStub: &orderedStub{caps: orderedCapabilities, rows: map[string][]record.Record{"Invoice": instantRecords(timestampDatasets[0].rows, false), "Customer": customerRecords()}}}
+		db := NewDB(stub)
+		if _, err := db.ExecuteQueryToRecordsReader(ctx, joinedBadKey); err == nil || !strings.Contains(err.Error(), "an aggregate order key must be a field") {
+			t.Fatalf("records reader: error = %v", err)
+		}
+		if _, err := db.ExecuteQueryToRecordsetReader(ctx, joinedBadKey); err == nil || !strings.Contains(err.Error(), "an aggregate order key must be a field") {
+			t.Fatalf("recordset reader: error = %v", err)
+		}
+		if stub.accepted == 0 || stub.native+stub.nativeSets != 0 {
+			t.Fatalf("accepted = %d, native = %d, nativeSets = %d: the provider was asked to accept the join and must not be asked to read it", stub.accepted, stub.native, stub.nativeSets)
+		}
+	})
 }

@@ -74,6 +74,13 @@ func TestEqualComparesTheOrdersOfAggregates(t *testing.T) {
 		"no order on either":                             {dal.NewAggregate(dal.LAST, false, total), dal.NewOrderedAggregate(dal.LAST, nil, total), true},
 		"an order and an aggregate that cannot hold one": {dal.NewOrderedAggregate(dal.LAST, byCreated, total), plainAggregate{dal.NewAggregate(dal.LAST, false, total)}, false},
 		"an aggregate that cannot hold one and none":     {plainAggregate{dal.NewAggregate(dal.LAST, false, total)}, dal.NewAggregate(dal.LAST, false, total), true},
+		// A key that is missing is for validation to refuse; comparing two queries must not stop on it.
+		"a missing key on both sides":                {dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{nil}, total), dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{nil}, total), true},
+		"a missing key and a key":                    {dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{nil}, total), dal.NewOrderedAggregate(dal.LAST, byCreated, total), false},
+		"a key and a missing key":                    {dal.NewOrderedAggregate(dal.LAST, byCreated, total), dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{nil}, total), false},
+		"a key with no expression on both sides":     {dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{dal.Ascending(nil)}, total), dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{dal.Ascending(nil)}, total), true},
+		"a key with no expression and a key":         {dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{dal.Ascending(nil)}, total), dal.NewOrderedAggregate(dal.LAST, byCreated, total), false},
+		"a missing key and a key with no expression": {dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{nil}, total), dal.NewOrderedAggregate(dal.LAST, []dal.OrderExpression{dal.Ascending(nil)}, total), false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got := Equal(q(tc.a), q(tc.b)); got != tc.want {

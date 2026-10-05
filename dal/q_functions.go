@@ -48,6 +48,11 @@ type DistinctAggregateFunc interface {
 // rows of its group in a stated order. An empty order means the aggregate has
 // none. AggregateFunc intentionally remains unchanged so existing third-party
 // expression implementations remain source compatible.
+//
+// The String of an implementation must write the order into its text, as the
+// aggregate NewOrderedAggregate builds does: DALgo's in-memory engine keeps the
+// state of an aggregate under its String, so two aggregates whose texts are equal
+// share one state and one answer.
 type OrderedAggregateFunc interface {
 	AggregateFunc
 	AggregateOrder() []OrderExpression
@@ -91,11 +96,24 @@ func (v function) String() string {
 	if len(v.order) > 0 {
 		keys := make([]string, len(v.order))
 		for i, key := range v.order {
-			keys[i] = key.String()
+			keys[i] = orderKeyText(key)
 		}
 		suffix = " ORDER BY " + strings.Join(keys, ", ")
 	}
 	return fmt.Sprintf("%v(%v%v%v)", v.Name, prefix, strings.Join(args, ", "), suffix)
+}
+
+// missingOrderKeyText stands in the text of an aggregate for an order key that is
+// missing or has no expression. Such a key is refused by ValidateAggregation, and
+// an aggregate is named by its text before that.
+const missingOrderKeyText = "<missing key>"
+
+// orderKeyText is the text of one key of an aggregate's order.
+func orderKeyText(key OrderExpression) string {
+	if key == nil || key.Expression() == nil {
+		return missingOrderKeyText
+	}
+	return key.String()
 }
 
 // star is the `*` argument of COUNT(*); it is not a field reference, which is

@@ -193,9 +193,6 @@ func (s *federatedJoinStream) Next() (record.Record, error) {
 		if err != nil {
 			return nil, err
 		}
-		if sortValues != nil {
-			data[sortValuesKey] = sortValues
-		}
 		if !s.validated {
 			alias := joinAlias(s.root.Base())
 			if s.execution.fields == nil {
@@ -211,6 +208,11 @@ func (s *federatedJoinStream) Next() (record.Record, error) {
 				return nil, err
 			}
 			s.validated = true
+		}
+		// The sort values are not a field of the source, so they are attached after
+		// the field names of a source with no schema metadata are read from the row.
+		if sortValues != nil {
+			data[sortValuesKey] = sortValues
 		}
 		s.execution.candidates = 0 // the work bound applies to one streamed fact row
 		rows, err := s.execution.build(s.root, "from", nil, []scannedJoinRow{{key: rec.Key(), data: data}})

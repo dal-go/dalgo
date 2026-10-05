@@ -94,6 +94,9 @@ func executePlannedRecords(ctx context.Context, executor QueryExecutor, query Qu
 		return nil, err
 	}
 	if plan.Strategy == JoinNative {
+		if err := validateOrderedAggregatesForProvider(q); err != nil {
+			return nil, err
+		}
 		reader, err := executor.ExecuteQueryToRecordsReader(ctx, query)
 		if refusedAsNotSupported(q, err) {
 			return executeGenericJoin(ctx, executor, q)
@@ -620,7 +623,13 @@ func (e *joinExecution) collectKeyRefs(node FromSource, path string) {
 	}
 }
 
-func rawJoinField(data any, path string) any {
+func rawJoinField(data any, path string) any { return rawField(data, path, false) }
+
+// rawField reads a field, or a dotted path of fields, of a provider's row before it
+// becomes JSON values. A field of a struct is found by its json tag or its name;
+// promoted says whether a field of an embedded struct is found as a field of the
+// struct that embeds it, as encoding/json writes it.
+func rawField(data any, path string, promoted bool) any {
 	current := reflect.ValueOf(data)
 	for _, part := range strings.Split(path, ".") {
 		for current.IsValid() && (current.Kind() == reflect.Interface || current.Kind() == reflect.Pointer) {
@@ -639,25 +648,17 @@ func rawJoinField(data any, path string) any {
 			}
 			current = current.MapIndex(reflect.ValueOf(part))
 		case reflect.Struct:
-			found := false
-			for i := 0; i < current.NumField(); i++ {
-				field := current.Type().Field(i)
-				if field.PkgPath != "" {
-					continue
-				}
-				name := strings.Split(field.Tag.Get("json"), ",")[0]
-				if name == "" {
-					name = field.Name
-				}
-				if name == part {
-					current = current.Field(i)
-					found = true
-					break
-				}
+			var field reflect.Value
+			var found bool
+			if promoted {
+				field, found = promotedStructField(current, part)
+			} else {
+				field, found = ownStructField(current, part)
 			}
 			if !found {
 				return nil
 			}
+			current = field
 		default:
 			return nil
 		}
@@ -666,6 +667,25 @@ func rawJoinField(data any, path string) any {
 		return nil
 	}
 	return current.Interface()
+}
+
+// ownStructField finds an exported field of a struct by its json tag or its name,
+// among the fields the struct itself declares.
+func ownStructField(current reflect.Value, part string) (reflect.Value, bool) {
+	for i := 0; i < current.NumField(); i++ {
+		field := current.Type().Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+		name := strings.Split(field.Tag.Get("json"), ",")[0]
+		if name == "" {
+			name = field.Name
+		}
+		if name == part {
+			return current.Field(i), true
+		}
+	}
+	return reflect.Value{}, false
 }
 
 func normalizedJoinRecordMap(rec record.Record) (map[string]any, error) {

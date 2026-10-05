@@ -3,6 +3,7 @@ package dal
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"time"
 
@@ -32,12 +33,13 @@ func timestampSortValue(instant time.Time) (string, error) {
 
 // buildSortValues reads the fields of a provider's raw row, before it becomes
 // JSON values, and returns the sort value of each one that holds a timestamp.
-// It returns nil when no field does.
+// It returns nil when no field does. A struct row is read as encoding/json writes
+// it, so a field of an embedded struct is a field of the row.
 func buildSortValues(raw any, fields []string) (map[string]any, error) {
 	var values map[string]any
 	for _, name := range fields {
 		var instant time.Time
-		switch value := rawJoinField(raw, name).(type) {
+		switch value := rawField(raw, name, true).(type) {
 		case time.Time:
 			instant = value
 		case *time.Time:
@@ -158,8 +160,11 @@ func orderedAggregateSortFields(q StructuredQuery) map[string][]string {
 }
 
 // compareOrderedTuples orders two candidate rows of an ordered aggregate: by the
-// order keys in the stated directions, then by the argument ascending.
-func compareOrderedTuples(order []OrderExpression, a []any, aTie any, b []any, bTie any) int {
+// order keys in the stated directions, then by the argument ascending, then by the
+// answer each one returns. The argument's sort value is the instant of a timestamp,
+// so two rows of one instant written in two zones still tie on it; the last step
+// tells them apart by their text, and the answer depends on the group's data alone.
+func compareOrderedTuples(order []OrderExpression, a []any, aTie, aAnswer any, b []any, bTie, bAnswer any) int {
 	for i, key := range order {
 		comparison := compareAggregationValues(a[i], b[i])
 		if key.Descending() {
@@ -169,7 +174,10 @@ func compareOrderedTuples(order []OrderExpression, a []any, aTie any, b []any, b
 			return comparison
 		}
 	}
-	return compareAggregationValues(aTie, bTie)
+	if comparison := compareAggregationValues(aTie, bTie); comparison != 0 {
+		return comparison
+	}
+	return compareAggregationValues(aAnswer, bAnswer)
 }
 
 // updateOrderedState lets one row compete for the answer of an ordered first or
@@ -191,7 +199,7 @@ func (r *localAggregationReader) updateOrderedState(group *localGroup, state *ag
 		tie = sortValue(field, row)
 	}
 	if state.hasValue {
-		comparison := compareOrderedTuples(order, keys, tie, state.orderKeys, state.orderTie)
+		comparison := compareOrderedTuples(order, keys, tie, value, state.orderKeys, state.orderTie, state.value)
 		if strings.EqualFold(state.expression.FuncName(), LAST) {
 			if comparison <= 0 {
 				return nil
@@ -262,4 +270,70 @@ func executeAggregationAfterRefusal(ctx context.Context, executor QueryExecutor,
 		return nil, refusal
 	}
 	return reader, nil
+}
+
+// promotedStructField finds the field encoding/json writes under name in a struct,
+// among its own fields and those of the structs it embeds without a name of their
+// own, depth by depth: a field of the struct shadows one of an embedded struct, and
+// where several fields of one depth carry the name, a single one given the name by
+// its tag wins and otherwise none does, as in encoding/json.
+func promotedStructField(root reflect.Value, name string) (reflect.Value, bool) {
+	level := []reflect.Value{root}
+	explored := map[reflect.Type]bool{}
+	for len(level) > 0 {
+		var next, found, tagged []reflect.Value
+		for _, current := range level {
+			if explored[current.Type()] {
+				continue
+			}
+			for i := 0; i < current.NumField(); i++ {
+				field := current.Type().Field(i)
+				fieldType := field.Type
+				if fieldType.Kind() == reflect.Pointer {
+					fieldType = fieldType.Elem()
+				}
+				embeddedStruct := field.Anonymous && fieldType.Kind() == reflect.Struct
+				// An unexported field is not written, but the fields of an unexported embedded struct are.
+				if field.Tag.Get("json") == "-" || !field.IsExported() && !embeddedStruct {
+					continue
+				}
+				written := strings.Split(field.Tag.Get("json"), ",")[0]
+				if written == "" && embeddedStruct {
+					embedded := current.Field(i)
+					if embedded.Kind() == reflect.Pointer {
+						if embedded.IsNil() {
+							continue
+						}
+						embedded = embedded.Elem()
+					}
+					next = append(next, embedded)
+					continue
+				}
+				isTagged := written != ""
+				if !isTagged {
+					written = field.Name
+				}
+				if written != name {
+					continue
+				}
+				found = append(found, current.Field(i))
+				if isTagged {
+					tagged = append(tagged, current.Field(i))
+				}
+			}
+		}
+		switch {
+		case len(found) == 1:
+			return found[0], true
+		case len(tagged) == 1:
+			return tagged[0], true
+		case len(found) > 1:
+			return reflect.Value{}, false
+		}
+		for _, current := range level {
+			explored[current.Type()] = true
+		}
+		level = next
+	}
+	return reflect.Value{}, false
 }
