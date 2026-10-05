@@ -105,7 +105,7 @@ func TestAggregationYAMLSerializationBranchCoverage(t *testing.T) {
 		},
 		varyGroup: true,
 	}
-	if _, err := Serialize(varyingGroup); err == nil || !strings.Contains(err.Error(), "groupBy #0") {
+	if _, err := Serialize(varyingGroup); err == nil || !strings.Contains(err.Error(), "invalid aggregation: GROUP BY expression #0: unsupported scalar expression") {
 		t.Fatalf("varying GROUP BY error = %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestAggregationYAMLSerializationBranchCoverage(t *testing.T) {
 		},
 		varyHaving: true,
 	}
-	if _, err := Serialize(varyingHaving); err == nil || !strings.Contains(err.Error(), "having") {
+	if _, err := Serialize(varyingHaving); err == nil || !strings.Contains(err.Error(), "invalid aggregation: HAVING uses unsupported condition") {
 		t.Fatalf("varying HAVING error = %v", err)
 	}
 }

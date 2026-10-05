@@ -30,8 +30,17 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 		}
 	}
 	collect(q.From())
+	var walk documentWalk
 	var expression func(dal.Expression, string) error
 	expression = func(value dal.Expression, path string) error {
+		leave, exceeded := walk.enter(value)
+		if leave == nil {
+			if exceeded {
+				return fmt.Errorf("JOIN expression is too deep to be checked")
+			}
+			return fmt.Errorf("JOIN expression holds itself at %s", path)
+		}
+		defer leave()
 		switch v := value.(type) {
 		case dal.FieldRef:
 			if v.Source() == "" {
@@ -45,6 +54,10 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 				return err
 			}
 			return expression(v.Right, path+".right")
+		case *dal.BinaryExpression:
+			if v != nil {
+				return expression(*v, path)
+			}
 		case dal.AggregateFunc:
 			for i, arg := range v.FuncArgs() {
 				if err := expression(arg, fmt.Sprintf("%s.args[%d]", path, i)); err != nil {
@@ -65,19 +78,39 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 	}
 	var condition func(dal.Condition, string) error
 	condition = func(value dal.Condition, path string) error {
+		leave, exceeded := walk.enter(value)
+		if leave == nil {
+			if exceeded {
+				return fmt.Errorf("JOIN condition is too deep to be checked")
+			}
+			return fmt.Errorf("JOIN condition holds itself at %s", path)
+		}
+		defer leave()
 		switch v := value.(type) {
 		case dal.IsNullCondition:
 			return expression(v.Operand(), path+".operand")
+		case *dal.IsNullCondition:
+			if v != nil {
+				return condition(*v, path)
+			}
 		case dal.Comparison:
 			if err := expression(v.Left, path+".left"); err != nil {
 				return err
 			}
 			return expression(v.Right, path+".right")
+		case *dal.Comparison:
+			if v != nil {
+				return condition(*v, path)
+			}
 		case dal.GroupCondition:
 			for i, child := range v.Conditions() {
 				if err := condition(child, fmt.Sprintf("%s.conditions[%d]", path, i)); err != nil {
 					return err
 				}
+			}
+		case *dal.GroupCondition:
+			if v != nil {
+				return condition(*v, path)
 			}
 		}
 		return nil

@@ -1,0 +1,32 @@
+from:
+  database: orders
+  name: Invoice
+  alias: i
+where:
+  exists:
+    query:
+      from:
+        database: customers
+        name: Customer
+        alias: c
+      where:
+        op: ==
+        left:
+          field: Id
+          source: c
+        right:
+          field: CustomerId
+          source: i
+      columns:
+      - field: Id
+        source: c
+columns:
+- aggregate:
+    function: last
+    args:
+    - field: Total
+      source: i
+    orderBy:
+    - field: InvoiceDate
+      source: i
+  as: last_total

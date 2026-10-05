@@ -395,7 +395,7 @@ func (scope orderedAggregateScope) check(field FieldRef) error {
 func validateOrderedAggregateSources(q StructuredQuery) error {
 	var scope *orderedAggregateScope
 	var refusal error
-	walkAggregates(q, func(a AggregateFunc) {
+	complete := walkAggregates(q, func(a AggregateFunc) {
 		order := aggregateOrder(a)
 		if refusal != nil || len(order) == 0 {
 			return
@@ -421,6 +421,9 @@ func validateOrderedAggregateSources(q StructuredQuery) error {
 			}
 		}
 	})
+	if refusal == nil && !complete {
+		return queryTooDeepError()
+	}
 	return refusal
 }
 
@@ -555,14 +558,18 @@ func queryTooDeepError() error {
 // itself by value ends. truncated records that a path was cut at that bound; what
 // lies beyond it has not been seen.
 type aggregateWalk struct {
-	path      queryTreePath
-	visit     func(AggregateFunc)
-	truncated bool
+	path       queryTreePath
+	visit      func(AggregateFunc)
+	queryVisit func(StructuredQuery)
+	truncated  bool
 }
 
 // enter admits a node to the path and returns the function that leaves it, or nil
 // when the node is not to be walked.
 func (w *aggregateWalk) enter(node any) (leave func()) {
+	if w.truncated {
+		return nil
+	}
 	leave, exceeded := w.path.enter(nodePointerID(node))
 	if leave == nil && exceeded {
 		w.truncated = true
@@ -592,6 +599,18 @@ func (w *aggregateWalk) expression(expression Expression) {
 	case BinaryExpression:
 		w.expression(e.Left)
 		w.expression(e.Right)
+	case *BinaryExpression:
+		if e != nil {
+			w.expression(*e)
+		}
+	case QueryExpression:
+		if w.queryVisit != nil {
+			w.queryVisit(e.Query())
+		}
+	case *QueryExpression:
+		if e != nil {
+			w.expression(*e)
+		}
 	}
 }
 
@@ -657,7 +676,7 @@ func walkFromTree(from FromSource, visit func(FromSource)) (complete bool) {
 	complete = true
 	var walk func(FromSource)
 	walk = func(node FromSource) {
-		if node == nil || node.Base() == nil {
+		if !complete || node == nil || node.Base() == nil {
 			return
 		}
 		leave, exceeded := path.enter(nodePointerID(node))
@@ -701,6 +720,44 @@ func walkAggregates(q StructuredQuery, visit func(AggregateFunc)) (complete bool
 // read here. A query nested more than maxQueryTreeDepth levels deep in either place
 // is refused, as the walk cannot see its end.
 func validateOrderedAggregatePlacement(q StructuredQuery) error {
+	if err := validateOrderedAggregatePlacementShallow(q); err != nil {
+		return err
+	}
+	var nestedError error
+	if inspectQueryTree(q, func(nested StructuredQuery) bool {
+		if nested == nil {
+			nestedError = queryValidationError("query_shape", "query", "nested query is required")
+			return true
+		}
+		nestedError = validateOrderedAggregatePlacementShallow(nested)
+		return nestedError != nil
+	}) {
+		if nestedError != nil {
+			return nestedError
+		}
+		return queryTooDeepError()
+	}
+	return nil
+}
+
+func queryTreeHoldsOrderedAggregate(q StructuredQuery) bool {
+	check := func(query StructuredQuery) bool {
+		if query == nil {
+			return false
+		}
+		found := false
+		visit := func(a AggregateFunc) { found = found || len(aggregateOrder(a)) > 0 }
+		columnsComplete := walkAggregates(query, visit)
+		where := aggregateWalk{visit: visit}
+		where.condition(query.Where())
+		scans := aggregateWalk{visit: visit}
+		scans.scanOrders(query.From())
+		return found || !columnsComplete || where.truncated || scans.truncated
+	}
+	return check(q) || inspectQueryTree(q, check)
+}
+
+func validateOrderedAggregatePlacementShallow(q StructuredQuery) error {
 	var inWhere, inScanOrder bool
 	holdsOrder := func(found *bool) func(AggregateFunc) {
 		return func(a AggregateFunc) {
@@ -711,7 +768,11 @@ func validateOrderedAggregatePlacement(q StructuredQuery) error {
 	}
 	where := aggregateWalk{visit: holdsOrder(&inWhere)}
 	where.condition(q.Where())
-	scans := aggregateWalk{visit: holdsOrder(&inScanOrder)}
+	scans := aggregateWalk{visit: holdsOrder(&inScanOrder), queryVisit: func(nested StructuredQuery) {
+		if nested != nil && queryTreeHoldsOrderedAggregate(nested) {
+			inScanOrder = true
+		}
+	}}
 	scans.scanOrders(q.From())
 	switch {
 	case inWhere:

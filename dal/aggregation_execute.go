@@ -96,10 +96,49 @@ func (q aggregationSourceQuery) GroupBy() []Expression      { return nil }
 func (q aggregationSourceQuery) Having() Condition          { return nil }
 func (q aggregationSourceQuery) OrderBy() []OrderExpression { return q.orders }
 func (q aggregationSourceQuery) Columns() []Column          { return q.columns }
-func (q aggregationSourceQuery) Offset() int                { return 0 }
-func (q aggregationSourceQuery) Limit() int                 { return 0 }
-func (q aggregationSourceQuery) StartFrom() Cursor          { return "" }
-func (q aggregationSourceQuery) StartAfter() Cursor         { return "" }
+
+// OrderedAggregateSourceFields identifies the raw timestamp values that the
+// local ordered aggregate must see before a backend converts a typed record
+// into its ordinary JSON projection. Backends without typed records can return
+// their existing values; the local engine then applies its normal sort rules.
+func (q aggregationSourceQuery) OrderedAggregateSourceFields() []FieldRef {
+	return orderedAggregateFieldRefs(q.StructuredQuery)
+}
+
+// OrderedAggregateSourceValues applies the same JSON-aware raw-field policy as
+// the generic aggregate route to a typed record supplied by an adapter. Only
+// timestamp fields are returned; the adapter's ordinary projection is otherwise
+// left as written by its storage engine.
+func (q aggregationSourceQuery) OrderedAggregateSourceValues(raw any) map[string]any {
+	base := q.From().Base()
+	var values map[string]any
+	for _, field := range q.OrderedAggregateSourceFields() {
+		if source := field.Source(); source != "" && source != base.Alias() && source != base.Name() {
+			continue
+		}
+		var instant time.Time
+		switch value := rawField(raw, field.Name(), true).(type) {
+		case time.Time:
+			instant = value
+		case *time.Time:
+			if value == nil {
+				continue
+			}
+			instant = *value
+		default:
+			continue
+		}
+		if values == nil {
+			values = map[string]any{}
+		}
+		values[field.Name()] = instant
+	}
+	return values
+}
+func (q aggregationSourceQuery) Offset() int        { return 0 }
+func (q aggregationSourceQuery) Limit() int         { return 0 }
+func (q aggregationSourceQuery) StartFrom() Cursor  { return "" }
+func (q aggregationSourceQuery) StartAfter() Cursor { return "" }
 
 func collectSourceFields(q StructuredQuery) []FieldRef {
 	seen := map[string]bool{}
@@ -1072,6 +1111,11 @@ func normalizedRecordMap(rec record.Record) (map[string]any, error) {
 }
 
 func lookupAggregationField(row map[string]any, path string) (any, bool) {
+	// A provider projection can return a dotted field name as one map key.
+	// Resolve it before treating the same name as a path through nested maps.
+	if value, ok := row[path]; ok {
+		return value, true
+	}
 	current := any(row)
 	for _, part := range strings.Split(path, ".") {
 		object, ok := current.(map[string]any)

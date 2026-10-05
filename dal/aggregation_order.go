@@ -42,12 +42,19 @@ func timestampSortValue(instant time.Time) (string, error) {
 // It returns nil when no field does. A struct row is read as encoding/json writes
 // it: a field of an embedded struct is a field of the row, and a struct whose type
 // writes itself has no field to read, so a key in it is compared by the text the
-// row writes, as every other read of the row does.
+// row writes, as every other read of the row does. A map that writes itself
+// follows the same rule.
 func buildSortValues(raw any, fields []string) (map[string]any, error) {
 	var values map[string]any
 	for _, name := range fields {
 		var instant time.Time
-		switch value := rawField(raw, name, true).(type) {
+		value := rawField(raw, name, true)
+		if projected, ok := raw.(map[string]any); ok {
+			if direct, exists := projected[name]; exists {
+				value = direct
+			}
+		}
+		switch value := value.(type) {
 		case time.Time:
 			instant = value
 		case *time.Time:
@@ -450,7 +457,7 @@ var (
 	textMarshalerType = reflect.TypeFor[encoding.TextMarshaler]()
 )
 
-// writesItself reports whether encoding/json writes a struct value by calling a
+// writesItself reports whether encoding/json writes a struct or map value by calling a
 // method of its type, MarshalJSON or MarshalText, and not field by field. The
 // method of the pointer type is called for a value that can be addressed (a row
 // given by pointer, a field of one) and not for another.

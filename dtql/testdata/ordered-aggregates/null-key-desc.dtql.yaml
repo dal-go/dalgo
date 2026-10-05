@@ -1,0 +1,17 @@
+from:
+  name: Invoice
+where:
+  op: ==
+  left:
+    field: CustomerId
+  right:
+    value: 2
+columns:
+- aggregate:
+    function: last
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+      desc: true
+  as: last_total

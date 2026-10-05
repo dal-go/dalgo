@@ -1,0 +1,10 @@
+from:
+  name: Invoice
+columns:
+- aggregate:
+    function: percentile
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+  as: v

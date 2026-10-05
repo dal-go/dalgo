@@ -24,6 +24,13 @@
             "first",
             "last"
           ]
+        },
+        "orderBy": {
+          "items": {
+            "$ref": "#/$defs/fieldOrder"
+          },
+          "minItems": 1,
+          "type": "array"
         }
       },
       "required": [
@@ -556,6 +563,26 @@
           "type": "array"
         }
       },
+      "type": "object"
+    },
+    "fieldOrder": {
+      "additionalProperties": false,
+      "properties": {
+        "desc": {
+          "type": "boolean"
+        },
+        "field": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
       "type": "object"
     },
     "from": {

@@ -382,6 +382,9 @@ func exprFromYAMLAt(e exprYAML, path string) (dal.Expression, error) {
 		if e.Aggregate.Function == "" {
 			return nil, fmt.Errorf("aggregate.function is required")
 		}
+		if e.Aggregate.orderPresent && len(e.Aggregate.OrderBy) == 0 {
+			return nil, fmt.Errorf("invalid DTQL: aggregate.orderBy must contain at least one item")
+		}
 		args := make([]dal.Expression, len(e.Aggregate.Args))
 		for i, encoded := range e.Aggregate.Args {
 			arg, err := exprFromYAMLAt(encoded, fmt.Sprintf("%s.aggregate.args[%d]", path, i))
@@ -389,6 +392,21 @@ func exprFromYAMLAt(e exprYAML, path string) (dal.Expression, error) {
 				return nil, fmt.Errorf("aggregate argument #%d: %w", i, err)
 			}
 			args[i] = arg
+		}
+		if len(e.Aggregate.OrderBy) > 0 {
+			orders, err := orderFromYAMLAt(e.Aggregate.OrderBy, path+".aggregate.orderBy")
+			if err != nil {
+				return nil, err
+			}
+			for _, order := range e.Aggregate.OrderBy {
+				if order.Field == "" || expressionFieldsSet(order.exprYAML) != 1 {
+					return nil, fmt.Errorf("invalid DTQL: aggregate.orderBy key must be a field")
+				}
+			}
+			if e.Aggregate.Distinct {
+				return nil, fmt.Errorf("invalid DTQL: aggregate.orderBy does not support distinct")
+			}
+			return dal.NewOrderedAggregate(e.Aggregate.Function, orders, args...), nil
 		}
 		aggregate := dal.NewAggregate(e.Aggregate.Function, e.Aggregate.Distinct, args...)
 		return aggregate, nil

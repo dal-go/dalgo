@@ -70,6 +70,7 @@
         <tr><td><code>GroupCondition</code> (And)</td><td><code>{ and: [ … ] }</code></td></tr>
         <tr><td><code>GroupCondition</code> (Or)</td><td><code>{ or: [ … ] }</code></td></tr>
         <tr><td><code>OrderExpression</code></td><td>item under <code>orderBy:</code> — an expression plus optional <code>desc: true</code></td></tr>
+        <tr><td>Ordered <code>first</code> / <code>last</code></td><td><code>aggregate: {function: last, args: [{field: Total}], orderBy: [{field: InvoiceDate}]}</code></td></tr>
         <tr><td><code>FieldRef</code></td><td><code>{ field: &lt;name&gt; }</code></td></tr>
         <tr><td><code>Constant</code></td><td><code>{ value: &lt;scalar&gt; }</code></td></tr>
         <tr><td><code>Array</code></td><td><code>{ values: [ &lt;scalar&gt;, … ] }</code></td></tr>

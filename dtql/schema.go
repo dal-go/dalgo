@@ -132,6 +132,15 @@ func schemaDocument() map[string]any {
 				"source": map[string]any{"type": "string", "minLength": 1},
 			},
 		},
+		"fieldOrder": map[string]any{
+			"type": "object", "additionalProperties": false,
+			"required": []any{"field"},
+			"properties": map[string]any{
+				"field":  map[string]any{"type": "string", "minLength": 1},
+				"source": map[string]any{"type": "string", "minLength": 1},
+				"desc":   map[string]any{"type": "boolean"},
+			},
+		},
 		"expression": map[string]any{
 			"type":                 "object",
 			"additionalProperties": false,
@@ -145,6 +154,7 @@ func schemaDocument() map[string]any {
 				"function": map[string]any{"enum": []any{"count", "sum", "avg", "min", "max", "first", "last"}},
 				"distinct": map[string]any{"type": "boolean"},
 				"args":     map[string]any{"type": "array", "minItems": 1, "maxItems": 1, "items": map[string]any{"$ref": "#/$defs/expression"}},
+				"orderBy":  map[string]any{"type": "array", "minItems": 1, "items": map[string]any{"$ref": "#/$defs/fieldOrder"}},
 			},
 		},
 		"binary": map[string]any{

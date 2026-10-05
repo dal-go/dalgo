@@ -61,6 +61,7 @@ func TestOrderedAggregateInWhereIsRefusedBeforeAnyRouteIsChosen(t *testing.T) {
 	invoice, customer := NewRootCollectionRef("Invoice", "i"), NewRootCollectionRef("Customer", "c")
 	onCustomer := joinOn("i", "CustomerId", "c", "Id")
 	inWhere := NewComparison(placementOrdered(), GreaterThen, NewConstant(1))
+	pointerBinary := Binary(placementOrdered(), Add, NewConstant(1))
 	columns := []Column{{Expression: NewFieldRef("i", "Total")}}
 	exists := NewExistsCondition(From(customer).NewQuery().Where(NewComparison(NewFieldRef("c", "Id"), Equal, NewFieldRef("i", "CustomerId"))).
 		SelectColumns(Column{Expression: NewFieldRef("c", "Id")}))
@@ -71,15 +72,15 @@ func TestOrderedAggregateInWhereIsRefusedBeforeAnyRouteIsChosen(t *testing.T) {
 
 	for name, tc := range map[string]struct {
 		q StructuredQuery
-		// the sources read before the refusal; a nested query is refused when it runs, after the sources of the
-		// query that holds it are read, and before any of its own
+		// All refusals precede reads, including a query held by another query.
 		reads []string
 	}{
 		"a join the provider does not run":                  {From(invoice).Join(NewJoinedSource(customer, JoinInner, onCustomer)).NewQuery().Where(inWhere).SelectColumns(columns...), nil},
 		"a join the provider does not run, held by pointer": {From(invoice).Join(NewJoinedSource(customer, JoinInner, onCustomer)).NewQuery().Where(&inWhere).SelectColumns(columns...), nil},
-		"one source": {From(invoice).NewQuery().Where(inWhere).SelectColumns(columns...), nil},
+		"one source":                                   {From(invoice).NewQuery().Where(inWhere).SelectColumns(columns...), nil},
+		"pointer arithmetic in where":                  {From(invoice).NewQuery().Where(NewComparison(&pointerBinary, GreaterThen, NewConstant(1))).SelectColumns(columns...), nil},
 		"a subquery in where, beside the aggregate":    {From(invoice).NewQuery().Where(NewGroupCondition(And, inWhere, exists)).SelectColumns(columns...), nil},
-		"a subquery in where that holds the aggregate": {From(invoice).NewQuery().Where(nested).SelectColumns(columns...), []string{"Invoice"}},
+		"a subquery in where that holds the aggregate": {From(invoice).NewQuery().Where(nested).SelectColumns(columns...), nil},
 		"a derived source that holds the aggregate":    {From(derived).NewQuery().SelectColumns(Column{Expression: NewFieldRef("d", "Id")}), nil},
 	} {
 		for label, caps := range map[string]QueryCapabilities{"no capabilities": {}, "capabilities": orderedCapabilities} {
@@ -243,6 +244,16 @@ func TestOrderedAggregateInAScanOrderIsRefusedBeforeAnythingIsRead(t *testing.T)
 		"a source of a nested join": From(invoice).Join(NewJoinedFrom(From(customer).Join(NewJoinedSource(scannedCustomer, JoinInner, joinOn("c", "Id", "c", "Id"))), JoinInner, onCustomer)).
 			NewQuery().SelectColumns(columns...),
 		"inside arithmetic": From(invoice.WithScan(5, Ascending(Binary(placementOrdered(), Add, NewConstant(1))))).NewQuery().SelectColumns(columns...),
+	}
+	pointerBinary := Binary(placementOrdered(), Add, NewConstant(1))
+	queries["pointer arithmetic"] = From(invoice.WithScan(5, Ascending(&pointerBinary))).NewQuery().SelectColumns(columns...)
+	nestedOrder := From(invoice).NewQuery().SelectColumns(Column{Alias: "v", Expression: placementOrdered()})
+	queries["query in scan order"] = From(invoice.WithScan(5, Ascending(NewQueryExpression(nestedOrder, "v")))).NewQuery().SelectColumns(columns...)
+	pointerNested := NewQueryExpression(nestedOrder, "v")
+	queries["pointer query in scan order"] = From(invoice.WithScan(5, Ascending(&pointerNested))).NewQuery().SelectColumns(columns...)
+	lawfulNested := From(invoice).NewQuery().SelectColumns(Column{Alias: "v", Expression: NewFieldRef("i", "InvoiceDate")})
+	if err := validateOrderedAggregatePlacement(From(invoice.WithScan(5, Ascending(NewQueryExpression(lawfulNested, "v")))).NewQuery().SelectColumns(columns...)); err != nil {
+		t.Fatalf("scan order with no ordered aggregate = %v", err)
 	}
 	for name, q := range queries {
 		for label, caps := range map[string]QueryCapabilities{"no capabilities": {}, "capabilities": orderedCapabilities} {

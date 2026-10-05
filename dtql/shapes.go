@@ -275,9 +275,31 @@ type exprYAML struct {
 }
 
 type aggregateYAML struct {
-	Function string     `yaml:"function"`
-	Distinct bool       `yaml:"distinct,omitempty"`
-	Args     []exprYAML `yaml:"args"`
+	Function     string      `yaml:"function"`
+	Distinct     bool        `yaml:"distinct,omitempty"`
+	Args         []exprYAML  `yaml:"args"`
+	OrderBy      []orderYAML `yaml:"orderBy,omitempty"`
+	orderPresent bool
+}
+
+func (aggregate *aggregateYAML) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return &yaml.TypeError{Errors: []string{"aggregate must be a mapping"}}
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		switch node.Content[i].Value {
+		case "function", "distinct", "args":
+		case "orderBy":
+			if aggregate.orderPresent {
+				return &yaml.TypeError{Errors: []string{"aggregate.orderBy must appear once"}}
+			}
+			aggregate.orderPresent = true
+		default:
+			return &yaml.TypeError{Errors: []string{"field " + node.Content[i].Value + " not found in aggregate"}}
+		}
+	}
+	type plain aggregateYAML
+	return node.Decode((*plain)(aggregate))
 }
 
 type binaryYAML struct {
@@ -458,7 +480,7 @@ func decodeExpressionNode(node *yaml.Node, expression *exprYAML, extra map[strin
 		case "star":
 			err = value.Decode(&expression.Star)
 		case "aggregate":
-			if err = validateExpressionObjectKeys(value, "aggregate", map[string]bool{"function": true, "distinct": true, "args": true}); err != nil {
+			if err = validateExpressionObjectKeys(value, "aggregate", map[string]bool{"function": true, "distinct": true, "args": true, "orderBy": true}); err != nil {
 				break
 			}
 			var decoded aggregateYAML

@@ -1,0 +1,377 @@
+{
+  "schemaVersion": 1,
+  "schema": "schema.json",
+  "dataset": "dataset.json",
+  "cases": [
+    {
+      "name": "first-last-by-date",
+      "input": "first-last-by-date.dtql.yaml",
+      "rows": "first-last-by-date.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "no-group",
+      "input": "no-group.dtql.yaml",
+      "rows": "no-group.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "empty-no-group",
+      "input": "empty-no-group.dtql.yaml",
+      "rows": "empty-no-group.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "empty-group",
+      "input": "empty-group.dtql.yaml",
+      "rows": "empty-group.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "null-key-first",
+      "input": "null-key-first.dtql.yaml",
+      "rows": "null-key-first.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "null-key-desc",
+      "input": "null-key-desc.dtql.yaml",
+      "rows": "null-key-desc.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "null-x",
+      "input": "null-x.dtql.yaml",
+      "rows": "null-x.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-null-key",
+      "input": "x-null-key.dtql.yaml",
+      "rows": "x-null-key.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "tie-broken-by-x",
+      "input": "tie-broken-by-x.dtql.yaml",
+      "rows": "tie-broken-by-x.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "last-is-not-first-desc",
+      "input": "last-is-not-first-desc.dtql.yaml",
+      "rows": "last-is-not-first-desc.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "two-keys-mixed-direction",
+      "input": "two-keys-mixed-direction.dtql.yaml",
+      "rows": "two-keys-mixed-direction.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "text-key-code-point",
+      "input": "text-key-code-point.dtql.yaml",
+      "rows": "text-key-code-point.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "number-key-as-float",
+      "input": "number-key-as-float.dtql.yaml",
+      "rows": "number-key-as-float.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "boolean-key",
+      "input": "boolean-key.dtql.yaml",
+      "rows": "boolean-key.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "timestamp-key",
+      "input": "timestamp-key.dtql.yaml",
+      "rows": "timestamp-key.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "timestamp-key-offsets",
+      "input": "timestamp-key-offsets.dtql.yaml",
+      "rows": "timestamp-key-offsets.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "text-that-looks-like-timestamp",
+      "input": "text-that-looks-like-timestamp.dtql.yaml",
+      "rows": "text-that-looks-like-timestamp.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-text",
+      "input": "x-text.dtql.yaml",
+      "rows": "x-text.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-boolean",
+      "input": "x-boolean.dtql.yaml",
+      "rows": "x-boolean.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-timestamp",
+      "input": "x-timestamp.dtql.yaml",
+      "rows": "x-timestamp.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-uuid",
+      "input": "x-uuid.dtql.yaml",
+      "rows": "x-uuid.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-citext",
+      "input": "x-citext.dtql.yaml",
+      "rows": "x-citext.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-json",
+      "input": "x-json.dtql.yaml",
+      "rows": "x-json.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "dalgo"
+      }
+    },
+    {
+      "name": "key-enum",
+      "input": "key-enum.dtql.yaml",
+      "rows": "key-enum.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "in-having",
+      "input": "in-having.dtql.yaml",
+      "rows": "in-having.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "in-order-by",
+      "input": "in-order-by.dtql.yaml",
+      "rows": "in-order-by.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "by-alias",
+      "input": "by-alias.dtql.yaml",
+      "rows": "by-alias.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "inside-arithmetic",
+      "input": "inside-arithmetic.dtql.yaml",
+      "rows": "inside-arithmetic.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "with-other-aggregates",
+      "input": "with-other-aggregates.dtql.yaml",
+      "rows": "with-other-aggregates.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "after-where",
+      "input": "after-where.dtql.yaml",
+      "rows": "after-where.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "joined",
+      "input": "joined.dtql.yaml",
+      "rows": "joined.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "with-subquery",
+      "input": "with-subquery.dtql.yaml",
+      "rows": "with-subquery.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "dalgo"
+      }
+    },
+    {
+      "name": "unaliased-long-name",
+      "input": "unaliased-long-name.dtql.yaml",
+      "rows": "unaliased-long-name.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "dalgo"
+      }
+    },
+    {
+      "name": "refused-empty-order",
+      "input": "refused-empty-order.dtql.yaml",
+      "error": "refused-empty-order.error.json"
+    },
+    {
+      "name": "refused-nonfield-key",
+      "input": "refused-nonfield-key.dtql.yaml",
+      "error": "refused-nonfield-key.error.json"
+    },
+    {
+      "name": "refused-other-function",
+      "input": "refused-other-function.dtql.yaml",
+      "error": "refused-other-function.error.json"
+    },
+    {
+      "name": "refused-distinct",
+      "input": "refused-distinct.dtql.yaml",
+      "error": "refused-distinct.error.json"
+    },
+    {
+      "name": "refused-unknown-key",
+      "input": "refused-unknown-key.dtql.yaml",
+      "error": "refused-unknown-key.error.json"
+    },
+    {
+      "name": "refused-where",
+      "input": "refused-where.dtql.yaml",
+      "error": "refused-where.error.json"
+    },
+    {
+      "name": "refused-group-by",
+      "input": "refused-group-by.dtql.yaml",
+      "error": "refused-group-by.error.json"
+    },
+    {
+      "name": "refused-unsupported-name",
+      "input": "refused-unsupported-name.dtql.yaml",
+      "error": "refused-unsupported-name.error.json"
+    }
+  ]
+}

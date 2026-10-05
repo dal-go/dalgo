@@ -1,0 +1,34 @@
+from:
+  database: orders
+  name: Invoice
+  alias: i
+  joins:
+  - type: inner
+    from:
+      database: customers
+      name: Customer
+      alias: c
+    'on':
+    - op: ==
+      left:
+        field: CustomerId
+        source: i
+      right:
+        field: Id
+        source: c
+groupBy:
+- field: Id
+  source: c
+columns:
+- field: Id
+  source: c
+  as: CustomerId
+- aggregate:
+    function: last
+    args:
+    - field: Total
+      source: i
+    orderBy:
+    - field: InvoiceDate
+      source: i
+  as: last_total

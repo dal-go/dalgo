@@ -21,10 +21,6 @@ type walkGraph struct {
 	deep bool
 	// oneSource marks a query over one source.
 	oneSource bool
-	// validatedOnly marks an aggregate held by value in the columns of a join: validation refuses
-	// it as a nested aggregate, and only validation is run on it, as the readers hand it to the scope
-	// validation, which follows a graph held by value to no end.
-	validatedOnly bool
 }
 
 // walkGraphs lists the graphs of TestHasSubqueryStopsAtACycle where an aggregate
@@ -52,13 +48,13 @@ func walkGraphs(visits *int, customers, orders CollectionRef) []walkGraph {
 
 	holding := func(aggregate Expression) Condition { return NewComparison(aggregate, GreaterThen, NewConstant(1)) }
 	return []walkGraph{
-		{"a condition group that holds itself by pointer, in where", From(customers).NewQuery().Where(pointerGroup).SelectKeysOnly(0), false, true, false},
-		{"a condition group that holds itself by value, in where", From(customers).NewQuery().Where(valueGroup).SelectKeysOnly(0), true, true, false},
-		{"an aggregate that holds itself by pointer, in where", From(customers).NewQuery().Where(holding(selfPointer)).SelectKeysOnly(0), false, true, false},
-		{"an aggregate that holds itself by value, in where", From(customers).NewQuery().Where(holding(selfValue)).SelectKeysOnly(0), true, true, false},
-		{"the group held by pointer, in the having of a join", joined().NewQuery().Having(pointerGroup).SelectColumns(count), false, false, false},
-		{"an aggregate that holds itself by pointer, in the columns of a join", joined().NewQuery().SelectColumns(Column{Alias: "n", Expression: selfPointer}), false, false, false},
-		{"an aggregate that holds itself by value, in the columns of a join", joined().NewQuery().SelectColumns(Column{Alias: "n", Expression: selfValue}), false, false, true},
+		{"a condition group that holds itself by pointer, in where", From(customers).NewQuery().Where(pointerGroup).SelectKeysOnly(0), false, true},
+		{"a condition group that holds itself by value, in where", From(customers).NewQuery().Where(valueGroup).SelectKeysOnly(0), true, true},
+		{"an aggregate that holds itself by pointer, in where", From(customers).NewQuery().Where(holding(selfPointer)).SelectKeysOnly(0), false, true},
+		{"an aggregate that holds itself by value, in where", From(customers).NewQuery().Where(holding(selfValue)).SelectKeysOnly(0), true, true},
+		{"the group held by pointer, in the having of a join", joined().NewQuery().Having(pointerGroup).SelectColumns(count), false, false},
+		{"an aggregate that holds itself by pointer, in the columns of a join", joined().NewQuery().SelectColumns(Column{Alias: "n", Expression: selfPointer}), false, false},
+		{"an aggregate that holds itself by value, in the columns of a join", joined().NewQuery().SelectColumns(Column{Alias: "n", Expression: selfValue}), true, false},
 	}
 }
 
@@ -75,13 +71,6 @@ func TestAggregateWalkEndsOnAGraphThatHoldsItself(t *testing.T) {
 			validateErr := ValidateAggregation(graph.query)
 			visits = 0
 			_, planErr := PlanAggregation(graph.query, orderedCapabilities)
-			if graph.validatedOnly {
-				// A graph the validation follows to no end is refused as a nested aggregate.
-				if validateErr == nil || planErr == nil {
-					t.Fatalf("validation errors = %v, %v", validateErr, planErr)
-				}
-				return
-			}
 			if graph.deep {
 				for _, err := range []error{validateErr, planErr} {
 					if err == nil || !strings.Contains(err.Error(), nestedTooDeep) {
@@ -90,7 +79,10 @@ func TestAggregateWalkEndsOnAGraphThatHoldsItself(t *testing.T) {
 				}
 			}
 			for label, caps := range map[string]QueryCapabilities{"no capabilities": {}, "capabilities": orderedCapabilities} {
-				rows := map[string][]record.Record{"Customer": customerRecords(), "Order": nil}
+				rows := map[string][]record.Record{
+					"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1, "a": 2})},
+					"Order":    {joinTestRecord("Order", "1", map[string]any{"ref": 1, "a": 3})},
+				}
 				stub := &orderedStub{caps: caps, rows: rows}
 				db := NewDB(stub)
 				visits = 0
@@ -112,6 +104,16 @@ func TestAggregateWalkEndsOnAGraphThatHoldsItself(t *testing.T) {
 				if graph.oneSource && !graph.deep && (recordsErr != nil || readsOfRecords != 1) {
 					t.Fatalf("%s: records reader error = %v, the provider was read %d times, want 1", label, recordsErr, readsOfRecords)
 				}
+				if !graph.deep && !graph.oneSource {
+					for _, err := range []error{recordsErr, recordsetErr} {
+						if err == nil || !strings.Contains(err.Error(), "query_cycle") {
+							t.Fatalf("%s: running JOIN cycle = %v", label, err)
+						}
+					}
+					if stub.plain != 4 || stub.native+stub.nativeSets != 0 {
+						t.Fatalf("%s: running JOIN reads = plain %d, native %d, recordset %d; want two sources per reader", label, stub.plain, stub.native, stub.nativeSets)
+					}
+				}
 			}
 		})
 	}
@@ -121,9 +123,6 @@ func TestAggregateWalkEndsOnAGraphThatHoldsItself(t *testing.T) {
 func TestFederatedQueryEndsOnAGraphThatHoldsItself(t *testing.T) {
 	visits := 0
 	for _, graph := range walkGraphs(&visits, NewDatabaseCollectionRef("customers", "", "Customer", "c"), NewDatabaseCollectionRef("orders", "", "Order", "o")) {
-		if graph.validatedOnly {
-			continue
-		}
 		t.Run(graph.name, func(t *testing.T) {
 			reads, resolved := 0, 0
 			resolve := func(context.Context, string) (QueryExecutor, error) {
@@ -143,11 +142,136 @@ func TestFederatedQueryEndsOnAGraphThatHoldsItself(t *testing.T) {
 	}
 }
 
+func TestNestedValueAggregateCycleIsRefusedBeforeOuterRead(t *testing.T) {
+	visits := 0
+	graphs := walkGraphs(&visits, NewRootCollectionRef("Customer", "c"), NewRootCollectionRef("Order", "o"))
+	inner := graphs[len(graphs)-1].query
+	outer := From(NewRootCollectionRef("Audit", "a")).NewQuery().Where(NewExistsCondition(inner)).
+		SelectColumns(Column{Expression: NewFieldRef("a", "id")})
+	stub := &orderedStub{rows: map[string][]record.Record{
+		"Audit":    {joinTestRecord("Audit", "1", map[string]any{"id": 1})},
+		"Customer": {joinTestRecord("Customer", "1", map[string]any{"id": 1})},
+		"Order":    {joinTestRecord("Order", "1", map[string]any{"ref": 1})},
+	}}
+	db := NewDB(stub)
+	for name, read := range map[string]func() error{
+		"records":   func() error { _, err := db.ExecuteQueryToRecordsReader(context.Background(), outer); return err },
+		"recordset": func() error { _, err := db.ExecuteQueryToRecordsetReader(context.Background(), outer); return err },
+	} {
+		visits = 0
+		if err := read(); err == nil || !strings.Contains(err.Error(), nestedTooDeep) {
+			t.Fatalf("%s nested cycle = %v", name, err)
+		}
+	}
+	if stub.readsReached() != 0 {
+		t.Fatalf("nested cycle reached provider %d times", stub.readsReached())
+	}
+}
+
 // valueFrom is a source tree held by value that holds a copy of itself, through the
 // slice of joins its copies share. It has no end, and no address to be known by.
 type valueFrom struct {
 	base  RecordsetSource
 	joins []JoinedSource
+}
+
+func TestAggregateWalkStopsAfterFirstCut(t *testing.T) {
+	visits := 0
+	args := make([]Expression, 2)
+	aggregate := valueAggregate{args: args, visits: &visits}
+	args[0], args[1] = aggregate, aggregate
+	q := From(NewRootCollectionRef("Customer", "c")).NewQuery().
+		Where(NewComparison(aggregate, GreaterThen, NewConstant(1))).SelectKeysOnly(0)
+	if err := ValidateAggregation(q); err == nil || !strings.Contains(err.Error(), nestedTooDeep) {
+		t.Fatalf("validation error = %v", err)
+	}
+	if visits > 2*maxQueryTreeDepth {
+		t.Fatalf("visited %d nodes", visits)
+	}
+}
+
+func TestSourceWalkStopsAfterFirstCut(t *testing.T) {
+	base := NewRootCollectionRef("Customer", "c")
+	on := joinOn("c", "id", "c", "id")
+	joins := make([]JoinedSource, 2)
+	tree := valueFrom{base: base, joins: joins}
+	joins[0], joins[1] = NewNestedJoinedSource(tree, JoinInner, on), NewNestedJoinedSource(tree, JoinInner, on)
+	visits := 0
+	complete := walkFromTree(tree, func(FromSource) {
+		visits++
+		if visits > 2*maxQueryTreeDepth {
+			panic("source walk continued after truncation")
+		}
+	})
+	if complete || visits > 2*maxQueryTreeDepth {
+		t.Fatalf("complete = %v, visits = %d", complete, visits)
+	}
+}
+
+func TestSelectListCutIsRefusedBeforePlanning(t *testing.T) {
+	ordered := NewOrderedAggregate(LAST, []OrderExpression{AscendingField("created")}, Field("amount"))
+	var expression Expression = ordered
+	for i := 0; i < maxQueryTreeDepth+1; i++ {
+		expression = Binary(expression, Add, NewConstant(0))
+	}
+	q := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Alias: "last_amount", Expression: expression})
+	if err := ValidateAggregation(q); err == nil || !strings.Contains(err.Error(), nestedTooDeep) {
+		t.Fatalf("validation error = %v", err)
+	}
+	if _, err := PlanAggregation(q, orderedCapabilities); err == nil || !strings.Contains(err.Error(), nestedTooDeep) {
+		t.Fatalf("plan error = %v", err)
+	}
+}
+
+type selfOrderWalkAggregate struct{ visits *int }
+
+func (a *selfOrderWalkAggregate) String() string   { return "self-order" }
+func (a *selfOrderWalkAggregate) FuncName() string { return LAST }
+func (a *selfOrderWalkAggregate) FuncArgs() []Expression {
+	return []Expression{NewFieldRef("i", "Total")}
+}
+func (a *selfOrderWalkAggregate) AggregateOrder() []OrderExpression {
+	*a.visits++
+	if *a.visits > 2*maxQueryTreeDepth {
+		panic("query walker did not stop at a cycle")
+	}
+	return []OrderExpression{Ascending(a)}
+}
+
+func TestScopeAndFreeReferenceWalksStopAtOrderKeyCycle(t *testing.T) {
+	visits := 0
+	aggregate := &selfOrderWalkAggregate{visits: &visits}
+	q := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Alias: "v", Expression: aggregate})
+	if err := validateQueryScope(q, nil, "", map[uintptr]bool{}); err == nil || !strings.Contains(err.Error(), "query_cycle") {
+		t.Fatalf("scope = %v, want a cycle refusal", err)
+	}
+	visits = 0
+	if free := queryFreeReferences(q, map[uintptr]bool{}); !free[""] {
+		t.Fatalf("free references = %v, want conservative correlation", free)
+	}
+}
+
+func TestLocalSourceQueryDeclaresTheFieldsUsedToOrder(t *testing.T) {
+	q := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{
+		Alias: "answer", Expression: NewOrderedAggregate(LAST,
+			[]OrderExpression{Ascending(NewFieldRef("i", "InvoiceDate"))}, NewFieldRef("i", "Total")),
+	})
+	source := newAggregationSourceQuery(q, false)
+	fields := source.(interface{ OrderedAggregateSourceFields() []FieldRef }).OrderedAggregateSourceFields()
+	if len(fields) != 2 || fields[0].Name() != "InvoiceDate" || fields[1].Name() != "Total" {
+		t.Fatalf("ordered source fields = %v", fields)
+	}
+}
+
+func TestOrderedSourceValidationRefusesAnIncompleteWalk(t *testing.T) {
+	deep := Expression(NewFieldRef("i", "Total"))
+	for range maxQueryTreeDepth + 1 {
+		deep = Binary(deep, Add, NewConstant(1))
+	}
+	q := From(NewRootCollectionRef("Invoice", "i")).NewQuery().SelectColumns(Column{Alias: "v", Expression: deep})
+	if err := validateOrderedAggregateSources(q); err == nil || !strings.Contains(err.Error(), "too deep") {
+		t.Fatalf("incomplete source walk = %v", err)
+	}
 }
 
 func (f valueFrom) Base() RecordsetSource        { return f.base }

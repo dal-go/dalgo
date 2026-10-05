@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "tables": {
+    "Invoice": [
+      {
+        "InvoiceId": 10,
+        "CustomerId": 1,
+        "InvoiceDate": "2024-01-01T00:00:00Z",
+        "Total": 100
+      },
+      {
+        "InvoiceId": 11,
+        "CustomerId": 1,
+        "InvoiceDate": "2024-01-02T00:00:00Z",
+        "Total": null
+      },
+      {
+        "InvoiceId": 13,
+        "CustomerId": 1,
+        "InvoiceDate": "2024-01-02T00:00:00Z",
+        "Total": 50
+      },
+      {
+        "InvoiceId": 12,
+        "CustomerId": 2,
+        "InvoiceDate": "2024-01-03T00:00:00Z",
+        "Total": 200
+      },
+      {
+        "InvoiceId": 14,
+        "CustomerId": 2,
+        "InvoiceDate": null,
+        "Total": 75
+      }
+    ],
+    "Customer": [
+      {
+        "Id": 1,
+        "Name": "Ada"
+      },
+      {
+        "Id": 2,
+        "Name": "Bea"
+      }
+    ],
+    "Typed": [
+      {
+        "G": 1,
+        "KText": "B",
+        "KNumber": 1,
+        "KBool": false,
+        "KTimestamp": "2024-01-01T10:00:00Z",
+        "XNumber": 1,
+        "XText": "Alpha",
+        "XBool": false,
+        "XTimestamp": "2024-01-01T10:00:00Z",
+        "XUUID": "00000000-0000-0000-0000-000000000001",
+        "XEnum": "B",
+        "XCitext": "Alpha",
+        "XJSON": {
+          "n": 1
+        }
+      },
+      {
+        "G": 1,
+        "KText": "a",
+        "KNumber": 3,
+        "KBool": true,
+        "KTimestamp": "2024-01-01T11:00:00+01:00",
+        "XNumber": 3,
+        "XText": "Gamma",
+        "XBool": true,
+        "XTimestamp": "2024-01-01T11:00:00+01:00",
+        "XUUID": "00000000-0000-0000-0000-000000000003",
+        "XEnum": "a",
+        "XCitext": "Gamma",
+        "XJSON": {
+          "n": 3
+        }
+      },
+      {
+        "G": 1,
+        "KText": "Z",
+        "KNumber": 2,
+        "KBool": false,
+        "KTimestamp": "2024-01-01T10:00:00.500Z",
+        "XNumber": 2,
+        "XText": "Beta",
+        "XBool": false,
+        "XTimestamp": "2024-01-01T10:00:00.500Z",
+        "XUUID": "00000000-0000-0000-0000-000000000002",
+        "XEnum": "Z",
+        "XCitext": "Beta",
+        "XJSON": {
+          "n": 2
+        }
+      },
+      {
+        "G": 1,
+        "KText": "é",
+        "KNumber": 4,
+        "KBool": true,
+        "KTimestamp": "2024-01-01T10:00:01Z",
+        "XNumber": 4,
+        "XText": "Delta",
+        "XBool": true,
+        "XTimestamp": "2024-01-01T10:00:01Z",
+        "XUUID": "00000000-0000-0000-0000-000000000004",
+        "XEnum": "é",
+        "XCitext": "Delta",
+        "XJSON": {
+          "n": 4
+        }
+      }
+    ],
+    "Numeric": [
+      {
+        "G": 1,
+        "K": 9007199254740992,
+        "X": 2
+      },
+      {
+        "G": 1,
+        "K": 9007199254740993,
+        "X": 1
+      }
+    ],
+    "Offset": [
+      {
+        "G": 1,
+        "K": "2024-01-01T00:00:00-02:00",
+        "X": "later"
+      },
+      {
+        "G": 1,
+        "K": "2024-01-01T01:00:00+02:00",
+        "X": "earlier"
+      }
+    ],
+    "StringTime": [
+      {
+        "G": 1,
+        "K": "2024-01-01T00:00:00-02:00",
+        "X": "later"
+      },
+      {
+        "G": 1,
+        "K": "2024-01-01T01:00:00+02:00",
+        "X": "earlier"
+      }
+    ],
+    "Empty": []
+  }
+}

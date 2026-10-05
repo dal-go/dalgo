@@ -1,0 +1,10 @@
+[
+  {
+    "CustomerId": 1,
+    "last_total": 50
+  },
+  {
+    "CustomerId": 2,
+    "last_total": 200
+  }
+]

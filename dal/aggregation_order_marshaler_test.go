@@ -58,6 +58,12 @@ type nestedRow struct {
 	Value int         `json:"v"`
 }
 
+type writtenMap map[string]any
+
+func (m writtenMap) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"g": m["g"], "at": m["text"], "v": m["v"]})
+}
+
 // A struct whose type writes itself is not read by its fields: a key in it has no sort
 // value, so it is compared by the text the row writes.
 func TestSortValuesOfAStructThatWritesItselfAreNotBuiltFromItsFields(t *testing.T) {
@@ -79,6 +85,7 @@ func TestSortValuesOfAStructThatWritesItselfAreNotBuiltFromItsFields(t *testing.
 		"MarshalText of a struct on the path, held by pointer":        {map[string]any{"stamp": &stampText{When: at}}, "stamp.When", nil},
 		"a struct that writes no method of its own is read as before": {map[string]any{"stamp": struct{ When time.Time }{at}}, "stamp.When", map[string]any{"stamp.When": at.Format(timestampSortLayout)}},
 		"a time is still the value read":                              {map[string]any{"at": at}, "at", map[string]any{"at": at.Format(timestampSortLayout)}},
+		"MarshalJSON of a named map":                                  {writtenMap{"at": at, "text": "x"}, "at", nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got, err := buildSortValues(tc.row, []string{tc.key})
@@ -111,6 +118,9 @@ func TestOrderedAggregateComparesAKeyOfARowThatWritesItselfByTheTextItWrites(t *
 	nested := func(group int, at time.Time, value int, text string) any {
 		return &nestedRow{Group: group, Meta: stampObject{When: at, Text: text}, Value: value}
 	}
+	mapRow := func(group int, at time.Time, value int, text string) any {
+		return writtenMap{"g": group, "at": at, "v": value, "text": text}
+	}
 	for name, tc := range map[string]struct {
 		rows []record.Record
 		key  string
@@ -119,6 +129,8 @@ func TestOrderedAggregateComparesAKeyOfARowThatWritesItselfByTheTextItWrites(t *
 		"MarshalJSON of the pointer type":     {records(pointer), "at"},
 		"MarshalJSON of a struct in the row":  {records(nested), "meta.when"},
 		"the same, the rows in reverse order": {reverse(records(row)), "at"},
+		"MarshalJSON of a named map":          {records(mapRow), "at"},
+		"named map in reverse order":          {reverse(records(mapRow)), "at"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			q := From(NewRootCollectionRef("T", "")).NewQuery().GroupBy(Field("g")).SelectColumns(

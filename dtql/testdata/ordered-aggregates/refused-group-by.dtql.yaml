@@ -1,0 +1,12 @@
+from:
+  name: Invoice
+groupBy:
+- aggregate:
+    function: last
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+columns:
+- field: CustomerId
+  as: CustomerId

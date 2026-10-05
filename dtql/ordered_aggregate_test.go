@@ -14,12 +14,27 @@ func orderedAggregateQuery(aggregate dal.AggregateFunc) fakeQuery {
 	}
 }
 
-// This release can read no document with an order on an aggregate, so it must not
-// write one: an aggregate with an order would come out as one without.
-func TestSerializeRefusesAnAggregateWithAnOrder(t *testing.T) {
+type markedAggregateSourceQuery struct{ fakeQuery }
+
+func (markedAggregateSourceQuery) OrderedAggregateSourceFields() []dal.FieldRef {
+	return []dal.FieldRef{dal.Field("created")}
+}
+
+func TestPrivateAggregateSourceMarkerIsNotSerialized(t *testing.T) {
+	plain := orderedAggregateQuery(dal.NewOrderedAggregate(dal.FIRST, []dal.OrderExpression{dal.AscendingField("created")}, dal.Field("total")))
+	want, err := Serialize(plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Serialize(markedAggregateSourceQuery{plain})
+	if err != nil || string(got) != string(want) || strings.Contains(string(got), "OrderedAggregateSourceFields") {
+		t.Fatalf("marked DTQL bytes = %q, err = %v; want %q", got, err, want)
+	}
+}
+
+func TestSerializeKeepsAnAggregateWithAnOrder(t *testing.T) {
 	order := []dal.OrderExpression{dal.AscendingField("created")}
 	ordered := dal.NewOrderedAggregate(dal.LAST, order, dal.Field("total"))
-	const want = "an aggregate with an order cannot be written by this version"
 
 	for name, q := range map[string]dal.StructuredQuery{
 		"in columns": orderedAggregateQuery(ordered),
@@ -34,8 +49,12 @@ func TestSerializeRefusesAnAggregateWithAnOrder(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			data, err := Serialize(q)
-			if err == nil || !strings.Contains(err.Error(), want) || data != nil {
-				t.Fatalf("data = %q, err = %v", data, err)
+			if err != nil || !strings.Contains(string(data), "orderBy:\n") {
+				t.Fatalf("serialized = %q, err = %v", data, err)
+			}
+			decoded, err := Deserialize(data)
+			if err != nil || !Equal(q, decoded) {
+				t.Fatalf("round trip = %v, err = %v", decoded, err)
 			}
 		})
 	}
@@ -97,6 +116,38 @@ type plainAggregate struct{ inner dal.AggregateFunc }
 func (a plainAggregate) String() string             { return a.inner.String() }
 func (a plainAggregate) FuncName() string           { return a.inner.FuncName() }
 func (a plainAggregate) FuncArgs() []dal.Expression { return a.inner.FuncArgs() }
+
+type selfOrderAggregate struct{ visits *int }
+
+func (a *selfOrderAggregate) String() string   { return "self-order" }
+func (a *selfOrderAggregate) FuncName() string { return dal.LAST }
+func (a *selfOrderAggregate) FuncArgs() []dal.Expression {
+	return []dal.Expression{dal.NewFieldRef("i", "Total")}
+}
+func (a *selfOrderAggregate) AggregateOrder() []dal.OrderExpression {
+	*a.visits++
+	if *a.visits > 20000 {
+		panic("order-key walk did not stop at cycle")
+	}
+	return []dal.OrderExpression{dal.Ascending(a)}
+}
+
+func TestOrderKeyWalkStopsAtPointerCycle(t *testing.T) {
+	visits := 0
+	aggregate := &selfOrderAggregate{visits: &visits}
+	if _, err := exprToYAML(aggregate); err == nil {
+		t.Fatal("serializer accepted recursive order key")
+	}
+	invoice := dal.NewRootCollectionRef("Invoice", "i")
+	customer := dal.NewRootCollectionRef("Customer", "c")
+	from := dal.From(invoice).Join(dal.NewJoinedSource(customer, dal.JoinInner,
+		dal.NewComparison(dal.NewFieldRef("i", "CustomerId"), dal.Equal, dal.NewFieldRef("c", "Id"))))
+	q := fakeQuery{from: from, columns: []dal.Column{{Alias: "v", Expression: aggregate}}}
+	visits = 0
+	if err := validateJoinClauseFields(q); err == nil || !strings.Contains(err.Error(), "holds itself") {
+		t.Fatalf("join field walk = %v, want cycle refusal", err)
+	}
+}
 
 // Every walk of a JOIN document holds the keys of an aggregate's order to the sources of the query.
 func TestJoinClauseFieldsHoldTheOrderKeysOfAnAggregate(t *testing.T) {

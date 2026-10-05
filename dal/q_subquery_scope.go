@@ -221,9 +221,21 @@ func collectionScanOrders(source RecordsetSource) []OrderExpression {
 }
 
 func validateQueryScope(q StructuredQuery, outer map[string]bool, path string, visiting map[uintptr]bool) error {
+	return validateQueryScopeAt(q, outer, path, visiting, &queryTreePath{})
+}
+
+func validateQueryScopeAt(q StructuredQuery, outer map[string]bool, path string, visiting map[uintptr]bool, walk *queryTreePath) error {
 	if q == nil {
 		return queryValidationError("query_shape", path, "query is required")
 	}
+	leave, exceeded := walk.enter(queryPointerID(q))
+	if leave == nil {
+		if exceeded {
+			return queryTooDeepError()
+		}
+		return queryValidationError("query_cycle", path, "recursive query reference")
+	}
+	defer leave()
 	if id := queryPointerID(q); id != 0 {
 		if visiting[id] {
 			return queryValidationError("query_cycle", path, "recursive query reference")
@@ -236,33 +248,33 @@ func validateQueryScope(q StructuredQuery, outer map[string]bool, path string, v
 	}
 	visible := cloneQueryAliases(outer)
 	local := map[string]bool{}
-	if err := validateFromScope(q.From(), visible, local, joinPath(path, "from"), visiting); err != nil {
+	if err := validateFromScopeAt(q.From(), visible, local, joinPath(path, "from"), visiting, walk); err != nil {
 		return err
 	}
 	for alias := range local {
 		visible[alias] = true
 	}
-	if err := validateConditionScope(q.Where(), visible, joinPath(path, "where"), visiting); err != nil {
+	if err := validateConditionScopeAt(q.Where(), visible, joinPath(path, "where"), visiting, walk); err != nil {
 		return err
 	}
-	if err := validateConditionScope(q.Having(), visible, joinPath(path, "having"), visiting); err != nil {
+	if err := validateConditionScopeAt(q.Having(), visible, joinPath(path, "having"), visiting, walk); err != nil {
 		return err
 	}
 	for i, column := range q.Columns() {
 		if column.Wildcard != nil && column.Wildcard.Source != "" && !visible[column.Wildcard.Source] {
 			return queryValidationError("query_scope", fmt.Sprintf("%s[%d].source", joinPath(path, "columns"), i), fmt.Sprintf("unknown alias %q", column.Wildcard.Source))
 		}
-		if err := validateExpressionScope(column.Expression, visible, fmt.Sprintf("%s[%d]", joinPath(path, "columns"), i), visiting); err != nil {
+		if err := validateExpressionScopeAt(column.Expression, visible, fmt.Sprintf("%s[%d]", joinPath(path, "columns"), i), visiting, walk); err != nil {
 			return err
 		}
 	}
 	for i, expression := range q.GroupBy() {
-		if err := validateExpressionScope(expression, visible, fmt.Sprintf("%s[%d]", joinPath(path, "groupBy"), i), visiting); err != nil {
+		if err := validateExpressionScopeAt(expression, visible, fmt.Sprintf("%s[%d]", joinPath(path, "groupBy"), i), visiting, walk); err != nil {
 			return err
 		}
 	}
 	for i, order := range q.OrderBy() {
-		if err := validateExpressionScope(order.Expression(), visible, fmt.Sprintf("%s[%d]", joinPath(path, "orderBy"), i), visiting); err != nil {
+		if err := validateExpressionScopeAt(order.Expression(), visible, fmt.Sprintf("%s[%d]", joinPath(path, "orderBy"), i), visiting, walk); err != nil {
 			return err
 		}
 	}
@@ -270,6 +282,18 @@ func validateQueryScope(q StructuredQuery, outer map[string]bool, path string, v
 }
 
 func validateFromScope(from FromSource, outer, local map[string]bool, path string, visiting map[uintptr]bool) error {
+	return validateFromScopeAt(from, outer, local, path, visiting, &queryTreePath{})
+}
+
+func validateFromScopeAt(from FromSource, outer, local map[string]bool, path string, visiting map[uintptr]bool, walk *queryTreePath) error {
+	leave, exceeded := walk.enter(nodePointerID(from))
+	if leave == nil {
+		if exceeded {
+			return queryTooDeepError()
+		}
+		return queryValidationError("query_cycle", path, "recursive source reference")
+	}
+	defer leave()
 	base := from.Base()
 	if source, ok := base.(*QuerySource); ok && source == nil {
 		return queryValidationError("query_shape", path+".query", "query is required")
@@ -288,7 +312,7 @@ func validateFromScope(from FromSource, outer, local map[string]bool, path strin
 		if source.Query() == nil {
 			return queryValidationError("query_shape", path+".query", "query is required")
 		}
-		if err := validateQueryScope(source.Query(), outer, path+".query", visiting); err != nil {
+		if err := validateQueryScopeAt(source.Query(), outer, path+".query", visiting, walk); err != nil {
 			return err
 		}
 	}
@@ -307,7 +331,7 @@ func validateFromScope(from FromSource, outer, local map[string]bool, path strin
 			return queryValidationError("query_shape", joinPath+".from", "from is required")
 		}
 		childLocal := map[string]bool{}
-		if err := validateFromScope(child, visible, childLocal, joinPath+".from", visiting); err != nil {
+		if err := validateFromScopeAt(child, visible, childLocal, joinPath+".from", visiting, walk); err != nil {
 			return err
 		}
 		childVisible := cloneQueryAliases(visible)
@@ -315,7 +339,7 @@ func validateFromScope(from FromSource, outer, local map[string]bool, path strin
 			childVisible[name] = true
 		}
 		for j, condition := range join.On() {
-			if err := validateConditionScope(condition, childVisible, fmt.Sprintf("%s.on[%d]", joinPath, j), visiting); err != nil {
+			if err := validateConditionScopeAt(condition, childVisible, fmt.Sprintf("%s.on[%d]", joinPath, j), visiting, walk); err != nil {
 				return err
 			}
 		}
@@ -334,48 +358,96 @@ func validateFromScope(from FromSource, outer, local map[string]bool, path strin
 }
 
 func validateConditionScope(condition Condition, visible map[string]bool, path string, visiting map[uintptr]bool) error {
+	return validateConditionScopeAt(condition, visible, path, visiting, &queryTreePath{})
+}
+
+func validateConditionScopeAt(condition Condition, visible map[string]bool, path string, visiting map[uintptr]bool, walk *queryTreePath) error {
 	if condition == nil {
 		return nil
 	}
+	leave, exceeded := walk.enter(nodePointerID(condition))
+	if leave == nil {
+		if exceeded {
+			return queryTooDeepError()
+		}
+		return queryValidationError("query_cycle", path, "recursive condition reference")
+	}
+	defer leave()
 	switch value := condition.(type) {
 	case ExistsCondition:
-		return validateQueryScope(value.Query(), visible, path+".query", visiting)
+		return validateQueryScopeAt(value.Query(), visible, path+".query", visiting, walk)
+	case *ExistsCondition:
+		if value != nil {
+			return validateConditionScopeAt(*value, visible, path, visiting, walk)
+		}
 	case IsNullCondition:
-		return validateExpressionScope(value.Operand(), visible, path+".operand", visiting)
+		return validateExpressionScopeAt(value.Operand(), visible, path+".operand", visiting, walk)
+	case *IsNullCondition:
+		if value != nil {
+			return validateConditionScopeAt(*value, visible, path, visiting, walk)
+		}
 	case Comparison:
-		if err := validateExpressionScope(value.Left, visible, path+".left", visiting); err != nil {
+		if err := validateExpressionScopeAt(value.Left, visible, path+".left", visiting, walk); err != nil {
 			return err
 		}
-		return validateExpressionScope(value.Right, visible, path+".right", visiting)
+		return validateExpressionScopeAt(value.Right, visible, path+".right", visiting, walk)
+	case *Comparison:
+		if value != nil {
+			return validateConditionScopeAt(*value, visible, path, visiting, walk)
+		}
 	case GroupCondition:
 		for i, child := range value.Conditions() {
-			if err := validateConditionScope(child, visible, fmt.Sprintf("%s.conditions[%d]", path, i), visiting); err != nil {
+			if err := validateConditionScopeAt(child, visible, fmt.Sprintf("%s.conditions[%d]", path, i), visiting, walk); err != nil {
 				return err
 			}
+		}
+	case *GroupCondition:
+		if value != nil {
+			return validateConditionScopeAt(*value, visible, path, visiting, walk)
 		}
 	}
 	return nil
 }
 
 func validateExpressionScope(expression Expression, visible map[string]bool, path string, visiting map[uintptr]bool) error {
+	return validateExpressionScopeAt(expression, visible, path, visiting, &queryTreePath{})
+}
+
+func validateExpressionScopeAt(expression Expression, visible map[string]bool, path string, visiting map[uintptr]bool, walk *queryTreePath) error {
 	if expression == nil {
 		return nil
 	}
+	leave, exceeded := walk.enter(nodePointerID(expression))
+	if leave == nil {
+		if exceeded {
+			return queryTooDeepError()
+		}
+		return queryValidationError("query_cycle", path, "recursive expression reference")
+	}
+	defer leave()
 	switch value := expression.(type) {
 	case FieldRef:
 		if value.Source() != "" && !visible[value.Source()] {
 			return queryValidationError("query_scope", path+".source", fmt.Sprintf("unknown alias %q", value.Source()))
 		}
 	case QueryExpression:
-		return validateQueryScope(value.Query(), visible, path+".query", visiting)
+		return validateQueryScopeAt(value.Query(), visible, path+".query", visiting, walk)
+	case *QueryExpression:
+		if value != nil {
+			return validateExpressionScopeAt(*value, visible, path, visiting, walk)
+		}
 	case BinaryExpression:
-		if err := validateExpressionScope(value.Left, visible, path+".left", visiting); err != nil {
+		if err := validateExpressionScopeAt(value.Left, visible, path+".left", visiting, walk); err != nil {
 			return err
 		}
-		return validateExpressionScope(value.Right, visible, path+".right", visiting)
+		return validateExpressionScopeAt(value.Right, visible, path+".right", visiting, walk)
+	case *BinaryExpression:
+		if value != nil {
+			return validateExpressionScopeAt(*value, visible, path, visiting, walk)
+		}
 	case AggregateFunc:
 		for i, arg := range value.FuncArgs() {
-			if err := validateExpressionScope(arg, visible, fmt.Sprintf("%s.args[%d]", path, i), visiting); err != nil {
+			if err := validateExpressionScopeAt(arg, visible, fmt.Sprintf("%s.args[%d]", path, i), visiting, walk); err != nil {
 				return err
 			}
 		}
@@ -383,7 +455,7 @@ func validateExpressionScope(expression Expression, visible map[string]bool, pat
 			if key == nil {
 				continue
 			}
-			if err := validateExpressionScope(key.Expression(), visible, fmt.Sprintf("%s.orderBy[%d]", path, i), visiting); err != nil {
+			if err := validateExpressionScopeAt(key.Expression(), visible, fmt.Sprintf("%s.orderBy[%d]", path, i), visiting, walk); err != nil {
 				return err
 			}
 		}

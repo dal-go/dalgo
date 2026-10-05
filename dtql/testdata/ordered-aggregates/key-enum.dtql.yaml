@@ -1,0 +1,10 @@
+from:
+  name: Typed
+columns:
+- aggregate:
+    function: last
+    args:
+    - field: XNumber
+    orderBy:
+    - field: XEnum
+  as: last_x

@@ -1,0 +1,14 @@
+from:
+  name: Empty
+groupBy:
+- field: G
+columns:
+- field: G
+  as: G
+- aggregate:
+    function: last
+    args:
+    - field: X
+    orderBy:
+    - field: K
+  as: last_x
