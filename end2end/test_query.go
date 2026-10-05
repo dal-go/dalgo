@@ -47,6 +47,9 @@ func queryOperationsTest(ctx context.Context, t *testing.T, db dal.DB, eventuall
 	t.Run("access_field_lists", func(t *testing.T) {
 		accessFieldListTest(ctx, t, db)
 	})
+	t.Run("access_sources", func(t *testing.T) {
+		accessSourcesTest(ctx, t, db)
+	})
 	t.Run(`SELECT ID FROM Cities`, func(t *testing.T) {
 		qb := dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "")).NewQuery()
 		t.Run("no_limit", func(t *testing.T) {

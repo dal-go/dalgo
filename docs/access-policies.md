@@ -210,10 +210,38 @@ responsibility.
 
 ## Query boundaries and future constraints
 
-The current boundary authorizes the base collection and every joined source.
-A filter cannot make an otherwise forbidden collection safe. Collection-group
-queries use `access.CollectionGroupScope`; non-structured queries use the
-deliberately broad `access.OpaqueQueryScope`.
+The current boundary authorizes every source a structured query reads before
+any of them is read: the base collection, every joined source at any depth,
+every source inside a derived source, and every source of a subquery (EXISTS,
+NOT EXISTS or scalar) in any clause. A filter cannot make an otherwise
+forbidden collection safe. Collection-group queries use
+`access.CollectionGroupScope`; non-structured queries use the deliberately
+broad `access.OpaqueQueryScope`. A part of a structured query that cannot be
+analysed (an unrecognised node, a query that refers to itself, nesting deeper
+than 64 levels) is an opaque query and needs the same explicit rule.
+
+Under a field allow-list, an aggregate is held to the list by its operands:
+`COUNT(*)` and an aggregate over allowed fields run, and an aggregate over a
+hidden field, alone or inside arithmetic, is denied as a column denial. Only
+the aggregate functions DALgo defines (`COUNT`, `SUM`, `AVG`, `MIN`, `MAX`,
+`FIRST`, `LAST`) and the operators `+ - * /` are checked this way; any other
+function or operator is refused as unsupported. An aggregate belongs in the
+select list, `HAVING` and `ORDER BY`; in `WHERE` or `GROUP BY` it is refused as
+unsupported.
+
+A selected field or aggregate comes back under the name the caller gave it. When
+the field list allows the column's expression but not that name, the access
+layer asks the adapter for the column under an alias of its own, different for
+every query, and renames it on the way back; a field the adapter returns under
+the caller's name is redacted like any other field. An adapter that ignores the
+column projection therefore returns no value for such a column. A column whose
+expression the list does not allow is sent under its own name and removed from
+the result by that name; this is what bounds a secured session over another
+secured session to the fields both lists allow, for the columns the outer
+session adds to a query that names none or uses a wildcard.
+
+A grouped query that names no columns selects its group keys, as DALgo defines
+it, and is sent with those keys as its columns.
 
 Custom SQL text is always opaque. DALgo does not inspect or attempt to infer
 tables from the SQL string, so ordinary path/collection rules can never

@@ -349,6 +349,13 @@ Recent query capabilities include:
 - Recordset readers with typed columns where the adapter supports columnar
   output.
 
+Structured queries reach SQL engines through `dalgo2sql`. Its SQLite compiler
+(`StructuredQueryDialect: "sqlite"`) and its PostgreSQL compiler
+(`StructuredQueryDialect: "postgres"`) bind query values; with an empty dialect
+every `database/sql` engine, SQLite included, uses the legacy text emitter,
+which writes query values into the SQL text. Do not pass untrusted values
+through it.
+
 ## 🔁 Transactions
 
 Transactions use callback-style workers. This keeps transaction lifetime scoped
@@ -386,12 +393,14 @@ DALgo supports production use through separate adapter modules:
 - [`dalgo2firestore`](https://github.com/dal-go/dalgo2firestore) for Google
   Cloud Firestore.
 - [`dalgo2sql`](https://github.com/dal-go/dalgo2sql) for SQL databases through
-  Go SQL drivers. SQLite has a structured-query compiler (opt in with
-  `DbOptions.StructuredQueryDialect: "sqlite"`). PostgreSQL, MySQL, Microsoft
-  SQL Server and Oracle have no compiler yet and use the legacy text emitter,
-  which is not dialect-aware and writes query values into the SQL text instead of
-  binding them; do not pass untrusted values through it. A PostgreSQL compiler is
-  planned.
+  Go SQL drivers. Two engines have a structured-query compiler that binds query
+  values as parameters: SQLite (`DbOptions.StructuredQueryDialect: "sqlite"`)
+  and PostgreSQL (`DbOptions.StructuredQueryDialect: "postgres"`, available
+  from dalgo2sql v0.26.0). With an empty dialect every `database/sql` engine,
+  SQLite and PostgreSQL included, uses the legacy text emitter, which is not
+  dialect-aware and writes query values into the SQL text instead of binding
+  them; do not pass untrusted values through it. MySQL, Microsoft SQL Server and
+  Oracle have no compiler yet and use the legacy text emitter.
 - [`dalgo2sqlite`](https://github.com/dal-go/dalgo2sqlite) for SQLite-specific
   schema, DDL, and concurrency-aware behavior on top of SQL support.
 

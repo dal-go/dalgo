@@ -284,9 +284,24 @@ func TestEndToEnd(t *testing.T) {
 			// The replay adapter cannot project columns; the positive control
 			// must skip rather than fail.
 			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access field list: allowed recordset":
+			// Nor can it read a recordset; the control skips on either read.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+			tx.EXPECT().ExecuteQueryToRecordsetReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 		case "access field list: records", "access field list: recordset":
 			// Every query in these transactions must be denied by the access
 			// layer; the adapter is never reached, so no call is expected.
+		case "access sources: records", "access sources: recordset":
+			// A query that reads the denied collection is refused by the access
+			// layer; the adapter is never reached, so no call is expected.
+		case "access sources: allowed":
+			// The replay adapter cannot run a query with nested sources; the
+			// control only asserts that the access layer does not refuse it.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access sources: nested read probe":
+			// The replay adapter does not serve the scan of a nested source, so the
+			// control skips; a real adapter runs it.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 		case "":
 			panic("no RO tx name")
 		default:

@@ -2,6 +2,8 @@ package access
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -271,6 +273,14 @@ func (sets fieldSets) redactMap(prefix string, data map[string]any) {
 // pruned in place; pointer data is round-tripped through JSON so nested
 // refusals apply, then written back into the zeroed target.
 func (sets fieldSets) redactRecord(rec record.Record) error {
+	return sets.redactRecordRenaming(rec, nil)
+}
+
+// redactRecordRenaming is redactRecord for the row of a query whose columns the
+// access layer renamed: in map data, the value under each generated key is kept
+// whatever the list says of the key and is moved to the name the caller gave
+// the column; every other top-level key is redacted by its own name.
+func (sets fieldSets) redactRecordRenaming(rec record.Record, renames []outputRename) error {
 	if !sets.restrictive() || !rec.Exists() {
 		return nil
 	}
@@ -278,13 +288,13 @@ func (sets fieldSets) redactRecord(rec record.Record) error {
 	switch {
 	case value.Kind() == reflect.Map:
 		if data, ok := rec.Data().(map[string]any); ok {
-			sets.redactMap("", data)
+			sets.redactMapRenaming(data, renames)
 			return nil
 		}
 		return fmt.Errorf("access: cannot redact map data of type %T", rec.Data())
 	case value.Kind() == reflect.Pointer && !value.IsNil():
 		if data, ok := rec.Data().(*map[string]any); ok {
-			sets.redactMap("", *data)
+			sets.redactMapRenaming(*data, renames)
 			return nil
 		}
 		data, err := condeval.ToMap(rec.Data())
@@ -300,10 +310,34 @@ func (sets fieldSets) redactRecord(rec record.Record) error {
 	}
 }
 
+// redactMapRenaming is redactMap for a row some of whose columns were sent
+// under generated aliases. Only a key the access layer generated for this query
+// is exempt, and it is judged by what produced it, not by its name: it was given
+// only to a column whose expression this session's field list allows (see
+// aliasRefusedOutputs). Whatever else the session returns under any other key,
+// a name the caller chose included, is redacted by that key.
+func (sets fieldSets) redactMapRenaming(data map[string]any, renames []outputRename) {
+	kept := make([]any, len(renames))
+	found := make([]bool, len(renames))
+	for i, rename := range renames {
+		kept[i], found[i] = data[rename.generated]
+		delete(data, rename.generated)
+	}
+	sets.redactMap("", data)
+	for i, rename := range renames {
+		if found[i] {
+			data[rename.name] = kept[i]
+		}
+	}
+}
+
 // redactingReader applies field redaction to every record a query returns.
+// renames are the columns the access layer sent under generated aliases (see
+// aliasRefusedOutputs).
 type redactingReader struct {
 	dal.RecordsReader
-	sets fieldSets
+	sets    fieldSets
+	renames []outputRename
 }
 
 func (r redactingReader) Next() (record.Record, error) {
@@ -311,10 +345,83 @@ func (r redactingReader) Next() (record.Record, error) {
 	if err != nil || rec == nil {
 		return rec, err
 	}
-	if err := r.sets.redactRecord(rec); err != nil {
+	if err := r.sets.redactRecordRenaming(rec, r.renames); err != nil {
 		return nil, err
 	}
 	return rec, nil
+}
+
+// outputRename records one column sent to the wrapped session under an alias the
+// access layer generated: the key the column comes back under, and the name the
+// caller gave it.
+type outputRename struct{ generated, name string }
+
+// outputName is the name a selected column comes back under, by DALgo's rule:
+// the alias when there is one, otherwise the field's own name, otherwise the
+// text of the expression. ok is false for a column that names no output: a
+// wildcard, or a column with no expression.
+func outputName(column dal.Column) (name string, ok bool) {
+	if column.Wildcard != nil || column.Expression == nil {
+		return "", false
+	}
+	if column.Alias != "" {
+		return column.Alias, true
+	}
+	switch expression := column.Expression.(type) {
+	case dal.FieldRef:
+		return expression.Name(), true
+	case *dal.FieldRef:
+		return expression.Name(), true
+	}
+	return column.Expression.String(), true
+}
+
+// aliasRefusedOutputs sends every explicitly selected column whose expression
+// the field list allows, and whose output name the list does not, under an alias
+// of the access layer's own, and returns the query to send with the renames that
+// undo it. The alias carries a random token drawn for this query, so neither the
+// caller nor the wrapped session can know it. Every other column is sent as it
+// is: one that comes back under a name the list allows, and one whose expression
+// the list does not allow, which this session did not hold to the list (it can
+// be a column an outer secured session's projection added) and which redaction
+// therefore judges by its name. The alias exists so that redaction can tell the
+// value of an allowed expression from a stored field of the same name: redaction
+// keeps exactly the generated keys, and a session that returns more than the
+// query projected, or none of it, brings back no generated key and so exempts
+// nothing.
+func aliasRefusedOutputs(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuery, []outputRename) {
+	columns := query.Columns()
+	var renames []outputRename
+	var rewritten []dal.Column
+	token := ""
+	for i, column := range columns {
+		if !sets.readsOnlyAllowedFields(column.Expression) {
+			continue
+		}
+		name, named := outputName(column)
+		if !named || sets.allowsWhole(name) {
+			continue
+		}
+		if rewritten == nil {
+			rewritten = append([]dal.Column(nil), columns...)
+			token = outputToken()
+		}
+		generated := fmt.Sprintf("access_%s_%d", token, i)
+		rewritten[i].Alias = generated
+		renames = append(renames, outputRename{generated: generated, name: name})
+	}
+	if renames == nil {
+		return query, nil
+	}
+	return dal.WithColumns(query, rewritten), renames
+}
+
+// outputToken returns 128 random bits as lower-case hexadecimal, so an alias
+// built from it survives an engine that folds identifier case.
+func outputToken() string {
+	var raw [16]byte
+	_, _ = rand.Read(raw[:]) // never fails: a failure of the system source ends the process
+	return hex.EncodeToString(raw[:])
 }
 
 // projectQuery narrows a structured query's columns to the enumerable
@@ -335,8 +442,7 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 				hasWildcard = true
 				continue
 			}
-			field, ok := column.Expression.(dal.FieldRef)
-			if !ok || !sets.allowsWhole(field.Name()) {
+			if !sets.readsOnlyAllowedFields(column.Expression) {
 				return queryProjection{query: query, status: queryProjectionUnavailable}
 			}
 		}
@@ -364,6 +470,18 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 		}
 		return queryProjection{query: query, status: queryProjectionApplied}
 	}
+	if len(query.GroupBy()) > 0 {
+		// A grouped query with no columns selects its group keys, so that is what
+		// it is projected to, not the allowed fields: a column that is neither
+		// aggregated nor a group key makes the aggregation invalid.
+		columns := dal.EffectiveAggregationColumns(query)
+		for _, column := range columns {
+			if !sets.readsOnlyAllowedFields(column.Expression) {
+				return queryProjection{query: query, status: queryProjectionUnavailable}
+			}
+		}
+		return queryProjection{query: dal.WithColumns(query, columns), status: queryProjectionApplied}
+	}
 	allowed, ok := sets.enumerable()
 	if !ok {
 		return queryProjection{query: query, status: queryProjectionUnavailable}
@@ -379,6 +497,25 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 }
 
 var _ = context.Background
+
+// readsOnlyAllowedFields reports whether a selected column is a plain field
+// (given by value or by non-nil pointer), or an aggregate whose operands name
+// only fields, that every set allows.
+func (sets fieldSets) readsOnlyAllowedFields(expression dal.Expression) bool {
+	switch expression := expression.(type) {
+	case dal.FieldRef:
+		return sets.allowsWhole(expression.Name())
+	case *dal.FieldRef:
+		return expression != nil && sets.allowsWhole(expression.Name())
+	case dal.AggregateFunc:
+		fields, checkable := aggregateFields(expression, 0)
+		for _, name := range fields {
+			checkable = checkable && sets.allowsWhole(name)
+		}
+		return checkable
+	}
+	return false
+}
 
 // allowsWhole prevents a whole-object query probe from observing masked leaves.
 // Masks may conservatively reject an object when subtree coverage is uncertain.
