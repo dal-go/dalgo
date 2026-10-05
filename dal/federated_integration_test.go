@@ -142,3 +142,112 @@ columns:
 		}
 	}
 }
+
+func TestFederatedMoneySingleSourceExactProductsWhereAndOrder(t *testing.T) {
+	const document = `from: {database: orders, name: Invoice, alias: o}
+money: {minorUnitScale: 2, divisionScale: 2, rounding: halfEven}
+columns:
+  - {aggregate: {function: sum, args: [{binary: {op: '*', left: {field: price, source: o}, right: {field: quantity, source: o}}}]}, as: total}
+  - {aggregate: {function: min, args: [{field: price, source: o}]}, as: cheapest}
+  - {aggregate: {function: max, args: [{field: price, source: o}]}, as: priciest}
+where: {left: {field: price, source: o}, op: '>', right: {value: '9'}}
+`
+	query, err := dtql.Deserialize([]byte(document))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := federatedFixtureSource{name: "Invoice", rows: []record.Record{
+		record.NewRecordWithData(record.NewKeyWithID("Invoice", "1"), map[string]any{"price": "9", "quantity": "100"}),
+		record.NewRecordWithData(record.NewKeyWithID("Invoice", "2"), map[string]any{"price": "10.00", "quantity": "0.2"}),
+		record.NewRecordWithData(record.NewKeyWithID("Invoice", "3"), map[string]any{"price": "9007199254740993", "quantity": "1"}),
+	}}
+	reader, err := dal.ExecuteFederatedQuery(context.Background(), query, func(context.Context, string) (dal.QueryExecutor, error) { return source, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := dal.ReadAllToRecords(context.Background(), reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows=%d", len(rows))
+	}
+	got := rows[0].Data().(map[string]any)
+	for key, want := range map[string]string{"total": "9007199254740995", "cheapest": "10.00", "priciest": "9007199254740993"} {
+		if got[key] != want {
+			t.Errorf("%s=%v want %s", key, got[key], want)
+		}
+	}
+}
+
+func TestFederatedMoneyKeepsTextDimensionsLexical(t *testing.T) {
+	const document = `from: {database: customers, name: Customer, alias: c}
+groupBy: [{field: customerName, source: c}]
+money: {minorUnitScale: 2, divisionScale: 2, rounding: halfEven}
+columns:
+  - {field: customerName, source: c}
+  - {aggregate: {function: count, distinct: true, args: [{field: label, source: c}]}, as: labels}
+  - {aggregate: {function: min, args: [{field: label, source: c}]}, as: firstLabel}
+  - {aggregate: {function: sum, args: [{field: amount, source: c}]}, as: total}
+where: {left: {field: customerName, source: c}, op: '==', right: {value: Bob}}
+`
+	query, err := dtql.Deserialize([]byte(document))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := federatedFixtureSource{name: "Customer", rows: []record.Record{
+		record.NewRecordWithData(record.NewKeyWithID("Customer", "1"), map[string]any{"customerName": "Bob", "label": "zeta", "amount": "1.00"}),
+		record.NewRecordWithData(record.NewKeyWithID("Customer", "2"), map[string]any{"customerName": "Bob", "label": "alpha", "amount": "2.00"}),
+		record.NewRecordWithData(record.NewKeyWithID("Customer", "3"), map[string]any{"customerName": "007", "label": "numeric-looking", "amount": "9.00"}),
+	}}
+	reader, err := dal.ExecuteFederatedQuery(context.Background(), query, func(context.Context, string) (dal.QueryExecutor, error) { return source, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := dal.ReadAllToRecords(context.Background(), reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows=%d", len(rows))
+	}
+	got := rows[0].Data().(map[string]any)
+	for key, want := range map[string]any{"customerName": "Bob", "labels": int64(2), "firstLabel": "alpha", "total": "3"} {
+		if got[key] != want {
+			t.Errorf("%s=%v want %v", key, got[key], want)
+		}
+	}
+}
+
+func TestFederatedMoneyOrderByUsesNumericDecimalOrder(t *testing.T) {
+	const document = `from: {database: orders, name: Invoice, alias: o}
+groupBy: [{field: price, source: o}]
+orderBy: [{field: price, source: o}]
+money: {minorUnitScale: 2, divisionScale: 2, rounding: halfEven}
+columns:
+  - {field: price, source: o}
+  - {aggregate: {function: sum, args: [{field: amount, source: o}]}, as: total}
+`
+	query, err := dtql.Deserialize([]byte(document))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := federatedFixtureSource{name: "Invoice", rows: []record.Record{
+		record.NewRecordWithData(record.NewKeyWithID("Invoice", "1"), map[string]any{"price": "10", "amount": "1"}),
+		record.NewRecordWithData(record.NewKeyWithID("Invoice", "2"), map[string]any{"price": "9", "amount": "2"}),
+	}}
+	reader, err := dal.ExecuteFederatedQuery(context.Background(), query, func(context.Context, string) (dal.QueryExecutor, error) { return source, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := dal.ReadAllToRecords(context.Background(), reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows=%d", len(rows))
+	}
+	if rows[0].Data().(map[string]any)["price"] != "9" || rows[1].Data().(map[string]any)["price"] != "10" {
+		t.Fatalf("numeric order = %#v, %#v", rows[0].Data(), rows[1].Data())
+	}
+}

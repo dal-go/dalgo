@@ -74,6 +74,10 @@ type aggregationSourceQuery struct {
 	orders  []OrderExpression
 }
 
+type moneyAggregationSourceQuery struct{ aggregationSourceQuery }
+
+func (q moneyAggregationSourceQuery) Where() Condition { return nil }
+
 func newAggregationSourceQuery(q StructuredQuery, ordered bool) StructuredQuery {
 	fields := collectSourceFields(q)
 	columns := make([]Column, len(fields))
@@ -142,6 +146,7 @@ func collectSourceFields(q StructuredQuery) []FieldRef {
 	for _, o := range q.OrderBy() {
 		walk(o.Expression())
 	}
+	walkCondition(q.Where())
 	walkCondition(q.Having())
 	return result
 }
@@ -150,7 +155,7 @@ type aggregateState struct {
 	expression AggregateFunc
 	count      int64
 	sum        float64
-	exactSum   *big.Int
+	exactSum   *big.Rat
 	value      any
 	hasValue   bool
 	distinct   map[string]struct{}
@@ -256,9 +261,26 @@ func (r *localAggregationReader) nextStreaming() (result record.Record, resultEr
 		if err != nil {
 			return nil, err
 		}
-		row, err := normalizedRecordMap(rec)
+		var row map[string]any
+		if r.money != nil {
+			if hasUnsafeMoneyFloat(rec.Data()) {
+				return nil, fmt.Errorf("money input contains a fractional or unsafe binary floating-point value")
+			}
+			row, err = normalizedJoinRecordMapForMode(rec, true)
+		} else {
+			row, err = normalizedRecordMap(rec)
+		}
 		if err != nil {
 			return nil, err
+		}
+		if r.money != nil {
+			keep, err := evalMoneyMapCondition(r.query.Where(), row, r.money)
+			if err != nil {
+				return nil, err
+			}
+			if !keep {
+				continue
+			}
 		}
 		key, values, err := r.groupKey(row)
 		if err != nil {
@@ -331,9 +353,26 @@ func (r *localAggregationReader) loadMaterialized() (resultErr error) {
 		if err != nil {
 			return err
 		}
-		row, err := normalizedRecordMap(rec)
+		var row map[string]any
+		if r.money != nil {
+			if hasUnsafeMoneyFloat(rec.Data()) {
+				return fmt.Errorf("money input contains a fractional or unsafe binary floating-point value")
+			}
+			row, err = normalizedJoinRecordMapForMode(rec, true)
+		} else {
+			row, err = normalizedRecordMap(rec)
+		}
 		if err != nil {
 			return err
+		}
+		if r.money != nil {
+			keep, err := evalMoneyMapCondition(r.query.Where(), row, r.money)
+			if err != nil {
+				return err
+			}
+			if !keep {
+				continue
+			}
 		}
 		key, values, err := r.groupKey(row)
 		if err != nil {
@@ -379,6 +418,11 @@ func (r *localAggregationReader) loadMaterialized() (resultErr error) {
 				if err != nil {
 					return fmt.Errorf("ORDER BY expression #%d: %w", i, err)
 				}
+				if r.money != nil {
+					if _, err := compareMoneyValues(value, value); err != nil {
+						return fmt.Errorf("ORDER BY expression #%d: %w", i, err)
+					}
+				}
 				out[aggregationOrderKey(i)] = value
 			}
 			if err := r.reserveMaterializedOutput(out); err != nil {
@@ -393,6 +437,9 @@ func (r *localAggregationReader) loadMaterialized() (resultErr error) {
 				a := output[i][aggregationOrderKey(orderIndex)]
 				b := output[j][aggregationOrderKey(orderIndex)]
 				comparison := compareAggregationValues(a, b)
+				if r.money != nil {
+					comparison, _ = compareMoneyValues(a, b)
+				}
 				if order.Descending() {
 					comparison = -comparison
 				}
@@ -486,7 +533,13 @@ func (r *localAggregationReader) groupKey(row map[string]any) (string, map[strin
 	parts := make([]string, len(r.query.GroupBy()))
 	values := make(map[string]any, len(parts))
 	for i, expression := range r.query.GroupBy() {
-		value, err := evalScalar(expression, row)
+		var value any
+		var err error
+		if r.money != nil {
+			value, err = evalMoneyScalar(expression, row, r.money)
+		} else {
+			value, err = evalScalar(expression, row)
+		}
 		if err != nil {
 			return "", nil, err
 		}
@@ -508,13 +561,22 @@ func (r *localAggregationReader) updateGroup(group *localGroup, row map[string]a
 		var value any
 		var err error
 		if !isStar {
-			value, err = evalScalar(arg, row)
+			if r.money != nil {
+				value, err = evalMoneyScalar(arg, row, r.money)
+			} else {
+				value, err = evalScalar(arg, row)
+			}
 		}
 		if err != nil {
 			return err
 		}
 		if state.distinct != nil && value != nil {
 			key, err := encodeTypedValue(value)
+			if r.money != nil && (strings.EqualFold(aggregate.FuncName(), SUM) || strings.EqualFold(aggregate.FuncName(), AVERAGE)) {
+				if n, parseErr := moneyNumber(value); parseErr == nil {
+					key = "decimal:" + n.RatString()
+				}
+			}
 			if err != nil {
 				return err
 			}
@@ -548,14 +610,22 @@ func (r *localAggregationReader) updateGroup(group *localGroup, row map[string]a
 				continue
 			}
 			if r.money != nil {
-				minor, err := moneyInput(value, r.money.MinorUnitScale)
+				if _, direct := arg.(FieldRef); direct {
+					if err := validateMoneyField(value, r.money); err != nil {
+						return err
+					}
+				}
+				number, err := moneyNumber(value)
 				if err != nil {
 					return err
 				}
 				if state.exactSum == nil {
-					state.exactSum = new(big.Int)
+					state.exactSum = new(big.Rat)
 				}
-				state.exactSum.Add(state.exactSum, minor)
+				state.exactSum.Add(state.exactSum, number)
+				if err := validateMoneyRat(state.exactSum); err != nil {
+					return err
+				}
 				if state.count == math.MaxInt64 {
 					return fmt.Errorf("AVG input count overflow")
 				}
@@ -583,7 +653,18 @@ func (r *localAggregationReader) updateGroup(group *localGroup, row map[string]a
 			if value == nil {
 				continue
 			}
-			if !state.hasValue || strings.EqualFold(aggregate.FuncName(), MIN) && compareAggregationValues(value, state.value) < 0 || strings.EqualFold(aggregate.FuncName(), MAX) && compareAggregationValues(value, state.value) > 0 {
+			comparison := 0
+			if state.hasValue {
+				if r.money != nil {
+					comparison, err = compareMoneyValues(value, state.value)
+					if err != nil {
+						return err
+					}
+				} else {
+					comparison = compareAggregationValues(value, state.value)
+				}
+			}
+			if !state.hasValue || strings.EqualFold(aggregate.FuncName(), MIN) && comparison < 0 || strings.EqualFold(aggregate.FuncName(), MAX) && comparison > 0 {
 				if err := r.setAggregateStateValue(group, state, value); err != nil {
 					return err
 				}
@@ -599,6 +680,17 @@ func (r *localAggregationReader) updateGroup(group *localGroup, row map[string]a
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func validateMoneyField(value any, config *MoneyConfig) error {
+	if _, err := moneyNumber(value); err != nil {
+		return err
+	}
+	text := fmt.Sprint(value)
+	if strings.Count(text, ".") == 1 && len(text)-strings.IndexByte(text, '.')-1 > config.MinorUnitScale {
+		return fmt.Errorf("money input %q exceeds minorUnitScale %d", text, config.MinorUnitScale)
 	}
 	return nil
 }
@@ -670,7 +762,7 @@ func (r *localAggregationReader) resolveGroupExpression(expression Expression, g
 				return nil, nil
 			}
 			if r.money != nil {
-				return moneyMinorText(state.exactSum, r.money.MinorUnitScale), nil
+				return moneyFiniteText(state.exactSum)
 			}
 			return state.sum, nil
 		case AVERAGE:
@@ -678,8 +770,7 @@ func (r *localAggregationReader) resolveGroupExpression(expression Expression, g
 				return nil, nil
 			}
 			if r.money != nil {
-				denominator := new(big.Int).Mul(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(r.money.MinorUnitScale)), nil), big.NewInt(state.count))
-				mean := new(big.Rat).SetFrac(state.exactSum, denominator)
+				mean := new(big.Rat).Quo(state.exactSum, new(big.Rat).SetInt64(state.count))
 				return moneyText(mean, r.money.DivisionScale), nil
 			}
 			return state.sum / float64(state.count), nil
@@ -700,7 +791,7 @@ func (r *localAggregationReader) resolveGroupExpression(expression Expression, g
 			return nil, err
 		}
 		if r.money != nil {
-			return moneyPerCapita(binary.Operator, left, right, r.money.DivisionScale)
+			return moneyArithmetic(binary.Operator, left, right, r.money.DivisionScale)
 		}
 		return evalArithmeticValues(binary.Operator, left, right)
 	}
@@ -734,8 +825,17 @@ func (r *localAggregationReader) evalHaving(condition Condition, group *localGro
 			return false, err
 		}
 		cmp := compareAggregationValues(left, right)
+		if r.money != nil {
+			cmp, err = compareMoneyValues(left, right)
+			if err != nil {
+				return false, err
+			}
+		}
 		switch c.Operator {
 		case Equal:
+			if r.money != nil {
+				return cmp == 0, nil
+			}
 			return valuesEqual(left, right), nil
 		case GreaterThen:
 			return left != nil && right != nil && cmp > 0, nil
@@ -843,6 +943,67 @@ func evalScalar(expression Expression, row map[string]any) (any, error) {
 	default:
 		return nil, fmt.Errorf("unsupported scalar expression %T", expression)
 	}
+}
+
+func evalMoneyMapCondition(c Condition, row map[string]any, config *MoneyConfig) (bool, error) {
+	switch v := c.(type) {
+	case nil:
+		return true, nil
+	case Comparison:
+		left, err := evalMoneyScalar(v.Left, row, config)
+		if err != nil {
+			return false, err
+		}
+		right, err := evalMoneyScalar(v.Right, row, config)
+		if err != nil {
+			return false, err
+		}
+		if left == nil || right == nil {
+			return false, nil
+		}
+		cmp, err := compareMoneyValues(left, right)
+		if err != nil {
+			return false, err
+		}
+		switch v.Operator {
+		case Equal:
+			return cmp == 0, nil
+		case GreaterThen:
+			return cmp > 0, nil
+		case GreaterOrEqual:
+			return cmp >= 0, nil
+		case LessThen:
+			return cmp < 0, nil
+		case LessOrEqual:
+			return cmp <= 0, nil
+		}
+	case IsNullCondition:
+		value, err := evalMoneyScalar(v.Operand(), row, config)
+		if err != nil {
+			return false, err
+		}
+		return IsNullValue(value) != v.Negated(), nil
+	case GroupCondition:
+		if v.Operator() == Or {
+			for _, child := range v.Conditions() {
+				ok, err := evalMoneyMapCondition(child, row, config)
+				if err != nil || ok {
+					return ok, err
+				}
+			}
+			return false, nil
+		}
+		for _, child := range v.Conditions() {
+			ok, err := evalMoneyMapCondition(child, row, config)
+			if err != nil || !ok {
+				return ok, err
+			}
+		}
+		return true, nil
+	default:
+		return false, fmt.Errorf("unsupported money condition %T", c)
+	}
+	return false, fmt.Errorf("unsupported money comparison operator")
 }
 
 func evalArithmeticValues(operator ArithmeticOperator, left, right any) (any, error) {

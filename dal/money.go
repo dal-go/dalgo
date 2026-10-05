@@ -18,6 +18,7 @@ type MoneyConfig struct {
 }
 
 var decimalText = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$`)
+var moneyDecimalText = regexp.MustCompile(`^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$`)
 var maxSafeMoneyInteger = big.NewInt(9007199254740991)
 
 func checkSafeMoneyInteger(text string) error {
@@ -99,23 +100,222 @@ func moneyNumber(value any) (*big.Rat, error) {
 		text = fmt.Sprint(v)
 	case float64:
 		if math.IsNaN(v) || math.IsInf(v, 0) || math.Trunc(v) != v || math.Abs(v) > 9007199254740991 {
-			return nil, fmt.Errorf("money operand must be a safe integer, got %v", v)
+			return nil, fmt.Errorf("money operand must be a safe whole integer, got %v", v)
 		}
 		text = fmt.Sprintf("%.0f", v)
 	default:
 		return nil, fmt.Errorf("money operand must be a decimal string or integer, got %T", value)
 	}
-	if !decimalText.MatchString(text) {
+	if !moneyDecimalText.MatchString(text) {
 		return nil, fmt.Errorf("invalid money operand %q", text)
 	}
-	if numeric {
+	if len(text) > 80 || strings.Count(text, ".") == 1 && len(text)-strings.IndexByte(text, '.')-1 > 38 {
+		return nil, fmt.Errorf("money operand exceeds 38 digits or fractional digits")
+	}
+	coefficient := strings.TrimLeft(strings.ReplaceAll(strings.TrimPrefix(text, "-"), ".", ""), "0")
+	coefficient = strings.TrimLeft(coefficient, "+")
+	if len(coefficient) > 38 {
+		return nil, fmt.Errorf("money operand exceeds 38 significant digits")
+	}
+	if numeric && !strings.Contains(text, ".") {
 		if err := checkSafeMoneyInteger(text); err != nil {
 			return nil, err
 		}
 	}
-	result := new(big.Rat)
-	result.SetString(text)
-	return result, nil
+	return parseMoneyDecimal(text)
+}
+
+func parseMoneyDecimal(text string) (*big.Rat, error) {
+	if !moneyDecimalText.MatchString(text) {
+		return nil, fmt.Errorf("invalid money operand %q", text)
+	}
+	negative := strings.HasPrefix(text, "-")
+	unsigned := strings.TrimLeft(text, "+-")
+	parts := strings.SplitN(unsigned, ".", 2)
+	whole, fraction := parts[0], ""
+	if len(parts) == 2 {
+		fraction = parts[1]
+	}
+	if whole == "" {
+		whole = "0"
+	}
+	digits := strings.TrimLeft(whole+fraction, "0")
+	if digits == "" {
+		digits = "0"
+	}
+	n := new(big.Int)
+	n.SetString(digits, 10) // The grammar above guarantees digits only.
+	if negative {
+		n.Neg(n)
+	}
+	den := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(len(fraction))), nil)
+	return new(big.Rat).SetFrac(n, den), nil
+}
+
+func validateMoneyRat(value *big.Rat) error {
+	if value == nil {
+		return nil
+	}
+	_, err := moneyFiniteText(value)
+	return err
+}
+
+func moneyFiniteText(value *big.Rat) (string, error) {
+	if value == nil {
+		return "", nil
+	}
+	den := new(big.Int).Set(value.Denom())
+	two, five := big.NewInt(2), big.NewInt(5)
+	count2, count5 := 0, 0
+	rem := new(big.Int)
+	for {
+		q := new(big.Int)
+		q.QuoRem(den, two, rem)
+		if rem.Sign() != 0 {
+			break
+		}
+		den = q
+		count2++
+	}
+	for {
+		q := new(big.Int)
+		q.QuoRem(den, five, rem)
+		if rem.Sign() != 0 {
+			break
+		}
+		den = q
+		count5++
+	}
+	if den.Cmp(big.NewInt(1)) != 0 {
+		return "", fmt.Errorf("money result is a non-terminating decimal")
+	}
+	scale := count2
+	if count5 > scale {
+		scale = count5
+	}
+	if scale > 38 {
+		return "", fmt.Errorf("money result exceeds 38 fractional digits")
+	}
+	return moneyText(value, scale), validateMoneyDigits(value, scale)
+}
+
+func validateMoneyDigits(value *big.Rat, scale int) error {
+	factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(scale)), nil)
+	n := new(big.Int).Mul(new(big.Int).Abs(value.Num()), factor)
+	digits := new(big.Int).Quo(n, value.Denom()).String()
+	digits = strings.TrimLeft(digits, "0")
+	if len(digits) > 38 {
+		return fmt.Errorf("money result exceeds 38 significant digits")
+	}
+	return nil
+}
+
+func evalMoneyScalar(expression Expression, row map[string]any, config *MoneyConfig) (any, error) {
+	switch e := expression.(type) {
+	case FieldRef:
+		return evalScalar(expression, row)
+	case BinaryExpression:
+		left, err := evalMoneyNumericScalar(e.Left, row, config)
+		if err != nil {
+			return nil, err
+		}
+		right, err := evalMoneyNumericScalar(e.Right, row, config)
+		if err != nil {
+			return nil, err
+		}
+		return moneyArithmetic(e.Operator, left, right, config.DivisionScale)
+	default:
+		return evalScalar(expression, row)
+	}
+}
+
+func evalMoneyNumericScalar(expression Expression, row map[string]any, config *MoneyConfig) (any, error) {
+	value, err := evalMoneyScalar(expression, row, config)
+	if err != nil || value == nil {
+		return value, err
+	}
+	if _, err = moneyNumber(value); err != nil {
+		return nil, err
+	}
+	if _, ok := expression.(FieldRef); ok {
+		if err := validateMoneyField(value, config); err != nil {
+			return nil, err
+		}
+	}
+	return value, nil
+}
+
+func moneyArithmetic(operator ArithmeticOperator, left, right any, divisionScale int) (any, error) {
+	if left == nil || right == nil {
+		return nil, nil
+	}
+	a, err := moneyNumber(left)
+	if err != nil {
+		return nil, fmt.Errorf("money left operand: %w", err)
+	}
+	b, err := moneyNumber(right)
+	if err != nil {
+		return nil, fmt.Errorf("money right operand: %w", err)
+	}
+	var result *big.Rat
+	switch operator {
+	case Add:
+		result = new(big.Rat).Add(a, b)
+	case Subtract:
+		result = new(big.Rat).Sub(a, b)
+	case Multiply:
+		result = new(big.Rat).Mul(a, b)
+	case Divide:
+		if b.Sign() == 0 {
+			return nil, fmt.Errorf("money division by zero")
+		}
+		rounded := moneyText(new(big.Rat).Quo(a, b), divisionScale)
+		if _, err := moneyNumber(rounded); err != nil {
+			return nil, fmt.Errorf("money division result: %w", err)
+		}
+		return rounded, nil
+	default:
+		return nil, fmt.Errorf("unsupported money arithmetic operator %q", operator)
+	}
+	if err := validateMoneyRat(result); err != nil {
+		return nil, err
+	}
+	return moneyFiniteText(result)
+}
+
+func compareMoneyValues(a, b any) (int, error) {
+	if a == nil {
+		if b == nil {
+			return 0, nil
+		}
+		return -1, nil
+	}
+	if b == nil {
+		return 1, nil
+	}
+	ra, ea := moneyNumber(a)
+	rb, eb := moneyNumber(b)
+	if ea == nil && eb == nil {
+		return ra.Cmp(rb), nil
+	}
+	if ea == nil {
+		if _, ok := b.(string); ok {
+			return -1, nil
+		}
+		return 0, fmt.Errorf("invalid money comparison operands %T and %T", a, b)
+	}
+	if eb == nil {
+		if _, ok := a.(string); ok {
+			return 1, nil
+		}
+		return 0, fmt.Errorf("invalid money comparison operands %T and %T", a, b)
+	}
+	as, aok := a.(string)
+	bs, bok := b.(string)
+	if aok && bok {
+		return strings.Compare(as, bs), nil
+	}
+	return 0, fmt.Errorf("invalid money comparison operands %T and %T", a, b)
 }
 
 func moneyText(value *big.Rat, scale int) string {
