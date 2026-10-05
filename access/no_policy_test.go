@@ -14,16 +14,23 @@ import (
 // allowAllOperations allows every operation on every collection.
 func allowAllOperations() Policy { return MustPolicy("allow-all", Root(Allow(ReadWrite, "all"))) }
 
+// unsetPolicy is a policy that was never set: a nil pointer held in the interface,
+// which is not a nil interface.
+var unsetPolicy Policy = (*AccessPolicy)(nil)
+
 // withoutPolicy is every way of building a secured session that holds no usable
-// policy: none, a nil one, an empty list and a list that holds a nil beside a
-// policy that allows everything.
+// policy: none, a nil one (an interface holding nothing, or a nil pointer), an
+// empty list and a list that holds a nil beside a policy that allows everything.
 func withoutPolicy() map[string][]Policy {
 	return map[string][]Policy{
-		"no policy":             nil,
-		"a nil policy":          {nil},
-		"an empty list":         {},
-		"a list holding a nil":  {allowAllOperations(), nil},
-		"a nil before a policy": {nil, allowAllOperations()},
+		"no policy":                     nil,
+		"a nil policy":                  {nil},
+		"a nil pointer policy":          {unsetPolicy},
+		"an empty list":                 {},
+		"a list holding a nil":          {allowAllOperations(), nil},
+		"a list holding a nil pointer":  {allowAllOperations(), unsetPolicy},
+		"a nil before a policy":         {nil, allowAllOperations()},
+		"a nil pointer before a policy": {unsetPolicy, allowAllOperations()},
 	}
 }
 
@@ -236,17 +243,27 @@ func TestEveryEntryPointThatTakesPoliciesRefusesNoPolicy(t *testing.T) {
 		if _, err := SecureDB(dal.NewDB(newFakeDB(&fakeSession{})), WithDatabasePolicies(allowAllOperations(), nil)); err == nil {
 			t.Fatal("want an error")
 		}
+		if _, err := SecureDB(dal.NewDB(newFakeDB(&fakeSession{})), WithDatabasePolicies(unsetPolicy)); err == nil {
+			t.Fatal("a nil pointer policy: want an error")
+		}
+		if _, err := SecureDB(dal.NewDB(newFakeDB(&fakeSession{})), WithDatabasePolicies(allowAllOperations(), unsetPolicy)); err == nil {
+			t.Fatal("a nil pointer policy beside a policy: want an error")
+		}
 	})
 	t.Run("WithPolicy refuses a nil policy", func(t *testing.T) {
-		defer func() {
-			if recover() == nil {
-				t.Fatal("want a panic")
-			}
-		}()
-		WithPolicy(ctx, nil)
+		for label, policy := range map[string]Policy{"a nil policy": nil, "a nil pointer policy": unsetPolicy} {
+			func() {
+				defer func() {
+					if recover() == nil {
+						t.Fatalf("%s: want a panic", label)
+					}
+				}()
+				WithPolicy(ctx, policy)
+			}()
+		}
 	})
 	t.Run("a policy provider that returns none, or a nil one, denies", func(t *testing.T) {
-		for label, policies := range map[string][]Policy{"none": nil, "an empty list": {}, "a nil policy": {nil}, "a nil beside a policy": {allowAllOperations(), nil}} {
+		for label, policies := range map[string][]Policy{"none": nil, "an empty list": {}, "a nil policy": {nil}, "a nil beside a policy": {allowAllOperations(), nil}, "a nil pointer policy": {unsetPolicy}, "a nil pointer beside a policy": {allowAllOperations(), unsetPolicy}} {
 			wrapped := &fakeSession{}
 			secured := MustSecureDB(dal.NewDB(newFakeDB(wrapped)), WithDatabasePolicyProvider(func(context.Context) ([]Policy, error) { return policies, nil }))
 			if err := secured.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("docs", "d1"), map[string]any{})); !errors.Is(err, ErrAccessDenied) {
@@ -258,7 +275,7 @@ func TestEveryEntryPointThatTakesPoliciesRefusesNoPolicy(t *testing.T) {
 		}
 	})
 	t.Run("NewStaticPolicyLease and NewStaticParticipant refuse none and a nil policy", func(t *testing.T) {
-		for _, policies := range [][]Policy{nil, {}, {nil}, {allowAllOperations(), nil}} {
+		for _, policies := range [][]Policy{nil, {}, {nil}, {allowAllOperations(), nil}, {unsetPolicy}, {allowAllOperations(), unsetPolicy}} {
 			if _, err := NewStaticPolicyLease(policies...); err == nil {
 				t.Fatalf("lease of %v: want an error", policies)
 			}
@@ -271,9 +288,11 @@ func TestEveryEntryPointThatTakesPoliciesRefusesNoPolicy(t *testing.T) {
 		raw := newFakeDB(&fakeSession{})
 		storage := &automaticCoordinatorStorage{}
 		for label, lease := range map[string]PolicyLease{
-			"a nil policy":          nilPolicyLease{policies: []Policy{nil}},
-			"a nil beside a policy": nilPolicyLease{policies: []Policy{MustPolicy("writer", Root(Allow(Set, "all"))), nil}},
-			"no policy":             nilPolicyLease{},
+			"a nil policy":                  nilPolicyLease{policies: []Policy{nil}},
+			"a nil beside a policy":         nilPolicyLease{policies: []Policy{MustPolicy("writer", Root(Allow(Set, "all"))), nil}},
+			"a nil pointer policy":          nilPolicyLease{policies: []Policy{unsetPolicy}},
+			"a nil pointer beside a policy": nilPolicyLease{policies: []Policy{MustPolicy("writer", Root(Allow(Set, "all"))), unsetPolicy}},
+			"no policy":                     nilPolicyLease{},
 		} {
 			coordinator, err := NewEnforcementCoordinator(storage, MandatoryParticipant{LayerID: "owner", Provider: func(context.Context) (PolicyLease, error) { return lease, nil }})
 			if err != nil {
@@ -290,7 +309,7 @@ func TestEveryEntryPointThatTakesPoliciesRefusesNoPolicy(t *testing.T) {
 		}
 	})
 	t.Run("AssessPlan does not allow none or a nil policy", func(t *testing.T) {
-		for label, policies := range map[string][]Policy{"none": nil, "a nil policy": {nil}, "a nil beside a policy": {allowAllOperations(), nil}} {
+		for label, policies := range map[string][]Policy{"none": nil, "a nil policy": {nil}, "a nil beside a policy": {allowAllOperations(), nil}, "a nil pointer policy": {unsetPolicy}, "a nil pointer beside a policy": {allowAllOperations(), unsetPolicy}} {
 			assessment := AssessPlan(ctx, request, policies)
 			if assessment.Outcome != AssessmentIndeterminate || assessment.Complete {
 				t.Fatalf("%s: assessment = %+v, want indeterminate and incomplete", label, assessment)

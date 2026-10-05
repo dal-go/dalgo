@@ -277,7 +277,7 @@ func assessPoliciesForInspection(ctx context.Context, request Request, policies 
 func assessPoliciesMode(ctx context.Context, request Request, policies []Policy, inspection bool) policyAssessment {
 	a := policyAssessment{assessment: Assessment{Outcome: AssessmentAllow, Complete: true}}
 	for policyIndex, policy := range policies {
-		if policy == nil {
+		if isNilNode(policy) {
 			decision := Decision{Operation: request.Operation, Effect: effectDeny.String(), Code: CodeEvaluationFailed, Scope: DecisionScopeConfiguration, Explanation: "nil mandatory policy"}
 			a.assessment.Policies = append(a.assessment.Policies, PolicyAssessment{Decision: decision})
 			a.assessment.Complete = false

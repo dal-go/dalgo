@@ -56,7 +56,7 @@ type DBOption func(*secureDBOptions) error
 func WithDatabasePolicies(policies ...Policy) DBOption {
 	return func(options *secureDBOptions) error {
 		for i, policy := range policies {
-			if policy == nil {
+			if isNilNode(policy) {
 				return fmt.Errorf("access: nil database policy at index %d", i)
 			}
 		}
@@ -73,7 +73,11 @@ func RequireContextPolicy() DBOption {
 	}
 }
 
-// SecureDB wraps db with adapter-independent access-policy enforcement.
+// SecureDB wraps db with adapter-independent access-policy enforcement. A request
+// is denied while no policy is in force for it: no database policy, no policy
+// bound with BindDB and none in the context of the request. An enforcement
+// coordinator governs the protected write profile only; it does not by itself
+// allow a read.
 func SecureDB(db dal.DB, options ...DBOption) (dal.DB, error) {
 	if db == nil {
 		return nil, fmt.Errorf("access: db is required")
@@ -113,7 +117,9 @@ func MustSecureDB(db dal.DB, options ...DBOption) dal.DB {
 
 // BindDB captures context policies on the returned DB handle. Passing a later
 // operation context cannot remove them, while additional policies still narrow
-// the capability.
+// the capability. A handle over a database that was not secured denies every
+// request when the context it is bound to, and the context of the request,
+// holds no policy.
 func BindDB(db dal.DB, ctx context.Context) dal.DB {
 	if secured, ok := db.(*securedWriteDB); ok {
 		bound := *secured.securedDB

@@ -433,17 +433,23 @@ type securedReadwriteSession struct {
 	securedWriteSession
 }
 
-// SecureReadSession wraps a read session with database-bound policies.
+// SecureReadSession wraps a read session with database-bound policies. A session
+// built with no policy, with a nil policy (an interface holding nothing, or a nil
+// pointer) or with a list that holds one denies every request.
 func SecureReadSession(session dal.ReadSession, policies ...Policy) dal.ReadSession {
 	return securedReadSession{session: session, guard: guard{databasePolicies: append([]Policy(nil), policies...)}}
 }
 
-// SecureWriteSession wraps a write session with database-bound policies.
+// SecureWriteSession wraps a write session with database-bound policies. A session
+// built with no policy, with a nil policy (an interface holding nothing, or a nil
+// pointer) or with a list that holds one denies every request.
 func SecureWriteSession(session dal.WriteSession, policies ...Policy) dal.WriteSession {
 	return securedWriteSession{session: session, guard: guard{databasePolicies: append([]Policy(nil), policies...)}}
 }
 
-// SecureReadwriteSession wraps a combined session with database-bound policies.
+// SecureReadwriteSession wraps a combined session with database-bound policies. A
+// session built with no policy, with a nil policy (an interface holding nothing,
+// or a nil pointer) or with a list that holds one denies every request.
 func SecureReadwriteSession(session dal.ReadwriteSession, policies ...Policy) dal.ReadwriteSession {
 	g := guard{databasePolicies: append([]Policy(nil), policies...)}
 	return securedReadwriteSession{

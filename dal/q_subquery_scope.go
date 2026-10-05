@@ -5,36 +5,52 @@ import (
 	"reflect"
 )
 
+// maxQueryTreeDepth bounds how many nodes (queries, source trees, conditions and
+// expressions) the walk of a query tree follows along one path. It is the bound
+// the access layer applies to a query's structure.
+const maxQueryTreeDepth = 64
+
 // inspectQueryTree reports whether found accepts a query nested anywhere in q:
 // a derived source, a subquery in any clause (the select list, WHERE, ON,
 // GROUP BY, HAVING, ORDER BY, an aggregate argument, an arithmetic operand or a
 // null test) or a subquery in the scan order of a source. A node is read the
 // same whether it is held by value or by non-nil pointer. A node that is on the
-// path being walked is not walked again, so a graph that holds itself ends.
+// path being walked is not walked again, so a graph of pointers that holds itself
+// ends, and so does one held by value, which the walk stops following at
+// maxQueryTreeDepth nodes along one path: there it reports a query, so that a
+// tree the walk cannot follow to its end is handled as one with nested queries.
 func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool {
 	seen := map[uintptr]bool{}
-	// enter marks a reference-typed node, given by its address, as being on the
-	// current path and returns the function that leaves it, or nil when the node
-	// is already on the path. A node held by value has no address (0) and cannot
-	// be reached again from inside itself.
-	enter := func(id uintptr) func() {
-		if id == 0 {
-			return func() {}
+	depth := 0
+	// enter admits a node to the current path and returns the function that leaves
+	// it. It returns nil when the node must not be walked, and says whether the
+	// walk reports a query instead: when the path is already maxQueryTreeDepth
+	// nodes long it does, and when a reference-typed node, given by its address, is
+	// already on the path it does not. A node held by value has no address (0).
+	enter := func(id uintptr) (leave func(), report bool) {
+		if depth >= maxQueryTreeDepth {
+			return nil, true
 		}
-		if seen[id] {
-			return nil
+		if id != 0 {
+			if seen[id] {
+				return nil, false
+			}
+			seen[id] = true
 		}
-		seen[id] = true
-		return func() { delete(seen, id) }
+		depth++
+		return func() {
+			depth--
+			delete(seen, id)
+		}, false
 	}
 	var visitQuery func(StructuredQuery) bool
 	var visitExpr func(Expression) bool
 	var visitCondition func(Condition) bool
 	var visitFrom func(FromSource) bool
 	visitExpr = func(expr Expression) bool {
-		leave := enter(nodePointerID(expr))
+		leave, report := enter(nodePointerID(expr))
 		if leave == nil {
-			return false
+			return report
 		}
 		defer leave()
 		switch value := expr.(type) {
@@ -56,9 +72,9 @@ func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool 
 		return false
 	}
 	visitCondition = func(condition Condition) bool {
-		leave := enter(nodePointerID(condition))
+		leave, report := enter(nodePointerID(condition))
 		if leave == nil {
-			return false
+			return report
 		}
 		defer leave()
 		switch value := condition.(type) {
@@ -105,9 +121,9 @@ func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool 
 		if from == nil || from.Base() == nil {
 			return false
 		}
-		leave := enter(nodePointerID(from))
+		leave, report := enter(nodePointerID(from))
 		if leave == nil {
-			return false
+			return report
 		}
 		defer leave()
 		if visitSource(from.Base()) {
@@ -138,9 +154,9 @@ func inspectQueryTree(q StructuredQuery, found func(StructuredQuery) bool) bool 
 		if query == nil {
 			return false
 		}
-		leave := enter(queryPointerID(query))
+		leave, report := enter(queryPointerID(query))
 		if leave == nil {
-			return false
+			return report
 		}
 		defer leave()
 		if visitFrom(query.From()) || visitCondition(query.Where()) || visitCondition(query.Having()) {

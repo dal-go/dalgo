@@ -26,6 +26,35 @@ func (a *countingAggregate) FuncArgs() []Expression {
 	return a.args
 }
 
+// valueAggregate is an aggregate held by value whose arguments can hold a copy of
+// itself, through the slice of arguments they share. It counts each visit and
+// panics past a bound, as countingAggregate does.
+type valueAggregate struct {
+	args   []Expression
+	visits *int
+}
+
+func (a valueAggregate) String() string   { return "counting" }
+func (a valueAggregate) FuncName() string { return COUNT }
+func (a valueAggregate) FuncArgs() []Expression {
+	*a.visits++
+	if *a.visits > 1000 {
+		panic("the walk does not stop at a cycle")
+	}
+	return a.args
+}
+
+// nestedGroups is a query whose WHERE is levels condition groups held by value,
+// one inside the other, around one comparison. Its longest path has levels+3
+// nodes: the query, each group, the comparison and the field it names.
+func nestedGroups(levels int) StructuredQuery {
+	var condition Condition = NewComparison(Field("a"), Equal, Field("b"))
+	for i := 0; i < levels; i++ {
+		condition = NewGroupCondition(And, condition)
+	}
+	return From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(condition).SelectKeysOnly(0)
+}
+
 // countingFrom is a source tree that can join itself. It counts each visit of
 // its joins and panics past a bound, as countingAggregate does.
 type countingFrom struct {
@@ -151,6 +180,29 @@ func TestHasSubqueryStopsAtACycle(t *testing.T) {
 			t.Fatal("HasSubquery missed the subquery beside the cycle")
 		}
 	})
+	t.Run("a condition group held by value that holds itself", func(t *testing.T) {
+		conditions := make([]Condition, 2)
+		group := NewGroupCondition(Or, conditions...)
+		conditions[0] = group
+		conditions[1] = WhereField("a", Equal, 1)
+		query := From(NewRootCollectionRef("Customer", "c")).NewQuery().Where(group).SelectKeysOnly(0)
+		if !HasSubquery(query) {
+			t.Fatal("HasSubquery did not report a tree nested past its bound")
+		}
+	})
+	t.Run("an aggregate held by value that holds itself", func(t *testing.T) {
+		visits := 0
+		args := make([]Expression, 1)
+		aggregate := valueAggregate{args: args, visits: &visits}
+		args[0] = aggregate
+		query := From(NewRootCollectionRef("Customer", "c")).NewQuery().SelectColumns(Column{Expression: aggregate})
+		if !HasSubquery(query) {
+			t.Fatal("HasSubquery did not report a tree nested past its bound")
+		}
+		if visits > maxQueryTreeDepth {
+			t.Fatalf("the walk visited the arguments %d times, want at most %d", visits, maxQueryTreeDepth)
+		}
+	})
 	t.Run("a source tree that joins itself", func(t *testing.T) {
 		visits := 0
 		tree := &countingFrom{base: NewRootCollectionRef("Customer", "c"), visits: &visits}
@@ -169,4 +221,16 @@ func TestHasSubqueryStopsAtACycle(t *testing.T) {
 			t.Fatal("HasSubquery reported a subquery in a tree that holds none")
 		}
 	})
+}
+
+// A walk stops at maxQueryTreeDepth nodes along one path and reports a query
+// there, so a query the walk cannot follow to its end is handled as one with
+// nested queries.
+func TestHasSubqueryBoundsTheDepthOfTheTree(t *testing.T) {
+	if HasSubquery(nestedGroups(maxQueryTreeDepth - 3)) {
+		t.Fatal("a tree whose longest path is at the bound holds no subquery")
+	}
+	if !HasSubquery(nestedGroups(maxQueryTreeDepth - 2)) {
+		t.Fatal("a tree whose longest path is past the bound is reported as holding a query")
+	}
 }

@@ -264,17 +264,28 @@ for a name two columns come back under, or for nothing is refused. When the
 access layer sends the aggregate under an alias of its own, it names that alias
 in `HAVING` and `ORDER BY` as well. The recordset reader renames nothing, so
 there an alias the field list does not allow is not a name `HAVING` or
-`ORDER BY` may use; the aggregate itself is.
+`ORDER BY` may use; the aggregate itself is. A plan (`access.AssessPlan`) is
+judged by the recordset rule, because it does not know which reader will run the
+query: it reports a denial for an alias the field list does not allow, including
+the alias of an allowed aggregate that the records reader would run.
 
 A field list applies to the base source of a query, and to every clause that
 reads its fields: the select list, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, the
 `ON` conditions of every join at any depth, and the scan order of every source.
-In a join condition or a scan order a field belongs to the source its qualifier
-names. A field that names the base (by its name or its alias), or that has no
-qualifier, is held to the list; a field qualified with a joined source is that
-source's own and is not; a field whose qualifier names no source of the query, or
-names the base and a joined source alike, is refused. A joined source carries no
-field list of its own: a rule that lists fields for one is refused.
+In a join condition a field belongs to the source its qualifier names. A field
+that names the base (by its name or its alias), or that has no qualifier, is held
+to the list; a field qualified with a joined source is that source's own and is
+not; a field whose qualifier names no source of the query, or names the base and a
+joined source alike, is refused. A qualifier is matched to the names and aliases
+of the sources of the query without regard to case, because an engine may match
+it that way: a qualifier that matches the base and a joined source alike names
+neither. A scan orders its own source alone, whatever qualifier a field of the
+scan order carries, so every field of the scan order of the base source is held
+to the list. In the scan order of a joined source a field is attributed as in a
+join condition, with an unqualified field belonging to that joined source. A
+joined source carries no field list of its own: a rule that lists fields for one
+is refused. A condition nested more than 64 levels deep, or one that holds
+itself, cannot be checked and is refused as an unsupported enforcement.
 
 A query with nested queries is executed one source at a time through the same
 secured session, which authorises and narrows each scan. The nesting between the
@@ -285,7 +296,7 @@ order that holds a query cannot be run together with nested queries, and is
 refused as an unsupported enforcement (`ACL_ENFORCEMENT_UNSUPPORTED`) before
 anything is read, after the sources of the query have been authorised.
 
-Two limits follow from how a source is matched to a rule.
+Three limits follow from how a source is matched to a rule.
 
 A source is matched to rules by the exact spelling of its collection name. On an
 engine that folds identifier case, one table can be named in several spellings,
@@ -298,6 +309,14 @@ for opaque queries (`access.OpaqueQueryScope`) can allow it, that rule applies t
 every opaque resource, custom SQL text included, and a rule for opaque queries
 carries no field list and no row condition. A collection rule, a field list or a
 row condition cannot be applied to a schema-qualified source.
+
+A source that names a database (`CollectionRef.Database`, used by a federated
+executor) and no schema is matched to rules by its collection name alone: the
+database is not part of its resource, so one policy cannot tell the same
+collection name in two databases apart, and a rule for a collection applies to it
+in every database the wrapped executor reaches. Where an executor routes a query
+by the database a source names, write the policy for every database it reaches
+as one.
 
 Custom SQL text is always opaque. DALgo does not inspect or attempt to infer
 tables from the SQL string, so ordinary path/collection rules can never

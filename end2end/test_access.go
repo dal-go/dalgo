@@ -476,6 +476,15 @@ func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
 				columnDenied(t, selectCityName(dal.From(citiesRef).Join(dal.NewJoinedSource(
 					joined("j").WithScan(5, dal.Descending(citiesField("State"))), dal.JoinInner,
 					joinOn(citiesField("Name"), dal.NewFieldRef("j", "ref"))))), access.DecisionSlotFields, "State")
+				// A scan orders its own source whatever qualifier its field carries,
+				// so a scan order of the listed source is held to the list when its
+				// field is qualified by a joined source too.
+				columnDenied(t, selectCityName(dal.From(citiesRef.WithScan(1, dal.AscendingField("Population"))).Join(dal.NewJoinedSource(
+					joined("j"), dal.JoinLeft, joinOn(citiesField("Name"), dal.NewFieldRef("j", "ref"))))), access.DecisionSlotFields, "Population")
+				columnDenied(t, selectCityName(dal.From(citiesRef.WithScan(1, dal.Ascending(dal.NewFieldRef("j", "Population")))).Join(dal.NewJoinedSource(
+					joined("j"), dal.JoinLeft, joinOn(citiesField("Name"), dal.NewFieldRef("j", "ref"))))), access.DecisionSlotFields, "Population")
+				columnDenied(t, selectCityName(dal.From(citiesRef.WithScan(1, dal.Ascending(dal.NewFieldRef(joinedSourceCollection, "Population")))).Join(dal.NewJoinedSource(
+					joined("j"), dal.JoinLeft, joinOn(citiesField("Name"), dal.NewFieldRef("j", "ref"))))), access.DecisionSlotFields, "Population")
 			})
 			t.Run("join_fields_of_the_joined_source_are_not_held_to_the_list", func(t *testing.T) {
 				// Negative control: Population here is a field of the joined source,

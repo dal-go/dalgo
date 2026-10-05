@@ -318,3 +318,42 @@ func TestRewriteAliasReferences(t *testing.T) {
 		}
 	})
 }
+
+// A plan is judged by the recordset rule: the records reader runs HAVING and
+// ORDER BY over the alias of an allowed aggregate, and a plan of the same query
+// reports a denial for that alias, as it does for an alias the list does not
+// allow. The aggregate itself, which every reader accepts, is not denied.
+func TestAssessPlanJudgesAnAggregateAliasByTheRecordsetRule(t *testing.T) {
+	ctx := context.Background()
+	policy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name", "age")))
+	byAlias := groupedTotals().
+		Having(dal.NewComparison(dal.Field("total"), dal.GreaterThen, dal.Constant{Value: 1})).
+		SelectColumns(totalColumns()...)
+	byAggregate := groupedTotals().
+		Having(dal.NewComparison(dal.SumAs(dal.Field("age"), "").Expression, dal.GreaterThen, dal.Constant{Value: 1})).
+		SelectColumns(totalColumns()...)
+	plan := func(query dal.StructuredQuery) Assessment {
+		return AssessPlan(ctx, Request{Operation: Query, Resources: resourcesForQuery(query), Query: query}, []Policy{policy})
+	}
+
+	wrapped := &countingSession{}
+	if _, err := SecureReadSession(wrapped, policy).ExecuteQueryToRecordsReader(ctx, byAlias); err != nil || wrapped.reads != 1 {
+		t.Fatalf("the records reader: error = %v, %d reads, want none and 1", err, wrapped.reads)
+	}
+	assessment := plan(byAlias)
+	if assessment.Outcome != AssessmentDeny {
+		t.Fatalf("outcome = %s, want deny", assessment.Outcome)
+	}
+	var columns [][]string
+	for _, assessed := range assessment.Policies {
+		if assessed.Decision.Code == CodeColumnDenied {
+			columns = append(columns, assessed.Decision.Columns...)
+		}
+	}
+	if !reflect.DeepEqual(columns, [][]string{{"total"}}) {
+		t.Fatalf("denied columns = %v, want total", columns)
+	}
+	if assessment := plan(byAggregate); assessment.Outcome == AssessmentDeny {
+		t.Fatalf("outcome = %s, want the aggregate itself to be allowed", assessment.Outcome)
+	}
+}

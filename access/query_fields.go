@@ -152,9 +152,15 @@ func validateQueryFields(query dal.StructuredQuery, sets fieldSets, aliasReferen
 		}
 		return nil
 	}
-	// checkCondition holds a condition to the allow-list.
-	var checkCondition func(dal.Condition, fieldScope) error
-	checkCondition = func(condition dal.Condition, scope fieldScope) error {
+	// checkCondition holds a condition to the allow-list. depth is the number of
+	// groups the condition stands in, whether they are held by value or by pointer;
+	// a condition nested deeper than maxQueryNesting, which includes one that holds
+	// itself, is refused.
+	var checkCondition func(dal.Condition, fieldScope, int) error
+	checkCondition = func(condition dal.Condition, scope fieldScope, depth int) error {
+		if depth > maxQueryNesting {
+			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotWhere, Explanation: "filter condition is nested too deeply to be checked against allowed fields"}}
+		}
 		switch condition := condition.(type) {
 		case nil:
 			return nil
@@ -184,10 +190,10 @@ func validateQueryFields(query dal.StructuredQuery, sets fieldSets, aliasReferen
 			if condition == nil {
 				return nil
 			}
-			return checkCondition(*condition, scope)
+			return checkCondition(*condition, scope, depth)
 		case dal.GroupCondition:
 			for _, child := range condition.Conditions() {
-				if err := checkCondition(child, scope); err != nil {
+				if err := checkCondition(child, scope, depth+1); err != nil {
 					return err
 				}
 			}
@@ -196,12 +202,12 @@ func validateQueryFields(query dal.StructuredQuery, sets fieldSets, aliasReferen
 			if condition == nil {
 				return nil
 			}
-			return checkCondition(*condition, scope)
+			return checkCondition(*condition, scope, depth)
 		default:
 			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotWhere, Explanation: "filter condition cannot be safely checked against allowed fields"}}
 		}
 	}
-	if err := checkCondition(query.Where(), fieldScope{usage: usageFilter}); err != nil {
+	if err := checkCondition(query.Where(), fieldScope{usage: usageFilter}, 0); err != nil {
 		return err
 	}
 	for _, expression := range query.GroupBy() {
@@ -209,7 +215,7 @@ func validateQueryFields(query dal.StructuredQuery, sets fieldSets, aliasReferen
 			return err
 		}
 	}
-	if err := checkCondition(query.Having(), fieldScope{usage: usageFilter, aggregates: true, aliases: true}); err != nil {
+	if err := checkCondition(query.Having(), fieldScope{usage: usageFilter, aggregates: true, aliases: true}, 0); err != nil {
 		return err
 	}
 	for _, order := range query.OrderBy() {
@@ -230,7 +236,7 @@ func validateQueryFields(query dal.StructuredQuery, sets fieldSets, aliasReferen
 			return unsupported("join conditions and scan orders cannot be checked: " + err.Error())
 		}
 		for _, condition := range clauses.conditions {
-			if err := checkCondition(condition, fieldScope{usage: usageJoin, clauses: clauses, own: ownerBase}); err != nil {
+			if err := checkCondition(condition, fieldScope{usage: usageJoin, clauses: clauses, own: ownerBase}, 0); err != nil {
 				return err
 			}
 		}
@@ -238,7 +244,15 @@ func validateQueryFields(query dal.StructuredQuery, sets fieldSets, aliasReferen
 			if isNilNode(scan.order) {
 				return deny(usageScan, "")
 			}
-			if err := checkExpression(scan.order.Expression(), fieldScope{usage: usageScan, clauses: clauses, own: scan.owner}); err != nil {
+			// A scan orders its own source alone, whatever qualifier a field
+			// carries, so every field of a scan order of the base source is held
+			// to the list. In the scan order of a joined source a field of the base
+			// is held to it too, and a field of a joined source is not.
+			scope := fieldScope{usage: usageScan, clauses: clauses, own: scan.owner}
+			if scan.owner == ownerBase {
+				scope.clauses = nil
+			}
+			if err := checkExpression(scan.order.Expression(), scope); err != nil {
 				return err
 			}
 		}

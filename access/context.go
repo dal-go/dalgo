@@ -122,7 +122,7 @@ func WithPolicy(ctx context.Context, policies ...Policy) context.Context {
 	}
 	combined := append(policiesFromContext(ctx), policies...)
 	for i, policy := range combined {
-		if policy == nil {
+		if isNilNode(policy) {
 			panic(fmt.Sprintf("access: nil context policy at index %d", i))
 		}
 	}
@@ -235,7 +235,7 @@ func (g guard) pinDatabasePolicies(ctx context.Context) (guard, error) {
 		return guard{}, &PolicyProviderError{Err: fmt.Errorf("enabled provider returned no policies")}
 	}
 	for i, policy := range policies {
-		if policy == nil {
+		if isNilNode(policy) {
 			return guard{}, &PolicyProviderError{Err: fmt.Errorf("nil policy at index %d", i)}
 		}
 	}

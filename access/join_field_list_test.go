@@ -82,6 +82,14 @@ func deniedJoinFieldShapes() []joinFieldShape {
 			return selectName(dal.From(customers).Join(dal.NewJoinedSource(orders, dal.JoinInner,
 				onField(qualified("x", "secret"), qualified("o", "ref")))))
 		}, true},
+		{"hidden field qualified by a joined alias that is the base's name in another case", func() dal.StructuredQuery {
+			return selectName(dal.From(customers).Join(dal.NewJoinedSource(dal.NewRootCollectionRef("Order", "CUSTOMER"), dal.JoinInner,
+				onField(qualified("CUSTOMER", "secret"), qualified("CUSTOMER", "ref")))))
+		}, true},
+		{"hidden field in a scan order of the base, qualified by a joined alias in another case", func() dal.StructuredQuery {
+			return selectName(dal.From(customers.WithScan(1, dal.Ascending(qualified("O", "secret")))).
+				Join(dal.NewJoinedSource(orders, dal.JoinLeft, joinOn("c", "o"))))
+		}, true},
 		{"allowed field qualified by an unknown source in a join ON", func() dal.StructuredQuery {
 			return selectName(dal.From(customers).Join(dal.NewJoinedSource(orders, dal.JoinInner,
 				onField(qualified("x", "name"), qualified("o", "ref")))))
@@ -91,6 +99,23 @@ func deniedJoinFieldShapes() []joinFieldShape {
 		}, true},
 		{"hidden field in a scan order of the base, qualified", func() dal.StructuredQuery {
 			return selectName(dal.From(customers.WithScan(5, dal.Descending(qualified("c", "secret")))))
+		}, true},
+		{"hidden field in a scan order of the base, qualified by a joined alias", func() dal.StructuredQuery {
+			return selectName(dal.From(customers.WithScan(1, dal.Ascending(qualified("o", "secret")))).
+				Join(dal.NewJoinedSource(orders, dal.JoinLeft, joinOn("c", "o"))))
+		}, true},
+		{"hidden field in a scan order of the base, qualified by a joined name", func() dal.StructuredQuery {
+			return selectName(dal.From(customers.WithScan(1, dal.Ascending(qualified("Order", "secret")))).
+				Join(dal.NewJoinedSource(orders, dal.JoinLeft, joinOn("c", "o"))))
+		}, true},
+		{"hidden field in a scan order of the base, qualified by a source of a joined tree", func() dal.StructuredQuery {
+			return selectName(dal.From(customers.WithScan(1, dal.Ascending(qualified("l", "secret")))).Join(dal.NewJoinedFrom(
+				dal.From(orders).Join(dal.NewJoinedSource(lines, dal.JoinInner, joinOn("o", "l"))),
+				dal.JoinInner, joinOn("c", "o"))))
+		}, true},
+		{"hidden field in a scan order of the base, qualified by an unknown source", func() dal.StructuredQuery {
+			return selectName(dal.From(customers.WithScan(1, dal.Ascending(qualified("x", "secret")))).
+				Join(dal.NewJoinedSource(orders, dal.JoinLeft, joinOn("c", "o"))))
 		}, true},
 		{"hidden field of the base in a scan order of a joined source", func() dal.StructuredQuery {
 			return selectName(dal.From(customers).Join(dal.NewJoinedSource(

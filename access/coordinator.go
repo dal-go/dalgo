@@ -198,7 +198,7 @@ func NewStaticPolicyLease(policies ...Policy) (PolicyLease, error) {
 		return nil, fmt.Errorf("access: static policy lease requires policies")
 	}
 	for i, p := range policies {
-		if p == nil {
+		if isNilNode(p) {
 			return nil, fmt.Errorf("access: nil static policy at index %d", i)
 		}
 	}

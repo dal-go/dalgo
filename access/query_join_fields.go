@@ -3,6 +3,7 @@ package access
 import (
 	"errors"
 	"reflect"
+	"strings"
 
 	"github.com/dal-go/dalgo/dal"
 )
@@ -34,10 +35,17 @@ type scanOrder struct {
 	owner fieldOwner
 }
 
+// foldIdentifier is an identifier as the identifier sets of joinClauses hold it:
+// without regard to case, because an engine may match a qualifier to a source
+// that way, and the access layer cannot tell which sources an engine would
+// resolve a qualifier to.
+func foldIdentifier(identifier string) string { return strings.ToLower(identifier) }
+
 // joinClauses are the clauses of a query's source tree that name fields: the ON
 // conditions of every join at any depth and the scan orders of every source,
 // with the identifiers (names and aliases) of the base source and of the joined
-// ones, which tell which source a qualified field belongs to.
+// ones, which tell which source a qualified field belongs to. The identifiers are
+// held folded (see foldIdentifier).
 type joinClauses struct {
 	base       map[string]bool
 	joined     map[string]bool
@@ -47,11 +55,12 @@ type joinClauses struct {
 
 // attribute names the source of a field. own is the source the clause the field
 // stands in belongs to; a field with no qualifier denotes it. A qualified field
-// belongs to the source that qualifier names.
+// belongs to the source that qualifier names, matched without regard to case: a
+// qualifier that matches the base and a joined source alike names neither.
 func (c *joinClauses) attribute(field dal.FieldRef, own fieldOwner) fieldOwner {
-	qualifier := field.Source()
+	qualifier := foldIdentifier(field.Source())
 	switch {
-	case qualifier == "":
+	case field.Source() == "":
 		return own
 	case c.base[qualifier] && c.joined[qualifier]:
 		return ownerUnknown
@@ -133,7 +142,7 @@ func (w *joinClauseWalk) source(source dal.RecordsetSource, owner fieldOwner) {
 	}
 	for _, identifier := range []string{source.Name(), source.Alias()} {
 		if identifier != "" {
-			identifiers[identifier] = true
+			identifiers[foldIdentifier(identifier)] = true
 		}
 	}
 	for _, order := range scanOrders(source) {

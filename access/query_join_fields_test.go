@@ -45,13 +45,13 @@ func TestCollectJoinClausesListsEveryConditionAndScanOrder(t *testing.T) {
 	if !reflect.DeepEqual(owners, want) || len(clauses.scans) != 3 {
 		t.Fatalf("scan orders = %v, want %v", clauses.scans, want)
 	}
-	for identifier, wantBase := range map[string]bool{"Customer": true, "c": true} {
-		if clauses.base[identifier] != wantBase {
+	for _, identifier := range []string{"Customer", "c"} {
+		if !clauses.base[foldIdentifier(identifier)] {
 			t.Fatalf("base identifiers = %v", clauses.base)
 		}
 	}
 	for _, identifier := range []string{"Order", "o", "Line", "l"} {
-		if !clauses.joined[identifier] || clauses.base[identifier] {
+		if !clauses.joined[foldIdentifier(identifier)] || clauses.base[foldIdentifier(identifier)] {
 			t.Fatalf("joined identifiers = %v, base = %v", clauses.joined, clauses.base)
 		}
 	}
@@ -65,6 +65,14 @@ func TestJoinClauseAttribution(t *testing.T) {
 		t.Fatal(err)
 	}
 	ambiguous, err := collectJoinClauses(selfJoined)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The base is Customer (alias c) and a joined source is aliased CUSTOMER:
+	// an engine that matches qualifiers without regard to case cannot tell them
+	// apart.
+	caseVariant, err := collectJoinClauses(dal.From(customers).
+		Join(dal.NewJoinedSource(dal.NewRootCollectionRef("Order", "CUSTOMER"), dal.JoinInner, joinOn("c", "CUSTOMER"))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,6 +91,14 @@ func TestJoinClauseAttribution(t *testing.T) {
 		{"no qualifier in a clause of a joined source", clauses, dal.Field("id"), ownerJoined, ownerJoined},
 		{"a qualifier no source has", clauses, qualified("x", "id"), ownerBase, ownerUnknown},
 		{"a qualifier of the base and of a joined source", ambiguous, qualified("c", "id"), ownerBase, ownerUnknown},
+		{"the base's alias in another case", clauses, qualified("C", "id"), ownerJoined, ownerBase},
+		{"the base's name in another case", clauses, qualified("CUSTOMER", "id"), ownerJoined, ownerBase},
+		{"a joined alias in another case", clauses, qualified("O", "id"), ownerBase, ownerJoined},
+		{"a joined name in another case", clauses, qualified("order", "id"), ownerBase, ownerJoined},
+		{"a joined alias that is the base's name in another case", caseVariant, qualified("CUSTOMER", "id"), ownerBase, ownerUnknown},
+		{"the base's name where a joined alias is that name in another case", caseVariant, qualified("Customer", "id"), ownerBase, ownerUnknown},
+		{"the base's alias where a joined source has another alias", caseVariant, qualified("c", "id"), ownerBase, ownerBase},
+		{"a qualifier no source has in any case", clauses, qualified("X", "id"), ownerBase, ownerUnknown},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -118,7 +134,7 @@ func TestJoinClausesOfAnIncompleteTreeHoldNothingMore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(clauses.scans) != 1 || len(clauses.conditions) != 2 || !clauses.joined["Line"] || !clauses.joined["Order"] {
+	if len(clauses.scans) != 1 || len(clauses.conditions) != 2 || !clauses.joined[foldIdentifier("Line")] || !clauses.joined[foldIdentifier("Order")] {
 		t.Fatalf("clauses = %+v", clauses)
 	}
 	empty, err := collectJoinClauses(nilTree)
@@ -172,6 +188,7 @@ func TestFieldListRefusesAJoinTreeItCannotCheck(t *testing.T) {
 func TestFieldListAttributesJoinFieldsToTheirSource(t *testing.T) {
 	sets := fieldList(t, "id", "name")
 	collision := dal.NewRootCollectionRef("Order", "c")
+	caseVariant := dal.NewRootCollectionRef("Order", "CUSTOMER")
 	cases := []struct {
 		name  string
 		query dal.StructuredQuery
@@ -181,6 +198,12 @@ func TestFieldListAttributesJoinFieldsToTheirSource(t *testing.T) {
 			Join(dal.NewJoinedSource(collision, dal.JoinInner, onField(qualified("c", "name"), qualified("c", "ref"))))), CodeEnforcementUnsupported},
 		{"a hidden field under a qualifier of the base and of a joined source", selectName(dal.From(customers).
 			Join(dal.NewJoinedSource(collision, dal.JoinInner, onField(qualified("c", "secret"), qualified("c", "ref"))))), CodeColumnDenied},
+		{"an allowed field under a joined alias that is the base's name in another case", selectName(dal.From(customers).
+			Join(dal.NewJoinedSource(caseVariant, dal.JoinInner, onField(qualified("CUSTOMER", "name"), qualified("CUSTOMER", "ref"))))), CodeEnforcementUnsupported},
+		{"a hidden field under a joined alias that is the base's name in another case", selectName(dal.From(customers).
+			Join(dal.NewJoinedSource(caseVariant, dal.JoinInner, onField(qualified("CUSTOMER", "secret"), qualified("CUSTOMER", "ref"))))), CodeColumnDenied},
+		{"a hidden field under the base's alias in another case", selectName(dal.From(customers).
+			Join(dal.NewJoinedSource(orders, dal.JoinInner, onField(qualified("C", "secret"), qualified("o", "ref"))))), CodeColumnDenied},
 		{"a missing scan order of the base", selectName(dal.From(customers.WithScan(5, nil))), CodeColumnDenied},
 		{"a scan order through a pointer", func() dal.StructuredQuery {
 			scanned := customers.WithScan(5, dal.AscendingField("secret"))
@@ -199,6 +222,65 @@ func TestFieldListAttributesJoinFieldsToTheirSource(t *testing.T) {
 	t.Run("a query with no source has no join clause", func(t *testing.T) {
 		if err := validateRequestedQueryFields(&shapeQuery{}, sets); err != nil {
 			t.Fatalf("error = %v", err)
+		}
+	})
+}
+
+// nestedConditions is levels condition groups held by value, one inside the
+// other, around a comparison of an allowed field.
+func nestedConditions(levels int) dal.Condition {
+	var condition dal.Condition = dal.NewComparison(dal.Field("name"), dal.Equal, dal.Constant{Value: 1})
+	for i := 0; i < levels; i++ {
+		condition = dal.NewGroupCondition(dal.And, condition)
+	}
+	return condition
+}
+
+// A condition is followed to maxQueryNesting levels and refused past that, in a
+// filter, in HAVING and in a join condition alike.
+func TestFieldListRefusesAConditionNestedTooDeeply(t *testing.T) {
+	sets := fieldList(t, "id", "name")
+	queries := map[string]func(dal.Condition) dal.StructuredQuery{
+		"WHERE": func(condition dal.Condition) dal.StructuredQuery {
+			return dal.From(customers).NewQuery().Where(condition).SelectKeysOnly(reflect.String)
+		},
+		"HAVING": func(condition dal.Condition) dal.StructuredQuery {
+			return dal.From(customers).NewQuery().Having(condition).SelectKeysOnly(reflect.String)
+		},
+		"a join ON": func(condition dal.Condition) dal.StructuredQuery {
+			return selectName(dal.From(customers).Join(dal.NewJoinedSource(orders, dal.JoinInner, condition)))
+		},
+	}
+	for name, build := range queries {
+		t.Run(name, func(t *testing.T) {
+			if err := validateRequestedQueryFields(build(nestedConditions(maxQueryNesting)), sets); err != nil {
+				t.Fatalf("a condition at the bound: error = %v", err)
+			}
+			decision := decisionOf(t, validateRequestedQueryFields(build(nestedConditions(maxQueryNesting+1)), sets))
+			if decision.Code != CodeEnforcementUnsupported || !strings.Contains(decision.Explanation, "nested too deeply") {
+				t.Fatalf("a condition past the bound: decision = %+v", decision)
+			}
+		})
+	}
+	t.Run("a group held by value that holds itself", func(t *testing.T) {
+		conditions := make([]dal.Condition, 2)
+		group := dal.NewGroupCondition(dal.Or, conditions...)
+		conditions[0] = group
+		conditions[1] = dal.WhereField("name", dal.Equal, 1)
+		decision := decisionOf(t, validateRequestedQueryFields(queries["WHERE"](group), sets))
+		if decision.Code != CodeEnforcementUnsupported {
+			t.Fatalf("decision = %+v", decision)
+		}
+	})
+	t.Run("a group held by pointer is followed as far as a group held by value", func(t *testing.T) {
+		condition := nestedConditions(maxQueryNesting - 1)
+		pointer := dal.NewGroupCondition(dal.And, condition)
+		if err := validateRequestedQueryFields(queries["WHERE"](&pointer), sets); err != nil {
+			t.Fatalf("error = %v", err)
+		}
+		deeper := dal.NewGroupCondition(dal.And, nestedConditions(maxQueryNesting))
+		if err := validateRequestedQueryFields(queries["WHERE"](&deeper), sets); err == nil {
+			t.Fatal("a condition past the bound through a pointer was not refused")
 		}
 	})
 }
