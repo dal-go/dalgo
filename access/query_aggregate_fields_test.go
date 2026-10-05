@@ -645,6 +645,49 @@ func TestNestedSecuredSessionsReturnTheFieldsBothListsAllow(t *testing.T) {
 	}
 }
 
+// On the recordset path nothing can be redacted, so a session that cannot project
+// the query onto columns its list allows refuses it. Two secured sessions, one
+// over the other: when the inner list is narrower than the outer one, the columns
+// the outer session adds are not all ones the inner list allows, and the inner
+// session refuses the query before the wrapped session reads anything; when the
+// outer list is narrower than the inner one, or the same, one read is made.
+func TestNestedSecuredSessionsOnTheRecordsetPath(t *testing.T) {
+	cases := []struct {
+		name         string
+		outer, inner []string
+		reads        int
+	}{
+		{"inner list narrower", []string{"name", "age"}, []string{"name"}, 0},
+		{"outer list narrower", []string{"name"}, []string{"name", "age"}, 1},
+		{"the same fields", []string{"name", "age"}, []string{"name", "age"}, 1},
+	}
+	queries := map[string]dal.StructuredQuery{
+		"no columns": usersQuery().SelectKeysOnly(reflect.String),
+		"wildcard":   usersQuery().SelectColumns(dal.AllColumnsExcept("secret")),
+	}
+	policy := func(name string, fields []string) Policy {
+		return MustPolicy(name, Collection("users", Allow(Query, "list").Fields(fields...)))
+	}
+	for _, c := range cases {
+		for shape, query := range queries {
+			t.Run(c.name+" "+shape, func(t *testing.T) {
+				wrapped := &countingSession{}
+				session := SecureReadSession(SecureReadSession(wrapped, policy("inner", c.inner)), policy("outer", c.outer))
+				_, err := session.ExecuteQueryToRecordsetReader(context.Background(), query)
+				if c.reads == 0 && !errors.Is(err, ErrAccessDenied) {
+					t.Fatalf("error = %v, want a denial", err)
+				}
+				if c.reads != 0 && err != nil {
+					t.Fatalf("error = %v, want none", err)
+				}
+				if wrapped.reads != c.reads {
+					t.Fatalf("%d reads reached the wrapped session, want %d", wrapped.reads, c.reads)
+				}
+			})
+		}
+	}
+}
+
 // A grouped query with no columns selects its group keys, which is what DALgo
 // defines for it. It is sent with those keys as its columns, whatever fields the
 // list allows besides, so the engine's own grouping rules accept it.
@@ -733,5 +776,55 @@ func TestGroupedQueryWithNoColumnsReachesTheWrappedSessionAsItsGroupKeys(t *test
 			t.Fatalf("%d queries reached the session, want 1", len(wrapped.seen))
 		}
 		assertGroupKeys(t, wrapped.seen[0])
+	})
+}
+
+// A query that aggregates with no GROUP BY and no columns has nothing the allowed
+// fields could be added to: DALgo's aggregation rules reject a plain column next
+// to an aggregate, so it is not projected, and the records reader falls back to
+// redacting the result as it does for any query it cannot project.
+func TestAggregateWithNoGroupByAndNoColumnsIsNotProjectedToTheAllowedFields(t *testing.T) {
+	moreThanOne := dal.NewComparison(dal.Count().Expression, dal.GreaterThen, dal.Constant{Value: 1})
+	queries := map[string]dal.StructuredQuery{
+		"only a HAVING":                      usersQuery().Having(moreThanOne).SelectKeysOnly(reflect.String),
+		"only an ORDER BY over an aggregate": usersQuery().OrderBy(dal.Descending(dal.Count().Expression)).SelectKeysOnly(reflect.String),
+	}
+	lists := map[string][]string{
+		"enumerable list": {"name", "age"},
+		"wildcard list":   {"name", "a*"},
+	}
+	for label, fields := range lists {
+		sets := fieldList(t, fields...)
+		for shape, query := range queries {
+			t.Run(label+" "+shape, func(t *testing.T) {
+				if projection := projectQuery(query, sets); projection.status != queryProjectionUnavailable {
+					t.Fatalf("status = %v, want unavailable", projection.status)
+				}
+			})
+		}
+	}
+	t.Run("control: a query that does not aggregate is still projected", func(t *testing.T) {
+		projection := projectQuery(usersQuery().SelectKeysOnly(reflect.String), fieldList(t, "name", "age"))
+		if projection.status != queryProjectionApplied || len(projection.query.Columns()) != 2 {
+			t.Fatalf("status = %v, columns = %v", projection.status, projection.query.Columns())
+		}
+	})
+	policy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name", "age")))
+	query := queries["only a HAVING"]
+	t.Run("records reader sends the query as it is", func(t *testing.T) {
+		wrapped := &projectingSession{stored: storedUser}
+		if _, err := SecureReadSession(wrapped, policy).ExecuteQueryToRecordsReader(context.Background(), query); err != nil {
+			t.Fatal(err)
+		}
+		if columns := wrapped.seen[0].Columns(); len(columns) != 0 {
+			t.Fatalf("columns sent = %v, want none", columns)
+		}
+	})
+	t.Run("recordset reader refuses it, with no read", func(t *testing.T) {
+		wrapped := &countingSession{}
+		_, err := SecureReadSession(wrapped, policy).ExecuteQueryToRecordsetReader(context.Background(), query)
+		if !errors.Is(err, ErrAccessDenied) || wrapped.reads != 0 {
+			t.Fatalf("error = %v, %d reads, want a denial and 0", err, wrapped.reads)
+		}
 	})
 }

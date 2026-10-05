@@ -2,9 +2,9 @@ package access
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
@@ -176,6 +176,16 @@ func TestResourcesForQueryListsEverySource(t *testing.T) {
 				t.Fatalf("resources = %v, want %v", got, c.want)
 			}
 		})
+		// The same shapes decide the route a query takes: a query that holds a
+		// nested query anywhere the walk finds one is executed as a nested query.
+		t.Run(c.name+" is routed as the walk finds it", func(t *testing.T) {
+			structured := c.query.(dal.StructuredQuery)
+			walk := querySourceWalk{onPath: map[uintptr]bool{}}
+			walk.query(structured, 0)
+			if got, want := dal.HasSubquery(structured), walk.queries > 1; got != want {
+				t.Fatalf("HasSubquery = %v, but the walk entered %d queries", got, walk.queries)
+			}
+		})
 	}
 }
 
@@ -310,7 +320,9 @@ func TestUnanalysableQueryNeedsAnOpaquePolicy(t *testing.T) {
 	query := customerQuery().Where(strangeNode{}).SelectKeysOnly(reflect.String)
 
 	denied := &countingSession{}
-	if _, err := SecureReadSession(denied, allowEverything()).ExecuteQueryToRecordsReader(ctx, query); err == nil || !strings.Contains(err.Error(), "opaque-query") {
+	_, err := SecureReadSession(denied, allowEverything()).ExecuteQueryToRecordsReader(ctx, query)
+	var denial *DeniedError
+	if !errors.Is(err, ErrAccessDenied) || !errors.As(err, &denial) || denial.Decision.Resource.Kind() != OpaqueQueryResource {
 		t.Fatalf("a policy without an opaque rule: error = %v", err)
 	}
 	if denied.reads != 0 {

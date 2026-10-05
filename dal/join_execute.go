@@ -462,7 +462,7 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 	if provider, ok := e.executor.(JoinFieldsProvider); ok {
 		fields, err := provider.JoinFields(e.ctx, node.Base())
 		if err != nil {
-			return joinError("join_plan", path, fmt.Sprintf("cannot load fields for %s: %v", alias, err))
+			return joinErrorFrom(err, "join_plan", path, fmt.Sprintf("cannot load fields for %s: %v", alias, err))
 		}
 		if fields != nil {
 			e.fields[alias] = append(make([]string, 0, len(fields)), fields...)
@@ -495,11 +495,11 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 		reader, err = e.executor.ExecuteQueryToRecordsReader(e.ctx, query)
 	}
 	if err != nil {
-		return joinError("join_plan", path, fmt.Sprintf("cannot scan %s: %v", alias, err))
+		return joinErrorFrom(err, "join_plan", path, fmt.Sprintf("cannot scan %s: %v", alias, err))
 	}
 	defer func() {
 		if err := reader.Close(); resultErr == nil && err != nil {
-			resultErr = joinError("join_plan", path, fmt.Sprintf("close scan %s: %v", alias, err))
+			resultErr = joinErrorFrom(err, "join_plan", path, fmt.Sprintf("close scan %s: %v", alias, err))
 		}
 	}()
 	for {
@@ -511,7 +511,7 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 			break
 		}
 		if err != nil {
-			return joinError("join_plan", path, fmt.Sprintf("scan %s: %v", alias, err))
+			return joinErrorFrom(err, "join_plan", path, fmt.Sprintf("scan %s: %v", alias, err))
 		}
 		// Check raw values before JSON normalization so bytes, dates, NaN, and
 		// unsafe integers cannot hide in rows later removed by WHERE or ON.

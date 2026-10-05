@@ -281,6 +281,10 @@ func assessPoliciesMode(ctx context.Context, request Request, policies []Policy,
 			decision := Decision{Operation: request.Operation, Effect: effectDeny.String(), Code: CodeEvaluationFailed, Scope: DecisionScopeConfiguration, Explanation: "nil mandatory policy"}
 			a.assessment.Policies = append(a.assessment.Policies, PolicyAssessment{Decision: decision})
 			a.assessment.Complete = false
+			if a.firstIndeterminate == nil {
+				copy := decision
+				a.firstIndeterminate = &copy
+			}
 			continue
 		}
 		if inspection && !CanInspectPolicy(policy) {

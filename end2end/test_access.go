@@ -156,8 +156,8 @@ func accessConditionsTest(ctx context.Context, t *testing.T, db dal.DB) {
 // accessFieldListTest proves, on a real adapter, that a policy's field
 // allow-list holds when the caller reaches for a hidden field indirectly
 // (dalgo issue 148): under an alias that is itself allowed, in a selection
-// where every column is refused, or in a filter, order, HAVING or null test
-// the result never shows. Each denial pins the decision's code, slot and
+// where every column is refused, or in a filter, order, HAVING, null test, join
+// condition (at any depth) or scan order the result never shows. Each denial pins the decision's code, slot and
 // column. An aggregate is held to the list by its operands: over allowed fields
 // it runs and comes back under the name it was given, over a hidden field
 // (alone or inside arithmetic) it is refused as ACL_COLUMN_DENIED. An allowed
@@ -179,6 +179,7 @@ func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
 		t.Run(name, func(t *testing.T) {
 			secured := access.MustSecureDB(db, access.WithDatabasePolicies(access.MustPolicy("cities-fields",
 				access.Collection(models.CitiesCollection, access.Allow(access.Query, "query-allowed-fields").Fields(fields...)),
+				access.Collection(joinedSourceCollection, access.Allow(access.Query, "query-joined-source")),
 			)))
 			// assertDenied runs the query on both read paths; the adapter must not
 			// be reached, so a denial is the only acceptable answer. It pins the
@@ -373,6 +374,128 @@ func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
 				columnDenied(t, cities().GroupBy(dal.Field("Country")).
 					Having(dal.NewIsNullCondition(dal.Field("State"))).SelectColumns(selectCountry), access.DecisionSlotWhere, "State")
 			})
+			// HAVING and ORDER BY may name an aggregate of the select list by its
+			// alias. Under a list the alias is not a field, so the name an allowed
+			// aggregate was given is let through and no other: the same name for an
+			// aggregate over a hidden field, for a plain field or for nothing is
+			// refused.
+			aliasedGroups := func(having dal.Condition, order dal.OrderExpression, columns ...dal.Column) dal.Query {
+				return cities().GroupBy(dal.Field("Country")).Having(having).OrderBy(order).SelectColumns(columns...)
+			}
+			moreThanOne := func(alias string) dal.Condition {
+				return dal.NewComparison(dal.Field(alias), dal.GreaterThen, dal.Constant{Value: 1})
+			}
+			selectCountry := dal.Column{Expression: dal.Field("Country")}
+			t.Run("having_and_order_by_over_the_alias_of_an_allowed_aggregate", func(t *testing.T) {
+				q := aliasedGroups(moreThanOne("n"), dal.Descending(dal.Field("n")), selectCountry, dal.CountAs(dal.Field("Name"), "n"))
+				// An adapter that does not run a HAVING or an ORDER BY over an
+				// aggregate alias on its own skips the control: the unsecured
+				// database is asked first.
+				if _, err := readMapRecords(ctx, db, q, "access field list: aggregate alias probe"); err != nil {
+					t.Skip("adapter does not run HAVING or ORDER BY over an aggregate alias:", err)
+				}
+				rows, err := readMapRecords(ctx, secured, q, "access field list: aggregate alias")
+				require.NoError(t, err)
+				var countries []string
+				for _, row := range rows {
+					country, isString := row["Country"].(string)
+					require.True(t, isString, "Country holds %v", row["Country"])
+					countries = append(countries, country)
+					assert.Greater(t, numberOf(t, row["n"]), float64(1), "the groups kept have more than one city")
+				}
+				assert.ElementsMatch(t, []string{"CN", "IN"}, countries, "the countries with more than one city")
+				for i := 1; i < len(rows); i++ {
+					assert.GreaterOrEqual(t, numberOf(t, rows[i-1]["n"]), numberOf(t, rows[i]["n"]), "ordered by the alias, descending")
+				}
+			})
+			t.Run("having_over_the_alias_is_refused_on_the_recordset_path", func(t *testing.T) {
+				// The recordset path sends the aggregate under the caller's own alias
+				// and renames nothing, so an alias the list does not allow is not a
+				// name it may use there; the aggregate itself is.
+				q := aliasedGroups(moreThanOne("n"), dal.Descending(dal.Field("Country")), selectCountry, dal.CountAs(dal.Field("Name"), "n"))
+				err := secured.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
+					_, err := tx.ExecuteQueryToRecordsetReader(ctx, q)
+					return err
+				}, dal.TxWithMessage("access field list: recordset"))
+				assert.ErrorIs(t, err, access.ErrAccessDenied)
+				var denied *access.DeniedError
+				if assert.ErrorAs(t, err, &denied) {
+					assert.Equal(t, access.CodeColumnDenied, denied.Decision.Code)
+					assert.Equal(t, [][]string{{"n"}}, denied.Decision.Columns)
+				}
+				byAggregate := cities().GroupBy(dal.Field("Country")).
+					Having(dal.NewComparison(dal.Count().Expression, dal.GreaterThen, dal.Constant{Value: 1})).
+					SelectColumns(selectCountry, dal.CountAs(dal.Field("Name"), "n"))
+				assertRecordsetRowCount(ctx, t, secured, byAggregate, "access field list: allowed recordset", 2)
+			})
+			t.Run("an_alias_that_is_not_an_allowed_aggregate_is_refused", func(t *testing.T) {
+				columnDenied(t, aliasedGroups(moreThanOne("p"), dal.Descending(dal.Field("Country")), selectCountry, dal.SumAs(dal.Field("Population"), "p")),
+					access.DecisionSlotWhere, "p")
+				columnDenied(t, aliasedGroups(moreThanOne("c"), dal.Descending(dal.Field("Country")), selectCountry, dal.Column{Alias: "c", Expression: dal.Field("Country")}),
+					access.DecisionSlotWhere, "c")
+				columnDenied(t, aliasedGroups(moreThanOne("unknown"), dal.Descending(dal.Field("Country")), selectCountry, dal.CountAs(dal.Field("Name"), "n")),
+					access.DecisionSlotWhere, "unknown")
+				columnDenied(t, aliasedGroups(dal.NewComparison(dal.Count().Expression, dal.GreaterThen, dal.Constant{Value: 1}), dal.Descending(dal.Field("p")), selectCountry, dal.CountAs(dal.Field("Name"), "n"), dal.SumAs(dal.Field("Population"), "p")),
+					access.DecisionSlotFields, "p")
+			})
+			// A join condition and a scan order read the stored fields of the
+			// source they belong to, so the list applies to them as it does to a
+			// filter. The joined collection is not in the fixture: a query that
+			// names a hidden field is refused before the adapter runs.
+			citiesRef := dal.NewRootCollectionRef(models.CitiesCollection, "c")
+			joined := func(alias string) dal.CollectionRef { return dal.NewRootCollectionRef(joinedSourceCollection, alias) }
+			joinOn := func(left, right dal.Expression) dal.Condition { return dal.NewComparison(left, dal.Equal, right) }
+			citiesField := func(name string) dal.Expression { return dal.NewFieldRef("c", name) }
+			selectCityName := func(from dal.FromSource) dal.StructuredQuery {
+				return from.NewQuery().SelectColumns(dal.Column{Expression: dal.Field("Name")})
+			}
+			t.Run("join_on_a_hidden_field", func(t *testing.T) {
+				columnDenied(t, selectCityName(dal.From(citiesRef).Join(dal.NewJoinedSource(joined("j"), dal.JoinInner,
+					joinOn(citiesField("Population"), dal.NewFieldRef("j", "ref"))))), access.DecisionSlotWhere, "Population")
+				columnDenied(t, selectCityName(dal.From(citiesRef).Join(dal.NewJoinedSource(joined("j"), dal.JoinInner,
+					joinOn(dal.NewFieldRef("j", "ref"), citiesField("State"))))), access.DecisionSlotWhere, "State")
+				columnDenied(t, selectCityName(dal.From(citiesRef).Join(dal.NewJoinedSource(joined("j"), dal.JoinInner,
+					joinOn(citiesField("Population"), dal.Constant{Value: 1})))), access.DecisionSlotWhere, "Population")
+			})
+			t.Run("join_on_a_hidden_field_at_depth_two_and_three", func(t *testing.T) {
+				depthTwo := dal.From(citiesRef).Join(dal.NewJoinedFrom(
+					dal.From(joined("j")).Join(dal.NewJoinedSource(joined("k"), dal.JoinInner,
+						joinOn(citiesField("Population"), dal.NewFieldRef("k", "ref")))),
+					dal.JoinInner, joinOn(citiesField("Name"), dal.NewFieldRef("j", "ref"))))
+				columnDenied(t, selectCityName(depthTwo), access.DecisionSlotWhere, "Population")
+				depthThree := dal.From(citiesRef).Join(dal.NewJoinedFrom(
+					dal.From(joined("j")).Join(dal.NewJoinedFrom(
+						dal.From(joined("k")).Join(dal.NewJoinedSource(joined("l"), dal.JoinInner,
+							joinOn(citiesField("State"), dal.NewFieldRef("l", "ref")))),
+						dal.JoinInner, joinOn(dal.NewFieldRef("j", "ref"), dal.NewFieldRef("k", "ref")))),
+					dal.JoinInner, joinOn(citiesField("Name"), dal.NewFieldRef("j", "ref"))))
+				columnDenied(t, selectCityName(depthThree), access.DecisionSlotWhere, "State")
+			})
+			t.Run("scan_order_on_a_hidden_field", func(t *testing.T) {
+				columnDenied(t, selectCityName(dal.From(citiesRef.WithScan(5, dal.AscendingField("Population")))), access.DecisionSlotFields, "Population")
+				columnDenied(t, selectCityName(dal.From(citiesRef).Join(dal.NewJoinedSource(
+					joined("j").WithScan(5, dal.Descending(citiesField("State"))), dal.JoinInner,
+					joinOn(citiesField("Name"), dal.NewFieldRef("j", "ref"))))), access.DecisionSlotFields, "State")
+			})
+			t.Run("join_fields_of_the_joined_source_are_not_held_to_the_list", func(t *testing.T) {
+				// Negative control: Population here is a field of the joined source,
+				// not of the listed one, so this policy does not refuse it. The
+				// adapter may refuse a query it cannot run, so only a refusal by the
+				// field list counts.
+				run := func(q dal.Query) error {
+					return secured.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
+						_, err := tx.ExecuteQueryToRecordsReader(ctx, q)
+						return err
+					}, dal.TxWithMessage("access field list: joined source field"))
+				}
+				policy, _ := denialOf(run(selectCityName(dal.From(citiesRef).Join(dal.NewJoinedSource(joined("j"), dal.JoinInner,
+					joinOn(dal.NewFieldRef("j", "Population"), citiesField("Name")))))))
+				assert.NotEqual(t, "fields", policy, "a field of the joined source in a join condition")
+				policy, _ = denialOf(run(selectCityName(dal.From(citiesRef).Join(dal.NewJoinedSource(
+					joined("j").WithScan(5, dal.AscendingField("Population")), dal.JoinInner,
+					joinOn(dal.NewFieldRef("j", "ref"), citiesField("Name")))))))
+				assert.NotEqual(t, "fields", policy, "a field of the joined source in its own scan order")
+			})
 		})
 	}
 
@@ -415,6 +538,11 @@ func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
 		}
 	})
 }
+
+// joinedSourceCollection is a collection the field-list policy allows without a
+// field list. No test creates it: every query that reads it is refused before an
+// adapter runs, or tolerates the adapter's answer.
+const joinedSourceCollection = models.CitiesCollection + "_Joined"
 
 // hiddenSourceCollection is a collection the sources policy denies. No test
 // creates it: every query that reads it is refused before an adapter runs.
@@ -551,6 +679,14 @@ func accessSourcesTest(ctx context.Context, t *testing.T, db dal.DB) {
 		require.NoError(t, err)
 		assert.Len(t, records, len(models.Cities), "an uncorrelated EXISTS over a populated allowed collection keeps every row")
 	})
+}
+
+// numberOf is a value an adapter returned for a count or a sum as a float.
+func numberOf(t *testing.T, value any) float64 {
+	t.Helper()
+	number := reflect.ValueOf(value)
+	require.True(t, number.IsValid() && number.CanConvert(reflect.TypeOf(0.0)), "%v is not a number", value)
+	return number.Convert(reflect.TypeOf(0.0)).Float()
 }
 
 // denialOf returns the policy and the resource of an access denial in err, and

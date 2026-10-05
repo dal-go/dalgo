@@ -48,23 +48,68 @@ func preserveRequestedQuery(query dal.Query, requested dal.StructuredQuery) dal.
 	return securedStructuredQuery{StructuredQuery: structured, requested: requested}
 }
 
+// fieldScope says how the fields of one clause are held to the allow-list.
+type fieldScope struct {
+	// usage names the clause in a denial.
+	usage string
+	// aggregates is true where an aggregate may stand: the select list, HAVING and
+	// ORDER BY.
+	aggregates bool
+	// aliases is true where a bare name may be the alias of an allowed aggregate
+	// of the same query: HAVING and ORDER BY.
+	aliases bool
+	// clauses, when set, attributes each field to a source: a field of a joined
+	// source is not held to the list, which applies to the base source. Clauses
+	// without it hold every field to the list whatever its qualifier.
+	clauses *joinClauses
+	// own is the source an unqualified field belongs to, when clauses is set.
+	own fieldOwner
+}
+
+const (
+	usageFilter   = "filter"
+	usageGroup    = "group"
+	usageOrder    = "order"
+	usageSelected = "selected"
+	usageJoin     = "join condition"
+	usageScan     = "scan order"
+)
+
+// validateRequestedQueryFields holds the caller's query to the field allow-list.
+// HAVING and ORDER BY may name a column only by a name the list allows.
 func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) error {
+	return validateQueryFields(query, sets, false)
+}
+
+// validateRequestedQueryFieldsWithAliases is validateRequestedQueryFields for a
+// reader that sends an allowed aggregate under an alias of the access layer's own
+// (see aliasRefusedOutputs) and names that alias in HAVING and ORDER BY: there,
+// the alias of an allowed aggregate of the query is a name they may use.
+func validateRequestedQueryFieldsWithAliases(query dal.StructuredQuery, sets fieldSets) error {
+	return validateQueryFields(query, sets, true)
+}
+
+func validateQueryFields(query dal.StructuredQuery, sets fieldSets, aliasReferences bool) error {
 	resource := resourcesForQuery(query)[0]
 	unsupported := func(explanation string) error {
 		return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotFields, Explanation: explanation}}
 	}
 	deny := func(usage, field string) error {
 		slot := DecisionSlotFields
-		if usage == "filter" {
+		if usage == usageFilter || usage == usageJoin {
 			slot = DecisionSlotWhere
 		}
 		return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeColumnDenied, Scope: DecisionScopeColumn, Slot: slot, Columns: [][]string{{field}}, Explanation: fmt.Sprintf("%s field %q is not allowed", usage, field)}}
+	}
+	var aliases map[string]bool
+	if aliasReferences {
+		aliases = allowedAggregateAliases(query.Columns(), sets)
 	}
 	// checkExpression holds an expression to the allow-list. An aggregate is
 	// accepted only where aggregates belong (the select list, HAVING and ORDER
 	// BY); anywhere else, and in any slot when it is not one DALgo defines, it
 	// is refused as unsupported.
-	checkExpression := func(expression dal.Expression, usage string, aggregatesAllowed bool) error {
+	checkExpression := func(expression dal.Expression, scope fieldScope) error {
 		field, ok := expression.(dal.FieldRef)
 		if !ok {
 			if pointer, pointerOK := expression.(*dal.FieldRef); pointerOK && pointer != nil {
@@ -75,27 +120,41 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			// An aggregate reads only the fields of its operands, so it is held
 			// to the allow-list operand by operand; the first refused field is
 			// the one named.
-			if aggregate, isAggregate := expression.(dal.AggregateFunc); isAggregate && aggregatesAllowed {
+			if aggregate, isAggregate := expression.(dal.AggregateFunc); isAggregate && scope.aggregates {
 				if fields, checkable := aggregateFields(aggregate, 0); checkable {
 					for _, name := range fields {
 						if !sets.allowsWhole(name) {
-							return deny(usage, name)
+							return deny(scope.usage, name)
 						}
 					}
 					return nil
 				}
 			}
-			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotFields, Explanation: fmt.Sprintf("%s expression cannot be safely checked against allowed fields", usage)}}
+			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotFields, Explanation: fmt.Sprintf("%s expression cannot be safely checked against allowed fields", scope.usage)}}
 		}
-		if !sets.allowsWhole(field.Name()) {
-			return deny(usage, field.Name())
+		name := field.Name()
+		if scope.aliases && field.Source() == "" && aliases[name] {
+			return nil
+		}
+		if scope.clauses != nil {
+			switch scope.clauses.attribute(field, scope.own) {
+			case ownerJoined:
+				return nil
+			case ownerUnknown:
+				if !sets.allowsWhole(name) {
+					return deny(scope.usage, name)
+				}
+				return unsupported(fmt.Sprintf("%s field %q cannot be attributed to a source", scope.usage, name))
+			}
+		}
+		if !sets.allowsWhole(name) {
+			return deny(scope.usage, name)
 		}
 		return nil
 	}
-	// checkCondition holds a condition to the allow-list; aggregatesAllowed is
-	// true for HAVING and false for WHERE.
-	var checkCondition func(dal.Condition, bool) error
-	checkCondition = func(condition dal.Condition, aggregatesAllowed bool) error {
+	// checkCondition holds a condition to the allow-list.
+	var checkCondition func(dal.Condition, fieldScope) error
+	checkCondition = func(condition dal.Condition, scope fieldScope) error {
 		switch condition := condition.(type) {
 		case nil:
 			return nil
@@ -105,7 +164,7 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 				case dal.Constant, *dal.Constant, dal.Array, *dal.Array, dal.Param, *dal.Param:
 					continue
 				}
-				if err := checkExpression(expression, "filter", aggregatesAllowed); err != nil {
+				if err := checkExpression(expression, scope); err != nil {
 					return err
 				}
 			}
@@ -120,15 +179,15 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			case dal.Constant, *dal.Constant:
 				return nil
 			}
-			return checkExpression(condition.Operand(), "filter", aggregatesAllowed)
+			return checkExpression(condition.Operand(), scope)
 		case *dal.Comparison:
 			if condition == nil {
 				return nil
 			}
-			return checkCondition(*condition, aggregatesAllowed)
+			return checkCondition(*condition, scope)
 		case dal.GroupCondition:
 			for _, child := range condition.Conditions() {
-				if err := checkCondition(child, aggregatesAllowed); err != nil {
+				if err := checkCondition(child, scope); err != nil {
 					return err
 				}
 			}
@@ -137,28 +196,51 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			if condition == nil {
 				return nil
 			}
-			return checkCondition(*condition, aggregatesAllowed)
+			return checkCondition(*condition, scope)
 		default:
 			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotWhere, Explanation: "filter condition cannot be safely checked against allowed fields"}}
 		}
 	}
-	if err := checkCondition(query.Where(), false); err != nil {
+	if err := checkCondition(query.Where(), fieldScope{usage: usageFilter}); err != nil {
 		return err
 	}
 	for _, expression := range query.GroupBy() {
-		if err := checkExpression(expression, "group", false); err != nil {
+		if err := checkExpression(expression, fieldScope{usage: usageGroup}); err != nil {
 			return err
 		}
 	}
-	if err := checkCondition(query.Having(), true); err != nil {
+	if err := checkCondition(query.Having(), fieldScope{usage: usageFilter, aggregates: true, aliases: true}); err != nil {
 		return err
 	}
 	for _, order := range query.OrderBy() {
 		if order == nil {
-			return deny("order", "")
+			return deny(usageOrder, "")
 		}
-		if err := checkExpression(order.Expression(), "order", true); err != nil {
+		if err := checkExpression(order.Expression(), fieldScope{usage: usageOrder, aggregates: true, aliases: true}); err != nil {
 			return err
+		}
+	}
+	// The list applies to the base source. A field in a join condition or a scan
+	// order is held to it when it belongs to the base, let through when it
+	// belongs to a joined source, and refused when it cannot be attributed to
+	// either.
+	if from := query.From(); from != nil {
+		clauses, err := collectJoinClauses(from)
+		if err != nil {
+			return unsupported("join conditions and scan orders cannot be checked: " + err.Error())
+		}
+		for _, condition := range clauses.conditions {
+			if err := checkCondition(condition, fieldScope{usage: usageJoin, clauses: clauses, own: ownerBase}); err != nil {
+				return err
+			}
+		}
+		for _, scan := range clauses.scans {
+			if isNilNode(scan.order) {
+				return deny(usageScan, "")
+			}
+			if err := checkExpression(scan.order.Expression(), fieldScope{usage: usageScan, clauses: clauses, own: scan.owner}); err != nil {
+				return err
+			}
 		}
 	}
 	wildcards := 0
@@ -194,13 +276,32 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			continue
 		}
 		if column.Expression == nil {
-			return deny("selected", "")
+			return deny(usageSelected, "")
 		}
-		if err := checkExpression(column.Expression, "selected", true); err != nil {
+		if err := checkExpression(column.Expression, fieldScope{usage: usageSelected, aggregates: true}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// allowedAggregateAliases names the aliases of the select list that stand for an
+// aggregate the field list allows. A name that two columns come back under
+// stands for neither.
+func allowedAggregateAliases(columns []dal.Column, sets fieldSets) map[string]bool {
+	count := map[string]int{}
+	for _, column := range columns {
+		if name, named := outputName(column); named {
+			count[name]++
+		}
+	}
+	aliases := map[string]bool{}
+	for _, column := range columns {
+		if _, isAggregate := column.Expression.(dal.AggregateFunc); isAggregate && column.Alias != "" && count[column.Alias] == 1 && sets.readsOnlyAllowedFields(column.Expression) {
+			aliases[column.Alias] = true
+		}
+	}
+	return aliases
 }
 
 // aggregateFunctions are the aggregate functions DALgo defines. Only these are

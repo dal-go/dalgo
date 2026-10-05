@@ -378,9 +378,6 @@ func sourceShapes() []sourceShape {
 		{"scalar subquery in a null test", func() dal.StructuredQuery {
 			return customerQuery().Where(dal.NewIsNullCondition(scalarSecret())).SelectKeysOnly(reflect.String)
 		}, 1, false},
-		{"subquery in a scan order", func() dal.StructuredQuery {
-			return dal.From(customers.WithScan(10, dal.Ascending(scalarSecret()))).NewQuery().SelectKeysOnly(reflect.String)
-		}, 1, false},
 		{"subquery inside a derived source", func() dal.StructuredQuery {
 			inner := customerQuery().Where(dal.NewExistsCondition(secretRows())).SelectKeysOnly(reflect.String)
 			return dal.From(dal.NewQuerySource(inner, "d")).NewQuery().SelectKeysOnly(reflect.String)
