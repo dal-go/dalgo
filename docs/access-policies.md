@@ -24,6 +24,8 @@ background jobs, ingestion endpoints, analytics, and technical-support tools.
   operation-context policy must allow every target resource.
 - Batches and joined queries are preflighted in full before execution.
 - Collection-group and opaque queries require explicit rules.
+- A table in a schema or a database is named with a table rule
+  (`access.TableScope`); see [Tables in schemas and databases](#tables-in-schemas-and-databases).
 
 These rules support both useful hierarchical shapes:
 
@@ -211,6 +213,84 @@ audit := access.MustAuditPolicy("sensitive-mutations",
 Persistence, delivery guarantees, and redaction remain the application's
 responsibility.
 
+## Tables in schemas and databases
+
+A source that writes a schema (`dal.NewQualifiedRootCollectionRef`) or a database
+(`dal.NewDatabaseCollectionRef`) can have rules of its own, written with a table
+rule. A table rule names the table by its schema, its database, or both, and by
+its name. In Go:
+
+```go
+policy := access.MustPolicy("sales-readers",
+	access.Collection("Customer",
+		access.Allow(access.Query, "customers-basic").Fields("CustomerId", "FirstName", "Country")),
+	access.TableScope(access.TableName{Schema: "sales", Name: "Customer"},
+		access.Allow(access.Query, "sales-customers-gb").
+			Fields("id", "company", "country").
+			Where(dal.WhereField("country", dal.Equal, "GB"))),
+)
+```
+
+In a policy document `table` is a fourth selector beside `path`,
+`collectionGroup` and `opaqueQuery`; a scope selects exactly one of them:
+
+```yaml
+scopes:
+  - path: /Customer
+    rules:
+      - {id: customers-basic, effect: allow, operations: [query], fields: [CustomerId, FirstName, Country]}
+  - table: {schema: sales, name: Customer}   # database: is optional
+    rules:
+      - id: sales-customers-gb
+        effect: allow
+        operations: [query]
+        fields: [id, company, country]
+        where: {op: "==", left: {field: country}, right: {value: GB}}
+```
+
+A table scope is top-level and holds rules, not scopes. The `name` is required and
+at least one of `schema` and `database` is required; a table with neither is an
+ordinary collection, which a path rule names. A rule under a table scope may carry
+`fields`, a field mask, a row condition and a post-image check, as a rule under a
+path scope does. A condition that uses `$path.x` is refused, because a table scope
+captures nothing. A name is compared as written, with no SQL quoting: a dot is part
+of the name, so the schema `a` and the name `b.c` are not the schema `a.b` and the
+name `c`. The portable file format of the DTQL policy loader keeps path scopes only.
+
+A rule written for a collection (`/Customer`) keeps its meaning: it governs the
+source that writes no schema, and nothing else. It never applies to
+`sales.Customer`. How a policy that holds table rules decides a request:
+
+- A source that writes a schema is decided by the table rules that match it, and
+  by them alone. When none does, the request is denied (`ACL_NO_MATCH`). A rule for
+  opaque queries, whether it allows or denies, is not consulted for it; it still
+  decides custom SQL text and a part of a query that cannot be read.
+- A resource that carries the identity of a table with a schema, though its source
+  writes none, is decided by the table rules that match it, and by the path rules
+  when none does. A deny rule written for the collection's bare name is never
+  overridden by a table rule. A deny at the root does not name the collection, so
+  a table rule allows beside it. No adapter of this repository says which schema
+  an unqualified name is read from, so in this version a source that writes no
+  schema carries no identity.
+- A source that writes no schema, a key and a root collection are decided by the
+  path rules as before, with one exception that only refuses: when the policy holds
+  a table rule for a table of the same name, compared without regard to case, the
+  name could be that table, and the request is denied
+  (`ACL_ENFORCEMENT_UNSUPPORTED`) because the source does not say which schema it
+  is read from. A key with a parent is decided by the path rules.
+- A table rule matches a source when schema and name are equal byte for byte and
+  neither the rule nor the source names a database. A database cannot be checked,
+  so a rule or a source that names one never matches; the source is denied as above.
+- The collection mask is checked first, as it is for every resource, and it denies a
+  schema-qualified source.
+
+A policy that holds no table rule is decided exactly as before. Several policies
+intersect, so every policy in force must allow every resource: a table in another
+schema is readable only when each applied policy has a table rule for it.
+
+An audit policy takes table scopes too, with audit effects. It refuses nothing, so
+a name that a table rule makes ambiguous is classified by its path rules.
+
 ## Query boundaries and future constraints
 
 The current boundary authorizes every source a structured query reads before
@@ -300,27 +380,33 @@ order that holds a query cannot be run together with nested queries, and is
 refused as an unsupported enforcement (`ACL_ENFORCEMENT_UNSUPPORTED`) before
 anything is read, after the sources of the query have been authorised.
 
-Three limits follow from how a source is matched to a rule.
+What stays of the three published limits.
 
-A source is matched to rules by the exact spelling of its collection name. On an
-engine that folds identifier case, one table can be named in several spellings,
-and a rule written for one spelling does not apply to another. A policy for such
-an engine should therefore be an allow-list written with the names the engine
-stores, not an allow-all with denials for particular names.
+A source is matched to a path rule by the exact spelling of its collection name.
+On an engine that folds identifier case, one table can be named in several
+spellings, and a rule written for one spelling does not apply to another. A
+policy for such an engine should therefore be an allow-list written with the
+names the engine stores, not an allow-all with denials for particular names. The
+names of a table rule are compared exactly as well.
 
-A schema-qualified source (`schema.table`) is one opaque resource. Only a rule
-for opaque queries (`access.OpaqueQueryScope`) can allow it, that rule applies to
-every opaque resource, custom SQL text included, and a rule for opaque queries
-carries no field list and no row condition. A collection rule, a field list or a
-row condition cannot be applied to a schema-qualified source.
+A schema-qualified source (`schema.table`) is one opaque resource in a policy that
+holds no table rule: only a rule for opaque queries (`access.OpaqueQueryScope`)
+can allow it, that rule applies to every opaque resource, custom SQL text
+included, and a rule for opaque queries carries no field list and no row
+condition. In a policy that holds table rules a schema-qualified source is decided
+by the table rules, which carry a field list and a row condition (see
+[Tables in schemas and databases](#tables-in-schemas-and-databases)), and a rule
+for opaque queries is not consulted for it.
 
 A source that names a database (`CollectionRef.Database`, used by a federated
-executor) and no schema is matched to rules by its collection name alone: the
+executor) and no schema is matched to path rules by its collection name alone: the
 database is not part of its resource, so one policy cannot tell the same
 collection name in two databases apart, and a rule for a collection applies to it
 in every database the wrapped executor reaches. Where an executor routes a query
 by the database a source names, write the policy for every database it reaches
-as one.
+as one. A table rule that names a database never matches a source in this version,
+because a session cannot say which database it is; a policy that holds a table
+rule for the name of such a source denies it.
 
 Custom SQL text is always opaque. DALgo does not inspect or attempt to infer
 tables from the SQL string, so ordinary path/collection rules can never

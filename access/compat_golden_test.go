@@ -321,6 +321,22 @@ func compatGolden() []string {
 	return lines
 }
 
+// compatGoldenLines reads the golden, without its comment lines.
+func compatGoldenLines(t *testing.T) []string {
+	t.Helper()
+	data, err := os.ReadFile(compatGoldenPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for _, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+		if !strings.HasPrefix(line, "#") {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
 func TestCompatGolden(t *testing.T) {
 	got := compatGolden()
 	if parent := os.Getenv("DALGO_COMPAT_GOLDEN_PARENT"); parent != "" {
@@ -333,16 +349,7 @@ func TestCompatGolden(t *testing.T) {
 		t.Logf("wrote %d lines to %s", len(got), compatGoldenPath)
 		return
 	}
-	data, err := os.ReadFile(compatGoldenPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var want []string
-	for _, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
-		if !strings.HasPrefix(line, "#") {
-			want = append(want, line)
-		}
-	}
+	want := compatGoldenLines(t)
 	if len(got) != len(want) {
 		t.Errorf("the matrix has %d lines, the golden has %d", len(got), len(want))
 	}

@@ -41,13 +41,16 @@ const (
 	scopeRule
 	collectionGroupRule
 	opaqueQueryRule
+	tableScopeRule
 )
 
 // Rule is a declarative policy rule. Use Allow, Deny, Audit, IgnoreAudit,
-// Scope, Collection, Under, Root, CollectionGroupScope, or OpaqueQueryScope.
+// Scope, Collection, Under, Root, CollectionGroupScope, OpaqueQueryScope, or
+// TableScope.
 type Rule struct {
 	kind       ruleKind
 	pattern    PathPattern
+	table      TableName
 	name       string
 	operations Operations
 	effect     effect
@@ -177,6 +180,7 @@ func OpaqueQueryScope(rules ...Rule) Rule {
 type compiledRule struct {
 	kind       ResourceKind
 	pattern    PathPattern
+	table      TableName
 	resource   string
 	name       string
 	operations Operations
@@ -192,7 +196,7 @@ type compiledRule struct {
 func compileRules(rules []Rule, allowedEffects map[effect]bool) ([]compiledRule, error) {
 	compiled := make([]compiledRule, 0, len(rules))
 	for _, rule := range rules {
-		if err := compileRule(rule, PathPattern{}, PathResource, "", allowedEffects, &compiled); err != nil {
+		if err := compileRule(rule, PathPattern{}, PathResource, "", TableName{}, allowedEffects, &compiled); err != nil {
 			return nil, err
 		}
 	}
@@ -211,6 +215,7 @@ func compileRule(
 	prefix PathPattern,
 	resourceKind ResourceKind,
 	resourceName string,
+	table TableName,
 	allowedEffects map[effect]bool,
 	compiled *[]compiledRule,
 ) error {
@@ -232,7 +237,7 @@ func compileRule(
 			if rule.effect != effectAllow {
 				return fmt.Errorf("access: rule %q: fields apply to allow rules only", rule.name)
 			}
-			if resourceKind != PathResource {
+			if !takesFieldsAndConditions(resourceKind) {
 				return fmt.Errorf("access: rule %q: fields are not valid on %s rules", rule.name, resourceKind)
 			}
 			parsed, err := parseFieldPatterns(rule.fields)
@@ -242,8 +247,8 @@ func compileRule(
 			fields = parsed
 		}
 		if rule.fieldMask != nil {
-			if rule.fields != nil || rule.effect != effectAllow || resourceKind != PathResource {
-				return fmt.Errorf("access: fieldMask requires a path allow rule without fields")
+			if rule.fields != nil || rule.effect != effectAllow || !takesFieldsAndConditions(resourceKind) {
+				return fmt.Errorf("access: fieldMask requires a path or table allow rule without fields")
 			}
 			if operations&Truncate != 0 {
 				if operations != Write && operations != ReadWrite {
@@ -261,7 +266,7 @@ func compileRule(
 			if rule.effect != effectAllow {
 				return fmt.Errorf("access: rule %q: conditional %s rules are not supported; conditions apply to allow rules only", rule.name, rule.effect)
 			}
-			if resourceKind != PathResource {
+			if !takesFieldsAndConditions(resourceKind) {
 				return fmt.Errorf("access: rule %q: conditions are not valid on %s rules", rule.name, resourceKind)
 			}
 			if operations&Truncate != 0 {
@@ -310,15 +315,21 @@ func compileRule(
 				name += " fields [" + strings.Join(fields.sources, ", ") + "]"
 			}
 		}
+		depth, literals := len(prefix.segments), literalCount(prefix)
+		if resourceKind == tableRuleResource {
+			depth = table.parts()
+			literals = depth
+		}
 		*compiled = append(*compiled, compiledRule{
 			kind:       resourceKind,
 			pattern:    prefix,
+			table:      table,
 			resource:   resourceName,
 			name:       name,
 			operations: operations,
 			effect:     rule.effect,
-			depth:      len(prefix.segments),
-			literals:   literalCount(prefix),
+			depth:      depth,
+			literals:   literals,
 			where:      rule.where,
 			check:      rule.check,
 			fields:     fields,
@@ -331,7 +342,7 @@ func compileRule(
 		}
 		joined := prefix.append(rule.pattern)
 		for _, child := range rule.children {
-			if err := compileRule(child, joined, PathResource, "", allowedEffects, compiled); err != nil {
+			if err := compileRule(child, joined, PathResource, "", TableName{}, allowedEffects, compiled); err != nil {
 				return err
 			}
 		}
@@ -344,7 +355,7 @@ func compileRule(
 			return fmt.Errorf("access: collection-group name is required")
 		}
 		for _, child := range rule.children {
-			if err := compileRule(child, PathPattern{}, CollectionGroupResource, rule.resource, allowedEffects, compiled); err != nil {
+			if err := compileRule(child, PathPattern{}, CollectionGroupResource, rule.resource, TableName{}, allowedEffects, compiled); err != nil {
 				return err
 			}
 		}
@@ -354,7 +365,20 @@ func compileRule(
 			return fmt.Errorf("access: opaque-query rules must be top-level")
 		}
 		for _, child := range rule.children {
-			if err := compileRule(child, PathPattern{}, OpaqueQueryResource, "", allowedEffects, compiled); err != nil {
+			if err := compileRule(child, PathPattern{}, OpaqueQueryResource, "", TableName{}, allowedEffects, compiled); err != nil {
+				return err
+			}
+		}
+		return nil
+	case tableScopeRule:
+		if resourceKind != PathResource || len(prefix.segments) != 0 {
+			return fmt.Errorf("access: table rules must be top-level")
+		}
+		if err := rule.table.validate(); err != nil {
+			return err
+		}
+		for _, child := range rule.children {
+			if err := compileRule(child, PathPattern{}, tableRuleResource, rule.table.describe(), rule.table, allowedEffects, compiled); err != nil {
 				return err
 			}
 		}
@@ -374,10 +398,19 @@ func literalCount(pattern PathPattern) int {
 	return count
 }
 
+// takesFieldsAndConditions reports whether the rules of a scope of this kind may
+// carry a field list, a field mask, a row condition and a post-image check: the
+// rules of a path scope and of a table scope may.
+func takesFieldsAndConditions(kind ResourceKind) bool {
+	return kind == PathResource || kind == tableRuleResource
+}
+
 func resourceDescription(kind ResourceKind, name string, pattern PathPattern) string {
 	switch kind {
 	case CollectionGroupResource:
 		return "collection-group:" + name
+	case tableRuleResource:
+		return "table " + name
 	case OpaqueQueryResource:
 		return "opaque-query"
 	default:
