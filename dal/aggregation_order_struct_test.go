@@ -61,6 +61,7 @@ func TestOrderedAggregateSortValuesFollowEmbeddedStructsAsEncodingJSONDoes(t *te
 		promotedBase:     promotedBase{Created: at(1), Shadow: at(10)},
 		promotedSeen:     &promotedSeen{Seen: &seen},
 		promotedAbsent:   nil,
+		promotedCount:    1,
 		promotedDupA:     promotedDupA{Dup: at(20)},
 		promotedDupB:     promotedDupB{Dup: at(21)},
 		promotedTagged:   promotedTagged{Pick: at(5)},
