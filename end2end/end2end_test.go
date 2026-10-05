@@ -306,6 +306,14 @@ func TestEndToEnd(t *testing.T) {
 			// The replay adapter does not serve the scan of a nested source, so the
 			// control skips; a real adapter runs it.
 			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access permitted copy: probe", "access permitted copy: read":
+			// The replay adapter cannot run the cells' reads, with or without a
+			// policy; each cell skips on its first read.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+			tx.EXPECT().ExecuteQueryToRecordsetReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
+		case "access permitted copy: denied":
+			// Every read in this transaction must be denied by the access layer;
+			// the adapter is never reached, so no call is expected.
 		case "":
 			panic("no RO tx name")
 		default:
