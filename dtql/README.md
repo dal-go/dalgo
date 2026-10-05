@@ -338,9 +338,9 @@ represent a schema-qualified source must reject it explicitly; they must not
 silently flatten the two segments into a dotted collection name.
 
 DALgo access policies likewise do not collapse a qualified source onto the
-ordinary root collection path. Secured sessions classify it as an opaque query,
-so execution requires an explicit `OpaqueQueryScope` rule until schema-aware
-path resources are defined.
+ordinary root collection path. Secured sessions classify it as an opaque query.
+A policy names such a source with a table rule (`access.TableScope`); a policy
+with no table rule needs an explicit `OpaqueQueryScope` rule for it.
 
 ## Round-trip guarantees
 

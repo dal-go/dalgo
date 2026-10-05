@@ -48,11 +48,14 @@ type DocumentMetadata struct {
 }
 
 // DocumentScope selects exactly one resource kind. Path is a structural path
-// fragment; nested scopes append their path to the containing scope.
+// fragment; nested scopes append their path to the containing scope. Table names
+// one table by schema, database or both (see TableScope); it is top-level only
+// and holds rules, not scopes.
 type DocumentScope struct {
 	Path            string          `json:"path,omitempty" yaml:"path,omitempty"`
 	CollectionGroup string          `json:"collectionGroup,omitempty" yaml:"collectionGroup,omitempty"`
 	OpaqueQuery     bool            `json:"opaqueQuery,omitempty" yaml:"opaqueQuery,omitempty"`
+	Table           *TableName      `json:"table,omitempty" yaml:"table,omitempty"`
 	Rules           []DocumentRule  `json:"rules,omitempty" yaml:"rules,omitempty"`
 	Scopes          []DocumentScope `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 }
@@ -452,8 +455,11 @@ func ruleFromDocumentScope(scope DocumentScope, allowedEffects map[effect]bool) 
 	if scope.OpaqueQuery {
 		selectors++
 	}
+	if scope.Table != nil {
+		selectors++
+	}
 	if selectors != 1 {
-		return Rule{}, fmt.Errorf("a scope must select exactly one of path, collectionGroup, or opaqueQuery")
+		return Rule{}, fmt.Errorf("a scope must select exactly one of path, collectionGroup, opaqueQuery, or table")
 	}
 	children := make([]Rule, 0, len(scope.Rules)+len(scope.Scopes))
 	for i, documentRule := range scope.Rules {
@@ -482,6 +488,8 @@ func ruleFromDocumentScope(scope DocumentScope, allowedEffects map[effect]bool) 
 		return Under(pattern, children...), nil
 	case scope.CollectionGroup != "":
 		return CollectionGroupScope(scope.CollectionGroup, children...), nil
+	case scope.Table != nil:
+		return TableScope(*scope.Table, children...), nil
 	default:
 		return OpaqueQueryScope(children...), nil
 	}
@@ -618,6 +626,9 @@ func documentScopeFromRule(rule Rule) (DocumentScope, error) {
 		scope.CollectionGroup = rule.resource
 	case opaqueQueryRule:
 		scope.OpaqueQuery = true
+	case tableScopeRule:
+		table := rule.table
+		scope.Table = &table
 	default:
 		return DocumentScope{}, fmt.Errorf("%w: unknown rule kind", ErrNotSerializable)
 	}
