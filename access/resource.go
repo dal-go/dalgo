@@ -40,6 +40,10 @@ type Resource struct {
 	kind ResourceKind
 	path []pathSegment
 	name string
+	// table is the identity of the table a query source denotes, when the source
+	// writes a schema or a database. It travels beside the kind and the text, which
+	// are the same with or without it; see Table.
+	table *TableName
 }
 
 func (r Resource) Kind() ResourceKind { return r.kind }

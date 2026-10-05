@@ -336,18 +336,17 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 		return Decision{Operation: operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectDeny.String(), Code: CodeCollectionDenied, Scope: DecisionScopeTable, Explanation: "collection mask denies resource"}
 	}
 
-	matching := matchingRules(p.compiled, operation, resource)
+	matching, verdict := selectRules(p.compiled, operation, resource)
+	switch verdict {
+	case tableAmbiguous:
+		return p.denyAmbiguousTable(operation, resource)
+	case tableNoRule:
+		return p.denyNoMatch(operation, resource, "no table rule names this table")
+	case tableDatabaseUnchecked:
+		return p.denyNoMatch(operation, resource, "a table rule has this schema and name, but this session cannot check the database a source or a rule names")
+	}
 	if len(matching) == 0 {
-		return Decision{
-			Operation:    operation,
-			Resource:     resource,
-			Policy:       p.name,
-			PolicySource: p.source,
-			Effect:       effectDeny.String(),
-			Code:         CodeNoMatch,
-			Scope:        DecisionScopeOperation,
-			Explanation:  "no matching allow rule",
-		}
+		return p.denyNoMatch(operation, resource, "no matching allow rule")
 	}
 	// Walk matches in precedence order: conditional allows met before the first
 	// unconditional rule apply to the rows their conditions select; the first
@@ -448,6 +447,20 @@ func (p *AccessPolicy) decideResource(resolver variableResolver, operation Opera
 	return decision
 }
 
+// denyNoMatch is the decision for a resource that no rule allows.
+func (p *AccessPolicy) denyNoMatch(operation Operations, resource Resource, explanation string) Decision {
+	return Decision{
+		Operation:    operation,
+		Resource:     resource,
+		Policy:       p.name,
+		PolicySource: p.source,
+		Effect:       effectDeny.String(),
+		Code:         CodeNoMatch,
+		Scope:        DecisionScopeOperation,
+		Explanation:  explanation,
+	}
+}
+
 func ruleSourceCondition(rules []compiledRule) dal.Condition {
 	conditions := make([]dal.Condition, 0, len(rules))
 	for _, rule := range rules {
@@ -530,6 +543,13 @@ func matchingRules(rules []compiledRule, operation Operations, resource Resource
 		}
 		matches = append(matches, rule)
 	}
+	return sortRules(matches)
+}
+
+// sortRules puts the matching rules in precedence order: the rule that names more
+// segments (or, for a table rule, more parts) first, then the one with more
+// literal parts, then a restrictive effect before a permissive one.
+func sortRules(matches []compiledRule) []compiledRule {
 	sort.SliceStable(matches, func(i, j int) bool {
 		left, right := matches[i], matches[j]
 		if left.depth != right.depth {
@@ -619,7 +639,11 @@ func (p *AuditPolicy) Classify(_ context.Context, request Request) AuditDecision
 	}
 	var last AuditDecision
 	for _, resource := range request.Resources {
-		matching := matchingRules(p.compiled, request.Operation, resource)
+		// An audit policy refuses nothing, so it has no use for the verdict: a name
+		// that could be a table of a table rule is classified by the path rules, and a
+		// source that writes a schema which no table rule names, by the rules for
+		// opaque queries, as it was before the policy held a table rule.
+		matching, _ := selectRules(p.compiled, request.Operation, resource)
 		if len(matching) == 0 {
 			last = AuditDecision{Operation: request.Operation, Resource: resource, Policy: p.name, PolicySource: p.source, Effect: effectIgnoreAudit.String(), Explanation: "no matching audit rule"}
 			continue
