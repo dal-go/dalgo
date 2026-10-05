@@ -1,0 +1,24 @@
+from:
+  name: Invoice
+where:
+  op: ==
+  left:
+    field: CustomerId
+  right:
+    value: 1
+columns:
+- aggregate:
+    function: last
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+  as: last_asc
+- aggregate:
+    function: first
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+      desc: true
+  as: first_desc

@@ -1,0 +1,33 @@
+from:
+  name: Invoice
+groupBy:
+- field: CustomerId
+orderBy:
+- field: CustomerId
+columns:
+- field: CustomerId
+  as: CustomerId
+- aggregate:
+    function: count
+    args:
+    - star: true
+  as: count
+- aggregate:
+    function: sum
+    args:
+    - field: Total
+  as: sum
+- aggregate:
+    function: first
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+  as: first_total
+- aggregate:
+    function: last
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+  as: last_total

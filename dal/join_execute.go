@@ -348,8 +348,17 @@ func (e *joinExecution) validateQueryFields() error {
 		}
 		return nil
 	}
+	var fieldWalk queryTreePath
 	var expression func(Expression, string) error
 	expression = func(value Expression, path string) error {
+		leave, exceeded := fieldWalk.enter(nodePointerID(value))
+		if leave == nil {
+			if exceeded {
+				return queryTooDeepError()
+			}
+			return queryError("query_cycle", path, "recursive expression reference")
+		}
+		defer leave()
 		switch v := value.(type) {
 		case FieldRef:
 			return check(v, path)
@@ -358,6 +367,10 @@ func (e *joinExecution) validateQueryFields() error {
 				return err
 			}
 			return expression(v.Right, path+".right")
+		case *BinaryExpression:
+			if v != nil {
+				return expression(*v, path)
+			}
 		case AggregateFunc:
 			for i, arg := range v.FuncArgs() {
 				if err := expression(arg, fmt.Sprintf("%s.args[%d]", path, i)); err != nil {
@@ -377,19 +390,39 @@ func (e *joinExecution) validateQueryFields() error {
 	}
 	var condition func(Condition, string) error
 	condition = func(value Condition, path string) error {
+		leave, exceeded := fieldWalk.enter(nodePointerID(value))
+		if leave == nil {
+			if exceeded {
+				return queryTooDeepError()
+			}
+			return queryError("query_cycle", path, "recursive condition reference")
+		}
+		defer leave()
 		switch v := value.(type) {
 		case IsNullCondition:
 			return expression(v.Operand(), path+".operand")
+		case *IsNullCondition:
+			if v != nil {
+				return condition(*v, path)
+			}
 		case Comparison:
 			if err := expression(v.Left, path+".left"); err != nil {
 				return err
 			}
 			return expression(v.Right, path+".right")
+		case *Comparison:
+			if v != nil {
+				return condition(*v, path)
+			}
 		case GroupCondition:
 			for i, child := range v.Conditions() {
 				if err := condition(child, fmt.Sprintf("%s.conditions[%d]", path, i)); err != nil {
 					return err
 				}
+			}
+		case *GroupCondition:
+			if v != nil {
+				return condition(*v, path)
 			}
 		}
 		return nil
@@ -699,9 +732,8 @@ func rawJoinField(data any, path string) any { return rawField(data, path, false
 
 // rawField reads a field, or a dotted path of fields, of a provider's row before it
 // becomes JSON values. A field of a struct is found by its json tag or its name;
-// promoted says whether a field of an embedded struct is found as a field of the
-// struct that embeds it, as encoding/json writes it, and whether a struct that
-// writes itself is left unread (see writesItself).
+// promoted follows encoding/json's embedded-field rules and leaves a struct or
+// map that writes itself unread (see writesItself).
 func rawField(data any, path string, promoted bool) any {
 	current := reflect.ValueOf(data)
 	for _, part := range strings.Split(path, ".") {
@@ -716,6 +748,9 @@ func rawField(data any, path string, promoted bool) any {
 		}
 		switch current.Kind() {
 		case reflect.Map:
+			if promoted && writesItself(current) {
+				return nil
+			}
 			if current.Type().Key().Kind() != reflect.String {
 				return nil
 			}
@@ -1796,28 +1831,59 @@ func queryHasOuterReference(q StructuredQuery) bool {
 }
 
 func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[string]bool {
+	return queryFreeReferencesAt(q, visiting, &queryTreePath{})
+}
+
+func queryFreeReferencesAt(q StructuredQuery, visiting map[uintptr]bool, walk *queryTreePath) map[string]bool {
+	cut := false
+	return queryFreeReferencesWalk(q, visiting, walk, &cut)
+}
+
+func queryFreeReferencesWalk(q StructuredQuery, visiting map[uintptr]bool, walk *queryTreePath, cut *bool) map[string]bool {
 	free := map[string]bool{}
-	if q == nil {
+	if *cut || q == nil {
 		free[""] = true
+		*cut = true
 		return free
 	}
+	leave, _ := walk.enter(queryPointerID(q))
+	if leave == nil {
+		// A repeated query, like an over-deep tree, cannot be proven free of
+		// outer references. Stop the whole walk so it cannot be memoized.
+		free[""] = true
+		*cut = true
+		return free
+	}
+	defer leave()
 	if id := queryPointerID(q); id != 0 {
 		if visiting[id] {
 			free[""] = true
+			*cut = true
 			return free
 		}
 		visiting[id] = true
 		defer delete(visiting, id)
 	}
 	mergeChild := func(child StructuredQuery, visible map[string]bool) {
-		for alias := range queryFreeReferences(child, visiting) {
+		for alias := range queryFreeReferencesWalk(child, visiting, walk, cut) {
 			if !visible[alias] {
 				free[alias] = true
 			}
 		}
+		if *cut {
+			free[""] = true
+		}
 	}
 	var expression func(Expression, map[string]bool)
 	expression = func(expr Expression, visible map[string]bool) {
+		leave, _ := walk.enter(nodePointerID(expr))
+		if leave == nil {
+			// Either a cycle or an over-deep path is conservatively correlated.
+			free[""] = true
+			*cut = true
+			return
+		}
+		defer leave()
 		switch value := expr.(type) {
 		case FieldRef:
 			if value.Source() == "" || !visible[value.Source()] {
@@ -1825,14 +1891,33 @@ func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[strin
 			}
 		case BinaryExpression:
 			expression(value.Left, visible)
-			expression(value.Right, visible)
+			if !*cut {
+				expression(value.Right, visible)
+			}
+		case *BinaryExpression:
+			if value != nil {
+				expression(*value, visible)
+			}
 		case QueryExpression:
 			mergeChild(value.Query(), visible)
+		case *QueryExpression:
+			if value != nil {
+				expression(*value, visible)
+			}
 		case AggregateFunc:
 			for _, arg := range value.FuncArgs() {
+				if *cut {
+					break
+				}
 				expression(arg, visible)
 			}
+			if *cut {
+				return
+			}
 			for _, key := range aggregateOrder(value) {
+				if *cut {
+					break
+				}
 				if key != nil {
 					expression(key.Expression(), visible)
 				}
@@ -1841,49 +1926,106 @@ func queryFreeReferences(q StructuredQuery, visiting map[uintptr]bool) map[strin
 	}
 	var condition func(Condition, map[string]bool)
 	condition = func(value Condition, visible map[string]bool) {
+		leave, _ := walk.enter(nodePointerID(value))
+		if leave == nil {
+			free[""] = true
+			*cut = true
+			return
+		}
+		defer leave()
 		switch item := value.(type) {
 		case IsNullCondition:
 			expression(item.Operand(), visible)
+		case *IsNullCondition:
+			if item != nil {
+				condition(*item, visible)
+			}
 		case ExistsCondition:
 			mergeChild(item.Query(), visible)
+		case *ExistsCondition:
+			if item != nil {
+				condition(*item, visible)
+			}
 		case Comparison:
 			expression(item.Left, visible)
-			expression(item.Right, visible)
+			if !*cut {
+				expression(item.Right, visible)
+			}
+		case *Comparison:
+			if item != nil {
+				condition(*item, visible)
+			}
 		case GroupCondition:
 			for _, child := range item.Conditions() {
+				if *cut {
+					break
+				}
 				condition(child, visible)
+			}
+		case *GroupCondition:
+			if item != nil {
+				condition(*item, visible)
 			}
 		}
 	}
 	var inspectFrom func(FromSource, map[string]bool) map[string]bool
 	inspectFrom = func(from FromSource, visible map[string]bool) map[string]bool {
-		if from == nil || from.Base() == nil {
+		if *cut || from == nil || from.Base() == nil {
 			return visible
 		}
+		leave, _ := walk.enter(nodePointerID(from))
+		if leave == nil {
+			free[""] = true
+			*cut = true
+			return visible
+		}
+		defer leave()
 		if source, ok := asQuerySource(from.Base()); ok {
 			mergeChild(source.Query(), visible)
+		}
+		if *cut {
+			return visible
 		}
 		visible = cloneQueryAliases(visible)
 		visible[joinAlias(from.Base())] = true
 		for _, join := range from.Joins() {
 			childVisible := inspectFrom(joinedFrom(join), visible)
+			if *cut {
+				return visible
+			}
 			for _, on := range join.On() {
 				condition(on, childVisible)
+				if *cut {
+					return visible
+				}
 			}
 			visible = childVisible
 		}
 		return visible
 	}
 	local := inspectFrom(q.From(), map[string]bool{})
-	condition(q.Where(), local)
-	condition(q.Having(), local)
+	if !*cut {
+		condition(q.Where(), local)
+	}
+	if !*cut {
+		condition(q.Having(), local)
+	}
 	for _, column := range q.Columns() {
+		if *cut {
+			break
+		}
 		expression(column.Expression, local)
 	}
 	for _, value := range q.GroupBy() {
+		if *cut {
+			break
+		}
 		expression(value, local)
 	}
 	for _, value := range q.OrderBy() {
+		if *cut {
+			break
+		}
 		expression(value.Expression(), local)
 	}
 	return free

@@ -1,0 +1,17 @@
+from:
+  name: Numeric
+columns:
+- aggregate:
+    function: first
+    args:
+    - field: X
+    orderBy:
+    - field: K
+  as: first_x
+- aggregate:
+    function: last
+    args:
+    - field: X
+    orderBy:
+    - field: K
+  as: last_x

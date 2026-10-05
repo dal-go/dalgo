@@ -1,0 +1,10 @@
+from:
+  name: Typed
+columns:
+- aggregate:
+    function: last
+    args:
+    - field: XCitext
+    orderBy:
+    - field: KText
+  as: last_x

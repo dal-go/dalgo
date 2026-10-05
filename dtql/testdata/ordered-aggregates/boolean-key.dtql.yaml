@@ -1,0 +1,17 @@
+from:
+  name: Typed
+columns:
+- aggregate:
+    function: first
+    args:
+    - field: XNumber
+    orderBy:
+    - field: KBool
+  as: first_x
+- aggregate:
+    function: last
+    args:
+    - field: XNumber
+    orderBy:
+    - field: KBool
+  as: last_x

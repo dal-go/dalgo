@@ -35,3 +35,22 @@ func TestSerializeEndsOnAConditionGroupThatHoldsItself(t *testing.T) {
 		})
 	}
 }
+
+type valueCycleDocumentAggregate struct{ args []dal.Expression }
+
+func (valueCycleDocumentAggregate) String() string               { return "value-cycle" }
+func (valueCycleDocumentAggregate) FuncName() string             { return dal.LAST }
+func (a valueCycleDocumentAggregate) FuncArgs() []dal.Expression { return a.args }
+
+func TestSerializeRefusesValueAggregateCycleInRunningJoinShape(t *testing.T) {
+	args := make([]dal.Expression, 1)
+	cycle := valueCycleDocumentAggregate{args: args}
+	args[0] = cycle
+	from := dal.From(dal.NewRootCollectionRef("Customer", "c")).Join(dal.NewJoinedSource(
+		dal.NewRootCollectionRef("Order", "o"), dal.JoinInner,
+		dal.NewComparison(dal.NewFieldRef("c", "id"), dal.Equal, dal.NewFieldRef("o", "ref"))))
+	q := fakeQuery{from: from, columns: []dal.Column{{Alias: "answer", Expression: cycle}}}
+	if bytes, err := Serialize(q); err == nil || !strings.Contains(err.Error(), "too deep to be checked") || bytes != nil {
+		t.Fatalf("cyclic aggregate serialization = %q, %v", bytes, err)
+	}
+}

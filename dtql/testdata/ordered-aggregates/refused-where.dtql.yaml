@@ -1,0 +1,16 @@
+from:
+  name: Invoice
+where:
+  op: '>'
+  left:
+    aggregate:
+      function: last
+      args:
+      - field: Total
+      orderBy:
+      - field: InvoiceDate
+  right:
+    value: 10
+columns:
+- field: CustomerId
+  as: CustomerId

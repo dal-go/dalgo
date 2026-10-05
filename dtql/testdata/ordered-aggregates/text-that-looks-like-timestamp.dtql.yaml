@@ -1,0 +1,10 @@
+from:
+  name: StringTime
+columns:
+- aggregate:
+    function: first
+    args:
+    - field: X
+    orderBy:
+    - field: K
+  as: first_x

@@ -245,6 +245,18 @@ func derivedQuerySource(source dal.RecordsetSource) (dal.QuerySource, bool) {
 }
 
 func exprToYAML(expr dal.Expression) (exprYAML, error) {
+	return exprToYAMLAt(expr, &documentWalk{})
+}
+
+func exprToYAMLAt(expr dal.Expression, walk *documentWalk) (exprYAML, error) {
+	leave, exceeded := walk.enter(expr)
+	if leave == nil {
+		if exceeded {
+			return exprYAML{}, fmt.Errorf("expression is too deep to be written")
+		}
+		return exprYAML{}, fmt.Errorf("expression holds itself")
+	}
+	defer leave()
 	switch e := expr.(type) {
 	case dal.FieldRef:
 		return exprYAML{Field: e.Name(), Source: e.Source()}, nil
@@ -264,14 +276,25 @@ func exprToYAML(expr dal.Expression) (exprYAML, error) {
 	case dal.StarExpression:
 		return exprYAML{Star: true}, nil
 	case dal.AggregateFunc:
-		// The document format has no key for an aggregate's order, so an aggregate
-		// that has one cannot be written: it would come back as one without.
-		if ordered, ok := e.(dal.OrderedAggregateFunc); ok && len(ordered.AggregateOrder()) > 0 {
-			return exprYAML{}, fmt.Errorf("an aggregate with an order cannot be written by this version")
+		var orders []orderYAML
+		if ordered, ok := e.(dal.OrderedAggregateFunc); ok {
+			for i, order := range ordered.AggregateOrder() {
+				if order == nil {
+					return exprYAML{}, fmt.Errorf("aggregate orderBy #%d: missing key", i)
+				}
+				key, err := exprToYAMLAt(order.Expression(), walk)
+				if err != nil {
+					return exprYAML{}, fmt.Errorf("aggregate orderBy #%d: %w", i, err)
+				}
+				if key.Field == "" || expressionFieldsSet(key) != 1 {
+					return exprYAML{}, fmt.Errorf("aggregate orderBy #%d: key must be a field", i)
+				}
+				orders = append(orders, orderYAML{exprYAML: key, Desc: order.Descending()})
+			}
 		}
 		args := make([]exprYAML, len(e.FuncArgs()))
 		for i, arg := range e.FuncArgs() {
-			encoded, err := exprToYAML(arg)
+			encoded, err := exprToYAMLAt(arg, walk)
 			if err != nil {
 				return exprYAML{}, fmt.Errorf("aggregate argument #%d: %w", i, err)
 			}
@@ -281,13 +304,13 @@ func exprToYAML(expr dal.Expression) (exprYAML, error) {
 		if d, ok := e.(dal.DistinctAggregateFunc); ok {
 			distinct = d.IsDistinct()
 		}
-		return exprYAML{Aggregate: &aggregateYAML{Function: strings.ToLower(e.FuncName()), Distinct: distinct, Args: args}}, nil
+		return exprYAML{Aggregate: &aggregateYAML{Function: strings.ToLower(e.FuncName()), Distinct: distinct, Args: args, OrderBy: orders}}, nil
 	case dal.BinaryExpression:
-		left, err := exprToYAML(e.Left)
+		left, err := exprToYAMLAt(e.Left, walk)
 		if err != nil {
 			return exprYAML{}, fmt.Errorf("binary left: %w", err)
 		}
-		right, err := exprToYAML(e.Right)
+		right, err := exprToYAMLAt(e.Right, walk)
 		if err != nil {
 			return exprYAML{}, fmt.Errorf("binary right: %w", err)
 		}

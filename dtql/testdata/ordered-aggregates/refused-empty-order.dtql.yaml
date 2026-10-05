@@ -1,0 +1,9 @@
+from:
+  name: Invoice
+columns:
+- aggregate:
+    function: last
+    args:
+    - field: Total
+    orderBy: []
+  as: v

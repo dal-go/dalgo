@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "tables": {
+    "Invoice": {
+      "InvoiceId": "integer",
+      "CustomerId": "integer",
+      "InvoiceDate": "timestamp",
+      "Total": "number"
+    },
+    "Customer": {
+      "Id": "integer",
+      "Name": "text"
+    },
+    "Typed": {
+      "G": "integer",
+      "KText": "text",
+      "KNumber": "number",
+      "KBool": "boolean",
+      "KTimestamp": "timestamp",
+      "XNumber": "number",
+      "XText": "text",
+      "XBool": "boolean",
+      "XTimestamp": "timestamp",
+      "XUUID": "uuid",
+      "XEnum": "enum",
+      "XCitext": "text",
+      "XJSON": "json"
+    },
+    "Numeric": {
+      "G": "integer",
+      "K": "number",
+      "X": "number"
+    },
+    "Offset": {
+      "G": "integer",
+      "K": "timestamp",
+      "X": "text"
+    },
+    "StringTime": {
+      "G": "integer",
+      "K": "text",
+      "X": "text"
+    },
+    "Empty": {
+      "G": "integer",
+      "K": "integer",
+      "X": "number"
+    }
+  },
+  "postgresTypes": {
+    "Typed": {
+      "XCitext": "citext"
+    }
+  }
+}

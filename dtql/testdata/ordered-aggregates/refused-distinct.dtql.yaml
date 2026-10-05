@@ -1,0 +1,11 @@
+from:
+  name: Invoice
+columns:
+- aggregate:
+    function: first
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+    distinct: true
+  as: v

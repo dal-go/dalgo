@@ -20,12 +20,16 @@ of any one provider. DTQL uses YAML pipeline order with `columns` last. DALgo
 chooses full native execution, ordered streaming, or hash aggregation from
 granular provider capabilities. SQLite renders its supported subset natively.
 
+Alexander Trakhimenok, 2026-10-05: "It is OK to add ordered aggregates to DALgo and DTQL: DataTug and OVDB need the aggregate capabilities users expect from PostgreSQL, run natively where the server supports them and in DALgo's engine elsewhere."
+
 ## Behavior
 
 ### REQ: yaml-aggregation
 
 DTQL MUST serialize and deserialize `groupBy`, aggregate/binary expressions,
-`having`, aliases, and aggregate ordering. Canonical YAML MUST keep `columns`
+`having`, aliases, and aggregate-local `orderBy` on `first` and `last`. Its
+nonempty order list contains field keys with optional source and descending
+direction. Canonical YAML MUST keep `columns`
 after filtering, grouping, HAVING, ordering and pagination. With `groupBy` and
 no `columns`, grouping expressions MUST be the implicit projection.
 
@@ -57,8 +61,9 @@ COUNT(*) counts rows and returns int64. Other aggregates ignore null, except
 FIRST/LAST where null is a legitimate value. SUM/AVG use finite float64
 accumulation; non-numeric dynamic inputs are ignored. Empty implicit grouping
 returns one row with count zero and other aggregates null; empty explicit
-grouping returns no rows. FIRST/LAST MUST require a declared stable input order
-until aggregate-local ordering exists. Arithmetic MUST normalize numeric
+grouping returns no rows. FIRST/LAST without their own order MUST require a
+declared stable input order; with aggregate-local `orderBy` they use that
+order and break ties by the argument value. Arithmetic MUST normalize numeric
 operands to float64; non-numeric operands and division by zero evaluate to null.
 
 ### REQ: capabilities-plan
@@ -87,8 +92,9 @@ explicit errors.
 
 SQLite MUST render GROUP BY, aggregate expressions, DISTINCT, HAVING, aliases
 rewritten to expressions, result ORDER BY and pagination in SQL clause order.
-It MUST advertise only operations it executes with DALgo semantics. FIRST/LAST
-MUST remain local/unsupported until deterministic aggregate ordering is modeled.
+It MUST advertise only operations it executes with DALgo semantics. An adapter
+that does not advertise aggregate-local ordering leaves ordered FIRST/LAST to
+DALgo's engine; the native SQLite form is specified separately.
 
 ### REQ: lifecycle
 
@@ -157,8 +163,10 @@ and requested result ordering.
 
 ### AC: deterministic-first-last (verifies REQ:value-semantics)
 
-FIRST/LAST include null and execute with declared stable input order; planning
-without that guarantee returns an explicit deterministic-order error.
+FIRST/LAST include null. Without aggregate-local order they execute with a
+declared stable input order, and planning without that guarantee returns an
+explicit deterministic-order error. With aggregate-local order, reversing
+provider arrival order does not change the answer.
 
 ### AC: cancellation-errors (verifies REQ:lifecycle)
 

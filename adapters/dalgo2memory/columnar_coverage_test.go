@@ -15,10 +15,10 @@ import (
 // option-only tag (",omitempty" -> field name), and a skipped field
 // (json:"-"). It also carries reference-bearing types for isRefBearing.
 type tagged struct {
-	Renamed    string         `json:"renamed"`
-	OnlyOpts   int            `json:",omitempty"`
-	Skipped    string         `json:"-"`
-	unexported int            //nolint:unused // proves unexported fields get no column
+	Renamed    string `json:"renamed"`
+	OnlyOpts   int    `json:",omitempty"`
+	Skipped    string `json:"-"`
+	unexported int
 	Mapping    map[string]int `json:"mapping"`
 }
 
@@ -33,6 +33,8 @@ func TestColumnar_BuildColumnsTagsAndRefTypes(t *testing.T) {
 	require.Contains(t, eng.byName, "OnlyOpts")
 	require.Contains(t, eng.byName, "mapping")
 	require.NotContains(t, eng.byName, "Skipped")
+	hidden := tagged{unexported: 7}
+	require.Equal(t, 7, hidden.unexported)
 	require.NotContains(t, eng.byName, "unexported")
 	require.True(t, eng.byName["mapping"].refBearing)
 	require.False(t, eng.byName["renamed"].refBearing)

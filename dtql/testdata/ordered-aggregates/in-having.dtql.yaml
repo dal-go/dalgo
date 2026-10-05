@@ -1,0 +1,27 @@
+from:
+  name: Invoice
+groupBy:
+- field: CustomerId
+having:
+  op: '>'
+  left:
+    aggregate:
+      function: last
+      args:
+      - field: Total
+      orderBy:
+      - field: InvoiceDate
+  right:
+    value: 100
+orderBy:
+- field: CustomerId
+columns:
+- field: CustomerId
+  as: CustomerId
+- aggregate:
+    function: last
+    args:
+    - field: Total
+    orderBy:
+    - field: InvoiceDate
+  as: last_total

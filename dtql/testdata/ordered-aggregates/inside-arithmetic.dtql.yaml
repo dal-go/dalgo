@@ -1,0 +1,26 @@
+from:
+  name: Invoice
+where:
+  op: ==
+  left:
+    field: CustomerId
+  right:
+    value: 1
+columns:
+- binary:
+    op: '-'
+    left:
+      aggregate:
+        function: last
+        args:
+        - field: Total
+        orderBy:
+        - field: InvoiceDate
+    right:
+      aggregate:
+        function: first
+        args:
+        - field: Total
+        orderBy:
+        - field: InvoiceDate
+  as: change

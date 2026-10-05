@@ -795,7 +795,16 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	for i, row := range rows {
 		key := resultKey(row, collectionName)
 		if len(columns) > 0 {
-			records[i] = record.NewRecordWithData(key, projectRow(columns, baseSources(base, row.data))).SetError(nil)
+			projected := projectRow(columns, baseSources(base, row.data))
+			if source, ok := q.(interface {
+				OrderedAggregateSourceFields() []dal.FieldRef
+				OrderedAggregateSourceValues(any) map[string]any
+			}); ok && len(source.OrderedAggregateSourceFields()) > 0 {
+				if err := promoteOrderedSourceTimestamps(projected, row, factory, source.OrderedAggregateSourceValues); err != nil {
+					return nil, err
+				}
+			}
+			records[i] = record.NewRecordWithData(key, projected).SetError(nil)
 			continue
 		}
 		template := q.IntoRecord()

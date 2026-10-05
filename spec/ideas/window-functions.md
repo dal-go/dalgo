@@ -35,6 +35,12 @@ natively on servers that support them."); windows follow the same rule.
 
 ## Recommended Direction
 
+Use one spelling for an order inside an expression: DTQL `orderBy` items carry
+an expression and optional `desc`, and the Go model uses `[]dal.OrderExpression`.
+The aggregate-local order and a future window order share that shape; a window
+adds `partitionBy` without introducing a second order syntax. A future NULL
+placement option belongs on the shared order item.
+
 Founder rulings: window functions are part of DTQL, and DALgo computes them in memory
 for providers without native support. Native execution where the server supports
 windows rests on the founder's hedged "We also probably should add support for native
