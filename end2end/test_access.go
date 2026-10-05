@@ -275,6 +275,38 @@ func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
 			t.Run("aggregates_over_allowed_fields_on_the_recordset_path", func(t *testing.T) {
 				assertRecordsetRowCount(ctx, t, secured, aggregated(), "access field list: allowed recordset", 1)
 			})
+			t.Run("allowed_column_under_a_refused_name_never_returns_the_stored_field", func(t *testing.T) {
+				// Population is in neither list. A column selected under that name
+				// carries what its own expression produced, or nothing when the
+				// adapter ignores the projection; it never carries the stored
+				// Population of the row, whatever the adapter returns besides.
+				names := map[string]bool{}
+				for _, city := range models.Cities {
+					names[city.Name] = true
+				}
+				rows, err := readMapRecords(ctx, secured,
+					cities().SelectColumns(dal.Column{Alias: "Population", Expression: dal.Field("Name")}),
+					"access field list: allowed columns")
+				if errors.Is(err, dal.ErrNotSupported) {
+					t.Skip("column projection not supported by adapter:", err)
+				}
+				require.NoError(t, err)
+				for _, row := range rows {
+					if value, ok := row["Population"]; ok {
+						name, isString := value.(string)
+						assert.True(t, isString && names[name], "Population holds %v, not a city name", value)
+					}
+				}
+				rows, err = readMapRecords(ctx, secured,
+					cities().SelectColumns(dal.CountAs(dal.Field("Name"), "Population")),
+					"access field list: allowed columns")
+				require.NoError(t, err)
+				for _, row := range rows {
+					if value, ok := row["Population"]; ok {
+						assert.EqualValues(t, len(models.Cities), value, "COUNT(Name) under the name Population")
+					}
+				}
+			})
 			t.Run("hidden_field_under_an_allowed_alias", func(t *testing.T) {
 				columnDenied(t, cities().SelectColumns(dal.Column{Alias: "Name", Expression: dal.Field("Population")}), access.DecisionSlotFields, "Population")
 				columnDenied(t, cities().SelectColumns(dal.Column{Alias: "Country", Expression: dal.Field("State")}), access.DecisionSlotFields, "State")
@@ -412,16 +444,39 @@ func accessSourcesTest(ctx context.Context, t *testing.T, db dal.DB) {
 				_, err := tx.ExecuteQueryToRecordsetReader(ctx, q)
 				return err
 			})
-			// Allowing the collection lifts the refusal; whatever the adapter then
-			// answers, it is not an access denial.
+			// Allowing the collection lifts the refusal. The adapter may still
+			// answer a query it cannot run with a denial of its own, among other
+			// errors, so only a refusal by this policy, or of the collection,
+			// counts.
 			err := allowing.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 				_, err := tx.ExecuteQueryToRecordsReader(ctx, shape.build())
 				return err
 			}, dal.TxWithMessage("access sources: allowed"))
-			assert.NotErrorIs(t, err, access.ErrAccessDenied, "the collection is allowed")
+			policy, resource := denialOf(err)
+			assert.NotEqual(t, "sources-allowed", policy, "the collection is allowed")
+			assert.NotEqual(t, "/"+hiddenSourceCollection, resource, "the collection is allowed")
 		})
 	}
 	t.Run("an_allowed_nested_source_still_reads", func(t *testing.T) {
+		// A query with nested sources is read one source at a time, each source by
+		// the scan DALgo's generic engine issues: a query with no target record and
+		// no key kind. An adapter that cannot answer that scan skips this control,
+		// as it skips any query it does not support. The scan is tried on the
+		// unsecured database first, so the control runs only where the adapter
+		// serves it.
+		scan := dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "i")).NewQuery().SelectIntoRecord(nil)
+		probe := db.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
+			reader, err := tx.ExecuteQueryToRecordsReader(ctx, scan)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = reader.Close() }()
+			_, err = reader.Next()
+			return err
+		}, dal.TxWithMessage("access sources: nested read probe"))
+		if errors.Is(probe, dal.ErrNotSupported) {
+			t.Skip("adapter does not serve the scan of a nested source:", probe)
+		}
 		inner := dal.From(dal.NewRootCollectionRef(models.CitiesCollection, "i")).NewQuery().SelectKeysOnly(reflect.String)
 		q := keys(citiesQuery().Where(dal.NewExistsCondition(inner)))
 		var records []record.Record
@@ -432,4 +487,14 @@ func accessSourcesTest(ctx context.Context, t *testing.T, db dal.DB) {
 		require.NoError(t, err)
 		assert.Len(t, records, len(models.Cities), "an uncorrelated EXISTS over a populated allowed collection keeps every row")
 	})
+}
+
+// denialOf returns the policy and the resource of an access denial in err, and
+// empty strings for any other answer, an absent error included.
+func denialOf(err error) (policy, resource string) {
+	var denied *access.DeniedError
+	if errors.As(err, &denied) {
+		return denied.Decision.Policy, denied.Decision.Resource.String()
+	}
+	return "", ""
 }

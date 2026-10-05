@@ -91,21 +91,23 @@ func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, que
 	if err != nil {
 		return nil, err
 	}
+	var renames []outputRename
 	if structured, ok := query.(dal.StructuredQuery); ok && sets.restrictive() {
 		projection := projectQuery(structured, sets)
 		if projection.status == queryProjectionEmpty {
 			return nil, emptyProjectionDeniedError(query)
 		}
 		if projection.status == queryProjectionApplied {
-			query = projection.query
+			structured = projection.query
 		}
+		query, renames = aliasRefusedOutputs(structured, sets)
 	}
 	query = preserveRequestedQuery(query, requested)
 	reader, err := s.session.ExecuteQueryToRecordsReader(ctx, query)
 	if err != nil || !sets.restrictive() {
 		return reader, err
 	}
-	return redactingReader{RecordsReader: reader, sets: sets, outputs: outputNames(requested)}, nil
+	return redactingReader{RecordsReader: reader, sets: sets, renames: renames}, nil
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {

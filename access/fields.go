@@ -2,6 +2,8 @@ package access
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -271,14 +273,14 @@ func (sets fieldSets) redactMap(prefix string, data map[string]any) {
 // pruned in place; pointer data is round-tripped through JSON so nested
 // refusals apply, then written back into the zeroed target.
 func (sets fieldSets) redactRecord(rec record.Record) error {
-	return sets.redactRecordKeeping(rec, nil)
+	return sets.redactRecordRenaming(rec, nil)
 }
 
-// redactRecordKeeping is redactRecord for the row of a query whose columns the
-// caller named: the top-level keys in keep are the names those columns come
-// back under, and each was already checked against the field list by its
-// source expression, so they stay whatever the list says of the name itself.
-func (sets fieldSets) redactRecordKeeping(rec record.Record, keep []string) error {
+// redactRecordRenaming is redactRecord for the row of a query whose columns the
+// access layer renamed: in map data, the value under each generated key is kept
+// whatever the list says of the key and is moved to the name the caller gave
+// the column; every other top-level key is redacted by its own name.
+func (sets fieldSets) redactRecordRenaming(rec record.Record, renames []outputRename) error {
 	if !sets.restrictive() || !rec.Exists() {
 		return nil
 	}
@@ -286,13 +288,13 @@ func (sets fieldSets) redactRecordKeeping(rec record.Record, keep []string) erro
 	switch {
 	case value.Kind() == reflect.Map:
 		if data, ok := rec.Data().(map[string]any); ok {
-			sets.redactMapKeeping(data, keep)
+			sets.redactMapRenaming(data, renames)
 			return nil
 		}
 		return fmt.Errorf("access: cannot redact map data of type %T", rec.Data())
 	case value.Kind() == reflect.Pointer && !value.IsNil():
 		if data, ok := rec.Data().(*map[string]any); ok {
-			sets.redactMapKeeping(*data, keep)
+			sets.redactMapRenaming(*data, renames)
 			return nil
 		}
 		data, err := condeval.ToMap(rec.Data())
@@ -308,29 +310,34 @@ func (sets fieldSets) redactRecordKeeping(rec record.Record, keep []string) erro
 	}
 }
 
-// redactMapKeeping is redactMap for a row whose top-level keys in keep are
-// exempt from redaction.
-func (sets fieldSets) redactMapKeeping(data map[string]any, keep []string) {
-	kept := make(map[string]any, len(keep))
-	for _, name := range keep {
-		if value, ok := data[name]; ok {
-			kept[name] = value
-			delete(data, name)
-		}
+// redactMapRenaming is redactMap for a row some of whose columns were sent
+// under generated aliases. Only a key the access layer generated for this query
+// is exempt, and it is checked by what produced it, not by its name: the column
+// expression was held to the field list before the query was sent. Whatever
+// else the session returns under any other key, a name the caller chose
+// included, is redacted by that key.
+func (sets fieldSets) redactMapRenaming(data map[string]any, renames []outputRename) {
+	kept := make([]any, len(renames))
+	found := make([]bool, len(renames))
+	for i, rename := range renames {
+		kept[i], found[i] = data[rename.generated]
+		delete(data, rename.generated)
 	}
 	sets.redactMap("", data)
-	for name, value := range kept {
-		data[name] = value
+	for i, rename := range renames {
+		if found[i] {
+			data[rename.name] = kept[i]
+		}
 	}
 }
 
 // redactingReader applies field redaction to every record a query returns.
-// outputs are the names the query's explicitly selected columns come back
-// under (see outputNames).
+// renames are the columns the access layer sent under generated aliases (see
+// aliasRefusedOutputs).
 type redactingReader struct {
 	dal.RecordsReader
 	sets    fieldSets
-	outputs []string
+	renames []outputRename
 }
 
 func (r redactingReader) Next() (record.Record, error) {
@@ -338,35 +345,76 @@ func (r redactingReader) Next() (record.Record, error) {
 	if err != nil || rec == nil {
 		return rec, err
 	}
-	if err := r.sets.redactRecordKeeping(rec, r.outputs); err != nil {
+	if err := r.sets.redactRecordRenaming(rec, r.renames); err != nil {
 		return nil, err
 	}
 	return rec, nil
 }
 
-// outputNames lists the names the explicitly selected columns of a query come
-// back under, by DALgo's rule: the alias when there is one, otherwise the
-// field's own name, otherwise the text of the expression. A field under its own
-// name needs no entry; it is allowed by the list that allowed the column. A
-// wildcard names no output of its own.
-func outputNames(query dal.StructuredQuery) []string {
-	if query == nil {
-		return nil
+// outputRename records one column sent to the wrapped session under an alias the
+// access layer generated: the key the column comes back under, and the name the
+// caller gave it.
+type outputRename struct{ generated, name string }
+
+// outputName is the name a selected column comes back under, by DALgo's rule:
+// the alias when there is one, otherwise the field's own name, otherwise the
+// text of the expression. ok is false for a column that names no output: a
+// wildcard, or a column with no expression.
+func outputName(column dal.Column) (name string, ok bool) {
+	if column.Wildcard != nil || column.Expression == nil {
+		return "", false
 	}
-	var names []string
-	for _, column := range query.Columns() {
-		if column.Wildcard != nil || column.Expression == nil {
+	if column.Alias != "" {
+		return column.Alias, true
+	}
+	switch expression := column.Expression.(type) {
+	case dal.FieldRef:
+		return expression.Name(), true
+	case *dal.FieldRef:
+		return expression.Name(), true
+	}
+	return column.Expression.String(), true
+}
+
+// aliasRefusedOutputs sends every explicitly selected column whose output name
+// the field list does not allow under an alias of the access layer's own, and
+// returns the query to send with the renames that undo it. The alias carries a
+// random token drawn for this query, so neither the caller nor the wrapped
+// session can know it. A column that comes back under a name the list allows
+// is sent as it is. The alias exists so that redaction can tell the value of a
+// checked column from a stored field of the same name: redaction keeps exactly
+// the generated keys, and a session that returns more than the query projected,
+// or none of it, brings back no generated key and so exempts nothing.
+func aliasRefusedOutputs(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuery, []outputRename) {
+	columns := query.Columns()
+	var renames []outputRename
+	var rewritten []dal.Column
+	token := ""
+	for i, column := range columns {
+		name, named := outputName(column)
+		if !named || sets.allowsWhole(name) {
 			continue
 		}
-		if column.Alias != "" {
-			names = append(names, column.Alias)
-			continue
+		if rewritten == nil {
+			rewritten = append([]dal.Column(nil), columns...)
+			token = outputToken()
 		}
-		if _, plain := column.Expression.(dal.FieldRef); !plain {
-			names = append(names, column.Expression.String())
-		}
+		generated := fmt.Sprintf("access_%s_%d", token, i)
+		rewritten[i].Alias = generated
+		renames = append(renames, outputRename{generated: generated, name: name})
 	}
-	return names
+	if renames == nil {
+		return query, nil
+	}
+	return dal.WithColumns(query, rewritten), renames
+}
+
+// outputToken returns 128 random bits as lower-case hexadecimal, so an alias
+// built from it survives an engine that folds identifier case.
+func outputToken() string {
+	var raw [16]byte
+	_, _ = rand.Read(raw[:]) // never fails: a failure of the system source ends the process
+	return hex.EncodeToString(raw[:])
 }
 
 // projectQuery narrows a structured query's columns to the enumerable

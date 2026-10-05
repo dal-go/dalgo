@@ -167,11 +167,13 @@ func (w *querySourceWalk) node(node fmt.Stringer, depth int) {
 	}
 	defer leave()
 	switch node := node.(type) {
-	case dal.FieldRef, *dal.FieldRef, dal.FieldName, dal.Constant, *dal.Constant, dal.Param, *dal.Param, dal.Array, *dal.Array, dal.StarExpression:
 	case dal.AggregateFunc:
+		// Before the leaf case: a type that is both an aggregate and a star
+		// still holds the arguments it was given.
 		for _, argument := range node.FuncArgs() {
 			w.node(argument, depth+1)
 		}
+	case dal.FieldRef, *dal.FieldRef, dal.FieldName, dal.Constant, *dal.Constant, dal.Param, *dal.Param, dal.Array, *dal.Array, dal.StarExpression:
 	case dal.BinaryExpression:
 		w.node(node.Left, depth+1)
 		w.node(node.Right, depth+1)

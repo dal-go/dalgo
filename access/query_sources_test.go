@@ -50,6 +50,15 @@ type strangeNode struct{}
 
 func (strangeNode) String() string { return "strange" }
 
+// starAggregate is an aggregate that also marks itself as a star: a type that
+// satisfies both dal.AggregateFunc and dal.StarExpression.
+type starAggregate struct{ args []dal.Expression }
+
+func (starAggregate) String() string               { return "star aggregate" }
+func (starAggregate) IsStar() bool                 { return true }
+func (starAggregate) FuncName() string             { return dal.COUNT }
+func (a starAggregate) FuncArgs() []dal.Expression { return a.args }
+
 // wrappedSource is a source type the walk has no case for: it satisfies
 // dal.RecordsetSource through the collection it embeds.
 type wrappedSource struct{ dal.CollectionRef }
@@ -130,6 +139,8 @@ func TestResourcesForQueryListsEverySource(t *testing.T) {
 			return customerQuery().SelectColumns(dal.Column{Expression: &sum})
 		}(), []string{"/Customer", "/Secret"}},
 		{"an aggregate argument", customerQuery().SelectColumns(dal.SumAs(dal.Binary(dal.Field("a"), dal.Multiply, scalar), "t")), []string{"/Customer", "/Secret"}},
+		{"an aggregate that is also a star holds its arguments' sources", customerQuery().SelectColumns(dal.Column{Expression: starAggregate{args: []dal.Expression{scalar}}}),
+			[]string{"/Customer", "/Secret"}},
 		{"a join ON", dal.From(customers).Join(dal.NewJoinedSource(orders, dal.JoinInner, dal.NewComparison(dal.Field("a"), dal.Equal, scalar))).NewQuery().SelectKeysOnly(reflect.String),
 			[]string{"/Customer", "/Order", "/Secret"}},
 		{"a scan order", dal.From(customers.WithScan(5, dal.Descending(scalar))).NewQuery().SelectKeysOnly(reflect.String), []string{"/Customer", "/Secret"}},

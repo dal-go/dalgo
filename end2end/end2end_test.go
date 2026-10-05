@@ -298,17 +298,10 @@ func TestEndToEnd(t *testing.T) {
 			// The replay adapter cannot run a query with nested sources; the
 			// control only asserts that the access layer does not refuse it.
 			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
-		case "access sources: nested read":
-			// The access layer reads the outer and the nested source with one
-			// scan each; both scans return every city.
-			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, dal.Query) (dal.RecordsReader, error) {
-				records := make([]record.Record, len(models.Cities))
-				for i, city := range models.Cities {
-					records[i] = record.NewRecordWithData(record.NewKeyWithID(models.CitiesCollection, models.CityID(city)), &city)
-					records[i].SetError(nil)
-				}
-				return dal.NewRecordsReader(records), nil
-			}).AnyTimes()
+		case "access sources: nested read probe":
+			// The replay adapter does not serve the scan of a nested source, so the
+			// control skips; a real adapter runs it.
+			tx.EXPECT().ExecuteQueryToRecordsReader(gomock.Any(), gomock.Any()).Return(nil, dal.ErrNotSupported).AnyTimes()
 		case "":
 			panic("no RO tx name")
 		default:

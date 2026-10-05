@@ -123,6 +123,48 @@ func secured(wrapped *countingSession, policy Policy) dal.DB {
 	return MustSecureDB(newCountingDB(wrapped), WithDatabasePolicies(policy))
 }
 
+// countingWriteDB is a countingDB that is also a write session, so SecureDB
+// wraps it as a database that writes.
+type countingWriteDB struct{ countingDB }
+
+func (db countingWriteDB) Set(ctx context.Context, rec record.Record) error {
+	return db.session.Set(ctx, rec)
+}
+func (db countingWriteDB) SetMulti(ctx context.Context, records []record.Record) error {
+	return db.session.SetMulti(ctx, records)
+}
+func (db countingWriteDB) Insert(ctx context.Context, rec record.Record, options ...dal.InsertOption) error {
+	return db.session.Insert(ctx, rec, options...)
+}
+func (db countingWriteDB) InsertMulti(ctx context.Context, records []record.Record, options ...dal.InsertOption) error {
+	return db.session.InsertMulti(ctx, records, options...)
+}
+func (db countingWriteDB) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+	return db.session.Update(ctx, key, updates, preconditions...)
+}
+func (db countingWriteDB) UpdateRecord(ctx context.Context, rec record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
+	return db.session.UpdateRecord(ctx, rec, updates, preconditions...)
+}
+func (db countingWriteDB) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
+	return db.session.UpdateMulti(ctx, keys, updates, preconditions...)
+}
+func (db countingWriteDB) Delete(ctx context.Context, key *record.Key) error {
+	return db.session.Delete(ctx, key)
+}
+func (db countingWriteDB) DeleteMulti(ctx context.Context, keys []*record.Key) error {
+	return db.session.DeleteMulti(ctx, keys)
+}
+
+// securedWriting secures a database that is also a write session. It is a
+// *securedWriteDB, a different type from the one secured returns.
+func securedWriting(wrapped *countingSession, policy Policy) dal.DB {
+	db := MustSecureDB(countingWriteDB{newCountingDB(wrapped)}, WithDatabasePolicies(policy))
+	if _, ok := db.(*securedWriteDB); !ok {
+		panic("a database that writes is not secured as one")
+	}
+	return db
+}
+
 var sourcePaths = map[string]sourcePath{
 	"session records reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
 		_, err := SecureReadSession(wrapped, policy).ExecuteQueryToRecordsReader(ctx, query)
@@ -159,6 +201,48 @@ var sourcePaths = map[string]sourcePath{
 	"read transaction select": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
 		return secured(wrapped, policy).RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 			_, err := tx.(selectReader).Select(ctx, query)
+			return err
+		})
+	},
+	"read-write session records reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := SecureReadwriteSession(wrapped, policy).ExecuteQueryToRecordsReader(ctx, query)
+		return err
+	},
+	"read-write session recordset reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := SecureReadwriteSession(wrapped, policy).ExecuteQueryToRecordsetReader(ctx, query)
+		return err
+	},
+	"bound database records reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := BindDB(secured(wrapped, policy), ctx).ExecuteQueryToRecordsReader(ctx, query)
+		return err
+	},
+	"bound database recordset reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := BindDB(secured(wrapped, policy), ctx).ExecuteQueryToRecordsetReader(ctx, query)
+		return err
+	},
+	"bound database select": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := BindDB(secured(wrapped, policy), ctx).(selectReader).Select(ctx, query)
+		return err
+	},
+	"writing database records reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := securedWriting(wrapped, policy).ExecuteQueryToRecordsReader(ctx, query)
+		return err
+	},
+	"writing database recordset reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := securedWriting(wrapped, policy).ExecuteQueryToRecordsetReader(ctx, query)
+		return err
+	},
+	"writing database select": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := securedWriting(wrapped, policy).(selectReader).Select(ctx, query)
+		return err
+	},
+	"bound writing database records reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		_, err := BindDB(securedWriting(wrapped, policy), ctx).ExecuteQueryToRecordsReader(ctx, query)
+		return err
+	},
+	"writing database read transaction records reader": func(ctx context.Context, wrapped *countingSession, policy Policy, query dal.Query) error {
+		return securedWriting(wrapped, policy).RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
+			_, err := tx.ExecuteQueryToRecordsReader(ctx, query)
 			return err
 		})
 	},
@@ -370,4 +454,44 @@ func TestEverySourceAuthorisedOnReadwriteTransactionRecordsetReader(t *testing.T
 
 func TestEverySourceAuthorisedOnReadwriteTransactionSelect(t *testing.T) {
 	checkSourceShapes(t, sourcePaths["read-write transaction select"])
+}
+
+func TestEverySourceAuthorisedOnReadwriteSessionRecordsReader(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["read-write session records reader"])
+}
+
+func TestEverySourceAuthorisedOnReadwriteSessionRecordsetReader(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["read-write session recordset reader"])
+}
+
+func TestEverySourceAuthorisedOnBoundDatabaseRecordsReader(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["bound database records reader"])
+}
+
+func TestEverySourceAuthorisedOnBoundDatabaseRecordsetReader(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["bound database recordset reader"])
+}
+
+func TestEverySourceAuthorisedOnBoundDatabaseSelect(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["bound database select"])
+}
+
+func TestEverySourceAuthorisedOnWritingDatabaseRecordsReader(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["writing database records reader"])
+}
+
+func TestEverySourceAuthorisedOnWritingDatabaseRecordsetReader(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["writing database recordset reader"])
+}
+
+func TestEverySourceAuthorisedOnWritingDatabaseSelect(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["writing database select"])
+}
+
+func TestEverySourceAuthorisedOnBoundWritingDatabaseRecordsReader(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["bound writing database records reader"])
+}
+
+func TestEverySourceAuthorisedOnWritingDatabaseReadTransactionRecordsReader(t *testing.T) {
+	checkSourceShapes(t, sourcePaths["writing database read transaction records reader"])
 }

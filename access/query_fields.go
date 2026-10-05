@@ -60,7 +60,11 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 		}
 		return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeColumnDenied, Scope: DecisionScopeColumn, Slot: slot, Columns: [][]string{{field}}, Explanation: fmt.Sprintf("%s field %q is not allowed", usage, field)}}
 	}
-	checkExpression := func(expression dal.Expression, usage string) error {
+	// checkExpression holds an expression to the allow-list. An aggregate is
+	// accepted only where aggregates belong (the select list, HAVING and ORDER
+	// BY); anywhere else, and in any slot when it is not one DALgo defines, it
+	// is refused as unsupported.
+	checkExpression := func(expression dal.Expression, usage string, aggregatesAllowed bool) error {
 		field, ok := expression.(dal.FieldRef)
 		if !ok {
 			if pointer, pointerOK := expression.(*dal.FieldRef); pointerOK && pointer != nil {
@@ -71,7 +75,7 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			// An aggregate reads only the fields of its operands, so it is held
 			// to the allow-list operand by operand; the first refused field is
 			// the one named.
-			if aggregate, isAggregate := expression.(dal.AggregateFunc); isAggregate {
+			if aggregate, isAggregate := expression.(dal.AggregateFunc); isAggregate && aggregatesAllowed {
 				if fields, checkable := aggregateFields(aggregate, 0); checkable {
 					for _, name := range fields {
 						if !sets.allowsWhole(name) {
@@ -88,8 +92,10 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 		}
 		return nil
 	}
-	var checkCondition func(dal.Condition) error
-	checkCondition = func(condition dal.Condition) error {
+	// checkCondition holds a condition to the allow-list; aggregatesAllowed is
+	// true for HAVING and false for WHERE.
+	var checkCondition func(dal.Condition, bool) error
+	checkCondition = func(condition dal.Condition, aggregatesAllowed bool) error {
 		switch condition := condition.(type) {
 		case nil:
 			return nil
@@ -99,7 +105,7 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 				case dal.Constant, *dal.Constant, dal.Array, *dal.Array, dal.Param, *dal.Param:
 					continue
 				}
-				if err := checkExpression(expression, "filter"); err != nil {
+				if err := checkExpression(expression, "filter", aggregatesAllowed); err != nil {
 					return err
 				}
 			}
@@ -114,15 +120,15 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			case dal.Constant, *dal.Constant:
 				return nil
 			}
-			return checkExpression(condition.Operand(), "filter")
+			return checkExpression(condition.Operand(), "filter", aggregatesAllowed)
 		case *dal.Comparison:
 			if condition == nil {
 				return nil
 			}
-			return checkCondition(*condition)
+			return checkCondition(*condition, aggregatesAllowed)
 		case dal.GroupCondition:
 			for _, child := range condition.Conditions() {
-				if err := checkCondition(child); err != nil {
+				if err := checkCondition(child, aggregatesAllowed); err != nil {
 					return err
 				}
 			}
@@ -131,27 +137,27 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 			if condition == nil {
 				return nil
 			}
-			return checkCondition(*condition)
+			return checkCondition(*condition, aggregatesAllowed)
 		default:
 			return &DeniedError{Decision: Decision{Operation: Query, Resource: resource, Policy: "fields", Effect: effectDeny.String(), Code: CodeEnforcementUnsupported, Scope: DecisionScopeColumn, Slot: DecisionSlotWhere, Explanation: "filter condition cannot be safely checked against allowed fields"}}
 		}
 	}
-	if err := checkCondition(query.Where()); err != nil {
+	if err := checkCondition(query.Where(), false); err != nil {
 		return err
 	}
 	for _, expression := range query.GroupBy() {
-		if err := checkExpression(expression, "group"); err != nil {
+		if err := checkExpression(expression, "group", false); err != nil {
 			return err
 		}
 	}
-	if err := checkCondition(query.Having()); err != nil {
+	if err := checkCondition(query.Having(), true); err != nil {
 		return err
 	}
 	for _, order := range query.OrderBy() {
 		if order == nil {
 			return deny("order", "")
 		}
-		if err := checkExpression(order.Expression(), "order"); err != nil {
+		if err := checkExpression(order.Expression(), "order", true); err != nil {
 			return err
 		}
 	}
@@ -190,19 +196,30 @@ func validateRequestedQueryFields(query dal.StructuredQuery, sets fieldSets) err
 		if column.Expression == nil {
 			return deny("selected", "")
 		}
-		if err := checkExpression(column.Expression, "selected"); err != nil {
+		if err := checkExpression(column.Expression, "selected", true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// aggregateFunctions are the aggregate functions DALgo defines. Only these are
+// checked by their operands; an aggregate under any other name might read
+// anything.
+var aggregateFunctions = map[string]bool{
+	dal.COUNT: true, dal.SUM: true, dal.AVERAGE: true, dal.MIN: true, dal.MAX: true, dal.FIRST: true, dal.LAST: true,
+}
+
 // aggregateFields lists, left to right, the fields an aggregate reads. checkable
-// is false when an operand is something a field list cannot be applied to: a
-// param, an array, a subquery, an expression the check does not know, a star
-// anywhere but directly under COUNT, or nesting past maxQueryNesting. A
-// constant reads no field, and COUNT(*) reads no field value.
+// is false when the function is not one DALgo defines, or an operand is
+// something a field list cannot be applied to: a param, an array, a subquery,
+// an expression the check does not know, an arithmetic operator other than
+// + - * /, a star anywhere but directly under COUNT, or nesting past
+// maxQueryNesting. A constant reads no field, and COUNT(*) reads no field value.
 func aggregateFields(aggregate dal.AggregateFunc, depth int) (fields []string, checkable bool) {
+	if !aggregateFunctions[strings.ToUpper(aggregate.FuncName())] {
+		return nil, false
+	}
 	for _, argument := range aggregate.FuncArgs() {
 		if star, isStar := argument.(dal.StarExpression); isStar && star.IsStar() && strings.EqualFold(aggregate.FuncName(), dal.COUNT) {
 			continue
@@ -244,6 +261,11 @@ func operandFields(expression dal.Expression, depth int) (fields []string, ok bo
 }
 
 func binaryFields(expression dal.BinaryExpression, depth int) ([]string, bool) {
+	switch expression.Operator {
+	case dal.Add, dal.Subtract, dal.Multiply, dal.Divide:
+	default:
+		return nil, false
+	}
 	left, ok := operandFields(expression.Left, depth+1)
 	if !ok {
 		return nil, false

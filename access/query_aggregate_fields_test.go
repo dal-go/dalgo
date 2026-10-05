@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
@@ -62,6 +63,19 @@ func TestAggregatesAreCheckedOperandByOperand(t *testing.T) {
 		"aggregate with an alias":              usersQuery().SelectColumns(dal.Column{Alias: "n", Expression: dal.NewAggregate(dal.COUNT, false, name)}),
 		"aggregate without an argument":        usersQuery().SelectColumns(dal.Column{Expression: dal.NewAggregate(dal.COUNT, false)}),
 		"COUNT(*) from another aggregate type": usersQuery().SelectColumns(dal.Column{Expression: customAggregate{name: "count", args: []dal.Expression{dal.Star()}}}),
+		"every function DALgo defines": usersQuery().SelectColumns(
+			dal.Column{Expression: dal.NewAggregate(dal.COUNT, false, age)},
+			dal.Column{Expression: dal.NewAggregate(dal.SUM, false, age)},
+			dal.Column{Expression: dal.NewAggregate(dal.AVERAGE, false, age)},
+			dal.Column{Expression: dal.NewAggregate(dal.MIN, false, age)},
+			dal.Column{Expression: dal.NewAggregate(dal.MAX, false, age)},
+			dal.Column{Expression: dal.NewAggregate(dal.FIRST, false, age)},
+			dal.Column{Expression: dal.NewAggregate(dal.LAST, false, age)}),
+		"a function name in lower case": usersQuery().SelectColumns(dal.Column{Expression: customAggregate{name: "sum", args: []dal.Expression{age}}}),
+		"every operator DALgo defines":  usersQuery().SelectColumns(sum(dal.Binary(dal.Binary(age, dal.Add, age), dal.Subtract, dal.Binary(dal.Binary(age, dal.Multiply, age), dal.Divide, age)))),
+		"an aggregate in HAVING beside one in ORDER BY": usersQuery().GroupBy(name).
+			Having(dal.NewComparison(sum(age).Expression, dal.GreaterThen, dal.Constant{Value: 1})).
+			OrderBy(dal.Ascending(sum(age).Expression)).SelectColumns(selectName),
 	}
 	for name, query := range allowed {
 		t.Run("allowed "+name, func(t *testing.T) {
@@ -103,20 +117,34 @@ func TestAggregatesAreCheckedOperandByOperand(t *testing.T) {
 	}
 
 	unsupported := map[string]dal.StructuredQuery{
-		"a param operand":                          usersQuery().SelectColumns(sum(dal.NewParam("p"))),
-		"a param in arithmetic":                    usersQuery().SelectColumns(sum(dal.Binary(age, dal.Add, dal.NewParam("p")))),
-		"an array operand":                         usersQuery().SelectColumns(sum(dal.NewArray([]int{1}))),
-		"a star under a function other than COUNT": usersQuery().SelectColumns(dal.Column{Expression: dal.NewAggregate(dal.MAX, false, dal.Star())}),
-		"a star inside arithmetic":                 usersQuery().SelectColumns(sum(dal.Binary(age, dal.Add, dal.Star()))),
-		"a bare star column":                       usersQuery().SelectColumns(dal.Column{Expression: dal.Star()}),
-		"an operand the check does not know":       usersQuery().SelectColumns(sum(strangeNode{})),
-		"a subquery operand":                       usersQuery().SelectColumns(sum(dal.NewQueryExpression(secretRows(), "x"))),
-		"arithmetic outside an aggregate":          usersQuery().SelectColumns(dal.Column{Expression: dal.Binary(age, dal.Add, age)}),
-		"a bare constant column":                   usersQuery().SelectColumns(dal.Column{Expression: dal.Constant{Value: 1}}),
-		"a nil operand":                            usersQuery().SelectColumns(sum(nil)),
-		"a nil pointer operand":                    usersQuery().SelectColumns(sum((*dal.FieldRef)(nil))),
-		"a nil pointer in arithmetic":              usersQuery().SelectColumns(sum((*dal.BinaryExpression)(nil))),
-		"a star under a custom MAX":                usersQuery().SelectColumns(dal.Column{Expression: customAggregate{name: "max", args: []dal.Expression{dal.Star()}}}),
+		"a param operand":                            usersQuery().SelectColumns(sum(dal.NewParam("p"))),
+		"a param in arithmetic":                      usersQuery().SelectColumns(sum(dal.Binary(age, dal.Add, dal.NewParam("p")))),
+		"an array operand":                           usersQuery().SelectColumns(sum(dal.NewArray([]int{1}))),
+		"a star under a function other than COUNT":   usersQuery().SelectColumns(dal.Column{Expression: dal.NewAggregate(dal.MAX, false, dal.Star())}),
+		"a star inside arithmetic":                   usersQuery().SelectColumns(sum(dal.Binary(age, dal.Add, dal.Star()))),
+		"a bare star column":                         usersQuery().SelectColumns(dal.Column{Expression: dal.Star()}),
+		"an operand the check does not know":         usersQuery().SelectColumns(sum(strangeNode{})),
+		"a subquery operand":                         usersQuery().SelectColumns(sum(dal.NewQueryExpression(secretRows(), "x"))),
+		"arithmetic outside an aggregate":            usersQuery().SelectColumns(dal.Column{Expression: dal.Binary(age, dal.Add, age)}),
+		"a bare constant column":                     usersQuery().SelectColumns(dal.Column{Expression: dal.Constant{Value: 1}}),
+		"a nil operand":                              usersQuery().SelectColumns(sum(nil)),
+		"a function DALgo does not define":           usersQuery().SelectColumns(dal.Column{Expression: customAggregate{name: "EVIL", args: []dal.Expression{age}}}),
+		"an empty function name":                     usersQuery().SelectColumns(dal.Column{Expression: customAggregate{args: []dal.Expression{age}}}),
+		"a function that is not an aggregate":        usersQuery().SelectColumns(dal.Column{Expression: customAggregate{name: "LOWER", args: []dal.Expression{age}}}),
+		"an unknown function nested in an aggregate": usersQuery().SelectColumns(sum(customAggregate{name: "EVIL", args: []dal.Expression{age}})),
+		"an operator DALgo does not define":          usersQuery().SelectColumns(sum(dal.Binary(age, "%", age))),
+		"an empty operator":                          usersQuery().SelectColumns(sum(dal.Binary(age, "", age))),
+		"an operator that holds SQL":                 usersQuery().SelectColumns(sum(dal.Binary(age, "+ 1) FROM secrets --", age))),
+		"an unknown operator deep in the operand":    usersQuery().SelectColumns(sum(dal.Binary(age, dal.Add, dal.Binary(age, "^", age)))),
+		"an aggregate in WHERE":                      usersQuery().Where(dal.NewComparison(sum(age).Expression, dal.GreaterThen, dal.Constant{Value: 1})).SelectColumns(selectName),
+		"an aggregate on the right of a WHERE":       usersQuery().Where(dal.NewComparison(dal.Constant{Value: 1}, dal.LessThen, sum(age).Expression)).SelectColumns(selectName),
+		"an aggregate in a grouped WHERE":            usersQuery().Where(dal.NewGroupCondition(dal.And, dal.WhereField("name", dal.Equal, "Ann"), dal.NewComparison(sum(age).Expression, dal.GreaterThen, dal.Constant{Value: 1}))).SelectColumns(selectName),
+		"a null test of an aggregate in WHERE":       usersQuery().Where(dal.NewIsNotNullCondition(sum(age).Expression)).SelectColumns(selectName),
+		"an aggregate over a hidden field in WHERE":  usersQuery().Where(dal.NewComparison(sum(secret).Expression, dal.GreaterThen, dal.Constant{Value: 1})).SelectColumns(selectName),
+		"an aggregate in GROUP BY":                   usersQuery().GroupBy(sum(age).Expression).SelectColumns(selectName),
+		"a nil pointer operand":                      usersQuery().SelectColumns(sum((*dal.FieldRef)(nil))),
+		"a nil pointer in arithmetic":                usersQuery().SelectColumns(sum((*dal.BinaryExpression)(nil))),
+		"a star under a custom MAX":                  usersQuery().SelectColumns(dal.Column{Expression: customAggregate{name: "max", args: []dal.Expression{dal.Star()}}}),
 		"an operand nested past the bound": usersQuery().SelectColumns(sum(func() dal.Expression {
 			expression := dal.Expression(age)
 			for i := 0; i <= maxQueryNesting; i++ {
@@ -184,30 +212,6 @@ func TestAggregatesUnderAFieldListReachTheWrappedSessionOnce(t *testing.T) {
 	}
 }
 
-func TestQueryOutputNames(t *testing.T) {
-	name := dal.Field("name")
-	pointer := &name
-	query := usersQuery().SelectColumns(
-		dal.Column{Alias: "city", Expression: name},
-		dal.Column{Expression: name},
-		dal.Column{Expression: pointer},
-		dal.CountAs(name, "n"),
-		dal.Count(),
-		dal.Column{},
-		dal.AllColumnsExcept("secret"),
-	)
-	want := []string{"city", "name", "n", "COUNT(*)"}
-	if got := outputNames(query); !reflect.DeepEqual(got, want) {
-		t.Fatalf("output names = %v, want %v", got, want)
-	}
-	if got := outputNames(usersQuery().SelectKeysOnly(reflect.String)); len(got) != 0 {
-		t.Fatalf("output names of a query without columns = %v", got)
-	}
-	if got := outputNames(nil); len(got) != 0 {
-		t.Fatalf("output names of no query = %v", got)
-	}
-}
-
 // rowsSession answers every query with the rows it was given. A row may carry
 // fields the query did not ask for, as an adapter that ignores a projection
 // would return them.
@@ -217,12 +221,66 @@ type rowsSession struct {
 }
 
 func (s *rowsSession) ExecuteQueryToRecordsReader(context.Context, dal.Query) (dal.RecordsReader, error) {
-	records := make([]record.Record, len(s.rows))
-	for i, row := range s.rows {
+	return rowsReader(s.rows), nil
+}
+
+func rowsReader(rows []map[string]any) dal.RecordsReader {
+	records := make([]record.Record, len(rows))
+	for i, row := range rows {
 		records[i] = record.NewRecordWithData(record.NewKeyWithID("users", i), row)
 		records[i].SetError(nil)
 	}
-	return dal.NewRecordsReader(records), nil
+	return dal.NewRecordsReader(records)
+}
+
+// projectingSession answers a query as an adapter that honours projections
+// does: one row with one key per selected column, named by the alias the query
+// carries, otherwise by the field or the text of the expression. A plain field
+// holds its stored value and an aggregate holds 2. A wildcard column adds every
+// stored field. seen records each query that reached it.
+type projectingSession struct {
+	countingSession
+	stored map[string]any
+	seen   []dal.StructuredQuery
+}
+
+func (s *projectingSession) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query) (dal.RecordsReader, error) {
+	structured := query.(dal.StructuredQuery)
+	s.seen = append(s.seen, structured)
+	row := map[string]any{}
+	for _, column := range structured.Columns() {
+		field, plain := column.Expression.(dal.FieldRef)
+		if pointer, isPointer := column.Expression.(*dal.FieldRef); isPointer {
+			field, plain = *pointer, true
+		}
+		key := column.Alias
+		switch {
+		case plain && key == "":
+			key = field.Name()
+		case key == "":
+			key = column.Expression.String()
+		}
+		if plain {
+			row[key] = s.stored[field.Name()]
+		} else {
+			row[key] = 2
+		}
+	}
+	return rowsReader([]map[string]any{row}), nil
+}
+
+// aliasesSent lists the alias of every selected column of the last query that
+// reached the session, in column order.
+func (s *projectingSession) aliasesSent(t *testing.T) []string {
+	t.Helper()
+	if len(s.seen) == 0 {
+		t.Fatal("no query reached the wrapped session")
+	}
+	var aliases []string
+	for _, column := range s.seen[len(s.seen)-1].Columns() {
+		aliases = append(aliases, column.Alias)
+	}
+	return aliases
 }
 
 func readRows(t *testing.T, session dal.ReadSession, query dal.Query) []map[string]any {
@@ -244,48 +302,158 @@ func readRows(t *testing.T, session dal.ReadSession, query dal.Query) []map[stri
 	}
 }
 
+var storedUser = map[string]any{"name": "Ann", "age": 3, "secret": "s"}
+
+// Every list refuses the names "secret" and "city".
+var outputNameLists = map[string][]string{
+	"enumerable list": {"name", "age"},
+	"wildcard list":   {"name", "a*"},
+}
+
 // Every column the caller selected comes back under the name the caller gave
-// it; any other field the adapter returns is still redacted.
-func TestSelectedOutputNamesSurviveRedaction(t *testing.T) {
-	name := dal.Field("name")
-	lists := map[string][]string{
-		"enumerable list": {"name", "age"},
-		"wildcard list":   {"name", "a*"},
+// it, with the value its own expression produced.
+func TestSelectedOutputNamesComeBackUnderTheCallersNames(t *testing.T) {
+	name, age := dal.Field("name"), dal.Field("age")
+	cases := map[string]struct {
+		query dal.StructuredQuery
+		want  map[string]any
+	}{
+		"allowed field under an alias": {
+			usersQuery().SelectColumns(dal.Column{Alias: "city", Expression: name}),
+			map[string]any{"city": "Ann"},
+		},
+		"allowed field under a refused name": {
+			usersQuery().SelectColumns(dal.Column{Alias: "secret", Expression: name}),
+			map[string]any{"secret": "Ann"},
+		},
+		"allowed field and an aliased one": {
+			usersQuery().SelectColumns(dal.Column{Expression: name}, dal.Column{Alias: "years", Expression: age}),
+			map[string]any{"name": "Ann", "years": 3},
+		},
+		"allowed field under an allowed name": {
+			usersQuery().SelectColumns(dal.Column{Alias: "age", Expression: name}),
+			map[string]any{"age": "Ann"},
+		},
+		"aggregate with an alias": {
+			usersQuery().SelectColumns(dal.CountAs(name, "n")),
+			map[string]any{"n": 2},
+		},
+		"aggregate under a refused name": {
+			usersQuery().SelectColumns(dal.CountAs(name, "secret")),
+			map[string]any{"secret": 2},
+		},
+		"aggregate without an alias": {
+			usersQuery().SelectColumns(dal.Count()),
+			map[string]any{"COUNT(*)": 2},
+		},
+		"grouped aggregate": {
+			usersQuery().GroupBy(name).SelectColumns(dal.Column{Expression: name}, dal.SumAs(age, "total")),
+			map[string]any{"name": "Ann", "total": 2},
+		},
+		"pointer to a field under an alias": {
+			usersQuery().SelectColumns(dal.Column{Alias: "city", Expression: &name}),
+			map[string]any{"city": "Ann"},
+		},
+		"pointer to a field without an alias": {
+			usersQuery().SelectColumns(dal.Column{Expression: &name}),
+			map[string]any{"name": "Ann"},
+		},
 	}
-	queries := map[string]struct {
+	for list, fields := range outputNameLists {
+		policy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields(fields...)))
+		for label, c := range cases {
+			t.Run(list+" "+label, func(t *testing.T) {
+				wrapped := &projectingSession{stored: storedUser}
+				rows := readRows(t, SecureReadSession(wrapped, policy), c.query)
+				if len(rows) != 1 || !reflect.DeepEqual(rows[0], c.want) {
+					t.Fatalf("rows = %v, want [%v]", rows, c.want)
+				}
+			})
+		}
+	}
+}
+
+// A name the field list refuses is never sent to the wrapped session as the
+// name of a column. The column goes under an alias of the access layer's own,
+// different for every query, and a name the list allows is sent as it is.
+func TestRefusedOutputNamesAreSentUnderAliasesOfTheirOwn(t *testing.T) {
+	policy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name", "age")))
+	name, age := dal.Field("name"), dal.Field("age")
+	query := usersQuery().SelectColumns(
+		dal.Column{Expression: name},
+		dal.Column{Alias: "city", Expression: name},
+		dal.Column{Alias: "age", Expression: name},
+		dal.Column{Alias: "secret", Expression: age},
+		dal.CountAs(name, "n"),
+		dal.Count(),
+	)
+	var runs [2][]string
+	for i := range runs {
+		wrapped := &projectingSession{stored: storedUser}
+		readRows(t, SecureReadSession(wrapped, policy), query)
+		runs[i] = wrapped.aliasesSent(t)
+	}
+	for i, aliases := range runs {
+		if len(aliases) != 6 || aliases[0] != "" || aliases[2] != "age" {
+			t.Fatalf("run %d aliases = %q, want no alias on the plain field and the allowed name unchanged", i, aliases)
+		}
+		for _, j := range []int{1, 3, 4, 5} {
+			if !strings.HasPrefix(aliases[j], "access_") || aliases[j] != strings.ToLower(aliases[j]) {
+				t.Fatalf("run %d column %d alias = %q, want a lower-case access_ alias", i, j, aliases[j])
+			}
+			for _, caller := range []string{"city", "secret", "n", "COUNT(*)"} {
+				if aliases[j] == caller {
+					t.Fatalf("run %d column %d alias = %q, a name the caller chose", i, j, aliases[j])
+				}
+			}
+		}
+	}
+	for _, j := range []int{1, 3, 4, 5} {
+		if runs[0][j] == runs[1][j] {
+			t.Fatalf("column %d got the alias %q in two queries", j, runs[0][j])
+		}
+	}
+}
+
+// A session that returns more than the query asked for, or ignores its
+// projection, cannot bring a field back by the name of a column: a stored field
+// the list refuses stays out whatever name the caller gave a column.
+func TestNoCallerChosenNameSurvivesRedaction(t *testing.T) {
+	name := dal.Field("name")
+	cases := map[string]struct {
 		query dal.StructuredQuery
 		row   map[string]any
 		want  map[string]any
 	}{
 		"allowed field under an alias": {
 			usersQuery().SelectColumns(dal.Column{Alias: "city", Expression: name}),
-			map[string]any{"city": "Cork", "secret": "s"},
-			map[string]any{"city": "Cork"},
+			map[string]any{"city": "Cork", "name": "Ann", "secret": "s"},
+			map[string]any{"name": "Ann"},
 		},
-		"allowed field and an aliased one": {
-			usersQuery().SelectColumns(dal.Column{Expression: name}, dal.Column{Alias: "years", Expression: dal.Field("age")}),
-			map[string]any{"name": "Ann", "years": 3, "secret": "s"},
-			map[string]any{"name": "Ann", "years": 3},
+		"allowed field under a refused name": {
+			usersQuery().SelectColumns(dal.Column{Alias: "secret", Expression: name}),
+			map[string]any{"name": "Ann", "secret": "s"},
+			map[string]any{"name": "Ann"},
 		},
-		"aggregate with an alias": {
-			usersQuery().SelectColumns(dal.CountAs(name, "n")),
-			map[string]any{"n": 2, "secret": "s"},
-			map[string]any{"n": 2},
+		"aggregate under a refused name": {
+			usersQuery().SelectColumns(dal.CountAs(name, "secret")),
+			map[string]any{"name": "Ann", "secret": 99},
+			map[string]any{"name": "Ann"},
 		},
 		"aggregate without an alias": {
 			usersQuery().SelectColumns(dal.Count()),
-			map[string]any{"COUNT(*)": 2, "secret": "s"},
-			map[string]any{"COUNT(*)": 2},
+			map[string]any{"COUNT(*)": 2, "name": "Ann", "secret": "s"},
+			map[string]any{"name": "Ann"},
 		},
-		"grouped aggregate": {
-			usersQuery().GroupBy(name).SelectColumns(dal.Column{Expression: name}, dal.SumAs(dal.Field("age"), "total")),
-			map[string]any{"name": "Ann", "total": 7, "secret": "s"},
-			map[string]any{"name": "Ann", "total": 7},
+		"aggregate named by its own text": {
+			usersQuery().SelectColumns(dal.Column{Expression: dal.NewAggregate(dal.COUNT, false, name)}),
+			map[string]any{"COUNT(name)": 2, "name": "Ann"},
+			map[string]any{"name": "Ann"},
 		},
-		"an alias that holds an object": {
-			usersQuery().SelectColumns(dal.Column{Alias: "who", Expression: name}),
-			map[string]any{"who": map[string]any{"first": "Ann"}, "secret": map[string]any{"x": 1}},
-			map[string]any{"who": map[string]any{"first": "Ann"}},
+		"field under a name the list allows": {
+			usersQuery().SelectColumns(dal.Column{Alias: "age", Expression: name}),
+			map[string]any{"age": 3, "secret": "s"},
+			map[string]any{"age": 3},
 		},
 		"no columns selected": {
 			usersQuery().SelectKeysOnly(reflect.String),
@@ -293,9 +461,9 @@ func TestSelectedOutputNamesSurviveRedaction(t *testing.T) {
 			map[string]any{"name": "Ann"},
 		},
 	}
-	for list, fields := range lists {
+	for list, fields := range outputNameLists {
 		policy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields(fields...)))
-		for label, c := range queries {
+		for label, c := range cases {
 			t.Run(list+" "+label, func(t *testing.T) {
 				session := SecureReadSession(&rowsSession{rows: []map[string]any{c.row}}, policy)
 				rows := readRows(t, session, c.query)
@@ -304,5 +472,51 @@ func TestSelectedOutputNamesSurviveRedaction(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// An alias that names a stored object with a leaf the list refuses brings back
+// only the leaves the list allows, never the refused one.
+func TestRefusedOutputNameHoldingAnObjectIsRedactedByLeaf(t *testing.T) {
+	row := map[string]any{"name": "Ann", "profile": map[string]any{"public": "p", "secret": "x"}}
+	want := map[string]any{"name": "Ann", "profile": map[string]any{"public": "p"}}
+	for list, fields := range map[string][]string{
+		"enumerable list": {"name", "profile.public"},
+		"wildcard list":   {"name*", "profile.public"},
+	} {
+		policy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields(fields...)))
+		t.Run(list, func(t *testing.T) {
+			query := usersQuery().SelectColumns(dal.Column{Alias: "profile", Expression: dal.Field("name")})
+			rows := readRows(t, SecureReadSession(&rowsSession{rows: []map[string]any{row}}, policy), query)
+			if len(rows) != 1 || !reflect.DeepEqual(rows[0], want) {
+				t.Fatalf("rows = %v, want [%v]", rows, want)
+			}
+		})
+	}
+}
+
+// Two secured sessions, one over the other, each give the column an alias of its
+// own and give back the name it was sent under, so the caller still gets its name.
+func TestOutputNamesSurviveNestedSecuredSessions(t *testing.T) {
+	policy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name", "age")))
+	wrapped := &projectingSession{stored: storedUser}
+	session := SecureReadSession(SecureReadSession(wrapped, policy), policy)
+	rows := readRows(t, session, usersQuery().SelectColumns(dal.Column{Alias: "city", Expression: dal.Field("name")}))
+	if len(rows) != 1 || !reflect.DeepEqual(rows[0], map[string]any{"city": "Ann"}) {
+		t.Fatalf("rows = %v, want [map[city:Ann]]", rows)
+	}
+	if aliases := wrapped.aliasesSent(t); len(aliases) != 1 || !strings.HasPrefix(aliases[0], "access_") {
+		t.Fatalf("aliases sent = %q, want one access_ alias", aliases)
+	}
+}
+
+// Columns that name no output are left as they are: a wildcard, and a column
+// with no expression.
+func TestAliasRefusedOutputsLeavesUnnamedColumnsAlone(t *testing.T) {
+	sets := fieldList(t, "name")
+	query := usersQuery().SelectColumns(dal.AllColumnsExcept("secret"), dal.Column{}, dal.Column{Expression: dal.Field("name")})
+	rewritten, renames := aliasRefusedOutputs(query, sets)
+	if len(renames) != 0 || !reflect.DeepEqual(rewritten.Columns(), query.Columns()) {
+		t.Fatalf("renames = %v, columns = %v, want the query unchanged", renames, rewritten.Columns())
 	}
 }
