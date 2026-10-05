@@ -275,6 +275,31 @@ func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
 			t.Run("aggregates_over_allowed_fields_on_the_recordset_path", func(t *testing.T) {
 				assertRecordsetRowCount(ctx, t, secured, aggregated(), "access field list: allowed recordset", 1)
 			})
+			// A grouped query that names no columns selects its group keys; the
+			// list must not add its other allowed fields to that selection.
+			groupedNoColumns := func() dal.Query {
+				return cities().GroupBy(dal.Field("Country")).
+					Having(dal.NewComparison(dal.Count().Expression, dal.GreaterThen, dal.Constant{Value: 1})).
+					SelectKeysOnly(reflect.String)
+			}
+			t.Run("grouped_query_with_no_columns_reads_its_group_keys", func(t *testing.T) {
+				rows, err := readMapRecords(ctx, secured, groupedNoColumns(), "access field list: allowed columns")
+				if errors.Is(err, dal.ErrNotSupported) {
+					t.Skip("grouped query with no columns not supported by adapter:", err)
+				}
+				require.NoError(t, err)
+				var countries []string
+				for _, row := range rows {
+					require.Len(t, row, 1, "only the group key comes back")
+					country, isString := row["Country"].(string)
+					require.True(t, isString, "Country holds %v", row["Country"])
+					countries = append(countries, country)
+				}
+				assert.ElementsMatch(t, []string{"CN", "IN"}, countries, "the countries with more than one city")
+			})
+			t.Run("grouped_query_with_no_columns_on_the_recordset_path", func(t *testing.T) {
+				assertRecordsetRowCount(ctx, t, secured, groupedNoColumns(), "access field list: allowed recordset", 2)
+			})
 			t.Run("allowed_column_under_a_refused_name_never_returns_the_stored_field", func(t *testing.T) {
 				// Population is in neither list. A column selected under that name
 				// carries what its own expression produced, or nothing when the
@@ -350,6 +375,45 @@ func accessFieldListTest(ctx context.Context, t *testing.T, db dal.DB) {
 			})
 		})
 	}
+
+	// A secured database over another one is held to the fields both lists
+	// allow. Whichever database lists AreaSqKm, the other does not, so a query
+	// that names no columns, or a wildcard, must come back without it: a column
+	// the outer database adds to such a query is one the inner database removes
+	// from the result.
+	t.Run("nested_secured_databases_return_the_fields_both_lists_allow", func(t *testing.T) {
+		secureWith := func(db dal.DB, name string, fields ...string) dal.DB {
+			return access.MustSecureDB(db, access.WithDatabasePolicies(access.MustPolicy(name,
+				access.Collection(models.CitiesCollection, access.Allow(access.Query, name+"-fields").Fields(fields...)),
+			)))
+		}
+		nestings := map[string]dal.DB{
+			"inner_list_narrower": secureWith(secureWith(db, "inner", "Name", "Country"), "outer", "Name", "Country", "AreaSqKm"),
+			"outer_list_narrower": secureWith(secureWith(db, "inner", "Name", "Country", "AreaSqKm"), "outer", "Name", "Country"),
+		}
+		shapes := map[string]dal.Query{
+			"no_columns": cities().SelectKeysOnly(reflect.String),
+			"wildcard":   cities().SelectColumns(dal.AllColumnsExcept("State")),
+		}
+		for nesting, secured := range nestings {
+			for shape, q := range shapes {
+				t.Run(nesting+"_"+shape, func(t *testing.T) {
+					rows, err := readMapRecords(ctx, secured, q, "access field list: allowed columns")
+					if errors.Is(err, dal.ErrNotSupported) {
+						t.Skip("column projection not supported by adapter:", err)
+					}
+					require.NoError(t, err)
+					require.Len(t, rows, len(models.Cities))
+					for _, row := range rows {
+						assert.NotContains(t, row, "AreaSqKm", "a field only one of the lists allows")
+						assert.NotContains(t, row, "Population")
+						assert.NotContains(t, row, "State")
+						assert.NotEmpty(t, row["Name"], "a field both lists allow")
+					}
+				})
+			}
+		}
+	})
 }
 
 // hiddenSourceCollection is a collection the sources policy denies. No test

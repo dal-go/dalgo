@@ -312,10 +312,10 @@ func (sets fieldSets) redactRecordRenaming(rec record.Record, renames []outputRe
 
 // redactMapRenaming is redactMap for a row some of whose columns were sent
 // under generated aliases. Only a key the access layer generated for this query
-// is exempt, and it is checked by what produced it, not by its name: the column
-// expression was held to the field list before the query was sent. Whatever
-// else the session returns under any other key, a name the caller chose
-// included, is redacted by that key.
+// is exempt, and it is judged by what produced it, not by its name: it was given
+// only to a column whose expression this session's field list allows (see
+// aliasRefusedOutputs). Whatever else the session returns under any other key,
+// a name the caller chose included, is redacted by that key.
 func (sets fieldSets) redactMapRenaming(data map[string]any, renames []outputRename) {
 	kept := make([]any, len(renames))
 	found := make([]bool, len(renames))
@@ -376,21 +376,28 @@ func outputName(column dal.Column) (name string, ok bool) {
 	return column.Expression.String(), true
 }
 
-// aliasRefusedOutputs sends every explicitly selected column whose output name
-// the field list does not allow under an alias of the access layer's own, and
-// returns the query to send with the renames that undo it. The alias carries a
-// random token drawn for this query, so neither the caller nor the wrapped
-// session can know it. A column that comes back under a name the list allows
-// is sent as it is. The alias exists so that redaction can tell the value of a
-// checked column from a stored field of the same name: redaction keeps exactly
-// the generated keys, and a session that returns more than the query projected,
-// or none of it, brings back no generated key and so exempts nothing.
+// aliasRefusedOutputs sends every explicitly selected column whose expression
+// the field list allows, and whose output name the list does not, under an alias
+// of the access layer's own, and returns the query to send with the renames that
+// undo it. The alias carries a random token drawn for this query, so neither the
+// caller nor the wrapped session can know it. Every other column is sent as it
+// is: one that comes back under a name the list allows, and one whose expression
+// the list does not allow, which this session did not hold to the list (it can
+// be a column an outer secured session's projection added) and which redaction
+// therefore judges by its name. The alias exists so that redaction can tell the
+// value of an allowed expression from a stored field of the same name: redaction
+// keeps exactly the generated keys, and a session that returns more than the
+// query projected, or none of it, brings back no generated key and so exempts
+// nothing.
 func aliasRefusedOutputs(query dal.StructuredQuery, sets fieldSets) (dal.StructuredQuery, []outputRename) {
 	columns := query.Columns()
 	var renames []outputRename
 	var rewritten []dal.Column
 	token := ""
 	for i, column := range columns {
+		if !sets.readsOnlyAllowedFields(column.Expression) {
+			continue
+		}
 		name, named := outputName(column)
 		if !named || sets.allowsWhole(name) {
 			continue
@@ -463,6 +470,18 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 		}
 		return queryProjection{query: query, status: queryProjectionApplied}
 	}
+	if len(query.GroupBy()) > 0 {
+		// A grouped query with no columns selects its group keys, so that is what
+		// it is projected to, not the allowed fields: a column that is neither
+		// aggregated nor a group key makes the aggregation invalid.
+		columns := dal.EffectiveAggregationColumns(query)
+		for _, column := range columns {
+			if !sets.readsOnlyAllowedFields(column.Expression) {
+				return queryProjection{query: query, status: queryProjectionUnavailable}
+			}
+		}
+		return queryProjection{query: dal.WithColumns(query, columns), status: queryProjectionApplied}
+	}
 	allowed, ok := sets.enumerable()
 	if !ok {
 		return queryProjection{query: query, status: queryProjectionUnavailable}
@@ -479,12 +498,15 @@ func projectQuery(query dal.StructuredQuery, sets fieldSets) queryProjection {
 
 var _ = context.Background
 
-// readsOnlyAllowedFields reports whether a selected column is a plain field, or
-// an aggregate whose operands name only fields, that every set allows.
+// readsOnlyAllowedFields reports whether a selected column is a plain field
+// (given by value or by non-nil pointer), or an aggregate whose operands name
+// only fields, that every set allows.
 func (sets fieldSets) readsOnlyAllowedFields(expression dal.Expression) bool {
 	switch expression := expression.(type) {
 	case dal.FieldRef:
 		return sets.allowsWhole(expression.Name())
+	case *dal.FieldRef:
+		return expression != nil && sets.allowsWhole(expression.Name())
 	case dal.AggregateFunc:
 		fields, checkable := aggregateFields(expression, 0)
 		for _, name := range fields {

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/recordset"
 	"github.com/dal-go/record"
 )
 
@@ -249,6 +250,14 @@ func (s *projectingSession) ExecuteQueryToRecordsReader(_ context.Context, query
 	s.seen = append(s.seen, structured)
 	row := map[string]any{}
 	for _, column := range structured.Columns() {
+		if column.Wildcard != nil {
+			for key, value := range s.stored {
+				if !column.Wildcard.Excludes(key) {
+					row[key] = value
+				}
+			}
+			continue
+		}
 		field, plain := column.Expression.(dal.FieldRef)
 		if pointer, isPointer := column.Expression.(*dal.FieldRef); isPointer {
 			field, plain = *pointer, true
@@ -510,13 +519,219 @@ func TestOutputNamesSurviveNestedSecuredSessions(t *testing.T) {
 	}
 }
 
-// Columns that name no output are left as they are: a wildcard, and a column
-// with no expression.
+// Columns that name no output are left as they are: a wildcard, a column with
+// no expression, and a wildcard that also carries an expression.
 func TestAliasRefusedOutputsLeavesUnnamedColumnsAlone(t *testing.T) {
 	sets := fieldList(t, "name")
-	query := usersQuery().SelectColumns(dal.AllColumnsExcept("secret"), dal.Column{}, dal.Column{Expression: dal.Field("name")})
+	query := usersQuery().SelectColumns(
+		dal.AllColumnsExcept("secret"),
+		dal.Column{},
+		dal.Column{Expression: dal.Field("name")},
+		dal.Column{Expression: dal.Field("name"), Wildcard: &dal.WildcardProjection{Exclude: []string{"secret"}}},
+	)
 	rewritten, renames := aliasRefusedOutputs(query, sets)
 	if len(renames) != 0 || !reflect.DeepEqual(rewritten.Columns(), query.Columns()) {
 		t.Fatalf("renames = %v, columns = %v, want the query unchanged", renames, rewritten.Columns())
 	}
+}
+
+// A column is sent under a generated alias only when this session's list allows
+// its expression: the list is what holds an expression to a name the list
+// refuses. Every other column keeps the name it has, so redaction judges it by
+// that name.
+func TestAliasRefusedOutputsAliasesOnlyColumnsTheListAllows(t *testing.T) {
+	sets := fieldList(t, "name")
+	name, age := dal.Field("name"), dal.Field("age")
+	var nilField *dal.FieldRef
+	columns := []dal.Column{
+		{Expression: age},
+		{Alias: "city", Expression: age},
+		{Expression: &age},
+		{Alias: "city", Expression: &age},
+		dal.SumAs(age, "total"),
+		dal.CountAs(dal.Binary(name, dal.Add, age), "n"),
+		{Alias: "unknown", Expression: customAggregate{name: "MEDIAN", args: []dal.Expression{name}}},
+		{Alias: "constant", Expression: dal.Constant{Value: 1}},
+		{Alias: "nothing", Expression: nilField},
+		{Alias: "city", Expression: name},
+		{Alias: "town", Expression: &name},
+		dal.CountAs(name, "n"),
+		{Expression: name},
+	}
+	rewritten, renames := aliasRefusedOutputs(usersQuery().SelectColumns(columns...), sets)
+	generated := map[int]bool{9: true, 10: true, 11: true}
+	if len(renames) != len(generated) {
+		t.Fatalf("renames = %v, want %d", renames, len(generated))
+	}
+	for i, column := range rewritten.Columns() {
+		if generated[i] {
+			if !strings.HasPrefix(column.Alias, "access_") {
+				t.Errorf("column %d alias = %q, want a generated alias", i, column.Alias)
+			}
+			continue
+		}
+		if !reflect.DeepEqual(column, columns[i]) {
+			t.Errorf("column %d = %#v, want it unchanged: %#v", i, column, columns[i])
+		}
+	}
+}
+
+// A selected column holds what the list allows only if the list allows its
+// expression, whether the field is given by value or by pointer.
+func TestReadsOnlyAllowedFieldsCoversThePointerForm(t *testing.T) {
+	sets := fieldList(t, "name")
+	name, age := dal.Field("name"), dal.Field("age")
+	var nilField *dal.FieldRef
+	for label, c := range map[string]struct {
+		expression dal.Expression
+		want       bool
+	}{
+		"allowed field":                   {name, true},
+		"pointer to an allowed field":     {&name, true},
+		"hidden field":                    {age, false},
+		"pointer to a hidden field":       {&age, false},
+		"nil pointer":                     {nilField, false},
+		"no expression":                   {nil, false},
+		"constant":                        {dal.Constant{Value: 1}, false},
+		"aggregate over an allowed field": {dal.CountAs(name, "n").Expression, true},
+		"aggregate over a hidden field":   {dal.SumAs(age, "n").Expression, false},
+	} {
+		if got := sets.readsOnlyAllowedFields(c.expression); got != c.want {
+			t.Errorf("%s: readsOnlyAllowedFields = %v, want %v", label, got, c.want)
+		}
+	}
+}
+
+// Two secured sessions, one over the other, with lists that differ: what comes
+// back is bounded by the fields both lists allow. A column the outer session's
+// projection adds to the query is one the inner session never held to its list,
+// so the inner session sends it under its own name and redacts it by that name,
+// and no generated alias is sent for it.
+func TestNestedSecuredSessionsReturnTheFieldsBothListsAllow(t *testing.T) {
+	nameOnly, nameAndAge := map[string]any{"name": "Ann"}, map[string]any{"name": "Ann", "age": 3}
+	cases := map[string]struct {
+		outer, inner []string
+		want         map[string]any
+	}{
+		"inner list narrower":      {[]string{"name", "age"}, []string{"name"}, nameOnly},
+		"outer list narrower":      {[]string{"name"}, []string{"name", "age"}, nameOnly},
+		"the same fields":          {[]string{"name", "age"}, []string{"name", "age"}, nameAndAge},
+		"outer list with wildcard": {[]string{"name", "a*"}, []string{"name"}, nameOnly},
+		"inner list with wildcard": {[]string{"name"}, []string{"name", "a*"}, nameOnly},
+	}
+	queries := map[string]dal.StructuredQuery{
+		"no columns": usersQuery().SelectKeysOnly(reflect.String),
+		"wildcard":   usersQuery().SelectColumns(dal.AllColumnsExcept("secret")),
+	}
+	policy := func(name string, fields []string) Policy {
+		return MustPolicy(name, Collection("users", Allow(Query, "list").Fields(fields...)))
+	}
+	for label, c := range cases {
+		for shape, query := range queries {
+			t.Run(label+" "+shape, func(t *testing.T) {
+				wrapped := &projectingSession{stored: storedUser}
+				session := SecureReadSession(SecureReadSession(wrapped, policy("inner", c.inner)), policy("outer", c.outer))
+				rows := readRows(t, session, query)
+				if len(rows) != 1 || !reflect.DeepEqual(rows[0], c.want) {
+					t.Fatalf("rows = %v, want [%v]", rows, c.want)
+				}
+				for _, alias := range wrapped.aliasesSent(t) {
+					if alias != "" {
+						t.Fatalf("aliases sent = %q, want none", wrapped.aliasesSent(t))
+					}
+				}
+			})
+		}
+	}
+}
+
+// A grouped query with no columns selects its group keys, which is what DALgo
+// defines for it. It is sent with those keys as its columns, whatever fields the
+// list allows besides, so the engine's own grouping rules accept it.
+func TestGroupedQueryWithNoColumnsProjectsItsGroupKeys(t *testing.T) {
+	name, secret := dal.Field("name"), dal.Field("secret")
+	moreThanOne := dal.NewComparison(dal.Count().Expression, dal.GreaterThen, dal.Constant{Value: 1})
+	grouped := func(key dal.Expression) dal.StructuredQuery {
+		return usersQuery().GroupBy(key).Having(moreThanOne).SelectKeysOnly(reflect.String)
+	}
+	lists := map[string][]string{
+		"enumerable list": {"name", "age"},
+		"wildcard list":   {"name", "a*"},
+	}
+	for label, fields := range lists {
+		sets := fieldList(t, fields...)
+		for shape, key := range map[string]dal.Expression{"field": name, "pointer to a field": &name} {
+			t.Run(label+" "+shape, func(t *testing.T) {
+				projection := projectQuery(grouped(key), sets)
+				columns := projection.query.Columns()
+				if projection.status != queryProjectionApplied || len(columns) != 1 || columns[0].Expression != key {
+					t.Fatalf("status = %v, columns = %v, want applied with the group key", projection.status, columns)
+				}
+				// DALgo's grouping rules accept a group key given by value only.
+				if _, byValue := key.(dal.FieldRef); byValue {
+					if err := dal.ValidateAggregation(projection.query); err != nil {
+						t.Fatalf("the projected query is not a valid aggregation: %v", err)
+					}
+				}
+			})
+		}
+		t.Run(label+" hidden group key", func(t *testing.T) {
+			if projection := projectQuery(grouped(secret), sets); projection.status != queryProjectionUnavailable {
+				t.Fatalf("status = %v, want unavailable for a group key the list refuses", projection.status)
+			}
+		})
+	}
+}
+
+// recordsetRecorder remembers the query of each recordset read that reaches it.
+type recordsetRecorder struct {
+	countingSession
+	seen []dal.Query
+}
+
+func (s *recordsetRecorder) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
+	s.seen = append(s.seen, query)
+	return s.countingSession.ExecuteQueryToRecordsetReader(ctx, query, options...)
+}
+
+// On both read paths a grouped query with no columns reaches the wrapped session
+// as a valid aggregation over its group keys, with a HAVING over an aggregate.
+func TestGroupedQueryWithNoColumnsReachesTheWrappedSessionAsItsGroupKeys(t *testing.T) {
+	policy := MustPolicy("fields", Collection("users", Allow(Query, "list").Fields("name", "age")))
+	name := dal.Field("name")
+	query := usersQuery().GroupBy(name).
+		Having(dal.NewComparison(dal.Count().Expression, dal.GreaterThen, dal.Constant{Value: 1})).
+		SelectKeysOnly(reflect.String)
+	assertGroupKeys := func(t *testing.T, reached dal.Query) {
+		t.Helper()
+		structured, ok := reached.(dal.StructuredQuery)
+		if !ok {
+			t.Fatalf("query %T is not structured", reached)
+		}
+		columns := structured.Columns()
+		if len(columns) != 1 || columns[0].Expression != dal.Expression(name) {
+			t.Fatalf("columns = %v, want the group key", columns)
+		}
+		if err := dal.ValidateAggregation(structured); err != nil {
+			t.Fatalf("the query that reached the session is not a valid aggregation: %v", err)
+		}
+	}
+	t.Run("records reader", func(t *testing.T) {
+		wrapped := &projectingSession{stored: storedUser}
+		rows := readRows(t, SecureReadSession(wrapped, policy), query)
+		if len(rows) != 1 || !reflect.DeepEqual(rows[0], map[string]any{"name": "Ann"}) {
+			t.Fatalf("rows = %v, want [map[name:Ann]]", rows)
+		}
+		assertGroupKeys(t, wrapped.seen[0])
+	})
+	t.Run("recordset reader", func(t *testing.T) {
+		wrapped := &recordsetRecorder{}
+		if _, err := SecureReadSession(wrapped, policy).ExecuteQueryToRecordsetReader(context.Background(), query); err != nil {
+			t.Fatal(err)
+		}
+		if len(wrapped.seen) != 1 {
+			t.Fatalf("%d queries reached the session, want 1", len(wrapped.seen))
+		}
+		assertGroupKeys(t, wrapped.seen[0])
+	})
 }

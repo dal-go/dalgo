@@ -230,11 +230,18 @@ select list, `HAVING` and `ORDER BY`; in `WHERE` or `GROUP BY` it is refused as
 unsupported.
 
 A selected field or aggregate comes back under the name the caller gave it. When
-the field list does not allow that name, the access layer asks the adapter for
-the column under an alias of its own, different for every query, and renames it
-on the way back; a field the adapter returns under the caller's name is
-redacted like any other field. An adapter that ignores the column projection
-therefore returns no value for such a column.
+the field list allows the column's expression but not that name, the access
+layer asks the adapter for the column under an alias of its own, different for
+every query, and renames it on the way back; a field the adapter returns under
+the caller's name is redacted like any other field. An adapter that ignores the
+column projection therefore returns no value for such a column. A column whose
+expression the list does not allow is sent under its own name and removed from
+the result by that name; this is what bounds a secured session over another
+secured session to the fields both lists allow, for the columns the outer
+session adds to a query that names none or uses a wildcard.
+
+A grouped query that names no columns selects its group keys, as DALgo defines
+it, and is sent with those keys as its columns.
 
 Custom SQL text is always opaque. DALgo does not inspect or attempt to infer
 tables from the SQL string, so ordinary path/collection rules can never
