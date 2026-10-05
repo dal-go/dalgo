@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -8,6 +9,10 @@ import (
 
 func TestOrderedSourceTimestampValuesFollowGenericRawFieldPolicy(t *testing.T) {
 	instant := time.Date(2024, 1, 1, 1, 0, 0, 0, time.FixedZone("plus2", 2*3600))
+	malformedTag := reflect.StructTag(`json:"\q"`)
+	if name := malformedTag.Get("json"); name != "" {
+		t.Fatalf("malformed StructTag unexpectedly has JSON name %q", name)
+	}
 	type nested struct {
 		Stamp *time.Time `json:"stamp"`
 	}
@@ -28,9 +33,6 @@ func TestOrderedSourceTimestampValuesFollowGenericRawFieldPolicy(t *testing.T) {
 		{"custom nested JSON", nestedRow{Meta: stampObject{When: instant, Text: "literal"}}, "meta.when"},
 		{"custom map JSON", writtenMap{"at": instant, "text": "literal"}, "at"},
 		{"ambiguous embedded", promotedRow{promotedDupA: promotedDupA{Dup: instant}, promotedDupB: promotedDupB{Dup: instant}}, "Dup"},
-		{"invalid tag", struct {
-			Stamp time.Time `json:"bad name"`
-		}{instant}, "Stamp"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			q := From(NewRootCollectionRef("events", "e")).NewQuery().SelectColumns(Column{
@@ -53,6 +55,27 @@ func TestOrderedSourceTimestampValuesFollowGenericRawFieldPolicy(t *testing.T) {
 				t.Fatalf("source timestamps = %v, generic sort values = %v", formatted, want)
 			}
 		})
+	}
+	malformedType := reflect.StructOf([]reflect.StructField{{Name: "Stamp", Type: reflect.TypeOf(time.Time{}), Tag: malformedTag}})
+	malformedRow := reflect.New(malformedType).Elem()
+	malformedRow.Field(0).Set(reflect.ValueOf(instant))
+	encoded, err := json.Marshal(malformedRow.Interface())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var jsonFields map[string]any
+	if err := json.Unmarshal(encoded, &jsonFields); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := jsonFields["Stamp"]; !ok || len(jsonFields) != 1 {
+		t.Fatalf("malformed tag did not fall back to Stamp: %s", encoded)
+	}
+	malformedSource := From(NewRootCollectionRef("events", "e")).NewQuery().SelectColumns(Column{
+		Alias: "first", Expression: NewOrderedAggregate(FIRST, []OrderExpression{AscendingField("Stamp")}, Field("value")),
+	})
+	values := newAggregationSourceQuery(malformedSource, false).(aggregationSourceQuery).OrderedAggregateSourceValues(malformedRow.Interface())
+	if stamp, ok := values["Stamp"].(time.Time); !ok || !stamp.Equal(instant) {
+		t.Fatalf("malformed-tag timestamp extraction = %v, want %v", values, instant)
 	}
 	q := From(NewRootCollectionRef("events", "e")).NewQuery().SelectColumns(Column{
 		Alias: "first", Expression: NewOrderedAggregate(FIRST,
