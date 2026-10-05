@@ -249,11 +249,19 @@ func (r *localAggregationReader) updateOrderedState(group *localGroup, state *ag
 // sort values are built first, from the raw row. A field the provider's own row
 // holds under the reserved name is removed from the row before they are added.
 func (r *localAggregationReader) normalizedRow(rec record.Record) (map[string]any, error) {
+	if r.money != nil && hasUnsafeMoneyFloat(rec.Data()) {
+		return nil, fmt.Errorf("money input contains a fractional or unsafe binary floating-point value")
+	}
 	values, err := buildSortValues(rec.Data(), r.sortFields)
 	if err != nil {
 		return nil, err
 	}
-	row, err := normalizedRecordMap(rec)
+	var row map[string]any
+	if r.money != nil {
+		row, err = normalizedJoinRecordMapForMode(rec, true)
+	} else {
+		row, err = normalizedRecordMap(rec)
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -52,11 +52,11 @@ func ExecuteFederatedQueryWithOptions(ctx context.Context, query StructuredQuery
 	if err := validateMoney(options.Money); err != nil {
 		return nil, err
 	}
-	if options.Money != nil && !canStreamFederatedAggregate(query) {
+	if options.Money != nil && !canStreamMoneyAggregate(query) {
 		return nil, fmt.Errorf("money requires the federated streaming aggregate plan")
 	}
 	routed := federatedQueryExecutor{resolve: resolve}
-	if canStreamFederatedAggregate(query) {
+	if options.Money != nil && canStreamMoneyAggregate(query) || options.Money == nil && canStreamFederatedAggregate(query) {
 		return executeStreamingFederatedAggregate(ctx, query, routed, options)
 	}
 	if canStreamFederatedRows(query) {
