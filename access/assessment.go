@@ -108,7 +108,7 @@ func (p describedPolicy) InspectionPure() bool           { return CanInspectPoli
 
 // WithPolicyMetadata attaches immutable owner snapshot metadata to a policy.
 func WithPolicyMetadata(policy Policy, metadata PolicyMetadata) (Policy, error) {
-	if policy == nil {
+	if isNilNode(policy) {
 		return nil, fmt.Errorf("access: policy is required")
 	}
 	if metadata.ID == "" {

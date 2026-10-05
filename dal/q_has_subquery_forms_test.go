@@ -1,7 +1,11 @@
 package dal
 
 import (
+	"context"
+	"reflect"
 	"testing"
+
+	"github.com/dal-go/dalgo/recordset"
 )
 
 func hasSubqueryLeaf() StructuredQuery {
@@ -20,7 +24,7 @@ func (a *countingAggregate) String() string   { return "counting" }
 func (a *countingAggregate) FuncName() string { return COUNT }
 func (a *countingAggregate) FuncArgs() []Expression {
 	*a.visits++
-	if *a.visits > 1000 {
+	if *a.visits > 2*maxQueryTreeDepth {
 		panic("the walk does not stop at a cycle")
 	}
 	return a.args
@@ -38,7 +42,7 @@ func (a valueAggregate) String() string   { return "counting" }
 func (a valueAggregate) FuncName() string { return COUNT }
 func (a valueAggregate) FuncArgs() []Expression {
 	*a.visits++
-	if *a.visits > 1000 {
+	if *a.visits > 2*maxQueryTreeDepth {
 		panic("the walk does not stop at a cycle")
 	}
 	return a.args
@@ -68,7 +72,7 @@ func (f *countingFrom) Join(JoinedSource) FromSource { return f }
 func (f *countingFrom) NewQuery() *QueryBuilder      { return NewQueryBuilder(f) }
 func (f *countingFrom) Joins() []JoinedSource {
 	*f.visits++
-	if *f.visits > 1000 {
+	if *f.visits > 2*maxQueryTreeDepth {
 		panic("the walk does not stop at a cycle")
 	}
 	return f.joins
@@ -227,10 +231,47 @@ func TestHasSubqueryStopsAtACycle(t *testing.T) {
 // there, so a query the walk cannot follow to its end is handled as one with
 // nested queries.
 func TestHasSubqueryBoundsTheDepthOfTheTree(t *testing.T) {
+	if maxQueryTreeDepth != 10000 {
+		t.Fatalf("maxQueryTreeDepth = %d, want 10000: no query written by hand reaches it", maxQueryTreeDepth)
+	}
 	if HasSubquery(nestedGroups(maxQueryTreeDepth - 3)) {
 		t.Fatal("a tree whose longest path is at the bound holds no subquery")
 	}
 	if !HasSubquery(nestedGroups(maxQueryTreeDepth - 2)) {
 		t.Fatal("a tree whose longest path is past the bound is reported as holding a query")
 	}
+}
+
+// A flat query whose condition nests many groups holds no subquery, as on main.
+// Past the access layer's bound of 64 levels it is still reported as none, and a
+// database that is not secured sends it to the backend as one query, not to the
+// generic engine.
+func TestHasSubqueryAnswersNoForADeeplyNestedFlatQuery(t *testing.T) {
+	query := nestedGroups(200)
+	if HasSubquery(query) {
+		t.Fatal("a flat query whose WHERE nests 200 groups holds no subquery")
+	}
+	ctx := context.Background()
+	t.Run("records reader", func(t *testing.T) {
+		reader := &aggregationCoverageReader{}
+		backend := &aggregationCoverageBackend{records: reader}
+		got, err := validatedDB{Backend: backend}.ExecuteQueryToRecordsReader(ctx, query)
+		if err != nil || got != reader {
+			t.Fatalf("reader = %T, err = %v: the query did not reach the backend", got, err)
+		}
+		if !reflect.DeepEqual(backend.seen, Query(query)) {
+			t.Fatal("the backend was not given the query as it is")
+		}
+	})
+	t.Run("recordset reader", func(t *testing.T) {
+		reader := &aggregationRecordsetReader{recordset: recordset.NewColumnarRecordset("direct")}
+		backend := &aggregationCoverageBackend{recordset: reader}
+		got, err := validatedDB{Backend: backend}.ExecuteQueryToRecordsetReader(ctx, query)
+		if err != nil || got != reader {
+			t.Fatalf("reader = %T, err = %v: the query did not reach the backend", got, err)
+		}
+		if !reflect.DeepEqual(backend.seen, Query(query)) {
+			t.Fatal("the backend was not given the query as it is")
+		}
+	})
 }

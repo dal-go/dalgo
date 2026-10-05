@@ -262,6 +262,16 @@ func TestEveryEntryPointThatTakesPoliciesRefusesNoPolicy(t *testing.T) {
 			}()
 		}
 	})
+	t.Run("WithPolicyMetadata and DeclareInspectionPure refuse a nil policy", func(t *testing.T) {
+		for label, policy := range map[string]Policy{"a nil policy": nil, "a nil pointer policy": unsetPolicy} {
+			if _, err := WithPolicyMetadata(policy, PolicyMetadata{}); err == nil {
+				t.Fatalf("WithPolicyMetadata of %s: want an error", label)
+			}
+			if _, err := DeclareInspectionPure(policy); err == nil {
+				t.Fatalf("DeclareInspectionPure of %s: want an error", label)
+			}
+		}
+	})
 	t.Run("a policy provider that returns none, or a nil one, denies", func(t *testing.T) {
 		for label, policies := range map[string][]Policy{"none": nil, "an empty list": {}, "a nil policy": {nil}, "a nil beside a policy": {allowAllOperations(), nil}, "a nil pointer policy": {unsetPolicy}, "a nil pointer beside a policy": {allowAllOperations(), unsetPolicy}} {
 			wrapped := &fakeSession{}

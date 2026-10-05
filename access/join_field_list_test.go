@@ -255,3 +255,39 @@ func TestAssessPlanHoldsJoinConditionsToTheFieldList(t *testing.T) {
 		})
 	}
 }
+
+// A condition nested past the access bound, and a condition that holds itself,
+// are each denied by every secured read path before anything is read.
+func TestSecuredReadPathsDenyAConditionTheFieldCheckCannotFollow(t *testing.T) {
+	ctx := context.Background()
+	selfHolding := func() dal.StructuredQuery {
+		conditions := make([]dal.Condition, 2)
+		group := dal.NewGroupCondition(dal.Or, conditions...)
+		conditions[0] = group
+		conditions[1] = dal.WhereField("name", dal.Equal, 1)
+		return dal.From(customers).NewQuery().Where(group).SelectKeysOnly(reflect.String)
+	}
+	shapes := map[string]func() dal.StructuredQuery{
+		"a condition nested past the access bound": func() dal.StructuredQuery {
+			return dal.From(customers).NewQuery().Where(nestedConditions(maxQueryNesting + 1)).SelectKeysOnly(reflect.String)
+		},
+		"a condition that holds itself": selfHolding,
+	}
+	for path, run := range sourcePaths {
+		t.Run(path, func(t *testing.T) {
+			for name, build := range shapes {
+				t.Run(name, func(t *testing.T) {
+					wrapped := &countingSession{}
+					err := run(ctx, wrapped, customerFields(), build())
+					var denied *DeniedError
+					if !errors.As(err, &denied) {
+						t.Fatalf("error = %v, want an access denial", err)
+					}
+					if wrapped.reads != 0 {
+						t.Fatalf("%d reads reached the wrapped session, want 0", wrapped.reads)
+					}
+				})
+			}
+		})
+	}
+}

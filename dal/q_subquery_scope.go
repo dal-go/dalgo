@@ -6,9 +6,11 @@ import (
 )
 
 // maxQueryTreeDepth bounds how many nodes (queries, source trees, conditions and
-// expressions) the walk of a query tree follows along one path. It is the bound
-// the access layer applies to a query's structure.
-const maxQueryTreeDepth = 64
+// expressions) the walk of a query tree follows along one path. It is far past
+// any query written by hand or parsed from DTQL, so the bound is reached only by
+// a tree that holds itself by value. The access layer applies its own, much
+// smaller bound to a query's structure.
+const maxQueryTreeDepth = 10000
 
 // inspectQueryTree reports whether found accepts a query nested anywhere in q:
 // a derived source, a subquery in any clause (the select list, WHERE, ON,

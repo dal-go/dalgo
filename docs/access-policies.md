@@ -284,8 +284,12 @@ scan order carries, so every field of the scan order of the base source is held
 to the list. In the scan order of a joined source a field is attributed as in a
 join condition, with an unqualified field belonging to that joined source. A
 joined source carries no field list of its own: a rule that lists fields for one
-is refused. A condition nested more than 64 levels deep, or one that holds
-itself, cannot be checked and is refused as an unsupported enforcement.
+is refused. A condition nested more than 64 levels deep cannot be checked, and
+a secured session refuses it as an unsupported enforcement. A condition that
+holds itself by value is not followed to its end by `dal.HasSubquery`, which
+reports it as a query with nested queries, so a secured session takes it to the
+nested route, where a policy with no rule for opaque queries denies it as a
+source it cannot analyse. Both are denied before anything is read.
 
 A query with nested queries is executed one source at a time through the same
 secured session, which authorises and narrows each scan. The nesting between the
