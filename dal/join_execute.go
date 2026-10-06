@@ -575,6 +575,9 @@ func (e *joinExecution) scanTree(node FromSource, path string) (resultErr error)
 			resultErr = joinErrorFrom(err, "join_plan", path, fmt.Sprintf("close scan %s: %v", alias, err))
 		}
 	}()
+	if err := requireUnannotatedQueryInput(reader); err != nil {
+		return err
+	}
 	for {
 		if err := e.ctx.Err(); err != nil {
 			return err
@@ -1547,6 +1550,9 @@ func (e *joinExecution) executeSimpleCapped(q StructuredQuery, outer *joinRow, c
 			resultErr = closeErr
 		}
 	}()
+	if err := requireUnannotatedQueryInput(reader); err != nil {
+		return nil, err
+	}
 	child := &joinExecution{ctx: e.ctx, q: q, executor: e.executor, outer: outer, recursive: true, budget: e.budget, aliases: []string{joinAlias(q.From().Base())}, memo: e.memo}
 	for len(records) < cap {
 		if err := e.ctx.Err(); err != nil {

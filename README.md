@@ -490,3 +490,34 @@ Start with these topic pages when you need more than the README:
 Contributions are welcome, especially adapter improvements, end-to-end coverage,
 and documentation that makes backend capabilities clearer. See
 [`CONTRIBUTING.md`](./CONTRIBUTING.md) for project conventions.
+
+## Optional source data rights
+
+`dbschema.CollectionDef.SourceRights` describes optional effective source data
+terms for tables/views. Providers can omit this metadata. The standalone
+`datarights` package carries source identity, declaration (name/SPDX/URL/text),
+true declaration scope, evidence pins and notices. It evaluates no licence and
+grants no access; provider code owns inheritance, authorization and validation.
+
+Query readers may implement the separate optional `dal.QueryMetadataProvider`
+capability. Existing `Reader`, `RecordsReader`, `RecordsetReader` and database
+interfaces do not grow. `dal.ReadQueryMetadata` obtains a detached snapshot before
+reading rows; `WithRecordsQueryMetadata` and `WithRecordsetQueryMetadata` attach
+a fixed snapshot while forwarding the original reader's methods.
+
+`datarights.QueryMetadata.SourceRights` is the complete authorized planned input
+inventory captured before output, not a licence assigned to the derived result.
+`UsedSourceIDs` identifies sources actually read or considered, including empty
+or projected-away inputs, independently of output rows. Nil means omitted;
+non-nil empty inventories serialize as empty arrays. IDs, scopes, evidence
+origins and pin roles remain provider-defined, with no OVDB requirement. Providers
+own deterministic ordering, evidence budgets and snapshot consistency across
+pages. Missing declarations mean unknown, not permission.
+
+Generic joins/recursive execution and local aggregation currently cannot preflight
+source rights. They refuse annotated inputs with `dal.ErrNotSupported` and a
+`source_rights` diagnostic instead of losing metadata. Native provider execution
+can expose metadata through either reader kind. A rights-aware provider must
+supply a complete immutable inventory at reader creation; later introduction of
+rights violates that contract. The wrappers snapshot supplied metadata and do
+not inspect row contents or certify the supplied terms.

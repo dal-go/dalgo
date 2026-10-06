@@ -1,6 +1,9 @@
 package dbschema
 
-import "github.com/dal-go/dalgo/dal"
+import (
+	"github.com/dal-go/dalgo/dal"
+	"github.com/dal-go/dalgo/datarights"
+)
 
 // CollectionDef is the portable description of one collection (a.k.a.
 // table) — its name, ordered fields, primary key, and inline
@@ -22,6 +25,10 @@ import "github.com/dal-go/dalgo/dal"
 // if the operation itself isn't supported) when validating against
 // the engine.
 type CollectionDef struct {
+	// SourceRights optionally describes effective data terms for this table/view.
+	// Providers that do not know source terms may omit it. This is metadata only.
+	SourceRights []datarights.SourceRight `json:"sourceRights,omitempty"`
+
 	// Name is the collection / table name.
 	Name string
 	// Fields lists the fields (columns) in declared order.

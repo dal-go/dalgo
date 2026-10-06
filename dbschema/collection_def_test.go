@@ -1,6 +1,8 @@
 package dbschema
 
 import (
+	"encoding/json"
+	"github.com/dal-go/dalgo/datarights"
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
@@ -54,4 +56,21 @@ func TestCollectionDef_ZeroValue(t *testing.T) {
 	assert.Nil(t, c.Fields)
 	assert.Nil(t, c.PrimaryKey)
 	assert.Nil(t, c.Indexes)
+}
+
+func TestCollectionSourceRightsAreOptional(t *testing.T) {
+	for _, def := range []CollectionDef{{Name: "legacy"}, {Name: "view", SourceRights: []datarights.SourceRight{{SourceID: "a"}}}} {
+		data, err := json.Marshal(def)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fields map[string]any
+		if err := json.Unmarshal(data, &fields); err != nil {
+			t.Fatal(err)
+		}
+		_, present := fields["sourceRights"]
+		if present != (len(def.SourceRights) != 0) {
+			t.Fatal(string(data))
+		}
+	}
 }
