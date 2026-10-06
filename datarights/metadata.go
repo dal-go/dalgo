@@ -3,7 +3,11 @@
 // licence to query output. Providers own those policies and evidence validation.
 package datarights
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+)
 
 // Declaration describes source terms. An absent declaration is not permission.
 type Declaration struct {
@@ -61,6 +65,35 @@ type SourceRight struct {
 	Transformations  []string    `json:"transformations"`
 }
 
+// MarshalJSON emits required evidence arrays as [] even for unpinned Go values.
+// Optional top-level inventories are handled separately by QueryMetadata.
+func (r SourceRight) MarshalJSON() ([]byte, error) {
+	type wire SourceRight
+	w := wire(r)
+	if w.Pins == nil {
+		w.Pins = []Pin{}
+	}
+	if w.Transformations == nil {
+		w.Transformations = []string{}
+	}
+	return json.Marshal(w)
+}
+
+// UnmarshalJSON rejects null or missing required evidence arrays. This is wire
+// shape validation only; provider authority and legal/evidence checks are separate.
+func (r *SourceRight) UnmarshalJSON(data []byte) error {
+	if err := checkArrayFields(data, true, "pins", "transformations"); err != nil {
+		return err
+	}
+	type wire SourceRight
+	var w wire
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+	*r = SourceRight(w)
+	return nil
+}
+
 // QueryMetadata is an optional inventory of source data terms, not output terms.
 // SourceRights contains the authorized planned inventory captured before output.
 // UsedSourceIDs identifies inputs actually read or considered, including empty
@@ -87,6 +120,38 @@ func (m QueryMetadata) MarshalJSON() ([]byte, error) {
 		w.UsedSourceIDs = &m.UsedSourceIDs
 	}
 	return json.Marshal(w)
+}
+
+// UnmarshalJSON accepts omitted inventories and empty arrays, but rejects
+// explicit null arrays, matching the JS query-page contract.
+func (m *QueryMetadata) UnmarshalJSON(data []byte) error {
+	if err := checkArrayFields(data, false, "sourceRights", "usedSourceIds"); err != nil {
+		return err
+	}
+	type wire QueryMetadata
+	var w wire
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+	*m = QueryMetadata(w)
+	return nil
+}
+
+func checkArrayFields(data []byte, required bool, names ...string) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if fields == nil {
+		return fmt.Errorf("source rights metadata must be an object")
+	}
+	for _, name := range names {
+		raw := bytes.TrimSpace(fields[name])
+		if (required && len(raw) == 0) || bytes.Equal(raw, []byte("null")) {
+			return fmt.Errorf("source rights field %s must be an array", name)
+		}
+	}
+	return nil
 }
 
 // Clone returns a detached snapshot safe from subsequent caller mutations.

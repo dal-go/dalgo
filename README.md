@@ -502,14 +502,18 @@ grants no access; provider code owns inheritance, authorization and validation.
 Query readers may implement the separate optional `dal.QueryMetadataProvider`
 capability. Existing `Reader`, `RecordsReader`, `RecordsetReader` and database
 interfaces do not grow. `dal.ReadQueryMetadata` obtains a detached snapshot before
-reading rows; `WithRecordsQueryMetadata` and `WithRecordsetQueryMetadata` attach
+reading rows; federated progress reporting preserves that optional capability
+and detaches the current metadata on each access. `WithRecordsQueryMetadata` and `WithRecordsetQueryMetadata` attach
 a fixed snapshot while forwarding the original reader's methods.
 
 `datarights.QueryMetadata.SourceRights` is the complete authorized planned input
 inventory captured before output, not a licence assigned to the derived result.
 `UsedSourceIDs` identifies sources actually read or considered, including empty
 or projected-away inputs, independently of output rows. Nil means omitted;
-non-nil empty inventories serialize as empty arrays. IDs, scopes, evidence
+non-nil empty inventories serialize as empty arrays. Required per-source pins and
+transformations always serialize as arrays, including for zero-value slices. JSON
+decoding rejects explicit null inventories and missing/null required evidence
+arrays. IDs, scopes, evidence
 origins and pin roles remain provider-defined, with no OVDB requirement. Providers
 own deterministic ordering, evidence budgets and snapshot consistency across
 pages. Missing declarations mean unknown, not permission.

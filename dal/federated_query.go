@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dal-go/dalgo/datarights"
 	"github.com/dal-go/dalgo/recordset"
 	"github.com/dal-go/record"
 )
@@ -68,7 +69,7 @@ func ExecuteFederatedQueryWithOptions(ctx context.Context, query StructuredQuery
 		if err != nil || options.OnProgress == nil {
 			return reader, err
 		}
-		return &federatedProgressReader{RecordsReader: reader, phase: "process", report: options.OnProgress}, nil
+		return withFederatedProgress(reader, "process", "", options.OnProgress), nil
 	}
 	routed.progress = options.OnProgress
 	if ref, ok := query.From().Base().(CollectionRef); ok && (len(ref.ScanOrders()) != 0 || ref.ScanLimit() > 0) {
@@ -127,7 +128,26 @@ func (e federatedQueryExecutor) ExecuteQueryToRecordsReader(ctx context.Context,
 		return reader, err
 	}
 	ref, _ := query.(StructuredQuery).From().Base().(CollectionRef)
-	return &federatedProgressReader{RecordsReader: reader, phase: "download", database: ref.Database(), report: e.progress}, nil
+	return withFederatedProgress(reader, "download", ref.Database(), e.progress), nil
+}
+
+// Preserve optional metadata only when the provider actually supplied the
+// capability. Forward current actual-use IDs while detaching each returned value.
+func withFederatedProgress(reader RecordsReader, phase, database string, report func(FederatedProgress)) RecordsReader {
+	progress := &federatedProgressReader{RecordsReader: reader, phase: phase, database: database, report: report}
+	if metadata, ok := reader.(QueryMetadataProvider); ok {
+		return &federatedProgressMetadataReader{federatedProgressReader: progress, provider: metadata}
+	}
+	return progress
+}
+
+type federatedProgressMetadataReader struct {
+	*federatedProgressReader
+	provider QueryMetadataProvider
+}
+
+func (r *federatedProgressMetadataReader) QueryMetadata() datarights.QueryMetadata {
+	return r.provider.QueryMetadata().Clone()
 }
 
 type federatedProgressReader struct {

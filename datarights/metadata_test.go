@@ -1,7 +1,9 @@
 package datarights
 
 import (
+	"bytes"
 	"encoding/json"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -54,4 +56,35 @@ func TestFreeSourceLinkIsRequiredOnWire(t *testing.T) {
 		t.Fatalf("required field was omitted: %s %v", data, err)
 	}
 	// An empty URL is invalid provider evidence; the core does not certify terms.
+}
+
+func TestSharedSourceRightsWireAndNullPolicy(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/source-rights-wire.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := QueryMetadata{SourceRights: []SourceRight{{SourceID: "a", Source: Source{ServerID: "provider", DatabaseID: "db", Recordset: "A"}, Declaration: Declaration{URL: "https://example.com/terms"}, DeclarationScope: "database", DeclaredAt: Source{ServerID: "provider", DatabaseID: "db"}, EvidenceOrigin: "server-declared"}}, UsedSourceIDs: []string{}}
+	encoded, err := json.Marshal(original)
+	if err != nil || !bytes.Equal(encoded, bytes.TrimSpace(fixture)) {
+		t.Fatalf("Go/JS required-array wire mismatch: %s %v", encoded, err)
+	}
+	var metadata QueryMetadata
+	if err := json.Unmarshal(fixture, &metadata); err != nil {
+		t.Fatal(err)
+	}
+	roundtrip, err := json.Marshal(metadata)
+	if err != nil || !bytes.Equal(roundtrip, encoded) {
+		t.Fatalf("wire roundtrip: %s %v", roundtrip, err)
+	}
+	for _, invalid := range []string{`{`, `[]`, `null`, `{"sourceRights":null}`, `{"usedSourceIds":null}`, `{"usedSourceIds":"invalid"}`, `{"sourceRights":[{"pins":null,"transformations":[]}]}`, `{"sourceRights":[{"pins":[],"transformations":null}]}`, `{"sourceRights":[{"pins":[],"transformations":"invalid"}]}`, `{"sourceRights":[{}]}`} {
+		if err := json.Unmarshal([]byte(invalid), &metadata); err == nil {
+			t.Fatalf("invalid metadata accepted: %s", invalid)
+		}
+	}
+	for _, invalid := range []string{`{`, `[]`, `null`, `{"pins":[],"transformations":null}`} {
+		var right SourceRight
+		if err := json.Unmarshal([]byte(invalid), &right); err == nil {
+			t.Fatalf("invalid right accepted: %s", invalid)
+		}
+	}
 }
