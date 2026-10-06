@@ -438,6 +438,10 @@ func executeAggregationLocal(ctx context.Context, executor QueryExecutor, q Stru
 	if err != nil {
 		return nil, err
 	}
+	if err := requireUnannotatedQueryInput(raw); err != nil {
+		_ = raw.Close()
+		return nil, err
+	}
 	return newLocalAggregationReader(ctx, q, raw, plan), nil
 }
 

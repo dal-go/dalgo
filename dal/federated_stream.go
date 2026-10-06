@@ -61,6 +61,10 @@ func executeStreamingFederatedAggregate(ctx context.Context, q StructuredQuery, 
 		if err != nil {
 			return nil, err
 		}
+		if err := requireUnannotatedQueryInput(reader); err != nil {
+			_ = reader.Close()
+			return nil, err
+		}
 		plan, err := PlanAggregation(q, QueryCapabilities{StableRowOrder: true})
 		if err != nil {
 			_ = reader.Close()
@@ -134,6 +138,10 @@ func newFederatedJoinStream(ctx context.Context, q StructuredQuery, routed feder
 	source, err := routed.ExecuteQueryToRecordsReader(ctx, rootQuery.SelectIntoRecord(nil))
 	if err != nil {
 		return nil, fmt.Errorf("scan federated fact source: %w", err)
+	}
+	if err := requireUnannotatedQueryInput(source); err != nil {
+		_ = source.Close()
+		return nil, err
 	}
 	stream := &federatedJoinStream{source: source, execution: e, root: root, progress: options.OnProgress, validated: validated}
 	if ref, ok := root.Base().(CollectionRef); ok {
