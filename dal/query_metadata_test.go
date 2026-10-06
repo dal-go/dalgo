@@ -71,7 +71,6 @@ func TestOptionalQueryReaderMetadata(t *testing.T) {
 type annotatedInputBackend struct {
 	*ignoringJoinBackend
 	annotated string
-	closed    bool
 }
 
 func (b *annotatedInputBackend) ExecuteQueryToRecordsReader(ctx context.Context, q Query) (RecordsReader, error) {
