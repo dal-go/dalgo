@@ -25,6 +25,11 @@ import (
 // if the operation itself isn't supported) when validating against
 // the engine.
 type CollectionDef struct {
+	// SourceDefinition optionally retains the backing provider's native DDL
+	// and catalog details that portable Fields/Indexes cannot represent.
+	// It is descriptive metadata, not an instruction to execute source SQL.
+	SourceDefinition *SourceDefinition `json:"sourceDefinition,omitempty"`
+
 	// SourceRights optionally describes effective data terms for this table/view.
 	// Providers that do not know source terms may omit it. This is metadata only.
 	SourceRights []datarights.SourceRight `json:"sourceRights,omitempty"`
