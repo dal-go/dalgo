@@ -89,3 +89,12 @@ type SourceRowCursor interface {
 type SourceRowsReader interface {
 	OpenSourceRows(ctx context.Context, ref *dal.CollectionRef) (SourceRowCursor, error)
 }
+
+// SourceConstraintChecker is an optional pre-export capability. It asks the
+// source provider to verify its own stored data with its native constraint
+// semantics, including affinity and collation where applicable. A nil error
+// means only that the source snapshot passed that provider's checks; it does
+// not claim that an export destination enforces equivalent constraints.
+type SourceConstraintChecker interface {
+	CheckSourceConstraints(ctx context.Context) error
+}
