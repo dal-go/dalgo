@@ -37,6 +37,13 @@ type Notice struct {
 	URL  string `json:"url,omitempty"`
 }
 
+// LinkNotice is a free-source notice with a required canonical HTTPS link.
+// Providers validate URL safety and evidence before exposing the metadata.
+type LinkNotice struct {
+	Text string `json:"text"`
+	URL  string `json:"url"`
+}
+
 // SourceRight describes effective source terms and their authored scope.
 // Scope and EvidenceOrigin are provider-defined; conventional scopes are
 // server, database and recordset. Pins may be empty for unpinned declarations.
@@ -50,7 +57,7 @@ type SourceRight struct {
 	EvidenceOrigin   string      `json:"evidenceOrigin"`
 	Pins             []Pin       `json:"pins"`
 	Attribution      *Notice     `json:"attribution,omitempty"`
-	FreeSource       *Notice     `json:"freeSource,omitempty"`
+	FreeSource       *LinkNotice `json:"freeSource,omitempty"`
 	Transformations  []string    `json:"transformations"`
 }
 
