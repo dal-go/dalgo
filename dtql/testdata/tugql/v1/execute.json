@@ -280,6 +280,162 @@
           }
         ]
       }
+    },
+    {
+      "name": "having-count-after-where",
+      "source": "parameters (\n  @MinInvoices integer default 2\n)\nfrom Invoice as i\nwhere i.InvoiceId > 1\ngroup by i.CustomerId\nhaving COUNT(*) >= @MinInvoices\norder by i.CustomerId asc\nselect i.CustomerId, COUNT(*) as InvoiceCount",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input": {
+        "tables": {
+          "Invoice": [
+            {
+              "InvoiceId": 1,
+              "CustomerId": 1
+            },
+            {
+              "InvoiceId": 2,
+              "CustomerId": 1
+            },
+            {
+              "InvoiceId": 3,
+              "CustomerId": 1
+            },
+            {
+              "InvoiceId": 4,
+              "CustomerId": 2
+            },
+            {
+              "InvoiceId": 5,
+              "CustomerId": 2
+            },
+            {
+              "InvoiceId": 6,
+              "CustomerId": 3
+            }
+          ]
+        }
+      },
+      "expected": {
+        "records": [
+          {
+            "CustomerId": 1,
+            "InvoiceCount": 2
+          },
+          {
+            "CustomerId": 2,
+            "InvoiceCount": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "having-null-group-key",
+      "source": "parameters (\n  @MinInvoices integer default 2\n)\nfrom Invoice as i\nwhere i.InvoiceId > 1\ngroup by i.CustomerId\nhaving COUNT(*) >= @MinInvoices\norder by i.CustomerId asc\nselect i.CustomerId, COUNT(*) as InvoiceCount",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input": {
+        "tables": {
+          "Invoice": [
+            {
+              "InvoiceId": 2,
+              "CustomerId": null
+            },
+            {
+              "InvoiceId": 3,
+              "CustomerId": null
+            }
+          ]
+        }
+      },
+      "expected": {
+        "records": [
+          {
+            "CustomerId": null,
+            "InvoiceCount": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "having-empty-input-has-no-groups",
+      "source": "parameters (\n  @MinInvoices integer default 2\n)\nfrom Invoice as i\nwhere i.InvoiceId > 1\ngroup by i.CustomerId\nhaving COUNT(*) >= @MinInvoices\norder by i.CustomerId asc\nselect i.CustomerId, COUNT(*) as InvoiceCount",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input": {
+        "tables": {
+          "Invoice": []
+        }
+      },
+      "expected": {
+        "records": []
+      }
     }
   ]
 }

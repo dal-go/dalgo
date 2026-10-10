@@ -90,6 +90,29 @@ relationship metadata identifies exactly one complete matching relationship.
 An omitted `select` expands authorized fields in order and merges guaranteed
 equal INNER-join keys while preserving both fields' lineage.
 
+`WHERE` filters source rows before grouping; `HAVING` filters completed groups
+after `GROUP BY`. The clause order is `FROM`, optional `WHERE`, optional
+`GROUP BY`, optional `HAVING`, optional `ORDER BY` and `LIMIT`, then optional
+final `SELECT`:
+
+```sql
+parameters (
+  @MinInvoices integer default 2
+)
+from Invoice as i
+where i.InvoiceId > 1
+group by i.CustomerId
+having COUNT(*) >= @MinInvoices
+order by i.CustomerId asc
+select i.CustomerId, COUNT(*) as InvoiceCount
+```
+
+`ResolveTugQL` binds the parameter default, validates the grouping, and lowers
+the predicate into the existing `dal.StructuredQuery`. The generic DALgo
+executor applies `WHERE` to invoice rows, computes each customer's `COUNT(*)`,
+keeps groups whose count is at least the threshold, then orders and projects
+the result. This count example avoids assumptions about exact money arithmetic.
+
 ### Resolution limits
 
 TugQL resolution uses a 128-level structural-depth limit and a 5,000-node

@@ -934,6 +934,134 @@
         ],
         "yaml": ""
       }
+    },
+    {
+      "name": "having-count-after-where",
+      "source": "parameters (\n  @MinInvoices integer default 2\n)\nfrom Invoice as i\nwhere i.InvoiceId > 1\ngroup by i.CustomerId\nhaving COUNT(*) >= @MinInvoices\norder by i.CustomerId asc\nselect i.CustomerId, COUNT(*) as InvoiceCount",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "parameters": [
+            {
+              "name": "MinInvoices",
+              "type": "integer",
+              "default": 2
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "CustomerId",
+                "source": "i"
+              },
+              {
+                "aggregate": {
+                  "args": [
+                    {
+                      "star": true
+                    }
+                  ],
+                  "function": "COUNT"
+                },
+                "as": "InvoiceCount"
+              }
+            ],
+            "from": {
+              "alias": "i",
+              "name": "Invoice"
+            },
+            "groupBy": [
+              {
+                "field": "CustomerId",
+                "source": "i"
+              }
+            ],
+            "having": {
+              "left": {
+                "aggregate": {
+                  "args": [
+                    {
+                      "star": true
+                    }
+                  ],
+                  "function": "COUNT"
+                }
+              },
+              "op": ">=",
+              "right": {
+                "param": "MinInvoices"
+              }
+            },
+            "orderBy": [
+              {
+                "field": "CustomerId",
+                "source": "i"
+              }
+            ],
+            "where": {
+              "left": {
+                "field": "InvoiceId",
+                "source": "i"
+              },
+              "op": ">",
+              "right": {
+                "value": 1
+              }
+            }
+          }
+        },
+        "diagnostics": [],
+        "yaml": "format: tugqtree\nversion: 1\nparameters:\n    - name: MinInvoices\n      type: integer\n      default: 2\nquery:\n    from:\n        name: Invoice\n        alias: i\n    where:\n        op: '>'\n        left:\n            field: InvoiceId\n            source: i\n        right:\n            value: 1\n    groupBy:\n        - field: CustomerId\n          source: i\n    having:\n        op: '>='\n        left:\n            aggregate:\n                function: COUNT\n                args:\n                    - star: true\n        right:\n            param: MinInvoices\n    orderBy:\n        - field: CustomerId\n          source: i\n    columns:\n        - field: CustomerId\n          source: i\n        - aggregate:\n            function: COUNT\n            args:\n                - star: true\n          as: InvoiceCount\n"
+      }
+    },
+    {
+      "name": "having-before-group-by-is-invalid",
+      "source": "from Invoice as i\nhaving COUNT(*) >= 2\ngroup by i.CustomerId\nselect i.CustomerId",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "clause_order",
+            "message": "query clauses are out of order",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 22
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "having-after-order-by-is-invalid",
+      "source": "from Invoice as i\ngroup by i.CustomerId\norder by i.CustomerId asc\nhaving COUNT(*) >= 1\nselect i.CustomerId",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "clause_order",
+            "message": "query clauses are out of order",
+            "span": {
+              "start": {
+                "line": 4,
+                "column": 1
+              },
+              "end": {
+                "line": 4,
+                "column": 21
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
     }
   ]
 }
