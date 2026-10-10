@@ -8,6 +8,8 @@ import (
 	"unicode"
 )
 
+const tugqlMultilineSelectBlockDiagnostic = "multiline SELECT requires '(' on the SELECT header line"
+
 type tugqlClause struct {
 	name   string
 	tokens []tugqlToken
@@ -27,6 +29,11 @@ func parseTugQLQueryAt(source string, depth int) (document, []tugqlDiagnostic) {
 	diags = append(diags, validateTugQLKeywordStyle(tokens)...)
 	clauses, lineDiags := collectTugQLClauses(lines)
 	diags = append(diags, lineDiags...)
+	for _, clause := range clauses {
+		if clause.name == "select" && requiresTugQLMultilineSelectBlock(clause) {
+			return document{}, append(diags, diagnostic("invalid_select", tugqlMultilineSelectBlockDiagnostic, clause.span))
+		}
+	}
 	diags = append(diags, validateTugQLIndentation(lines, clauses)...)
 	if hasErrors(diags) {
 		return document{}, diags
@@ -145,6 +152,21 @@ func parseTugQLQueryAt(source string, depth int) (document, []tugqlDiagnostic) {
 		}
 	}
 	return doc, diags
+}
+
+func requiresTugQLMultilineSelectBlock(clause tugqlClause) bool {
+	if clause.span.Start.Line == clause.span.End.Line {
+		return false
+	}
+	if len(clause.tokens) == 0 || clause.tokens[0].Text != "(" || clause.tokens[0].Span.Start.Line != clause.span.Start.Line {
+		return true
+	}
+	for _, token := range clause.tokens[1:] {
+		if token.Span.Start.Line == clause.span.Start.Line {
+			return true
+		}
+	}
+	return false
 }
 
 func parseTugQLRelationshipShorthand(tokens []tugqlToken) (condYAML, error) {

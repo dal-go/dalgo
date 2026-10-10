@@ -123,6 +123,148 @@
         "source": "with C as (\n  -- keep comment\n  from T\n  select Id\n)\nfrom C\nselect Id",
         "diagnostics": null
       }
+    },
+    {
+      "name": "comment-after-compact-select-does-not-change-block-close",
+      "source": "with C as (\n  from T\n  select Id\n  -- retain after compact SELECT\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "with C as (\n\tfrom T\n\tselect Id\n\t-- retain after compact SELECT\n)\nfrom C\nselect Id",
+        "diagnostics": null
+      }
+    },
+    {
+      "name": "invalid-bare-multiline-select-is-preserved-with-diagnostic",
+      "source": "from Invoice\nselect\n  InvoiceId",
+      "options": {
+        "keywordCase": "preserve-existing",
+        "indentation": "preserve-existing"
+      },
+      "expected": {
+        "source": "from Invoice\nselect\n  InvoiceId",
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 12
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-bare-multiline-select-preserves-cte-close",
+      "source": "with C as (\n  from T\n  select\n    Id\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "with C as (\n  from T\n  select\n    Id\n)\nfrom C\nselect Id",
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 3
+              },
+              "end": {
+                "line": 4,
+                "column": 7
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-bare-multiline-select-preserves-scalar-and-select-closes",
+      "source": "from T\nselect (\n  Child as (\n    from U\n    select\n      Id\n  )\n)",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "from T\nselect (\n  Child as (\n    from U\n    select\n      Id\n  )\n)",
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "nested scalar query: multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 8,
+                "column": 2
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-parenthesized-select-preserves-function-close-and-cte-close",
+      "source": "with C as (\n  from T\n  select COALESCE(\n    Id\n  )\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "with C as (\n  from T\n  select COALESCE(\n    Id\n  )\n)\nfrom C\nselect Id",
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 3
+              },
+              "end": {
+                "line": 5,
+                "column": 4
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-wrapped-parenthesized-select-preserves-expression-and-cte-closes",
+      "source": "with C as (\n  from T\n  select (Id\n  )\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "with C as (\n  from T\n  select (Id\n  )\n)\nfrom C\nselect Id",
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 3
+              },
+              "end": {
+                "line": 4,
+                "column": 4
+              }
+            }
+          }
+        ]
+      }
     }
   ],
   "format": "tugql-format-suite",

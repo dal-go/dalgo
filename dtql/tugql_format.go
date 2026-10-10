@@ -29,6 +29,12 @@ func FormatTugQL(doc TugQLDocument, options TugQLFormatOptions) (string, []TugQL
 		_, diagnostics := ParseTugQL(doc.Source)
 		return doc.Source, diagnostics
 	}
+	_, sourceDiagnostics := ParseTugQL(doc.Source)
+	for _, item := range sourceDiagnostics {
+		if item.Code == "invalid_select" && strings.HasSuffix(item.Message, tugqlMultilineSelectBlockDiagnostic) {
+			return doc.Source, sourceDiagnostics
+		}
+	}
 	out := doc.Source
 	if keywordCase != "preserve-existing" {
 		out = formatTugQLKeywordCase(out, keywordCase)
@@ -213,6 +219,7 @@ func formatTugQLIndentation(source, style string) string {
 		if len(stack) > 0 {
 			level = stack[len(stack)-1].base + 1
 		}
+		name, _ := tugqlClauseStart(lineTokens)
 		closeBlock := len(lineTokens) == 1 && lineTokens[0].Text == ")"
 		if closeBlock && len(stack) > 0 {
 			level = stack[len(stack)-1].base
@@ -220,7 +227,6 @@ func formatTugQLIndentation(source, style string) string {
 			raw[i] = strings.Repeat(unit, level) + strings.TrimLeft(line, " \t")
 			continue
 		}
-		name, _ := tugqlClauseStart(lineTokens)
 		if name == "on" && joinPending[minInt(len(stack), len(joinPending)-1)] {
 			level++
 		}

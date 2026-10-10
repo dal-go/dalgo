@@ -185,6 +185,22 @@
       }
     },
     {
+      "name": "compact-parenthesized-select",
+      "source": "from Invoice\nselect (InvoiceId)",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "query": {
+            "columns": [ { "field": "InvoiceId" } ],
+            "from": { "name": "Invoice" }
+          }
+        },
+        "diagnostics": [],
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: Invoice\n    columns:\n        - field: InvoiceId\n"
+      }
+    },
+    {
       "name": "scalar-call",
       "source": "from Invoice as i\nselect COALESCE(i.Note, 'a,b') as Note",
       "expected": {
@@ -1057,6 +1073,96 @@
                 "line": 4,
                 "column": 21
               }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-select-needs-block-single-item",
+      "source": "from Invoice\nselect\n  InvoiceId",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": { "line": 2, "column": 1 },
+              "end": { "line": 3, "column": 12 }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-select-needs-block-comma-list",
+      "source": "from Invoice\nselect\n  InvoiceId,\n  Total",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": { "line": 2, "column": 1 },
+              "end": { "line": 4, "column": 8 }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-select-needs-block-wrapped-compact-header",
+      "source": "from Invoice\nselect InvoiceId,\n  Total",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": { "line": 2, "column": 1 },
+              "end": { "line": 3, "column": 8 }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-select-needs-block-header-inline-item",
+      "source": "from Invoice\nselect (InvoiceId\n)",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": { "line": 2, "column": 1 },
+              "end": { "line": 3, "column": 2 }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-select-span-crlf-tab-unicode",
+      "source": "from T\r\nselect\r\n\t\"名\"",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": { "line": 2, "column": 1 },
+              "end": { "line": 3, "column": 5 }
             }
           }
         ],
