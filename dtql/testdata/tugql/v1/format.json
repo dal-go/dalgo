@@ -265,6 +265,264 @@
           }
         ]
       }
+    },
+    {
+      "name": "compact-select-expression-in-cte",
+      "source": "WITH X AS (\nfrom Invoice as i\nSELECT (i.InvoiceId + 1) as Amount\n)\nFROM X\nSELECT Amount",
+      "options": {
+        "keywordCase": "lowercase",
+        "indentation": "two-spaces"
+      },
+      "expected": {
+        "source": "with X as (\n  from Invoice as i\n  select (i.InvoiceId + 1) as Amount\n)\nfrom X\nselect Amount",
+        "diagnostics": null
+      }
+    },
+    {
+      "name": "multiline-string-lf",
+      "source": "from T\nwhere Name = 'a\nb'\nselect Id",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "from T\nwhere Name = 'a\nb'\nselect Id",
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 14
+              },
+              "end": {
+                "line": 2,
+                "column": 16
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 2
+              },
+              "end": {
+                "line": 3,
+                "column": 3
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiline-string-crlf",
+      "source": "from T\r\nwhere Name = 'a\r\nb'\r\nselect Id",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "from T\r\nwhere Name = 'a\r\nb'\r\nselect Id",
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 14
+              },
+              "end": {
+                "line": 2,
+                "column": 16
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 2
+              },
+              "end": {
+                "line": 3,
+                "column": 3
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiline-string-cr",
+      "source": "from T\rwhere Name = 'a\rb'\rselect Id",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "from T\rwhere Name = 'a\rb'\rselect Id",
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 14
+              },
+              "end": {
+                "line": 2,
+                "column": 16
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 2
+              },
+              "end": {
+                "line": 3,
+                "column": 3
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiline-string-escaped-quotes",
+      "source": "from T\nwhere Name = 'a''b\nc'\nselect Id",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "from T\nwhere Name = 'a''b\nc'\nselect Id",
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 14
+              },
+              "end": {
+                "line": 2,
+                "column": 19
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 2
+              },
+              "end": {
+                "line": 3,
+                "column": 3
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiline-quoted-identifier",
+      "source": "from \"In\nvoice\"\nselect *",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "from \"In\nvoice\"\nselect *",
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 6
+              },
+              "end": {
+                "line": 1,
+                "column": 9
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 6
+              },
+              "end": {
+                "line": 2,
+                "column": 7
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiline-string-mixed-case-cte",
+      "source": "WiTh X As (\n  FrOm T\n  SeLeCt Id\n  WhErE Name = 'a\nb'\n)\nFrOm X\nSeLeCt Id",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "WiTh X As (\n  FrOm T\n  SeLeCt Id\n  WhErE Name = 'a\nb'\n)\nFrOm X\nSeLeCt Id",
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 4,
+                "column": 16
+              },
+              "end": {
+                "line": 4,
+                "column": 18
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 5,
+                "column": 2
+              },
+              "end": {
+                "line": 5,
+                "column": 3
+              }
+            }
+          }
+        ]
+      }
     }
   ],
   "format": "tugql-format-suite",
