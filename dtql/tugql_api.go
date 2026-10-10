@@ -399,7 +399,7 @@ func (tree *TugQLTree) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&wire); err != nil {
 		return err
 	}
-	*tree = TugQLTree{Format: wire.Format, Version: wire.Version, Parameters: wire.Parameters, Definitions: wire.Definitions, Query: wire.Query}
+	*tree = TugQLTree(wire)
 	return nil
 }
 

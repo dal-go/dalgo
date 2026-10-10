@@ -1762,7 +1762,6 @@ func tugqlOutputField(expression exprYAML, sources []tugqlResolvedSource) (name,
 			if field.Name == expression.Field && field.Authorized {
 				if expression.Source == "" && source.scopeDepth < matchDepth {
 					match = nil
-					sourceAlias = ""
 					matchDepth = source.scopeDepth
 				}
 				if match != nil {

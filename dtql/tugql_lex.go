@@ -172,13 +172,14 @@ func scanTugQLUTF8(source string) (int, tugqlPosition, bool) {
 		}
 		runeCount++
 		offset += size
-		if r == '\r' {
+		switch r {
+		case '\r':
 			line, column = line+1, 1
-		} else if r == '\n' {
+		case '\n':
 			if offset < 2 || source[offset-2] != '\r' {
 				line, column = line+1, 1
 			}
-		} else {
+		default:
 			column++
 		}
 	}

@@ -141,7 +141,7 @@ func preflightTugQLTreeWithSelection(tree tugqlTree, selected bool) []tugqlDiagn
 				}
 			}
 		case columnYAML:
-			if value.exprYAML.Binary != nil || value.exprYAML.Aggregate != nil || value.exprYAML.Query != nil || value.exprYAML.tugqlQueryBody != nil || value.exprYAML.tugqlCall != nil || value.exprYAML.Value != nil || value.exprYAML.Values != nil || value.exprYAML.Param != "" || value.exprYAML.Field != "" || value.exprYAML.Star {
+			if value.Binary != nil || value.Aggregate != nil || value.Query != nil || value.tugqlQueryBody != nil || value.tugqlCall != nil || value.Value != nil || value.Values != nil || value.Param != "" || value.Field != "" || value.Star {
 				// A projection item and its expression share one mapping node in
 				// the canonical wire shape.
 				ok = add(value.exprYAML, item.depth, item.selected)

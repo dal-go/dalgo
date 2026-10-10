@@ -462,7 +462,7 @@ func validTugQLParamName(name string) bool {
 		return false
 	}
 	for i, r := range name {
-		if !(unicode.IsLetter(r) || r == '_') && !(i > 0 && unicode.IsDigit(r)) {
+		if (!unicode.IsLetter(r) && r != '_') && (i <= 0 || !unicode.IsDigit(r)) {
 			return false
 		}
 	}
