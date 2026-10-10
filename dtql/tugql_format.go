@@ -31,7 +31,7 @@ func FormatTugQL(doc TugQLDocument, options TugQLFormatOptions) (string, []TugQL
 	}
 	_, sourceDiagnostics := ParseTugQL(doc.Source)
 	for _, item := range sourceDiagnostics {
-		if item.Code == "invalid_select" && strings.Contains(item.Message, "multiline SELECT requires '(' on the SELECT header line") {
+		if item.Code == "invalid_select" && strings.HasSuffix(item.Message, tugqlMultilineSelectBlockDiagnostic) {
 			return doc.Source, sourceDiagnostics
 		}
 	}
@@ -194,49 +194,18 @@ func formatTugQLIndentation(source, style string) string {
 			byLine[token.Span.Start.Line-1] = append(byLine[token.Span.Start.Line-1], token)
 		}
 	}
-	selectContinuations := make(map[int]bool)
-	for i, lineTokens := range byLine {
-		name, consumed := tugqlClauseStart(lineTokens)
-		if name != "select" || (len(lineTokens) == 2 && lineTokens[1].Text == "(") {
-			continue
-		}
-		indent := len(raw[i]) - len(strings.TrimLeft(raw[i], " \t"))
-		depth := tugQLParenDepth(lineTokens[consumed:])
-		for j := i + 1; j < len(byLine); j++ {
-			if len(byLine[j]) == 0 {
-				continue
-			}
-			if depth > 0 {
-				selectContinuations[i] = true
-				break
-			}
-			if nextName, _ := tugqlClauseStart(byLine[j]); nextName != "" {
-				break
-			}
-			nextIndent := len(raw[j]) - len(strings.TrimLeft(raw[j], " \t"))
-			if nextIndent <= indent {
-				break
-			}
-			selectContinuations[i] = true
-			break
-		}
-	}
 	type block struct {
 		base int
 		kind string
 	}
 	var stack []block
 	joinPending := make([]bool, maxTugQLDepth+1)
-	selectContinuationLevel := -1
 	for i, line := range raw {
 		lineTokens := byLine[i]
 		if len(lineTokens) == 0 {
 			levels := 0
 			if len(stack) > 0 {
 				levels = stack[len(stack)-1].base + 1
-			}
-			if selectContinuationLevel >= 0 {
-				levels = selectContinuationLevel
 			}
 			body := strings.TrimLeft(line, " \t")
 			if body == "" {
@@ -251,15 +220,6 @@ func formatTugQLIndentation(source, style string) string {
 			level = stack[len(stack)-1].base + 1
 		}
 		name, _ := tugqlClauseStart(lineTokens)
-		if selectContinuationLevel >= 0 {
-			closeBlock := len(lineTokens) == 1 && lineTokens[0].Text == ")"
-			if name == "" && !(closeBlock && len(stack) > 0) {
-				body := strings.TrimLeft(line, " \t")
-				raw[i] = strings.Repeat(unit, selectContinuationLevel) + body
-				continue
-			}
-			selectContinuationLevel = -1
-		}
 		closeBlock := len(lineTokens) == 1 && lineTokens[0].Text == ")"
 		if closeBlock && len(stack) > 0 {
 			level = stack[len(stack)-1].base
@@ -291,11 +251,6 @@ func formatTugQLIndentation(source, style string) string {
 			stack = append(stack, block{base: level, kind: "select"})
 		} else if len(stack) > 0 && stack[len(stack)-1].kind == "select" && isTugQLScalarHeader(lineTokens) {
 			stack = append(stack, block{base: level, kind: "scalar"})
-		}
-		if name == "select" && selectContinuations[i] {
-			selectContinuationLevel = level + 1
-		} else if name != "" {
-			selectContinuationLevel = -1
 		}
 	}
 	return strings.Join(raw, "\n")

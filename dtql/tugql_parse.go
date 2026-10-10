@@ -8,6 +8,8 @@ import (
 	"unicode"
 )
 
+const tugqlMultilineSelectBlockDiagnostic = "multiline SELECT requires '(' on the SELECT header line"
+
 type tugqlClause struct {
 	name   string
 	tokens []tugqlToken
@@ -29,7 +31,7 @@ func parseTugQLQueryAt(source string, depth int) (document, []tugqlDiagnostic) {
 	diags = append(diags, lineDiags...)
 	for _, clause := range clauses {
 		if clause.name == "select" && requiresTugQLMultilineSelectBlock(clause) {
-			return document{}, append(diags, diagnostic("invalid_select", "multiline SELECT requires '(' on the SELECT header line", clause.span))
+			return document{}, append(diags, diagnostic("invalid_select", tugqlMultilineSelectBlockDiagnostic, clause.span))
 		}
 	}
 	diags = append(diags, validateTugQLIndentation(lines, clauses)...)
