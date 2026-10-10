@@ -123,6 +123,38 @@
         "source": "with C as (\n  -- keep comment\n  from T\n  select Id\n)\nfrom C\nselect Id",
         "diagnostics": null
       }
+    },
+    {
+      "name": "comment-after-compact-select-does-not-change-block-close",
+      "source": "with C as (\n  from T\n  select Id\n  -- retain after compact SELECT\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "with C as (\n\tfrom T\n\tselect Id\n\t-- retain after compact SELECT\n)\nfrom C\nselect Id",
+        "diagnostics": null
+      }
+    },
+    {
+      "name": "invalid-bare-multiline-select-is-preserved-with-diagnostic",
+      "source": "from Invoice\nselect\n  InvoiceId",
+      "options": {
+        "keywordCase": "preserve-existing",
+        "indentation": "preserve-existing"
+      },
+      "expected": {
+        "source": "from Invoice\nselect\n  InvoiceId",
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": { "line": 2, "column": 1 },
+              "end": { "line": 3, "column": 12 }
+            }
+          }
+        ]
+      }
     }
   ],
   "format": "tugql-format-suite",
