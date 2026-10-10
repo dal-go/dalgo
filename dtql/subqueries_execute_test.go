@@ -33,7 +33,11 @@ func (e fixtureLeafExecutor) ExecuteQueryToRecordsReader(_ context.Context, quer
 	if !ok || q.From() == nil || q.From().Base() == nil || len(q.From().Joins()) != 0 {
 		return nil, errors.New("fixture executor received a non-leaf query")
 	}
-	return dal.NewRecordsReader(e.tables[q.From().Base().Name()]), nil
+	rows := e.tables[q.From().Base().Name()]
+	if len(rows) == 0 {
+		return &dal.EmptyReader{}, nil
+	}
+	return dal.NewRecordsReader(rows), nil
 }
 
 func (fixtureLeafExecutor) ExecuteQueryToRecordsetReader(context.Context, dal.Query, ...recordset.Option) (dal.RecordsetReader, error) {

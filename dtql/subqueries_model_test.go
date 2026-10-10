@@ -172,6 +172,20 @@ func TestRecursiveNestedErrorPathsAndJoinFieldNoop(t *testing.T) {
 	}
 }
 
+func TestLegacyDeserializeRejectsTugQLScalarBodyWrapperWithoutDefinitions(t *testing.T) {
+	input := []byte(`from: {name: T}
+columns:
+  - query:
+      query:
+        from: {name: T}
+        columns:
+          - field: Id
+`)
+	if query, err := Deserialize(input); err == nil || query != nil {
+		t.Fatalf("legacy Deserialize accepted a TugQL scalar body wrapper: query=%+v err=%v", query, err)
+	}
+}
+
 func TestRecursiveYAMLNodeValidationRejectsNestedInvalidShapes(t *testing.T) {
 	mapping := func(values ...*yaml.Node) *yaml.Node { return &yaml.Node{Kind: yaml.MappingNode, Content: values} }
 	scalar := func(value string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value} }

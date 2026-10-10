@@ -1,10 +1,107 @@
-# DTQL — YAML serialization of `dal.StructuredQuery`
+# DTQL YAML and TugQL text authoring
 
-DTQL is a 1:1, lossless, human-readable **YAML serialization** of dalgo's
-`dal.StructuredQuery` for the core relational read-only subset. It is plain YAML
-over the existing `dal` query model — there is no bespoke grammar and no
-hand-written parser; the standard `gopkg.in/yaml.v3` library produces and
-consumes it.
+The existing DTQL `Serialize` and `Deserialize` APIs provide a 1:1,
+human-readable **YAML serialization** of dalgo's `dal.StructuredQuery` for the
+core relational read-only subset. DTQL-YAML remains plain YAML over the
+existing `dal` query model and uses the standard `gopkg.in/yaml.v3` library.
+
+TugQL is a separate, additive text-authoring adapter with a versioned
+`TugQLDocument`/`TugQLTree` model. `ParseTugQL` parses source,
+`ResolveTugQL` validates it against caller-authorized schemas and lowers
+supported constructs into the same `dal.StructuredQuery`, and `FormatTugQL`
+formats the source. It does not replace or change the existing DTQL-YAML APIs.
+The TugQL grammar, supported resolution profile, and approval record are in
+[`spec/features/dtql/README.md`](../spec/features/dtql/README.md).
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/dal-go/dalgo/dtql"
+)
+
+func main() {
+	doc, diagnostics := dtql.ParseTugQL("from Invoice as i\nselect i.Id\n")
+	if len(diagnostics) != 0 {
+		fmt.Println(diagnostics)
+		return
+	}
+	context := dtql.TugQLResolveContext{
+		AuthorizedSchemas: []dtql.TugQLAuthorizedSchema{{
+			Version: "schema-r1",
+			Tables: []dtql.TugQLTable{{
+				Name: "Invoice",
+				Fields: []dtql.TugQLField{{Name: "Id", Type: "integer", Authorized: true}},
+			}},
+		}},
+	}
+	resolved, diagnostics := dtql.ResolveTugQL(doc, context)
+	if len(diagnostics) != 0 {
+		fmt.Println(diagnostics)
+		return
+	}
+	fmt.Printf("resolved %d output column(s)\n", len(resolved.Columns))
+}
+```
+
+### TugQL syntax
+
+TugQL puts parameters first and the optional projection last. This example
+combines a named CTE with a correlated scalar subquery:
+
+```sql
+parameters (
+  @CustomerId integer required
+)
+with Invoices as (
+  from Invoice as i -- billing records
+  where i.CustomerId = @CustomerId
+  select (
+    i.InvoiceId
+    i.CustomerId
+  )
+)
+from Invoices as i
+select (
+  i.InvoiceId as ID
+  CustomerName as (
+    from Customer as c
+    where c.CustomerId = i.CustomerId
+    select c.LastName
+  )
+)
+```
+
+Use one parameter or multiline projection item per line, without commas.
+Compact projections remain available: `select i.InvoiceId, i.CustomerId`.
+Block openers stay on their header line and closers have their own aligned line.
+Indent each level with two spaces or one tab, consistently within the query.
+Reserved words must be consistently lowercase or uppercase; identifiers retain
+their spelling. `as` is mandatory for aliases and CTEs. Ordinary fields use
+`expression as Alias`; scalar subqueries put the result name before `as (`.
+
+Saved queries use `with Saved from './saved.tql'`, with an indented `using (`
+block for explicit `@Parameter = @CallerParameter` or scalar literal mappings.
+The caller supplies project-relative contents pinned to its project revision.
+An omitted JOIN `on`, or `on CustomerId`, resolves only when caller-authorized
+relationship metadata identifies exactly one complete matching relationship.
+An omitted `select` expands authorized fields in order and merges guaranteed
+equal INNER-join keys while preserving both fields' lineage.
+
+### Resolution limits
+
+TugQL resolution uses a 128-level structural-depth limit and a 5,000-node
+semantic budget. The aggregate budget counts the authored root document, each
+parsed pinned import occurrence once (repeated imports count once per
+occurrence), and any positive node-count growth from the authored root query to the final expanded root query. Each expanded CTE, import, and
+scalar-query body is also checked independently against 5,000 canonical nodes
+and 128 levels before another recursive walk or copy. Version 1 validates all
+declared definitions eagerly, including unused ones, and caps import expansion
+at 128 documents.
+
+The sections below document the legacy DTQL-YAML mapping and behavior.
 
 ```go
 data, err := dtql.Serialize(q)   // dal.StructuredQuery -> DTQL-YAML

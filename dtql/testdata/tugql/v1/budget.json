@@ -1,0 +1,14 @@
+{
+  "format": "tugql-budget-suite",
+  "version": 1,
+  "cases": [
+    {"name": "columns-1665", "kind": "columns", "count": 1665, "expectedCode": ""},
+    {"name": "columns-1666", "kind": "columns", "count": 1666, "expectedCode": "document_node_limit"},
+    {"name": "parameters-1000", "kind": "parameters", "count": 1000, "expectedCode": ""},
+    {"name": "parameters-1200", "kind": "parameters", "count": 1200, "expectedCode": ""},
+    {"name": "parameters-1300", "kind": "parameters", "count": 1300, "expectedCode": ""},
+    {"name": "parameters-2000", "kind": "parameters", "count": 2000, "expectedCode": ""},
+    {"name": "parameters-2496", "kind": "parameters", "count": 2496, "expectedCode": ""},
+    {"name": "parameters-2497", "kind": "parameters", "count": 2497, "expectedCode": "document_node_limit"}
+  ]
+}
