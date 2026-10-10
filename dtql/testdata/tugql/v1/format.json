@@ -169,7 +169,7 @@
         "indentation": "tab"
       },
       "expected": {
-        "source": "with C as (\n\tfrom T\n\tselect\n\t\tId\n)\nfrom C\nselect Id",
+        "source": "with C as (\n  from T\n  select\n    Id\n)\nfrom C\nselect Id",
         "diagnostics": [
           {
             "code": "invalid_select",
@@ -177,11 +177,11 @@
             "span": {
               "start": {
                 "line": 3,
-                "column": 2
+                "column": 3
               },
               "end": {
                 "line": 4,
-                "column": 5
+                "column": 7
               }
             }
           }
@@ -195,7 +195,7 @@
         "indentation": "tab"
       },
       "expected": {
-        "source": "from T\nselect (\n\tChild as (\n\t\tfrom U\n\t\tselect\n\t\t\tId\n\t)\n)",
+        "source": "from T\nselect (\n  Child as (\n    from U\n    select\n      Id\n  )\n)",
         "diagnostics": [
           {
             "code": "invalid_select",
@@ -208,6 +208,58 @@
               "end": {
                 "line": 8,
                 "column": 2
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-parenthesized-select-preserves-function-close-and-cte-close",
+      "source": "with C as (\n  from T\n  select COALESCE(\n    Id\n  )\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "with C as (\n  from T\n  select COALESCE(\n    Id\n  )\n)\nfrom C\nselect Id",
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 3
+              },
+              "end": {
+                "line": 5,
+                "column": 4
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-wrapped-parenthesized-select-preserves-expression-and-cte-closes",
+      "source": "with C as (\n  from T\n  select (Id\n  )\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "with C as (\n  from T\n  select (Id\n  )\n)\nfrom C\nselect Id",
+        "diagnostics": [
+          {
+            "code": "invalid_select",
+            "message": "multiline SELECT requires '(' on the SELECT header line",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 3
+              },
+              "end": {
+                "line": 4,
+                "column": 4
               }
             }
           }

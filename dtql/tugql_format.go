@@ -29,6 +29,12 @@ func FormatTugQL(doc TugQLDocument, options TugQLFormatOptions) (string, []TugQL
 		_, diagnostics := ParseTugQL(doc.Source)
 		return doc.Source, diagnostics
 	}
+	_, sourceDiagnostics := ParseTugQL(doc.Source)
+	for _, item := range sourceDiagnostics {
+		if item.Code == "invalid_select" && strings.Contains(item.Message, "multiline SELECT requires '(' on the SELECT header line") {
+			return doc.Source, sourceDiagnostics
+		}
+	}
 	out := doc.Source
 	if keywordCase != "preserve-existing" {
 		out = formatTugQLKeywordCase(out, keywordCase)
