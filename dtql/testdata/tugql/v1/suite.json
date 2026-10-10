@@ -1432,6 +1432,86 @@
         ],
         "yaml": ""
       }
+    },
+    {
+      "name": "singleline-quoted-escapes-tabs-unicode",
+      "source": "from \"Order\"\"Line\t\u96ea\" as \"A\t\u96ea\"\nwhere \"A\t\u96ea\".\"Note\" = 'FROM -- SELECT''s\t\u96ea'\nselect \"A\t\u96ea\".\"Id\"",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "query": {
+            "columns": [
+              {
+                "field": "Id",
+                "source": "A\t\u96ea"
+              }
+            ],
+            "from": {
+              "alias": "A\t\u96ea",
+              "name": "Order\"Line\t\u96ea"
+            },
+            "where": {
+              "left": {
+                "field": "Note",
+                "source": "A\t\u96ea"
+              },
+              "op": "==",
+              "right": {
+                "value": "FROM -- SELECT's\t\u96ea"
+              }
+            }
+          }
+        },
+        "diagnostics": [],
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: \"Order\\\"Line\\t\u96ea\"\n        alias: \"A\\t\u96ea\"\n    where:\n        op: ==\n        left:\n            field: Note\n            source: \"A\\t\u96ea\"\n        right:\n            value: \"FROM -- SELECT's\\t\u96ea\"\n    columns:\n        - field: Id\n          source: \"A\\t\u96ea\"\n"
+      }
+    },
+    {
+      "name": "compact-select-expression-in-scalar-subquery",
+      "source": "from T as t\nselect (\n  Value as (\n    from U as u\n    select (u.Id + 1) as Id\n  )\n)",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "query": {
+            "columns": [
+              {
+                "as": "Value",
+                "query": {
+                  "query": {
+                    "columns": [
+                      {
+                        "as": "Id",
+                        "binary": {
+                          "left": {
+                            "field": "Id",
+                            "source": "u"
+                          },
+                          "op": "+",
+                          "right": {
+                            "value": 1
+                          }
+                        }
+                      }
+                    ],
+                    "from": {
+                      "alias": "u",
+                      "name": "U"
+                    }
+                  }
+                }
+              }
+            ],
+            "from": {
+              "alias": "t",
+              "name": "T"
+            }
+          }
+        },
+        "diagnostics": [],
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n        alias: t\n    columns:\n        - query:\n            query:\n                from:\n                    name: U\n                    alias: u\n                columns:\n                    - binary:\n                        op: +\n                        left:\n                            field: Id\n                            source: u\n                        right:\n                            value: 1\n                      as: Id\n          as: Value\n"
+      }
     }
   ]
 }

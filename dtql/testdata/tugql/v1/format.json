@@ -523,6 +523,30 @@
           }
         ]
       }
+    },
+    {
+      "name": "singleline-quoted-escapes-tabs-unicode",
+      "source": "from \"Order\"\"Line\t\u96ea\" as \"A\t\u96ea\"\nwhere \"A\t\u96ea\".\"Note\" = 'FROM -- SELECT''s\t\u96ea'\nselect \"A\t\u96ea\".\"Id\"",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "FROM \"Order\"\"Line\t\u96ea\" AS \"A\t\u96ea\"\nWHERE \"A\t\u96ea\".\"Note\" = 'FROM -- SELECT''s\t\u96ea'\nSELECT \"A\t\u96ea\".\"Id\"",
+        "diagnostics": null
+      }
+    },
+    {
+      "name": "compact-select-expression-in-scalar-subquery",
+      "source": "from T as t\nselect (\n  Value as (\n    from U as u\n    select (u.Id + 1) as Id\n  )\n)",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "FROM T AS t\nSELECT (\n\tValue AS (\n\t\tFROM U AS u\n\t\tSELECT (u.Id + 1) AS Id\n\t)\n)",
+        "diagnostics": null
+      }
     }
   ],
   "format": "tugql-format-suite",
