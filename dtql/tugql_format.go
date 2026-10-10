@@ -246,7 +246,8 @@ func formatTugQLIndentation(source, style string) string {
 		}
 		name, _ := tugqlClauseStart(lineTokens)
 		if selectContinuationLevel >= 0 {
-			if name == "" {
+			closeBlock := len(lineTokens) == 1 && lineTokens[0].Text == ")"
+			if name == "" && !(closeBlock && len(stack) > 0) {
 				body := strings.TrimLeft(line, " \t")
 				raw[i] = strings.Repeat(unit, selectContinuationLevel) + body
 				continue
