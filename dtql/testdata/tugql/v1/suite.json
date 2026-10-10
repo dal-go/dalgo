@@ -1038,6 +1038,30 @@
         ],
         "yaml": ""
       }
+    },
+    {
+      "name": "having-after-order-by-is-invalid",
+      "source": "from Invoice as i\ngroup by i.CustomerId\norder by i.CustomerId asc\nhaving COUNT(*) >= 1\nselect i.CustomerId",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "clause_order",
+            "message": "query clauses are out of order",
+            "span": {
+              "start": {
+                "line": 4,
+                "column": 1
+              },
+              "end": {
+                "line": 4,
+                "column": 21
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
     }
   ]
 }
