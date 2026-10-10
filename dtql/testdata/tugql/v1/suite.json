@@ -192,8 +192,14 @@
           "format": "tugqtree",
           "version": 1,
           "query": {
-            "columns": [ { "field": "InvoiceId" } ],
-            "from": { "name": "Invoice" }
+            "columns": [
+              {
+                "field": "InvoiceId"
+              }
+            ],
+            "from": {
+              "name": "Invoice"
+            }
           }
         },
         "diagnostics": [],
@@ -1089,8 +1095,14 @@
             "code": "invalid_select",
             "message": "multiline SELECT requires '(' on the SELECT header line",
             "span": {
-              "start": { "line": 2, "column": 1 },
-              "end": { "line": 3, "column": 12 }
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 12
+              }
             }
           }
         ],
@@ -1107,8 +1119,14 @@
             "code": "invalid_select",
             "message": "multiline SELECT requires '(' on the SELECT header line",
             "span": {
-              "start": { "line": 2, "column": 1 },
-              "end": { "line": 4, "column": 8 }
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 4,
+                "column": 8
+              }
             }
           }
         ],
@@ -1125,8 +1143,14 @@
             "code": "invalid_select",
             "message": "multiline SELECT requires '(' on the SELECT header line",
             "span": {
-              "start": { "line": 2, "column": 1 },
-              "end": { "line": 3, "column": 8 }
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 8
+              }
             }
           }
         ],
@@ -1143,8 +1167,14 @@
             "code": "invalid_select",
             "message": "multiline SELECT requires '(' on the SELECT header line",
             "span": {
-              "start": { "line": 2, "column": 1 },
-              "end": { "line": 3, "column": 2 }
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 2
+              }
             }
           }
         ],
@@ -1153,7 +1183,7 @@
     },
     {
       "name": "multiline-select-span-crlf-tab-unicode",
-      "source": "from T\r\nselect\r\n\t\"名\"",
+      "source": "from T\r\nselect\r\n\t\"\u540d\"",
       "expected": {
         "tree": null,
         "diagnostics": [
@@ -1161,8 +1191,370 @@
             "code": "invalid_select",
             "message": "multiline SELECT requires '(' on the SELECT header line",
             "span": {
-              "start": { "line": 2, "column": 1 },
-              "end": { "line": 3, "column": 5 }
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 5
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-string-lf",
+      "source": "from T\nwhere Name = 'a\nb'\nselect Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 14
+              },
+              "end": {
+                "line": 2,
+                "column": 16
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 2
+              },
+              "end": {
+                "line": 3,
+                "column": 3
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-string-crlf",
+      "source": "from T\r\nwhere Name = 'a\r\nb'\r\nselect Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 14
+              },
+              "end": {
+                "line": 2,
+                "column": 16
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 2
+              },
+              "end": {
+                "line": 3,
+                "column": 3
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-string-cr",
+      "source": "from T\rwhere Name = 'a\rb'\rselect Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 14
+              },
+              "end": {
+                "line": 2,
+                "column": 16
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 2
+              },
+              "end": {
+                "line": 3,
+                "column": 3
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-string-escaped-quotes",
+      "source": "from T\nwhere Name = 'a''b\nc'\nselect Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 14
+              },
+              "end": {
+                "line": 2,
+                "column": 19
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 3,
+                "column": 2
+              },
+              "end": {
+                "line": 3,
+                "column": 3
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-quoted-identifier",
+      "source": "from \"In\nvoice\"\nselect *",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 6
+              },
+              "end": {
+                "line": 1,
+                "column": 9
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 6
+              },
+              "end": {
+                "line": 2,
+                "column": 7
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-string-mixed-case-cte",
+      "source": "WiTh X As (\n  FrOm T\n  SeLeCt Id\n  WhErE Name = 'a\nb'\n)\nFrOm X\nSeLeCt Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 4,
+                "column": 16
+              },
+              "end": {
+                "line": 4,
+                "column": 18
+              }
+            }
+          },
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 5,
+                "column": 2
+              },
+              "end": {
+                "line": 5,
+                "column": 3
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "singleline-quoted-escapes-tabs-unicode",
+      "source": "from \"Order\"\"Line\t\u96ea\" as \"A\t\u96ea\"\nwhere \"A\t\u96ea\".\"Note\" = 'FROM -- SELECT''s\t\u96ea'\nselect \"A\t\u96ea\".\"Id\"",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "query": {
+            "columns": [
+              {
+                "field": "Id",
+                "source": "A\t\u96ea"
+              }
+            ],
+            "from": {
+              "alias": "A\t\u96ea",
+              "name": "Order\"Line\t\u96ea"
+            },
+            "where": {
+              "left": {
+                "field": "Note",
+                "source": "A\t\u96ea"
+              },
+              "op": "==",
+              "right": {
+                "value": "FROM -- SELECT's\t\u96ea"
+              }
+            }
+          }
+        },
+        "diagnostics": [],
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: \"Order\\\"Line\\t\u96ea\"\n        alias: \"A\\t\u96ea\"\n    where:\n        op: ==\n        left:\n            field: Note\n            source: \"A\\t\u96ea\"\n        right:\n            value: \"FROM -- SELECT's\\t\u96ea\"\n    columns:\n        - field: Id\n          source: \"A\\t\u96ea\"\n"
+      }
+    },
+    {
+      "name": "compact-select-expression-in-scalar-subquery",
+      "source": "from T as t\nselect (\n  Value as (\n    from U as u\n    select (u.Id + 1) as Id\n  )\n)",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "query": {
+            "columns": [
+              {
+                "as": "Value",
+                "query": {
+                  "query": {
+                    "columns": [
+                      {
+                        "as": "Id",
+                        "binary": {
+                          "left": {
+                            "field": "Id",
+                            "source": "u"
+                          },
+                          "op": "+",
+                          "right": {
+                            "value": 1
+                          }
+                        }
+                      }
+                    ],
+                    "from": {
+                      "alias": "u",
+                      "name": "U"
+                    }
+                  }
+                }
+              }
+            ],
+            "from": {
+              "alias": "t",
+              "name": "T"
+            }
+          }
+        },
+        "diagnostics": [],
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n        alias: t\n    columns:\n        - query:\n            query:\n                from:\n                    name: U\n                    alias: u\n                columns:\n                    - binary:\n                        op: +\n                        left:\n                            field: Id\n                            source: u\n                        right:\n                            value: 1\n                      as: Id\n          as: Value\n"
+      }
+    },
+    {
+      "name": "multiline-quoted-identifier-crlf-unicode-cte",
+      "source": "WiTh X As (\r\n  FrOm \"\ud83d\ude00\tIn\r\nvoice\r\n  SeLeCt Id\r\n)\r\nFrOm X\r\nSeLeCt Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 8
+              },
+              "end": {
+                "line": 2,
+                "column": 13
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-quoted-identifier-cr-unicode-cte",
+      "source": "WiTh X As (\r  FrOm \"\ud83d\ude00\tIn\rvoice\r  SeLeCt Id\r)\rFrOm X\rSeLeCt Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 8
+              },
+              "end": {
+                "line": 2,
+                "column": 13
+              }
             }
           }
         ],
