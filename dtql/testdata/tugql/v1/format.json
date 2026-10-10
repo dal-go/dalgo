@@ -1,0 +1,130 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "diagnostics": null,
+        "source": "from T\nselect (\n  Value as (\n    with Local as (\n      from U\n      select Id\n    )\n    from Local\n    select Id\n  )\n)"
+      },
+      "name": "nested-scalar-block",
+      "options": {},
+      "source": "from T\nselect (\n  Value as (\n    with Local as (\n      from U\n      select Id\n    )\n    from Local\n    select Id\n  )\n)"
+    },
+    {
+      "expected": {
+        "diagnostics": null,
+        "source": "FROM T\nSELECT Id"
+      },
+      "name": "project-over-user",
+      "options": {
+        "projectTeamKeywordCase": "uppercase",
+        "userKeywordCase": "lowercase"
+      },
+      "source": "from T\nselect Id"
+    },
+    {
+      "expected": {
+        "diagnostics": null,
+        "source": "FROM T\nWHERE Id = 1\nSELECT Id"
+      },
+      "name": "first-word-over-majority",
+      "options": {},
+      "source": "FROM T\nwhere Id = 1\nselect Id"
+    },
+    {
+      "expected": {
+        "diagnostics": null,
+        "source": "from T\nwhere Id = 1\nselect Id"
+      },
+      "name": "consistent-tab-indentation",
+      "options": {
+        "indentation": "preserve-existing"
+      },
+      "source": "from T\n\twhere Id = 1\nselect Id"
+    },
+    {
+      "expected": {
+        "diagnostics": [
+          {
+            "code": "unsupported_statement",
+            "message": "unrecognized or unsupported TugQL construct",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 2,
+                "column": 4
+              }
+            }
+          }
+        ],
+        "source": "from T\nnot a clause"
+      },
+      "name": "repair-invalid-source",
+      "options": {
+        "keywordCase": "preserve-existing",
+        "indentation": "preserve-existing"
+      },
+      "source": "from T\nnot a clause"
+    },
+    {
+      "expected": {
+        "diagnostics": null,
+        "source": "FROM T\nSELECT Id"
+      },
+      "name": "explicit-format",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "two-spaces"
+      },
+      "source": "from T\nselect Id"
+    },
+    {
+      "name": "uppercase-preserves-qualified-identifiers-and-function-names",
+      "source": "from Invoice as i\nselect Date(i.date) as Day\n",
+      "options": {
+        "keywordCase": "uppercase"
+      },
+      "expected": {
+        "source": "FROM Invoice AS i\nSELECT Date(i.date) AS Day\n",
+        "diagnostics": null
+      }
+    },
+    {
+      "name": "space-to-tab-with-comment",
+      "source": "with C as (\n  -- keep comment\n  from T\n  select Id\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "with C as (\n\t-- keep comment\n\tfrom T\n\tselect Id\n)\nfrom C\nselect Id",
+        "diagnostics": null
+      }
+    },
+    {
+      "name": "tab-to-two-spaces-with-comment",
+      "source": "with C as (\n\t-- keep comment\n\tfrom T\n\tselect Id\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "two-spaces"
+      },
+      "expected": {
+        "source": "with C as (\n  -- keep comment\n  from T\n  select Id\n)\nfrom C\nselect Id",
+        "diagnostics": null
+      }
+    },
+    {
+      "name": "mixed-indent-preserve-falls-back-to-two-spaces",
+      "source": "with C as (\n\t-- keep comment\n  from T\n\tselect Id\n)\nfrom C\nselect Id",
+      "options": {
+        "indentation": "preserve-existing"
+      },
+      "expected": {
+        "source": "with C as (\n  -- keep comment\n  from T\n  select Id\n)\nfrom C\nselect Id",
+        "diagnostics": null
+      }
+    }
+  ],
+  "format": "tugql-format-suite",
+  "version": 1
+}

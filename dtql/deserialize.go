@@ -287,6 +287,9 @@ func expressionFieldsSet(e exprYAML) int {
 	if e.Query != nil {
 		set++
 	}
+	if e.tugqlCall != nil {
+		set++
+	}
 	return set
 }
 
@@ -424,11 +427,16 @@ func exprFromYAMLAt(e exprYAML, path string) (dal.Expression, error) {
 		}
 		return dal.Binary(left, dal.ArithmeticOperator(e.Binary.Op), right), nil
 	case e.Query != nil:
+		if e.tugqlQueryBody != nil {
+			return nil, fmt.Errorf("unexpanded TugQL body in scalar query")
+		}
 		query, err := documentToQueryAt(*e.Query, path+".query")
 		if err != nil {
 			return nil, err
 		}
 		return dal.NewQueryExpression(query, e.Query.As), nil
+	case e.tugqlCall != nil:
+		return nil, fmt.Errorf("unsupported_function: scalar function %q is not executable by DALgo", e.tugqlCall.Function)
 	default: // e.Values != nil
 		if !portableScalarArray(e.Values) {
 			return nil, fmt.Errorf("values must be an array of scalars")

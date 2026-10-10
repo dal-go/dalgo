@@ -1,0 +1,285 @@
+{
+  "format": "tugql-execute-suite",
+  "version": 1,
+  "cases": [
+    {
+      "name": "scalar-zero-rows-yields-null",
+      "source": "from Invoice as i\nselect (\n  i.InvoiceId\n  Name as (\n    from Customer as c\n    where c.CustomerId = i.CustomerId\n    select c.Name\n  )\n)",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              },
+              {
+                "name": "Customer",
+                "fields": [
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "Name",
+                    "type": "string",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input": {
+        "tables": {
+          "Invoice": [
+            {
+              "InvoiceId": 1,
+              "CustomerId": 10
+            }
+          ],
+          "Customer": []
+        }
+      },
+      "expected": {
+        "records": [
+          {
+            "InvoiceId": 1,
+            "Name": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "scalar-one-row-yields-value",
+      "source": "from Invoice as i\nselect (\n  i.InvoiceId\n  Name as (\n    from Customer as c\n    where c.CustomerId = i.CustomerId\n    select c.Name\n  )\n)",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              },
+              {
+                "name": "Customer",
+                "fields": [
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "Name",
+                    "type": "string",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input": {
+        "tables": {
+          "Invoice": [
+            {
+              "InvoiceId": 1,
+              "CustomerId": 10
+            }
+          ],
+          "Customer": [
+            {
+              "CustomerId": 10,
+              "Name": "Ada"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "records": [
+          {
+            "InvoiceId": 1,
+            "Name": "Ada"
+          }
+        ]
+      }
+    },
+    {
+      "name": "scalar-many-rows-reports-cardinality",
+      "source": "from Invoice as i\nselect (\n  i.InvoiceId\n  Name as (\n    from Customer as c\n    where c.CustomerId = i.CustomerId\n    select c.Name\n  )\n)",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              },
+              {
+                "name": "Customer",
+                "fields": [
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "Name",
+                    "type": "string",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input": {
+        "tables": {
+          "Invoice": [
+            {
+              "InvoiceId": 1,
+              "CustomerId": 10
+            }
+          ],
+          "Customer": [
+            {
+              "CustomerId": 10,
+              "Name": "Ada"
+            },
+            {
+              "CustomerId": 10,
+              "Name": "Grace"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "error": {
+          "code": "cardinality",
+          "path": "columns[1].query"
+        }
+      }
+    },
+    {
+      "name": "aggregate-sum-no-numeric-contributors-null",
+      "source": "from T as t\nselect SUM(t.Value) as Total",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "T",
+                "fields": [
+                  {
+                    "name": "Value",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input": {
+        "tables": {
+          "T": [
+            {
+              "Value": null
+            }
+          ]
+        }
+      },
+      "expected": {
+        "records": [
+          {
+            "Total": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "aggregate-avg-ignores-nonnumeric-values",
+      "source": "from T as t\nselect AVG(t.Value) as Mean",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "T",
+                "fields": [
+                  {
+                    "name": "Value",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input": {
+        "tables": {
+          "T": [
+            {
+              "Value": 4
+            },
+            {
+              "Value": "x"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "records": [
+          {
+            "Mean": 4
+          }
+        ]
+      }
+    }
+  ]
+}

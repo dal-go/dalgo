@@ -1,0 +1,5 @@
+d6f66d064964974557a9604ef1893831fc7a3871fae4910970795b7db2ab4d28  dtql/testdata/tugql/v1/budget.json
+e0352cf1733eea67e7a07b85cd8176a1687eaec9288245b3294cacb11ac16b6e  dtql/testdata/tugql/v1/execute.json
+432fb2d272329cf0447b3a523238eae068d3c177c268b30449f8e2411e778f0a  dtql/testdata/tugql/v1/format.json
+dfd104b5c1419d3ba03dce66513c1468fdbb4a699a15be625fd072caab661ab4  dtql/testdata/tugql/v1/resolve.json
+d344f3f3d09b0d06c12eedc9564fde75a9a796f3651d0f1bbdab2b3d6d1c9bbe  dtql/testdata/tugql/v1/suite.json

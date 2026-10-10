@@ -21,6 +21,10 @@ type document struct {
 	// Columns is deliberately last: DTQL's SELECT/projection stage remains at
 	// the end of the pipeline rather than inheriting SQL's textual order.
 	Columns []columnYAML `yaml:"columns,omitempty"`
+	// Source spans are parser-only metadata used to report resource-limit
+	// diagnostics before recursively exporting the semantic tree.
+	tugqlQuerySpan  tugqlSpan `yaml:"-"`
+	tugqlSelectSpan tugqlSpan `yaml:"-"`
 }
 
 type moneyYAML struct {
@@ -262,16 +266,23 @@ func resolvedYAMLAlias(node *yaml.Node) *yaml.Node {
 // exprYAML is the YAML representation of an in-scope dal.Expression.
 // Exactly one discriminator is set.
 type exprYAML struct {
-	Field         string         `yaml:"field,omitempty"`
-	Source        string         `yaml:"source,omitempty"`
-	Value         *any           `yaml:"value,omitempty"`
-	Values        any            `yaml:"values,omitempty"`
-	Param         string         `yaml:"param,omitempty"`
-	Star          bool           `yaml:"star,omitempty"`
-	Aggregate     *aggregateYAML `yaml:"aggregate,omitempty"`
-	Binary        *binaryYAML    `yaml:"binary,omitempty"`
-	Query         *document      `yaml:"query,omitempty"`
-	sourcePresent bool
+	Field          string         `yaml:"field,omitempty"`
+	Source         string         `yaml:"source,omitempty"`
+	Value          *any           `yaml:"value,omitempty"`
+	Values         any            `yaml:"values,omitempty"`
+	Param          string         `yaml:"param,omitempty"`
+	Star           bool           `yaml:"star,omitempty"`
+	Aggregate      *aggregateYAML `yaml:"aggregate,omitempty"`
+	Binary         *binaryYAML    `yaml:"binary,omitempty"`
+	Query          *document      `yaml:"query,omitempty"`
+	tugqlQueryBody *tugqlBody
+	tugqlCall      *tugqlCallYAML
+	sourcePresent  bool
+}
+
+type tugqlCallYAML struct {
+	Function string     `yaml:"function"`
+	Args     []exprYAML `yaml:"args"`
 }
 
 type aggregateYAML struct {
@@ -321,6 +332,7 @@ type columnYAML struct {
 	exprYAML           `yaml:",inline"`
 	As                 string        `yaml:"as,omitempty"` // dal.Column.Alias
 	Wildcard           *wildcardYAML `yaml:"wildcard,omitempty"`
+	tugqlLineage       []TugQLOutputLineage
 	asPresent          bool
 	expressionKeyCount int
 }
@@ -425,8 +437,15 @@ func encodeExpressionNode(expression exprYAML, extra []yaml.Node) (*yaml.Node, e
 		key, value = "aggregate", expression.Aggregate
 	case expression.Binary != nil:
 		key, value = "binary", expression.Binary
+	case expression.tugqlQueryBody != nil:
+		key, value = "query", struct {
+			Definitions []tugqlDefinition `yaml:"definitions,omitempty"`
+			Query       *document         `yaml:"query"`
+		}{expression.tugqlQueryBody.Definitions, expression.Query}
 	case expression.Query != nil:
 		key, value = "query", expression.Query
+	case expression.tugqlCall != nil:
+		key, value = "call", expression.tugqlCall
 	}
 	if key != "" {
 		var encoded yaml.Node
@@ -494,9 +513,34 @@ func decodeExpressionNode(node *yaml.Node, expression *exprYAML, extra map[strin
 			err = value.Decode(&decoded)
 			expression.Binary = &decoded
 		case "query":
-			var decoded document
+			if isTugQLBodyYAML(value) {
+				if err = validateTugQLBodyYAMLKeys(value); err != nil {
+					break
+				}
+				var decoded struct {
+					Definitions []tugqlDefinition `yaml:"definitions,omitempty"`
+					Query       *document         `yaml:"query"`
+				}
+				err = value.Decode(&decoded)
+				if err == nil && decoded.Query == nil {
+					err = fmt.Errorf("scalar query body requires query")
+				}
+				if err == nil {
+					expression.Query = decoded.Query
+					expression.tugqlQueryBody = &tugqlBody{Definitions: decoded.Definitions, Query: *decoded.Query}
+				}
+			} else {
+				var decoded document
+				err = value.Decode(&decoded)
+				expression.Query = &decoded
+			}
+		case "call":
+			if err = validateExpressionObjectKeys(value, "call", map[string]bool{"function": true, "args": true}); err != nil {
+				break
+			}
+			var decoded tugqlCallYAML
 			err = value.Decode(&decoded)
-			expression.Query = &decoded
+			expression.tugqlCall = &decoded
 		default:
 			if decode := extra[key]; decode != nil {
 				err = decode(value)
@@ -507,6 +551,39 @@ func decodeExpressionNode(node *yaml.Node, expression *exprYAML, extra map[strin
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func isTugQLBodyYAML(node *yaml.Node) bool {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return false
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == "query" {
+			return true
+		}
+	}
+	return false
+}
+
+func validateTugQLBodyYAMLKeys(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("scalar query body must be a mapping")
+	}
+	seen := map[string]bool{}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		key := node.Content[i].Value
+		if key != "definitions" && key != "query" {
+			return fmt.Errorf("unknown scalar query body field %q", key)
+		}
+		if seen[key] {
+			return fmt.Errorf("duplicate scalar query body field %q", key)
+		}
+		seen[key] = true
+	}
+	if !seen["query"] {
+		return fmt.Errorf("scalar query body requires query")
 	}
 	return nil
 }
