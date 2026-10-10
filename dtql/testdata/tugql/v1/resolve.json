@@ -20295,6 +20295,59 @@
         ],
         "diagnostics": null
       }
+    },
+    {
+      "name": "having-count-parameterized-group-resolution",
+      "source": "parameters (\n  @MinInvoices integer default 2\n)\nfrom Invoice as i\nwhere i.InvoiceId > 1\ngroup by i.CustomerId\nhaving COUNT(*) >= @MinInvoices\norder by i.CustomerId asc\nselect i.CustomerId, COUNT(*) as InvoiceCount",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "version": "s1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "CustomerId",
+                    "type": "integer",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "parseDiagnostics": null,
+      "expected": {
+        "query": "from:\n  name: Invoice\n  alias: i\nwhere:\n  op: '>'\n  left:\n    field: InvoiceId\n    source: i\n  right:\n    value: 1\ngroupBy:\n  - field: CustomerId\n    source: i\nhaving:\n  op: '>='\n  left:\n    aggregate:\n      function: count\n      args:\n        - star: true\n  right:\n    value: 2\norderBy:\n  - field: CustomerId\n    source: i\ncolumns:\n  - field: CustomerId\n    source: i\n  - aggregate:\n      function: count\n      args:\n        - star: true\n    as: InvoiceCount\n",
+        "columns": [
+          {
+            "name": "CustomerId",
+            "type": "integer",
+            "lineage": [
+              {
+                "source": "i",
+                "field": "CustomerId"
+              }
+            ]
+          },
+          {
+            "name": "InvoiceCount",
+            "type": "integer",
+            "lineage": null
+          }
+        ],
+        "schemaVersion": "s1",
+        "dependencies": null,
+        "relationships": null,
+        "diagnostics": null
+      }
     }
   ],
   "format": "tugql-resolve-suite",
