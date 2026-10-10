@@ -547,6 +547,60 @@
         "source": "FROM T AS t\nSELECT (\n\tValue AS (\n\t\tFROM U AS u\n\t\tSELECT (u.Id + 1) AS Id\n\t)\n)",
         "diagnostics": null
       }
+    },
+    {
+      "name": "multiline-quoted-identifier-crlf-unicode-cte",
+      "source": "WiTh X As (\r\n  FrOm \"\ud83d\ude00\tIn\r\nvoice\r\n  SeLeCt Id\r\n)\r\nFrOm X\r\nSeLeCt Id",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "WiTh X As (\r\n  FrOm \"\ud83d\ude00\tIn\r\nvoice\r\n  SeLeCt Id\r\n)\r\nFrOm X\r\nSeLeCt Id",
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 8
+              },
+              "end": {
+                "line": 2,
+                "column": 13
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiline-quoted-identifier-cr-unicode-cte",
+      "source": "WiTh X As (\r  FrOm \"\ud83d\ude00\tIn\rvoice\r  SeLeCt Id\r)\rFrOm X\rSeLeCt Id",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "source": "WiTh X As (\r  FrOm \"\ud83d\ude00\tIn\rvoice\r  SeLeCt Id\r)\rFrOm X\rSeLeCt Id",
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 8
+              },
+              "end": {
+                "line": 2,
+                "column": 13
+              }
+            }
+          }
+        ]
+      }
     }
   ],
   "format": "tugql-format-suite",

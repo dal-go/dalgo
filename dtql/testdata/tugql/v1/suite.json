@@ -1512,6 +1512,54 @@
         "diagnostics": [],
         "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n        alias: t\n    columns:\n        - query:\n            query:\n                from:\n                    name: U\n                    alias: u\n                columns:\n                    - binary:\n                        op: +\n                        left:\n                            field: Id\n                            source: u\n                        right:\n                            value: 1\n                      as: Id\n          as: Value\n"
       }
+    },
+    {
+      "name": "multiline-quoted-identifier-crlf-unicode-cte",
+      "source": "WiTh X As (\r\n  FrOm \"\ud83d\ude00\tIn\r\nvoice\r\n  SeLeCt Id\r\n)\r\nFrOm X\r\nSeLeCt Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 8
+              },
+              "end": {
+                "line": 2,
+                "column": 13
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
+    },
+    {
+      "name": "multiline-quoted-identifier-cr-unicode-cte",
+      "source": "WiTh X As (\r  FrOm \"\ud83d\ude00\tIn\rvoice\r  SeLeCt Id\r)\rFrOm X\rSeLeCt Id",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "unterminated_quote",
+            "message": "quoted value cannot continue across lines",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 8
+              },
+              "end": {
+                "line": 2,
+                "column": 13
+              }
+            }
+          }
+        ],
+        "yaml": ""
+      }
     }
   ]
 }
