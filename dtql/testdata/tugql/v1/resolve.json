@@ -20469,6 +20469,27 @@
                 }
               ]
             }
+          ],
+          "relationships": [
+            {
+              "id": "invoice-customer",
+              "version": "r1",
+              "from": {
+                "source": "i",
+                "table": "Invoice"
+              },
+              "to": {
+                "source": "c",
+                "table": "Customer"
+              },
+              "pairs": [
+                {
+                  "fromField": "CustomerId",
+                  "toField": "CustomerId"
+                }
+              ],
+              "exactTypedEquality": true
+            }
           ]
         },
         "expected": {
@@ -20629,6 +20650,27 @@
                   ]
                 }
               ]
+            }
+          ],
+          "relationships": [
+            {
+              "id": "invoice-customer",
+              "version": "r1",
+              "from": {
+                "source": "i",
+                "table": "Invoice"
+              },
+              "to": {
+                "source": "c",
+                "table": "Customer"
+              },
+              "pairs": [
+                {
+                  "fromField": "CustomerId",
+                  "toField": "CustomerId"
+                }
+              ],
+              "exactTypedEquality": true
             }
           ]
         },
