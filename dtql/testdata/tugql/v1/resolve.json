@@ -20943,6 +20943,205 @@
           "schemaVersion": ""
         },
         "parseDiagnostics": null
+      },
+      {
+        "name": "joined-cte-projects-both-branches",
+        "source": "with I as (\n  from Invoice as i\n  select i.CustomerId\n)\nwith C as (\n  from Customer as c\n  select c.CustomerId, c.Name\n)\nfrom I as i\njoin C as c\n  on i.CustomerId = c.CustomerId\nselect i.CustomerId as InvoiceCustomerId, c.CustomerId as CustomerCustomerId, c.Name as CustomerName",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "definitions": [
+            {
+              "kind": "cte",
+              "name": "I",
+              "query": {
+                "query": {
+                  "columns": [
+                    {
+                      "field": "CustomerId",
+                      "source": "i"
+                    }
+                  ],
+                  "from": {
+                    "alias": "i",
+                    "name": "Invoice"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "cte",
+              "name": "C",
+              "query": {
+                "query": {
+                  "columns": [
+                    {
+                      "field": "CustomerId",
+                      "source": "c"
+                    },
+                    {
+                      "field": "Name",
+                      "source": "c"
+                    }
+                  ],
+                  "from": {
+                    "alias": "c",
+                    "name": "Customer"
+                  }
+                }
+              }
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "as": "InvoiceCustomerId",
+                "field": "CustomerId",
+                "source": "i"
+              },
+              {
+                "as": "CustomerCustomerId",
+                "field": "CustomerId",
+                "source": "c"
+              },
+              {
+                "as": "CustomerName",
+                "field": "Name",
+                "source": "c"
+              }
+            ],
+            "from": {
+              "alias": "i",
+              "joins": [
+                {
+                  "from": {
+                    "alias": "c",
+                    "name": "C"
+                  },
+                  "on": [
+                    {
+                      "left": {
+                        "field": "CustomerId",
+                        "source": "i"
+                      },
+                      "op": "==",
+                      "right": {
+                        "field": "CustomerId",
+                        "source": "c"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "name": "I"
+            }
+          }
+        },
+        "context": {
+          "authorizedSchemas": [
+            {
+              "version": "s1",
+              "tables": [
+                {
+                  "name": "Invoice",
+                  "fields": [
+                    {
+                      "name": "InvoiceId",
+                      "type": "integer",
+                      "authorized": true
+                    },
+                    {
+                      "name": "CustomerId",
+                      "type": "integer",
+                      "authorized": true
+                    },
+                    {
+                      "name": "Total",
+                      "type": "decimal",
+                      "authorized": true
+                    }
+                  ]
+                },
+                {
+                  "name": "Customer",
+                  "fields": [
+                    {
+                      "name": "CustomerId",
+                      "type": "integer",
+                      "authorized": true
+                    },
+                    {
+                      "name": "Name",
+                      "type": "string",
+                      "authorized": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "id": "invoice-customer",
+              "version": "r1",
+              "from": {
+                "source": "i",
+                "table": "Invoice"
+              },
+              "to": {
+                "source": "c",
+                "table": "Customer"
+              },
+              "pairs": [
+                {
+                  "fromField": "CustomerId",
+                  "toField": "CustomerId"
+                }
+              ],
+              "exactTypedEquality": true
+            }
+          ]
+        },
+        "expected": {
+          "columns": [
+            {
+              "name": "InvoiceCustomerId",
+              "type": "integer",
+              "lineage": [
+                {
+                  "source": "i",
+                  "field": "CustomerId"
+                }
+              ]
+            },
+            {
+              "name": "CustomerCustomerId",
+              "type": "integer",
+              "lineage": [
+                {
+                  "source": "c",
+                  "field": "CustomerId"
+                }
+              ]
+            },
+            {
+              "name": "CustomerName",
+              "type": "string",
+              "lineage": [
+                {
+                  "source": "c",
+                  "field": "Name"
+                }
+              ]
+            }
+          ],
+          "dependencies": null,
+          "diagnostics": null,
+          "query": "from:\n  query:\n    as: i\n    from:\n      name: Invoice\n      alias: i\n    columns:\n      - field: CustomerId\n        source: i\n  joins:\n    - from:\n        query:\n          as: c\n          from:\n            name: Customer\n            alias: c\n          columns:\n            - field: CustomerId\n              source: c\n            - field: Name\n              source: c\n      \"on\":\n        - op: ==\n          left:\n            field: CustomerId\n            source: i\n          right:\n            field: CustomerId\n            source: c\ncolumns:\n  - field: CustomerId\n    source: i\n    as: InvoiceCustomerId\n  - field: CustomerId\n    source: c\n    as: CustomerCustomerId\n  - field: Name\n    source: c\n    as: CustomerName\n",
+          "relationships": null,
+          "schemaVersion": "s1"
+        },
+        "parseDiagnostics": null
       }
   ],
   "format": "tugql-resolve-suite",
