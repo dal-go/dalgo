@@ -13,7 +13,10 @@ import (
 	"github.com/dal-go/dalgo/access"
 )
 
-const APIVersion = "dtql.org/authorization/v1"
+const (
+	APIVersion       = "tugql.org/authorization/v1"
+	LegacyAPIVersion = "dtql.org/authorization/v1"
+)
 
 type Outcome string
 
@@ -64,6 +67,8 @@ const (
 type ExecutionClass string
 
 const (
+	ExecutionTugQL ExecutionClass = "tugql"
+	// Deprecated: ExecutionDTQL is the legacy name for ExecutionTugQL.
 	ExecutionDTQL            ExecutionClass = "dtql"
 	ExecutionNativeSQL       ExecutionClass = "native_sql"
 	ExecutionNativeGraphQL   ExecutionClass = "native_graphql"
@@ -258,7 +263,7 @@ func (result Result) Validate() error {
 }
 
 func (result Result) validate(allowUnknownReasonCodes bool) error {
-	if result.APIVersion != APIVersion {
+	if result.APIVersion != APIVersion && result.APIVersion != LegacyAPIVersion {
 		return fmt.Errorf("authorization result: unsupported apiVersion %q", result.APIVersion)
 	}
 	if !validID(result.RequestID) {
@@ -526,7 +531,7 @@ func validAction(v string) bool {
 	return oneOf(v, "get", "exists", "query", "insert", "set", "update", "delete", "truncate")
 }
 func validExecution(v ExecutionClass) bool {
-	return oneOf(string(v), "dtql", "native_sql", "native_graphql", "stored_procedure")
+	return oneOf(string(v), "tugql", "dtql", "native_sql", "native_graphql", "stored_procedure")
 }
 func validReason(v ReasonCode) bool {
 	return oneOf(string(v), "ACCESS_DENIED", "ACL_RULE_DENIED", "ACL_NO_MATCH", "ACL_ROW_PREDICATE_FAILED", "ACL_POST_IMAGE_FAILED", "ACL_COLUMN_DENIED", "ACL_EVALUATION_FAILED", "ACL_CONFIGURATION_INVALID", "ACL_SOURCE_UNAVAILABLE", "ACL_ENFORCEMENT_UNSUPPORTED", "ACL_PRINCIPAL_UNRESOLVED", "ACL_CAPABILITY_DENIED", "ACL_EXECUTION_CLASS_DENIED", "ACL_CALLABLE_DENIED", "ACL_COLLECTION_DENIED")

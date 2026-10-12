@@ -24,6 +24,12 @@ func Serialize(q dal.StructuredQuery) ([]byte, error) {
 	return marshalCanonical(doc), nil
 }
 
+// SerializeTugQL converts an in-scope dal.StructuredQuery into a canonical TugQL/TugQT-YAML
+// document.
+func SerializeTugQL(q dal.StructuredQuery) ([]byte, error) {
+	return Serialize(q)
+}
+
 // marshalCanonical marshals a document with stable 2-space indentation. Struct
 // field order is fixed by the shape types, so the output is canonical. The
 // document holds only strings, ints, bools and slices of those, so encoding it

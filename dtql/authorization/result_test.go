@@ -139,6 +139,17 @@ func TestCompatibleDecodePreservesFutureDenialCode(t *testing.T) {
 	}
 }
 
+func TestTugQLAPIVersionAndExecution(t *testing.T) {
+	source := strings.Replace(inspectResultFixture, `"apiVersion":"dtql.org/authorization/v1"`, `"apiVersion":"tugql.org/authorization/v1"`, 1)
+	res, err := ParseResult([]byte(source))
+	if err != nil {
+		t.Fatalf("failed to parse TugQL apiVersion: %v", err)
+	}
+	if res.APIVersion != APIVersion {
+		t.Fatalf("expected APIVersion %q, got %q", APIVersion, res.APIVersion)
+	}
+}
+
 func TestReferenceAndMaskRestrictionDiscriminators(t *testing.T) {
 	base, err := ParseResult([]byte(inspectResultFixture))
 	if err != nil {
