@@ -942,8 +942,10 @@ func validateTugQLIndentation(lines []tugqlLine, clauses []tugqlClause) []tugqlD
 	}
 	currentClause := ""
 	currentIndent := ""
+	clauseHeaderLines := make(map[int]string, len(clauses))
 	clauseTokenLines := make(map[int]bool)
 	for _, clause := range clauses {
+		clauseHeaderLines[clause.span.Start.Line] = clause.name
 		for _, token := range clause.tokens {
 			clauseTokenLines[token.Span.Start.Line] = true
 		}
@@ -955,8 +957,7 @@ func validateTugQLIndentation(lines []tugqlLine, clauses []tugqlClause) []tugqlD
 		if selectBlockLines[lineIndex] {
 			continue
 		}
-		name, _ := tugqlClauseStart(line.Tokens)
-		if name != "" {
+		if name, isClauseHeader := clauseHeaderLines[lineIndex+1]; isClauseHeader {
 			currentClause = name
 			currentIndent = line.Indent
 			continue
@@ -1362,7 +1363,19 @@ func parseTugQLConditionAt(tokens []tugqlToken, depth int) (condYAML, error) {
 			return condYAML{IsNull: &operand}, nil
 		}
 	}
+	parenDepth := 0
 	for i, token := range tokens {
+		switch token.Text {
+		case "(":
+			parenDepth++
+			continue
+		case ")":
+			parenDepth--
+			continue
+		}
+		if parenDepth != 0 {
+			continue
+		}
 		if token.Kind == tugqlSymbol {
 			switch token.Text {
 			case "=", "!=", "<>", "<", ">", "<=", ">=":

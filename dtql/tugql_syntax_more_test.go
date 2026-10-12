@@ -425,8 +425,14 @@ func TestTugQLSyntaxMoreExpressionContinuationIndentation(t *testing.T) {
 	if _, diagnostics := ParseTugQL(valid); len(diagnostics) != 0 {
 		t.Fatalf("two-space continuation rejected: %+v", diagnostics)
 	}
+	validBoolean := "from T\nwhere (\n  A = 1\n  and B = 2\n)\nselect A"
+	if document, diagnostics := ParseTugQL(validBoolean); len(diagnostics) != 0 || document.Tree == nil {
+		t.Fatalf("valid multiline boolean condition rejected: document=%+v diagnostics=%+v", document, diagnostics)
+	}
 	invalid := "from T\nwhere (Id =\n 1)\nselect Id"
 	tugqlSyntaxWantCode(t, invalid, "indentation")
+	zeroIndent := "from T\nwhere (\nA = 1\n  and B = 2\n)\nselect A"
+	tugqlSyntaxWantCode(t, zeroIndent, "indentation")
 }
 
 func tugqlSyntaxWantCode(t *testing.T, source, code string) {

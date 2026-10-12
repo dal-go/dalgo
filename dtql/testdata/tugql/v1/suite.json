@@ -1560,6 +1560,606 @@
         ],
         "yaml": ""
       }
+    },
+    {
+      "name": "malformed-exists-exists-60",
+      "source": "from T\nwhere exists (\n  from T\n  select 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 as Total\n)\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "malformed-exists-exists-61",
+      "source": "from T\nwhere exists (\n  from T\n  select 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 as Total\n)\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "malformed-exists-exists-62",
+      "source": "from T\nwhere exists (\n  from T\n  select 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 as Total\n)\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "malformed-exists-exists-63",
+      "source": "from T\nwhere exists (\n  from T\n  select 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 as Total\n)\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "malformed-exists-exists-64",
+      "source": "from T\nwhere exists (\n  from T\n  select 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 as Total\n)\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "malformed-exists-exists-65",
+      "source": "from T\nwhere exists (\n  from T\n  select 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 as Total\n)\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-exists-malformed-multiline-comparison",
+      "source": "FROM T\nWHERE EXISTS (\n  FROM U\n  WHERE U.Id =\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-not-exists-malformed-multiline-comparison",
+      "source": "FROM T\nWHERE NOT EXISTS (\n  FROM U\n  WHERE U.Id =\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-exists-complete-unsupported-form",
+      "source": "FROM T\nWHERE EXISTS (\n  FROM U\n  WHERE U.Id = 1\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-not-exists-complete-unsupported-form",
+      "source": "FROM T\nWHERE NOT EXISTS (\n  FROM U\n  WHERE U.Id = 1\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-nested-exists-after-or",
+      "source": "FROM T\nWHERE A = 1 OR EXISTS (\n  FROM U\n  WHERE U.Id = 1\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-not-exists-malformed-comparison-crlf",
+      "source": "FROM T\r\nWHERE NOT EXISTS (\r\n  FROM U\r\n  WHERE U.Id =\r\n)\r\nSELECT A\r\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "unsupported condition",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-nested-operator-trailing-rhs",
+      "source": "FROM T\nWHERE (\n  (A = 1) >\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "comparison requires left and right expressions",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 4,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-nested-and-outer-operator",
+      "source": "FROM T\nWHERE (\n  (A = 1 AND B = 2) >\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "comparison requires left and right expressions",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 4,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-nested-or-outer-operator",
+      "source": "FROM T\nWHERE (\n  (A = 1 OR B = 2) >\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "comparison requires left and right expressions",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 4,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-multiline-trailing-comparison-control",
+      "source": "FROM T\nWHERE (\n  A = 1\n  AND B =\n)\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "comparison requires left and right expressions",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-nested-parens-empty-right-control-crlf",
+      "source": "FROM T\r\nWHERE (\r\n  A = 1\r\n  AND (B = )\r\n)\r\nSELECT A\r\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "comparison requires left and right expressions",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-where-multiline-or-trailing-right-control",
+      "source": "FROM T\nWHERE (A = 1 OR\n  B = )\nSELECT A\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "comparison requires left and right expressions",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 3,
+                "column": 8
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-parity-unicode-astral-incomplete-comparison",
+      "source": "from T\nwhere \"😀\" =\nselect Id\n",
+      "expected": {
+        "tree": null,
+        "diagnostics": [
+          {
+            "code": "invalid_condition",
+            "message": "comparison requires left and right expressions",
+            "span": {
+              "start": {
+                "line": 2,
+                "column": 1
+              },
+              "end": {
+                "line": 2,
+                "column": 12
+              }
+            }
+          }
+        ],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-control-valid-multiline-and",
+      "source": "from T\nwhere (\n  A = 1\n  and B = 2\n)\nselect A\n",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "query": {
+            "from": {
+              "name": "T"
+            },
+            "where": {
+              "and": [
+                {
+                  "op": "==",
+                  "left": {
+                    "field": "A"
+                  },
+                  "right": {
+                    "value": 1
+                  }
+                },
+                {
+                  "op": "==",
+                  "left": {
+                    "field": "B"
+                  },
+                  "right": {
+                    "value": 2
+                  }
+                }
+              ]
+            },
+            "columns": [
+              {
+                "field": "A"
+              }
+            ]
+          }
+        },
+        "diagnostics": [],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-control-valid-arithmetic-comparison",
+      "source": "from T\nwhere A + 1 > B * 2\nselect A\n",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "query": {
+            "from": {
+              "name": "T"
+            },
+            "where": {
+              "op": ">",
+              "left": {
+                "binary": {
+                  "op": "+",
+                  "left": {
+                    "field": "A"
+                  },
+                  "right": {
+                    "value": 1
+                  }
+                }
+              },
+              "right": {
+                "binary": {
+                  "op": "*",
+                  "left": {
+                    "field": "B"
+                  },
+                  "right": {
+                    "value": 2
+                  }
+                }
+              }
+            },
+            "columns": [
+              {
+                "field": "A"
+              }
+            ]
+          }
+        },
+        "diagnostics": [],
+        "yaml": "",
+        "sourceExact": true
+      }
+    },
+    {
+      "name": "condition-control-valid-unicode-crlf",
+      "source": "from \"T雪\"\r\nwhere \"A雪\" = 1\r\nselect \"A雪\"\r\n",
+      "expected": {
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "query": {
+            "from": {
+              "name": "T雪"
+            },
+            "where": {
+              "op": "==",
+              "left": {
+                "field": "A雪"
+              },
+              "right": {
+                "value": 1
+              }
+            },
+            "columns": [
+              {
+                "field": "A雪"
+              }
+            ]
+          }
+        },
+        "diagnostics": [],
+        "yaml": "",
+        "sourceExact": true
+      }
     }
   ]
 }
