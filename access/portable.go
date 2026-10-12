@@ -24,11 +24,23 @@ type ExecutionEntry struct {
 type ExecutionClass string
 
 const (
+	ExecutionTugQL ExecutionClass = "tugql"
+	// Deprecated: ExecutionDTQL is the legacy name for ExecutionTugQL.
 	ExecutionDTQL            ExecutionClass = "dtql"
 	ExecutionNativeSQL       ExecutionClass = "native_sql"
 	ExecutionNativeGraphQL   ExecutionClass = "native_graphql"
 	ExecutionStoredProcedure ExecutionClass = "stored_procedure"
 )
+
+// ParseTugQLPolicy validates a portable editable document.
+func ParseTugQLPolicy(data []byte) (TugQLDocument, error) {
+	return ParseDTQLPolicy(data)
+}
+
+// NormalizeTugQLPolicy returns a validated deep copy with canonical scoped masks.
+func NormalizeTugQLPolicy(document TugQLDocument) (TugQLDocument, error) {
+	return NormalizeDTQLPolicy(document)
+}
 
 // ParseDTQLPolicy validates a portable editable document. JSON is accepted as
 // the JSON subset of YAML. Parsing does not activate policy or authorize data.
@@ -336,6 +348,16 @@ func MarshalDTQLPolicyJSON(document DTQLDocument) ([]byte, error) {
 		return nil, err
 	}
 	return json.MarshalIndent(normalized, "", "  ")
+}
+
+// MarshalTugQLPolicyYAML emits normalized policy text using TugQLDocument.
+func MarshalTugQLPolicyYAML(document TugQLDocument) ([]byte, error) {
+	return MarshalDTQLPolicyYAML(document)
+}
+
+// MarshalTugQLPolicyJSON emits normalized policy JSON using TugQLDocument.
+func MarshalTugQLPolicyJSON(document TugQLDocument) ([]byte, error) {
+	return MarshalDTQLPolicyJSON(document)
 }
 
 // Explicit null is not absence for security-bearing selectors. The typed

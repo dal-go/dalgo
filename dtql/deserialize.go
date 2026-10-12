@@ -30,6 +30,11 @@ func Deserialize(data []byte) (dal.StructuredQuery, error) {
 	return documentToQuery(doc)
 }
 
+// DeserializeTugQL reconstructs a dal.StructuredQuery from a TugQL/TugQT-YAML document.
+func DeserializeTugQL(data []byte) (dal.StructuredQuery, error) {
+	return Deserialize(data)
+}
+
 func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	query, err := documentToQueryAt(doc, "")
 	if err != nil {

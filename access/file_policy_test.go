@@ -301,3 +301,13 @@ func writePolicyFile(t *testing.T, root, name, body string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(strings.TrimSpace(body)+"\n"), 0o600))
 }
+
+func TestTugQLDocumentAPIVersion(t *testing.T) {
+	source := []byte("apiVersion: tugql.org/access/v1\nkind: AccessPolicy\nmetadata:\n  name: p1\n  visibility: private\ntarget:\n  database: db1\ncomposition: dalgo-hierarchical-v1\ndefault: deny\n" + validPortableScopes)
+	doc, err := ParseTugQLPolicy(source)
+	require.NoError(t, err)
+	assert.Equal(t, TugQLDocumentAPIVersion, doc.APIVersion)
+	policy, err := policyFromDTQLDocument(doc, "db1", "p1.yaml")
+	require.NoError(t, err)
+	assert.NotNil(t, policy)
+}

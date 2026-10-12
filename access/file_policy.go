@@ -13,9 +13,13 @@ import (
 )
 
 const (
+	TugQLDocumentAPIVersion = "tugql.org/access/v1"
+	// Deprecated: DTQLDocumentAPIVersion is the legacy API version for TugQL access policies.
 	DTQLDocumentAPIVersion = "dtql.org/access/v1"
 	maxPolicyFileBytes     = 1 << 20
 )
+
+type TugQLDocument = DTQLDocument
 
 // FilePolicyConfig selects portable policy files relative to a trusted root.
 // Loading is opt-in: a zero value disables file policies.
@@ -294,7 +298,7 @@ func scopedPolicyFeature(scopes *yaml.Node) string {
 }
 
 func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Policy, error) {
-	if source.APIVersion != DTQLDocumentAPIVersion {
+	if source.APIVersion != TugQLDocumentAPIVersion && source.APIVersion != DTQLDocumentAPIVersion {
 		return nil, fmt.Errorf("access: unsupported apiVersion %q", source.APIVersion)
 	}
 	visibility := source.Metadata.Visibility
