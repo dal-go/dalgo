@@ -36,6 +36,7 @@ func TestTugQLSharedGoldenCorpus(t *testing.T) {
 				Tree        *TugQLTree        `json:"tree"`
 				Diagnostics []TugQLDiagnostic `json:"diagnostics"`
 				YAML        string            `json:"yaml"`
+				SourceExact bool              `json:"sourceExact,omitempty"`
 			} `json:"expected"`
 		} `json:"cases"`
 	}
@@ -67,6 +68,9 @@ func TestTugQLSharedGoldenCorpus(t *testing.T) {
 			}
 			if string(got) != string(want) {
 				t.Fatalf("parse differs from shared fixture\n got: %s\nwant: %s", got, want)
+			}
+			if testCase.Expected.SourceExact && document.Source != testCase.Source {
+				t.Fatalf("parse changed source bytes: got %q want %q", document.Source, testCase.Source)
 			}
 			if testCase.Expected.YAML != "" {
 				actual, err := yaml.Marshal(*document.Tree)
