@@ -20,6 +20,9 @@
 // dal.ErrNotImplementedYet where it expects a write to succeed. What it never
 // accepts is a storage error where a validation error was due — which is
 // exactly what a non-validating adapter produces.
+//
+// AssertUniqueKeys is the read-side counterpart: an adapter's tests hand it the
+// records of one read and it fails when two of them share a key.
 package dalgotest
 
 import (
