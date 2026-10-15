@@ -311,3 +311,25 @@ func TestTugQLDocumentAPIVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, policy)
 }
+
+// The TugQL-named entry points are the DTQL ones under the new name.
+func TestTugQLPolicyAliasesMatchTheDTQLEntryPoints(t *testing.T) {
+	source := []byte("apiVersion: tugql.org/access/v1\nkind: AccessPolicy\nmetadata:\n  name: p1\n  visibility: private\ntarget:\n  database: db1\ncomposition: dalgo-hierarchical-v1\ndefault: deny\n" + validPortableScopes)
+	doc, err := ParseTugQLPolicy(source)
+	require.NoError(t, err)
+	normalized, err := NormalizeTugQLPolicy(doc)
+	require.NoError(t, err)
+	wantNormalized, err := NormalizeDTQLPolicy(doc)
+	require.NoError(t, err)
+	assert.Equal(t, wantNormalized, normalized)
+	gotYAML, err := MarshalTugQLPolicyYAML(doc)
+	require.NoError(t, err)
+	wantYAML, err := MarshalDTQLPolicyYAML(doc)
+	require.NoError(t, err)
+	assert.Equal(t, wantYAML, gotYAML)
+	gotJSON, err := MarshalTugQLPolicyJSON(doc)
+	require.NoError(t, err)
+	wantJSON, err := MarshalDTQLPolicyJSON(doc)
+	require.NoError(t, err)
+	assert.Equal(t, wantJSON, gotJSON)
+}

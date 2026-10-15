@@ -104,3 +104,20 @@ func TestQualifiedFieldYAMLRejectsEmptyAndWildcardSiblingSource(t *testing.T) {
 		}
 	}
 }
+
+// The TugQL-named entry points are Serialize and Deserialize under the new name.
+func TestTugQLEntryPointsRoundTripLikeTheDTQLOnes(t *testing.T) {
+	q := dal.From(dal.NewRootCollectionRef("customers", "")).NewQuery().Limit(3).SelectColumns(dal.Column{Expression: dal.Field("country")})
+	encoded, err := SerializeTugQL(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := Serialize(q)
+	if err != nil || string(encoded) != string(want) {
+		t.Fatalf("SerializeTugQL = %q, Serialize = %q (%v)", encoded, want, err)
+	}
+	decoded, err := DeserializeTugQL(encoded)
+	if err != nil || !Equal(q, decoded) {
+		t.Fatalf("DeserializeTugQL = %v, %v; want the query back", decoded, err)
+	}
+}

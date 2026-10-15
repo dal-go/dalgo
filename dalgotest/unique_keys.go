@@ -63,7 +63,7 @@ func HasNoKey(key *record.Key) bool {
 func keyIdentity(key *record.Key) string {
 	var parts []string
 	for k := key; k != nil; k = k.Parent() {
-		parts = append(parts, fmt.Sprintf("%s/%v", k.Collection(), k.ID))
+		parts = append(parts, fmt.Sprintf("%s/%s", k.Collection(), record.EscapeID(fmt.Sprint(k.ID))))
 	}
 	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
 		parts[i], parts[j] = parts[j], parts[i]
