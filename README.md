@@ -32,7 +32,7 @@ We build with our own tooling:
 - **[DataTug](https://datatug.io)** — query & explore data
 <!-- /dev-approach -->
 
-## DataTug in DALgo development
+## DALgo in DataTug development
 
 DALgo provides the data-access seam in [DataTug](https://datatug.app)’s development ecosystem. Read [how DataTug’s development tools were built](https://datatug.app/en/under-the-hood/tools-we-built/).
 
