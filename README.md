@@ -20,12 +20,6 @@ go get github.com/dal-go/dalgo
 
 <!-- dev-approach:v1 -->
 
-## Flagship ecosystem product
-
-DALgo provides a data-access seam in DataTug’s development ecosystem.
-
-DataTug is the flagship ecosystem product. [Explore DataTug](https://datatug.app), and read [how we built its development tools](https://datatug.app/en/under-the-hood/tools-we-built/) for the open-source tools and standards behind it.
-
 ## Our approach to development
 
 We build with our own tooling:
@@ -37,6 +31,10 @@ We build with our own tooling:
 - **[cover100.dev](https://cover100.dev)** — drive toward 100% test coverage
 - **[DataTug](https://datatug.io)** — query & explore data
 <!-- /dev-approach -->
+
+## DataTug in DALgo development
+
+DALgo provides the data-access seam in [DataTug](https://datatug.app)’s development ecosystem. Read [how DataTug’s development tools were built](https://datatug.app/en/under-the-hood/tools-we-built/).
 
 > **Specification scope:** The [`spec/`](./spec) tree specifies DALgo code and
 > runtime behavior only. The separate [dalgo.io](https://dalgo.io/) website,
