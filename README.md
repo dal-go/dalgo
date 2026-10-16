@@ -19,6 +19,13 @@ go get github.com/dal-go/dalgo
 [![Sourcegraph](https://sourcegraph.com/github.com/dal-go/dalgo/-/badge.svg)](https://sourcegraph.com/github.com/dal-go/dalgo?badge)
 
 <!-- dev-approach:v1 -->
+
+## Flagship ecosystem product
+
+DALgo provides a data-access seam in DataTug’s development ecosystem.
+
+DataTug is the flagship ecosystem product. [Explore DataTug](https://datatug.app), and read [how we built its development tools](https://datatug.app/en/under-the-hood/tools-we-built/) for the open-source tools and standards behind it.
+
 ## Our approach to development
 
 We build with our own tooling:
