@@ -19,6 +19,7 @@ go get github.com/dal-go/dalgo
 [![Sourcegraph](https://sourcegraph.com/github.com/dal-go/dalgo/-/badge.svg)](https://sourcegraph.com/github.com/dal-go/dalgo?badge)
 
 <!-- dev-approach:v1 -->
+
 ## Our approach to development
 
 We build with our own tooling:
@@ -30,6 +31,10 @@ We build with our own tooling:
 - **[cover100.dev](https://cover100.dev)** — drive toward 100% test coverage
 - **[DataTug](https://datatug.io)** — query & explore data
 <!-- /dev-approach -->
+
+## DALgo in DataTug development
+
+DALgo provides the data-access seam in [DataTug](https://datatug.app)’s development ecosystem. Read [how DataTug’s development tools were built](https://datatug.app/en/under-the-hood/tools-we-built/).
 
 > **Specification scope:** The [`spec/`](./spec) tree specifies DALgo code and
 > runtime behavior only. The separate [dalgo.io](https://dalgo.io/) website,
