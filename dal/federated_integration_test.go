@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/dal-go/dalgo/dal"
-	"github.com/dal-go/dalgo/dtql"
 	"github.com/dal-go/dalgo/recordset"
+	"github.com/dal-go/dalgo/tugql"
 	"github.com/dal-go/record"
 )
 
@@ -47,7 +47,7 @@ columns:
   - {aggregate: {function: sum, args: [{field: amount, source: o}]}, as: totalSales}
   - {binary: {op: '/', left: {aggregate: {function: sum, args: [{field: amount, source: o}]}}, right: {field: population, source: c}}, as: salesPerCapita}
 `
-	query, err := dtql.Deserialize([]byte(document))
+	query, err := tugql.Deserialize([]byte(document))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,11 +103,11 @@ columns:
   - {aggregate: {function: avg, args: [{field: amount, source: o}]}, as: avgSale}
   - {binary: {op: '/', left: {aggregate: {function: sum, args: [{field: amount, source: o}]}}, right: {field: population, source: c}}, as: salesPerCapita}
 `
-	query, err := dtql.Deserialize([]byte(document))
+	query, err := tugql.Deserialize([]byte(document))
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded, err := dtql.Serialize(query)
+	encoded, err := tugql.Serialize(query)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ columns:
   - {aggregate: {function: max, args: [{field: price, source: o}]}, as: priciest}
 where: {left: {field: price, source: o}, op: '>', right: {value: '9'}}
 `
-	query, err := dtql.Deserialize([]byte(document))
+	query, err := tugql.Deserialize([]byte(document))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ columns:
   - {aggregate: {function: sum, args: [{field: amount, source: c}]}, as: total}
 where: {left: {field: customerName, source: c}, op: '==', right: {value: Bob}}
 `
-	query, err := dtql.Deserialize([]byte(document))
+	query, err := tugql.Deserialize([]byte(document))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ columns:
   - {field: price, source: o}
   - {aggregate: {function: sum, args: [{field: amount, source: o}]}, as: total}
 `
-	query, err := dtql.Deserialize([]byte(document))
+	query, err := tugql.Deserialize([]byte(document))
 	if err != nil {
 		t.Fatal(err)
 	}
