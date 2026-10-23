@@ -230,7 +230,7 @@ func TestDocumentToQueryWrapsNestedScopeError(t *testing.T) {
 			},
 		}}},
 	}
-	if _, err := documentToQuery(doc); err == nil || !strings.Contains(err.Error(), "invalid DTQL: query_scope") {
+	if _, err := documentToQuery(doc); err == nil || !strings.Contains(err.Error(), "invalid TugQL: query_scope") {
 		t.Fatalf("nested scope error = %v", err)
 	}
 }

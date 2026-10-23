@@ -14,13 +14,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const chinookNestedDTQLSHA256 = "2eeef93ffb02a4272f06f6ab909b2db4cbbb9a2a1df280ae4c47851534f583b3"
+const chinookNestedTugQLSHA256 = "2eeef93ffb02a4272f06f6ab909b2db4cbbb9a2a1df280ae4c47851534f583b3"
 const chinookNestedRowsSHA256 = "9f5b32d506541afd8f651d5474f87b44d2e8646d1410e3a03d03c70fccf4a757"
 
 func TestJoinNegativeFixtures_DiagnosticParity(t *testing.T) {
 	for _, name := range []string{"forward-alias", "unknown-alias"} {
 		t.Run(name, func(t *testing.T) {
-			document, err := os.ReadFile("testdata/joins/" + name + ".dtql.yaml")
+			document, err := os.ReadFile("testdata/joins/" + name + ".tugql.yaml")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -82,7 +82,7 @@ func TestJoinFixtureManifestDigests(t *testing.T) {
 }
 
 func TestChinookJoinedWildcardFixture_RoundTrips(t *testing.T) {
-	data, err := os.ReadFile("testdata/joins/chinook-wildcard.dtql.yaml")
+	data, err := os.ReadFile("testdata/joins/chinook-wildcard.tugql.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,11 +107,11 @@ func TestChinookJoinedWildcardFixture_RoundTrips(t *testing.T) {
 }
 
 func TestChinookAlgorithmHints_RoundTripAndIndependentEdges(t *testing.T) {
-	data, err := os.ReadFile("testdata/joins/chinook-hinted.dtql.yaml")
+	data, err := os.ReadFile("testdata/joins/chinook-hinted.tugql.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := validateDTQL(compileSchema(t), data); err != nil {
+	if err := validateTugQL(compileSchema(t), data); err != nil {
 		t.Fatalf("schema: %v", err)
 	}
 	q, err := Deserialize(data)
@@ -148,7 +148,7 @@ func TestChinookAlgorithmHints_RoundTripAndIndependentEdges(t *testing.T) {
 	if err != nil || Equal(q, reordered) {
 		t.Fatalf("hint preference order did not affect structural equality: %v", err)
 	}
-	legacy, err := os.ReadFile("testdata/joins/chinook-nested.dtql.yaml")
+	legacy, err := os.ReadFile("testdata/joins/chinook-nested.tugql.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,12 +283,12 @@ func TestJoinNestedShapeAndSourceSerializationErrors(t *testing.T) {
 }
 
 func TestChinookNestedFixture_RoundTripsCanonically(t *testing.T) {
-	data, err := os.ReadFile("testdata/joins/chinook-nested.dtql.yaml")
+	data, err := os.ReadFile("testdata/joins/chinook-nested.tugql.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fmt.Sprintf("%x", sha256.Sum256(data)); got != chinookNestedDTQLSHA256 {
-		t.Fatalf("fixture sha256 = %s, want %s", got, chinookNestedDTQLSHA256)
+	if got := fmt.Sprintf("%x", sha256.Sum256(data)); got != chinookNestedTugQLSHA256 {
+		t.Fatalf("fixture sha256 = %s, want %s", got, chinookNestedTugQLSHA256)
 	}
 	rows, err := os.ReadFile("testdata/joins/chinook-nested.rows.json")
 	if err != nil {
@@ -297,7 +297,7 @@ func TestChinookNestedFixture_RoundTripsCanonically(t *testing.T) {
 	if got := fmt.Sprintf("%x", sha256.Sum256(rows)); got != chinookNestedRowsSHA256 {
 		t.Fatalf("rows sha256 = %s, want %s", got, chinookNestedRowsSHA256)
 	}
-	if err := validateDTQL(compileSchema(t), data); err != nil {
+	if err := validateTugQL(compileSchema(t), data); err != nil {
 		t.Fatalf("fixture does not satisfy schema: %v", err)
 	}
 	query, err := Deserialize(data)
@@ -327,7 +327,7 @@ func TestDeserialize_JoinInputAliasesNormalize(t *testing.T) {
           op: eq
           right: {field: CustomerId, source: c}
 `)
-	if err := validateDTQL(compileSchema(t), input); err != nil {
+	if err := validateTugQL(compileSchema(t), input); err != nil {
 		t.Fatalf("schema rejected nested from.as: %v", err)
 	}
 	query, err := Deserialize(input)

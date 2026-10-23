@@ -52,8 +52,8 @@ type TugQLSourceMetadata struct {
 	Version int    `json:"version"`
 }
 
-// TugQLTree is a versioned semantic wrapper around the existing DTQL query
-// document. Query maps use the same field names and discriminators as DTQL YAML.
+// TugQLTree is a versioned semantic wrapper around the existing TugQL query
+// document. Query maps use the same field names and discriminators as TugQL YAML.
 type TugQLTree struct {
 	Format      string            `json:"format" yaml:"format"`
 	Version     int               `json:"version" yaml:"version"`
@@ -343,7 +343,7 @@ func expressionMap(in exprYAML) map[string]any {
 }
 
 // MarshalYAML allows standard yaml.Marshal(tree) to emit the canonical
-// versioned TugQTree form while retaining the legacy DTQL query field order.
+// versioned TugQTree form while retaining the legacy TugQL query field order.
 func (tree TugQLTree) MarshalYAML() (any, error) {
 	if err := validateTugQLTreeValues(tree, &tugqlResolveBudget{}); err != nil {
 		return nil, err
@@ -641,7 +641,7 @@ func validateTugQLQueryYAML(data []byte) error {
 	}
 	// This boundary is intentionally structural only. Schema-resolved authoring
 	// constructs (for example omitted ON shorthand) are lowered before the
-	// existing executable DTQL validator runs in ResolveTugQL.
+	// existing executable TugQL validator runs in ResolveTugQL.
 	return nil
 }
 

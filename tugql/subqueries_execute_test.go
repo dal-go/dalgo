@@ -122,7 +122,7 @@ func TestSubqueryFixturesExecuteThroughLeafScans(t *testing.T) {
 
 func TestSubqueryAmbiguousFixtureReportsExecutionScope(t *testing.T) {
 	const directory = "testdata/subqueries"
-	input, err := os.ReadFile(filepath.Join(directory, "scope-ambiguous.dtql.yaml"))
+	input, err := os.ReadFile(filepath.Join(directory, "scope-ambiguous.tugql.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestSubqueryNegativeFixtureCategoriesAndPaths(t *testing.T) {
 	}}
 	for _, name := range []string{"scalar-many-rows", "scalar-many-columns", "scope-forward-join", "scope-unknown-qualifier"} {
 		t.Run(name, func(t *testing.T) {
-			input, err := os.ReadFile(filepath.Join(directory, name+".dtql.yaml"))
+			input, err := os.ReadFile(filepath.Join(directory, name+".tugql.yaml"))
 			if err != nil {
 				t.Fatal(err)
 			}

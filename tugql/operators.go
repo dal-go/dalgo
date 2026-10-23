@@ -2,7 +2,7 @@ package tugql
 
 import "github.com/dal-go/dalgo/dal"
 
-// inScopeComparisonOps is the set of dal comparison operators DTQL represents.
+// inScopeComparisonOps is the set of dal comparison operators TugQL represents.
 // Their YAML form is the dal.Operator string itself (e.g. "==", "In", ">").
 var inScopeComparisonOps = map[dal.Operator]bool{
 	dal.Equal:          true, // ==

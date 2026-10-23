@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-// Mask is the portable DTQL scoped selection chain. Adjacent stages of the
+// Mask is the portable TugQL scoped selection chain. Adjacent stages of the
 // same action form one OR-list. Opposite-action stages select only within
 // the set selected by all preceding stages; they are not independent rules.
 type Mask struct {

@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// compileSchema compiles the generated DTQL JSON Schema for validation.
+// compileSchema compiles the generated TugQL JSON Schema for validation.
 func compileSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
 	c := jsonschema.NewCompiler()
@@ -29,12 +29,12 @@ func compileSchema(t *testing.T) *jsonschema.Schema {
 	return sch
 }
 
-// validateDTQL validates a DTQL-YAML document against the compiled schema. It
+// validateTugQL validates a TugQL YAML document against the compiled schema. It
 // normalizes the YAML to JSON-native types (string keys, float64 numbers) so
 // the validator sees the same value space the schema describes.
-func validateDTQL(sch *jsonschema.Schema, dtqlYAML []byte) error {
+func validateTugQL(sch *jsonschema.Schema, tugqlYAML []byte) error {
 	var asYAML any
-	if err := yaml.Unmarshal(dtqlYAML, &asYAML); err != nil {
+	if err := yaml.Unmarshal(tugqlYAML, &asYAML); err != nil {
 		return fmt.Errorf("not YAML: %w", err)
 	}
 	jsonBytes, err := json.Marshal(asYAML)
@@ -48,7 +48,7 @@ func validateDTQL(sch *jsonschema.Schema, dtqlYAML []byte) error {
 	return sch.Validate(doc)
 }
 
-// TestSerializedValidatesAgainstSchema asserts every DTQL document produced by
+// TestSerializedValidatesAgainstSchema asserts every TugQL document produced by
 // Serialize for an in-scope query validates against the generated schema, so the
 // schema and the serializer cannot drift.
 func TestSerializedValidatesAgainstSchema(t *testing.T) {
@@ -59,8 +59,8 @@ func TestSerializedValidatesAgainstSchema(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Serialize: %v", err)
 			}
-			if err := validateDTQL(sch, data); err != nil {
-				t.Fatalf("serialized DTQL failed schema validation: %v\nYAML:\n%s", err, data)
+			if err := validateTugQL(sch, data); err != nil {
+				t.Fatalf("serialized TugQL failed schema validation: %v\nYAML:\n%s", err, data)
 			}
 		})
 	}
@@ -84,7 +84,7 @@ func TestSchemaRejectsInvalid(t *testing.T) {
 	}
 	for name, doc := range invalid {
 		t.Run(name, func(t *testing.T) {
-			if err := validateDTQL(sch, []byte(doc)); err == nil {
+			if err := validateTugQL(sch, []byte(doc)); err == nil {
 				t.Fatalf("expected schema to reject %q", name)
 			}
 		})

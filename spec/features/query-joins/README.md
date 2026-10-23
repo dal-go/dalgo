@@ -15,11 +15,11 @@ status: Approved
 
 ## Summary
 
-Make a two-table INNER or LEFT **equi-join** a first-class, losslessly-expressible shape in dalgo's `dal.StructuredQuery`, and prove it end-to-end by executing it in the in-memory adapter `dalgo2memory`. This closes the three gaps that forced DTQL (and any other consumer) to defer joins: no join-type distinction, no public way to build a join's `ON` clause, and no source qualifier on a field reference.
+Make a two-table INNER or LEFT **equi-join** a first-class, losslessly-expressible shape in dalgo's `dal.StructuredQuery`, and prove it end-to-end by executing it in the in-memory adapter `dalgo2memory`. This closes the three gaps that forced TugQL (and any other consumer) to defer joins: no join-type distinction, no public way to build a join's `ON` clause, and no source qualifier on a field reference.
 
 ## Problem
 
-`dal` can almost represent a join but not losslessly. `JoinedSource` is `RecordsetSource` + an **unexported** `on []Condition` with no public constructor, so a caller outside `dal` cannot populate the `ON` clause. There is no join-type enum, so an `INNER` join is indistinguishable from a `LEFT` join in the AST. And `FieldRef` is `{name, isID}` with no source qualifier, so once two recordsets are in play, every field in `ON`/`WHERE`/`Columns`/`OrderBy` is ambiguous (`u.id` vs `o.userId`). The complementary `dtql` Feature explicitly carves joins out (`REQ:covered-subset` requires "a single `From` whose `Joins()` is empty"); this Feature supplies the model `dtql` and the SQL adapters will later build on.
+`dal` can almost represent a join but not losslessly. `JoinedSource` is `RecordsetSource` + an **unexported** `on []Condition` with no public constructor, so a caller outside `dal` cannot populate the `ON` clause. There is no join-type enum, so an `INNER` join is indistinguishable from a `LEFT` join in the AST. And `FieldRef` is `{name, isID}` with no source qualifier, so once two recordsets are in play, every field in `ON`/`WHERE`/`Columns`/`OrderBy` is ambiguous (`u.id` vs `o.userId`). The complementary `tugql` Feature explicitly carves joins out (`REQ:covered-subset` requires "a single `From` whose `Joins()` is empty"); this Feature supplies the model `tugql` and the SQL adapters will later build on.
 
 ## Behavior
 
@@ -87,7 +87,7 @@ When `dalgo2memory` encounters a join whose type it does not support (anything o
 
 **Given** an existing single-source `dalgo2memory` query whose fields use an empty `src`
 **When** it is executed after the `NewFieldRef` signature change and the join-resolution logic are in place
-**Then** it returns the same records, in the same order, as before this Feature (the full existing `dal` + `dalgo2memory` + `dtql` suites stay green).
+**Then** it returns the same records, in the same order, as before this Feature (the full existing `dal` + `dalgo2memory` + `tugql` suites stay green).
 
 ### AC: inner-join-matches-only (verifies REQ:memory-inner-join)
 
@@ -123,7 +123,7 @@ When `dalgo2memory` encounters a join whose type it does not support (anything o
 
 - **`dal` (query model).** New: a join-type value (enum), an exported `JoinedSource` constructor accepting `(src RecordsetSource, joinType, on ...Condition)`, and the `NewFieldRef(src, name)` signature change. `FromSource.Join`/`Joins` and `JoinedSource.On` already exist and are reused. No new dependencies.
 - **`dalgo2memory` (executor).** Extends the current single-collection scan (today it reads only `q.From().Base().Name()` and ignores `Joins()`) with a nested-loop join over the in-memory maps and a qualified-field resolver keyed on source `Alias()`/`Name()` with empty-`src` → base.
-- **Consumers unblocked (out of scope here):** `dtql` join serialization and the SQL adapters (`dalgo2sql`/`dalgo2sqlite`) build on the same AST later.
+- **Consumers unblocked (out of scope here):** `tugql` join serialization and the SQL adapters (`dalgo2sql`/`dalgo2sqlite`) build on the same AST later.
 
 ## Data Flow
 
@@ -137,7 +137,7 @@ When `dalgo2memory` encounters a join whose type it does not support (anything o
 
 ## Testing Strategy
 
-Table tests in `dalgo2memory` over two small in-memory collections cover INNER (matches only), LEFT (unmatched-left retained with `nil` right), qualified resolution in `Where`, the unsupported-join error, and the unresolvable-`src` error. `dal`-level tests cover the join-type round-trip and the public constructor producing a populated `On()` from outside the package. The `NewFieldRef(src, name)` signature change has only two constructor-call surfaces in the module — `dal` itself (the `Field`/`AscendingField`/`DescendingField` wrappers and `dal` tests) and `dtql/deserialize.go`; `dalgo2memory` consumes `FieldRef` by type assertion rather than the constructor. The migration is verified by the full existing `dal` + `dtql` + `dalgo2memory` suites returning green.
+Table tests in `dalgo2memory` over two small in-memory collections cover INNER (matches only), LEFT (unmatched-left retained with `nil` right), qualified resolution in `Where`, the unsupported-join error, and the unresolvable-`src` error. `dal`-level tests cover the join-type round-trip and the public constructor producing a populated `On()` from outside the package. The `NewFieldRef(src, name)` signature change has only two constructor-call surfaces in the module — `dal` itself (the `Field`/`AscendingField`/`DescendingField` wrappers and `dal` tests) and `tugql/deserialize.go`; `dalgo2memory` consumes `FieldRef` by type assertion rather than the constructor. The migration is verified by the full existing `dal` + `tugql` + `dalgo2memory` suites returning green.
 
 ## Out of Scope
 
@@ -145,7 +145,7 @@ Table tests in `dalgo2memory` over two small in-memory collections cover INNER (
 - Non-equality or arbitrary boolean `ON` trees — equi-join only.
 - SQL rendering/execution (`dalgo2sql`, `dalgo2sqlite`) — separate repos, unblocked by this Feature.
 - Multiple/chained joins (3+ recordsets) — single join (two recordsets) only.
-- DTQL serialization of joins — a later `dtql` cycle.
+- TugQL serialization of joins — a later `tugql` cycle.
 - Requiring a non-empty `src` on every field — empty `src` stays valid and means the base.
 
 ## Assumption Carryover

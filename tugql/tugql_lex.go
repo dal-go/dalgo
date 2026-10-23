@@ -347,4 +347,4 @@ func diagnostic(code, message string, span tugqlSpan) tugqlDiagnostic {
 }
 
 // expressionParser implements the shared authoring expression precedence and
-// lowers directly into DTQL's existing structured expression shape.
+// lowers directly into TugQL's existing structured expression shape.

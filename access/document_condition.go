@@ -7,7 +7,7 @@ import (
 )
 
 // DocumentCondition is a row condition in a portable policy document. It uses
-// the DTQL condition syntax so a policy and a saved query are written alike: a
+// the TugQL condition syntax so a policy and a saved query are written alike: a
 // comparison sets op/left/right; a group sets and or or.
 type DocumentCondition struct {
 	Op    string              `json:"op,omitempty" yaml:"op,omitempty"`

@@ -601,8 +601,8 @@ $defs:
     required:
       - exclude
     type: object
-$id: https://dal-go.github.io/dtql/schema.json
+$id: https://dal-go.github.io/tugql/schema.json
 $ref: '#/$defs/queryDocument'
 $schema: https://json-schema.org/draft/2020-12/schema
 description: YAML serialization of dalgo's dal.StructuredQuery (core relational read-only subset).
-title: DTQL
+title: TugQL

@@ -1,6 +1,6 @@
 # Ordered aggregate conformance fixtures
 
-`suite.json` names each DTQL document, its expected rows or refusal, and the
+`suite.json` names each TugQL document, its expected rows or refusal, and the
 expected strategy (`native` or `dalgo`) for the memory, SQLite, and PostgreSQL
 engines. The SQL strategy entries are contract data for the downstream adapter
 runners; this repository exercises the DALgo paths.

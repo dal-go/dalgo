@@ -1,13 +1,13 @@
-# Engineering Prompt: DTQL JOINs for DALGO Go and DALGO-JS
+# Engineering Prompt: TugQL JOINs for DALGO Go and DALGO-JS
 
 ## Mission
-Specify, plan, and implement first-class **JOIN support for DTQL and DALGO** in both **DALGO Go** and **DALGO-JS/TypeScript**. Work autonomously through repository discovery, specification, planning, adversarial review, implementation, tests, documentation, and final verification. Do not stop after producing a spec or plan unless genuinely blocked externally.
+Specify, plan, and implement first-class **JOIN support for TugQL and DALGO** in both **DALGO Go** and **DALGO-JS/TypeScript**. Work autonomously through repository discovery, specification, planning, adversarial review, implementation, tests, documentation, and final verification. Do not stop after producing a spec or plan unless genuinely blocked externally.
 
 First save this brief in an appropriate repository document so its intent survives context loss.
 
 ## Working process
-1. Inspect all relevant repositories/packages, current DTQL specification/models, DALGO query abstractions, adapters, capabilities, result models, errors, tests, and conventions.
-2. Identify the canonical DTQL specification location.
+1. Inspect all relevant repositories/packages, current TugQL specification/models, DALGO query abstractions, adapters, capabilities, result models, errors, tests, and conventions.
+2. Identify the canonical TugQL specification location.
 3. Save/update the authoritative specification **before substantial implementation**.
 4. Produce an implementation plan covering Go and TypeScript.
 5. Critically/adversarially review the specification and plan for ambiguity, unnecessary complexity, compatibility problems, execution correctness, missing cases, and Go/JS divergence.
@@ -20,8 +20,8 @@ First save this brief in an appropriate repository document so its intent surviv
 
 Use faster/cheaper suitable models or subagents for routine exploration, mechanical work, test generation, and straightforward reviews where supported. Reserve stronger reasoning for semantics, architecture, planning, difficult bugs, and final review.
 
-## DTQL is structured/YAML-based
-DTQL is **not textual SQL**. A real existing query is:
+## TugQL is structured/YAML-based
+TugQL is **not textual SQL**. A real existing query is:
 
 ```yaml
 from: {schema: main, name: Invoice}
@@ -31,7 +31,7 @@ orderBy:
 limit: 10
 ```
 
-Do not introduce SQL-like textual JOIN syntax. JOIN must be part of DTQL's structured YAML/JSON query model.
+Do not introduce SQL-like textual JOIN syntax. JOIN must be part of TugQL's structured YAML/JSON query model.
 
 # Core design: JOIN belongs inside FROM
 `joins` is a child of `from`, not a separate top-level query property. A `from` specification becomes a **recursive relation specification**:
@@ -118,7 +118,7 @@ on:
     right: c.CustomerId
 ```
 
-Multiple predicates are implicitly ANDed. MVP requires equality (`eq`). Design so `ne`, `lt`, `lte`, `gt`, `gte`, etc. can later be added without changing the structure. Inspect existing DTQL filter/expression abstractions and reuse/generalise them where appropriate, but do not force an unsuitable WHERE representation onto JOINs.
+Multiple predicates are implicitly ANDed. MVP requires equality (`eq`). Design so `ne`, `lt`, `lte`, `gt`, `gte`, etc. can later be added without changing the structure. Inspect existing TugQL filter/expression abstractions and reuse/generalise them where appropriate, but do not force an unsuitable WHERE representation onto JOINs.
 
 # ON scoping semantics
 This semantic is approved and must be explicitly specified and tested:
@@ -145,7 +145,7 @@ from:
 The second JOIN may use `b`; an earlier JOIN referring to a later alias must fail. Define nested visibility rigorously. Test parent/child references, nested references, earlier siblings, invalid forward references, unknown/duplicate aliases, ambiguous fields, and nested-scope visibility. Never silently guess.
 
 # Aliases and field references
-Aliases are supported at every FROM node. JOIN queries need qualified fields such as `i.InvoiceId`, `c.CustomerId`, `e.EmployeeId`. Inspect existing DTQL field-reference representation first. Reuse structured references if canonical; retain dotted strings if canonical. Unqualified fields may work only where existing DTQL permits and resolution is unambiguous. Ambiguity must error.
+Aliases are supported at every FROM node. JOIN queries need qualified fields such as `i.InvoiceId`, `c.CustomerId`, `e.EmployeeId`. Inspect existing TugQL field-reference representation first. Reuse structured references if canonical; retain dotted strings if canonical. Unqualified fields may work only where existing TugQL permits and resolution is unambiguous. Ambiguity must error.
 
 # Recursive FROM as reusable relation abstraction
 Treat recursive FROM as a reusable relation tree, not merely JOIN syntax. A future facility may support:
@@ -157,10 +157,10 @@ from:
 
 Do not implement FROM references unless an existing mechanism makes it naturally part of this work, but preserve the extension point and document the motivation.
 
-# DTQL versus DALGO responsibilities
-**DTQL defines what relation/query is requested.** It owns recursive FROM/JOIN structure, type, ON conditions, aliases, and backend-independent semantics/validation.
+# TugQL versus DALGO responsibilities
+**TugQL defines what relation/query is requested.** It owns recursive FROM/JOIN structure, type, ON conditions, aliases, and backend-independent semantics/validation.
 
-**DALGO decides how it is executed.** The same query may be executed natively, translated by an adapter, composed by DALGO from multiple reads, or eventually use mixed native/DALGO execution. Do not leak execution choices into DTQL.
+**DALGO decides how it is executed.** The same query may be executed natively, translated by an adapter, composed by DALGO from multiple reads, or eventually use mixed native/DALGO execution. Do not leak execution choices into TugQL.
 
 # DALGO execution architecture
 Not every adapter supports native JOINs—especially Firestore, document/key-value stores, HTTP/API sources, etc. JOIN support cannot simply be implemented in SQL adapters.
@@ -168,7 +168,7 @@ Not every adapter supports native JOINs—especially Firestore, document/key-val
 Conceptually:
 
 ```text
-DTQL relation tree
+TugQL relation tree
         ↓
     validation
         ↓
@@ -189,7 +189,7 @@ When an adapter can execute a complete JOIN subtree natively, allow pushdown. SQ
 Design for relation trees where some subtree can execute natively but another boundary requires DALGO composition. Implement mixed execution now if cleanly feasible; otherwise explicitly defer it while ensuring the architecture does not block it, unsupported plans fail clearly, and no incorrect result is silently returned.
 
 # Cross-database / cross-source JOINs
-Cross-source joins are an intentional future use case, especially for DataTug. Inspect how DTQL/DALGO identifies databases, connections, schemas, tables/collections, and sources. Avoid assumptions that permanently require every node to belong to one SQL database. Full distributed cross-source execution is not required unless current abstractions make it straightforward.
+Cross-source joins are an intentional future use case, especially for DataTug. Inspect how TugQL/DALGO identifies databases, connections, schemas, tables/collections, and sources. Avoid assumptions that permanently require every node to belong to one SQL database. Full distributed cross-source execution is not required unless current abstractions make it straightforward.
 
 # INNER and LEFT semantics
 INNER JOIN: only combinations satisfying all ON predicates survive; multiple matches produce multiple result combinations; unmatched left rows are removed.
@@ -217,7 +217,7 @@ Make semantics deliberate, not accidental.
 # Result shape
 Inspect current DALGO row/result representation before changing it. Specify how joined fields are exposed: flattened vs nested, alias participation, duplicate names, SELECT addressing, unmatched LEFT values, and schema metadata. Prefer compatibility. If insufficient, make the smallest coherent extension and implement parity in Go and JS.
 
-# Interaction with existing DTQL features
+# Interaction with existing TugQL features
 JOINs must compose with existing features where implemented: WHERE, SELECT, negative/excluded SELECT fields, ORDER BY, LIMIT, OFFSET, GROUP BY, HAVING, COUNT, COUNT DISTINCT, SUM, AVG, MIN, MAX, FIRST, LAST, and other query operations. Do not regress non-JOIN queries.
 
 Explicitly define logical semantics/order. A conceptual model may be:
@@ -236,7 +236,7 @@ FROM + JOIN relation construction
  ORDER / LIMIT / OFFSET
 ```
 
-But reconcile this with the actual DTQL specification rather than blindly imposing it. Pay particular attention to one-to-many joins followed by aggregates, LEFT JOIN + COUNT, and COUNT DISTINCT.
+But reconcile this with the actual TugQL specification rather than blindly imposing it. Pay particular attention to one-to-many joins followed by aggregates, LEFT JOIN + COUNT, and COUNT DISTINCT.
 
 # Validation and diagnostics
 Provide useful errors for at least: missing JOIN `from`; missing `on` where required; unsupported join type/operator; malformed ON; unknown/duplicate alias; ambiguous field; invalid forward reference; field unavailable in scope; malformed recursive FROM; cycles where applicable; unsupported execution plan; adapter capability mismatch; incompatible types when safely detectable.
@@ -244,10 +244,10 @@ Provide useful errors for at least: missing JOIN `from`; missing `on` where requ
 Include useful context such as alias, relation, field, JOIN index/path, and operator. Avoid generic `invalid join` errors when precise diagnostics are possible.
 
 # Go and JS parity
-The DTQL contract is language-independent. Do not independently invent subtly different semantics. Prefer shared YAML/JSON fixtures where practical; otherwise equivalent fixtures with identical expectations. Verify parity for serialization, defaults, type names, nested FROM, ON, scoping, validation, null/missing LEFT behaviour, field resolution, result shape, ordering, and aggregate interactions.
+The TugQL contract is language-independent. Do not independently invent subtly different semantics. Prefer shared YAML/JSON fixtures where practical; otherwise equivalent fixtures with identical expectations. Verify parity for serialization, defaults, type names, nested FROM, ON, scoping, validation, null/missing LEFT behaviour, field resolution, result shape, ordering, and aggregate interactions.
 
 # Compatibility
-Existing DTQL must continue working unchanged:
+Existing TugQL must continue working unchanged:
 
 ```yaml
 from: {schema: main, name: Invoice}
@@ -315,7 +315,7 @@ limit: 10
 Also test filtering and SELECT against joined fields.
 
 # Specification requirements
-Before substantial implementation, make the canonical DTQL specification authoritative about:
+Before substantial implementation, make the canonical TugQL specification authoritative about:
 
 1. recursive FROM;
 2. location/order of `joins`;
@@ -332,7 +332,7 @@ Before substantial implementation, make the canonical DTQL specification authori
 13. WHERE/SELECT/ORDER/LIMIT/OFFSET interaction;
 14. GROUP BY/HAVING/aggregate interaction;
 15. serialization;
-16. backend-independent nature of DTQL;
+16. backend-independent nature of TugQL;
 17. future reusable FROM references;
 18. future cross-source joins.
 
@@ -341,7 +341,7 @@ Use examples liberally. Go and TypeScript must implement this specification rath
 # Suggested milestones and success criteria
 
 ## 1. Discovery + specification
-Inspect repos, save this brief, update canonical DTQL spec, review it adversarially.
+Inspect repos, save this brief, update canonical TugQL spec, review it adversarially.
 
 **Success:** semantics are unambiguous enough for independent Go and JS implementations to produce equivalent results.
 
@@ -355,7 +355,7 @@ Implement correct INNER and LEFT execution, siblings and nesting, avoiding obvio
 
 **Success:** semantic tests pass in both implementations including nested LEFT/INNER combinations.
 
-## 4. DTQL composition
+## 4. TugQL composition
 Integrate JOIN results with existing WHERE/SELECT/ORDER/LIMIT/OFFSET/GROUP/HAVING/aggregates.
 
 **Success:** combined feature tests pass without regressions to non-JOIN queries.
@@ -373,8 +373,8 @@ Run complete checks, compare Go/JS semantics, adversarially review actual code/s
 # Engineering principles
 - Prefer a small coherent abstraction over adapter-specific hacks.
 - Preserve existing APIs and semantics where possible.
-- Do not make SQL the semantic definition of DTQL.
-- Keep DTQL declarative and backend-independent.
+- Do not make SQL the semantic definition of TugQL.
+- Keep TugQL declarative and backend-independent.
 - Make recursive FROM a first-class relation model.
 - Make nested joins genuinely work in MVP.
 - Fail explicitly rather than silently producing partial/incorrect results.

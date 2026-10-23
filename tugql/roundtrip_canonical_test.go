@@ -2,7 +2,7 @@ package tugql
 
 import "testing"
 
-// canonicalDocs are valid in-scope DTQL-YAML documents already in canonical form
+// canonicalDocs are valid in-scope TugQL YAML documents already in canonical form
 // (stable key order and 2-space indentation, as emitted by Serialize).
 var canonicalDocs = map[string]string{
 	"qualified source": `from:

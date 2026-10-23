@@ -1,0 +1,104 @@
+name: TugQL Publish
+
+# Publishes the TugQL artifacts to https://dal-go.github.io/tugql/.
+#
+# dalgo is the source of truth; dal-go.github.io is the serving surface. This
+# workflow assembles the /tugql/ subtree entirely from the GENERATED artifacts
+# (schema regenerated from the Go types, the validated example documents, and the
+# styled index page) and pushes it into the dal-go.github.io repository.
+#
+# A static stub is also written at /dtql/ so links to the former location keep
+# working: an index.html that redirects to /tugql/ and a schema.json that is only a
+# $ref to the /tugql/ schema. It is not generated from the Go types and carries no
+# other DTQL content.
+#
+# PENDING — the live cross-repo push requires the repository owner to add a
+# DALGO_SITE_TOKEN secret (a PAT or deploy key with push access to
+# dal-go/dal-go.github.io). Until then the publish step is skipped automatically
+# (the guard below is false), so this workflow only assembles and uploads the
+# /tugql/ subtree as a build artifact for review.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tugql/**'
+      - '.github/workflows/tugql-publish.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  publish:
+    name: Assemble and publish /tugql/
+    runs-on: ubuntu-latest
+    env:
+      DALGO_SITE_TOKEN: ${{ secrets.DALGO_SITE_TOKEN }}
+    steps:
+      - name: Checkout dalgo
+        uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # The schema is regenerated so the published artifact cannot be stale.
+      - name: Regenerate schema from the Go types
+        run: go test ./tugql/ -run TestSchemaIsFresh -update
+
+      - name: Assemble the /tugql/ subtree from generated artifacts
+        run: |
+          set -euo pipefail
+          out="_site/tugql"
+          mkdir -p "$out/examples"
+          cp tugql/schema/schema.json "$out/schema.json"
+          cp tugql/schema/schema.yaml "$out/schema.yaml"
+          cp tugql/examples/*.tugql.yaml "$out/examples/"
+          cp tugql/site/index.html "$out/index.html"
+          # Static redirect stub for the former /dtql/ location (not regenerated).
+          mkdir -p _site/dtql
+          cat > _site/dtql/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=/tugql/">
+          <title>Moved to /tugql/</title>
+          <p>This page moved to <a href="/tugql/">/tugql/</a>.</p>
+          HTML
+          printf '%s\n' '{"$ref": "https://dal-go.github.io/tugql/schema.json"}' > _site/dtql/schema.json
+          echo "Assembled:" && find _site -type f | sort
+
+      - name: Upload the site subtrees as a build artifact (always)
+        uses: actions/upload-artifact@v7
+        with:
+          name: tugql-site
+          path: _site
+
+      # Live cross-repo publish — runs only when the owner has provided a token.
+      - name: Publish to dal-go.github.io/tugql/
+        if: ${{ env.DALGO_SITE_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "https://x-access-token:${DALGO_SITE_TOKEN}@github.com/dal-go/dal-go.github.io.git" site-repo
+          rm -rf site-repo/tugql site-repo/dtql
+          mkdir -p site-repo/tugql site-repo/dtql
+          cp -R _site/tugql/. site-repo/tugql/
+          cp -R _site/dtql/. site-repo/dtql/
+          cd site-repo
+          git config user.name "dalgo-ci"
+          git config user.email "ci@dal-go.github.io"
+          git add tugql dtql
+          if git diff --cached --quiet; then
+            echo "No TugQL changes to publish."
+            exit 0
+          fi
+          git commit -m "Publish TugQL artifacts from dalgo@${GITHUB_SHA}"
+          git push origin HEAD
+
+      - name: Note when publish is skipped
+        if: ${{ env.DALGO_SITE_TOKEN == '' }}
+        run: |
+          echo "::notice::DALGO_SITE_TOKEN is not set — the live publish to dal-go.github.io/tugql/ was skipped."
+          echo "::notice::Add a DALGO_SITE_TOKEN secret with push access to dal-go/dal-go.github.io to enable it."

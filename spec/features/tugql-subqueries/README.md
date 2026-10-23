@@ -3,21 +3,21 @@ format: https://specscore.md/feature-specification
 status: Implementing
 ---
 
-# Feature: Recursive DTQL subqueries across DALgo Go and TypeScript
+# Feature: Recursive TugQL subqueries across DALgo Go and TypeScript
 
-> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-subqueries?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-subqueries?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-subqueries?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-subqueries?op=request-change) |
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/tugql-subqueries?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/tugql-subqueries?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/tugql-subqueries?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/tugql-subqueries?op=request-change) |
 **Status:** Implementing
 **Source Ideas:** —
 
 ## Summary
 
-One recursive DTQL query contract for scalar projection, derived FROM and JOIN sources, IN/NOT IN, and EXISTS/NOT EXISTS. The same serialized query has executable semantics in DALgo Go and DALgo-JS, including correlation, cardinality, and SQL-style NULL behavior.
+One recursive TugQL query contract for scalar projection, derived FROM and JOIN sources, IN/NOT IN, and EXISTS/NOT EXISTS. The same serialized query has executable semantics in DALgo Go and DALgo-JS, including correlation, cardinality, and SQL-style NULL behavior.
 
 ## Problem
 
-DTQL currently serializes a single query whose `from` may contain recursive JOINs, but a query cannot itself be a source, expression, or predicate operand. Go has a richer `dal.StructuredQuery` and generic JOIN/aggregation paths; DALgo-JS currently exposes a flat `StructuredQuery` and a Phase 1 DTQL parser that does not execute queries. Adding only YAML syntax would leave consumers with documents that parse but cannot run, and adding separate query variants would make composition and parity fragile.
+TugQL currently serializes a single query whose `from` may contain recursive JOINs, but a query cannot itself be a source, expression, or predicate operand. Go has a richer `dal.StructuredQuery` and generic JOIN/aggregation paths; DALgo-JS currently exposes a flat `StructuredQuery` and a Phase 1 TugQL parser that does not execute queries. Adding only YAML syntax would leave consumers with documents that parse but cannot run, and adding separate query variants would make composition and parity fragile.
 
-DALgo's repository rule requires a human's explicit, verbatim reason before adding exported query APIs. Alex approved the following reason on 2026-09-21: “First-class subqueries are needed for composable DTQL across DALgo Go and TypeScript; additive public query APIs are acceptable while existing queries remain compatible.” Existing exported interfaces and method signatures must remain source compatible.
+DALgo's repository rule requires a human's explicit, verbatim reason before adding exported query APIs. Alex approved the following reason on 2026-09-21: “First-class subqueries are needed for composable TugQL across DALgo Go and TypeScript; additive public query APIs are acceptable while existing queries remain compatible.” Existing exported interfaces and method signatures must remain source compatible.
 
 ## Behavior
 
@@ -25,7 +25,7 @@ DALgo's repository rule requires a human's explicit, verbatim reason before addi
 
 #### REQ: one-query-shape
 
-Every nested query MUST use the same recursive clause set as a top-level DTQL query: `as`, `from`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`, and final `columns`. The canonical Go serializer MUST retain `columns` at the end. Existing documents MUST remain parseable with equivalent semantics, and canonical output for pre-existing queries MUST remain byte-identical to the old serializer's output; original user formatting need not be retained. `as` belongs inside a nested query when its result is named; table aliases retain the current canonical `alias` field and accepted input synonym `as`. A nested query MUST NOT be represented by a reduced context-specific AST.
+Every nested query MUST use the same recursive clause set as a top-level TugQL query: `as`, `from`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`, and final `columns`. The canonical Go serializer MUST retain `columns` at the end. Existing documents MUST remain parseable with equivalent semantics, and canonical output for pre-existing queries MUST remain byte-identical to the old serializer's output; original user formatting need not be retained. `as` belongs inside a nested query when its result is named; table aliases retain the current canonical `alias` field and accepted input synonym `as`. A nested query MUST NOT be represented by a reduced context-specific AST.
 
 #### REQ: contextual-shape
 
@@ -73,7 +73,7 @@ columns:
 
 #### REQ: recursive-serialization
 
-Go and TypeScript MUST read equivalent YAML/JSON documents, reject unknown or conflicting discriminator keys, detect recursive YAML alias cycles, and produce stable canonical documents. Existing flat and JOIN documents MUST continue to deserialize unchanged. `dal-go/dalgo/dtql/testdata/subqueries/` owns versioned fixture inputs, expected rows, and expected errors; DALgo-JS vendors their exact bytes with a SHA-256 manifest that CI verifies. Normalized rows are ordered JSON arrays of field maps: absent fields stay absent, SQL NULL/Go nil/JS null become JSON null, finite numbers compare by numeric value, and output names remain case-sensitive. Expected errors carry stable `category` and `path` plus an explanatory message fragment; human wording may vary. Go and JS CI run the same case list independently without sibling checkouts.
+Go and TypeScript MUST read equivalent YAML/JSON documents, reject unknown or conflicting discriminator keys, detect recursive YAML alias cycles, and produce stable canonical documents. Existing flat and JOIN documents MUST continue to deserialize unchanged. `dal-go/dalgo/tugql/testdata/subqueries/` owns versioned fixture inputs, expected rows, and expected errors; DALgo-JS vendors their exact bytes with a SHA-256 manifest that CI verifies. Normalized rows are ordered JSON arrays of field maps: absent fields stay absent, SQL NULL/Go nil/JS null become JSON null, finite numbers compare by numeric value, and output names remain case-sensitive. Expected errors carry stable `category` and `path` plus an explanatory message fragment; human wording may vary. Go and JS CI run the same case list independently without sibling checkouts.
 
 ### Expressions, sources, and scopes
 
@@ -105,7 +105,7 @@ A null test does not change the comparison operators, which are not uniform: in 
 
 A misspelt field is the same as an absent one: without field metadata the executor cannot reject `isNull` on it, so Go matches every row for `isNull` and none for `isNotNull`; where the backend reports its fields (`JoinFieldsProvider`) Go rejects it before reading a row, and TypeScript, which always has a schema, rejects it at parse.
 
-POLICY predicates keep a different rule. Access-policy conditions (`access.DocumentCondition`, `condeval`) stay on the comparison and group subset and MUST reject a null test: the layered-ACL acceptance rule V02 (datatug/dtql `design/layered-acl/11-acceptance.md`: "Missing != null ... missing never matches") keeps winning there, and a null test would make a missing field match. In the QUERY engine a missing field reads as NULL, as it already does for every other operator; the two rules govern different evaluators and do not conflict.
+POLICY predicates keep a different rule. Access-policy conditions (`access.DocumentCondition`, `condeval`) stay on the comparison and group subset and MUST reject a null test: the layered-ACL acceptance rule V02 (datatug/tugql `design/layered-acl/11-acceptance.md`: "Missing != null ... missing never matches") keeps winning there, and a null test would make a missing field match. In the QUERY engine a missing field reads as NULL, as it already does for every other operator; the two rules govern different evaluators and do not conflict.
 
 #### REQ: exists-not-exists
 
@@ -115,7 +115,7 @@ POLICY predicates keep a different rule. Access-policy conditions (`access.Docum
 
 #### REQ: execution-routing
 
-The supported Go framework entrypoints are `dal.DB.ExecuteQueryToRecordsReader`, `dal.DB.ExecuteQueryToRecordsetReader`, and `Select` on the validated DB plus validated read and read-write transactions. The TypeScript path is a new additive DTQL execution entrypoint over the existing leaf `QueryExecutor`; legacy `query(StructuredQuery<T>)` remains unchanged. Direct raw-adapter calls must explicitly reject an unknown nested AST, and are not covered by the framework planner. A provider MAY claim whole-query native execution only for shapes it implements faithfully via a query-specific optional capability probe; a coarse `QueryCapabilities` flag or a JOIN-only claim is insufficient. Otherwise DALgo MAY execute through bounded relation scans using the same authorized session that accepted the outer query. Policy is checked for every leaf relation; row filters and masks apply before a row can join, correlate, or become a scalar result. If the current adapter/session cannot prove those semantics, the plan is unsupported before any output. Unknown capability MUST never imply native support. SQLite/SQL and in-use browser adapters need actual positive or negative execution tests, not structural typing alone.
+The supported Go framework entrypoints are `dal.DB.ExecuteQueryToRecordsReader`, `dal.DB.ExecuteQueryToRecordsetReader`, and `Select` on the validated DB plus validated read and read-write transactions. The TypeScript path is a new additive TugQL execution entrypoint over the existing leaf `QueryExecutor`; legacy `query(StructuredQuery<T>)` remains unchanged. Direct raw-adapter calls must explicitly reject an unknown nested AST, and are not covered by the framework planner. A provider MAY claim whole-query native execution only for shapes it implements faithfully via a query-specific optional capability probe; a coarse `QueryCapabilities` flag or a JOIN-only claim is insufficient. Otherwise DALgo MAY execute through bounded relation scans using the same authorized session that accepted the outer query. Policy is checked for every leaf relation; row filters and masks apply before a row can join, correlate, or become a scalar result. If the current adapter/session cannot prove those semantics, the plan is unsupported before any output. Unknown capability MUST never imply native support. SQLite/SQL and in-use browser adapters need actual positive or negative execution tests, not structural typing alone.
 
 #### REQ: correlation-cost
 
@@ -123,7 +123,7 @@ The planner MUST mark correlated query nodes and identify their outer bindings. 
 
 #### REQ: aggregate-and-existing-behavior
 
-Nested queries MUST reuse existing COUNT, COUNT DISTINCT, SUM, AVG, MIN, MAX, FIRST, LAST, grouping, HAVING, and ordering semantics. Ordinary flat DTQL, existing recursive JOINs, negative projection, and aggregation MUST keep their serialized and runtime behavior. Additions MUST NOT extend existing exported Go interfaces or require existing TypeScript callers to supply new fields. Go adds optional concrete nodes/accessors; TypeScript extends the JOIN branch's distinct `JoinedDTQLQuery` route into one recursive DTQL query AST, while keeping legacy flat `StructuredQuery<T>` and `QueryExecutor.query` intact. A new execution function handles recursive DTQL so old adapters do not silently accept unsupported trees. Changes to public types/functions await the required human rationale, and version/release notes must explain all additive surfaces.
+Nested queries MUST reuse existing COUNT, COUNT DISTINCT, SUM, AVG, MIN, MAX, FIRST, LAST, grouping, HAVING, and ordering semantics. Ordinary flat TugQL, existing recursive JOINs, negative projection, and aggregation MUST keep their serialized and runtime behavior. Additions MUST NOT extend existing exported Go interfaces or require existing TypeScript callers to supply new fields. Go adds optional concrete nodes/accessors; TypeScript extends the JOIN branch's distinct `JoinedTugQLQuery` route into one recursive TugQL query AST, while keeping legacy flat `StructuredQuery<T>` and `QueryExecutor.query` intact. A new execution function handles recursive TugQL so old adapters do not silently accept unsupported trees. Changes to public types/functions await the required human rationale, and version/release notes must explain all additive surfaces.
 
 #### REQ: diagnostics
 
@@ -133,7 +133,7 @@ Validation MUST distinguish syntax, scope, shape, cardinality, capability, and w
 
 ### AC: recursive-documents (verifies REQ:one-query-shape, REQ:wire-discriminators, REQ:recursive-serialization)
 
-Given existing flat and recursive JOIN DTQL plus nested examples in YAML and JSON
+Given existing flat and recursive JOIN TugQL plus nested examples in YAML and JSON
 When Go and TypeScript parse and serialize them
 Then old documents retain their meaning and canonical output, while every nested context round-trips through the same recursive query shape.
 
@@ -211,7 +211,7 @@ Then every entrypoint uses the same validation/plan and returns equivalent resul
 
 ### AC: released-journey (verifies REQ:recursive-serialization, REQ:execution-routing)
 
-Given the same saved canonical customer/invoice DTQL document and fixture data in a clean consumer workspace containing only released DALgo Go and DALgo-JS packages
+Given the same saved canonical customer/invoice TugQL document and fixture data in a clean consumer workspace containing only released DALgo Go and DALgo-JS packages
 When a standalone acceptance command parses, binds, and executes the query through both packages
 Then it compares their normalized rows and errors with the checked-in expected output without using sibling source checkouts.
 

@@ -10,16 +10,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Serialize converts an in-scope dal.StructuredQuery into a canonical DTQL-YAML
+// Serialize converts an in-scope dal.StructuredQuery into a canonical TugQL YAML
 // document. queryToDocument is the single validating pass: an out-of-scope query
 // yields a descriptive error and no document.
 func Serialize(q dal.StructuredQuery) ([]byte, error) {
 	if q == nil {
-		return nil, fmt.Errorf("query is not representable as DTQL: query is nil")
+		return nil, fmt.Errorf("query is not representable as TugQL: query is nil")
 	}
 	doc, err := queryToDocument(q)
 	if err != nil {
-		return nil, fmt.Errorf("query is not representable as DTQL: %w", err)
+		return nil, fmt.Errorf("query is not representable as TugQL: %w", err)
 	}
 	return marshalCanonical(doc), nil
 }
@@ -71,10 +71,10 @@ func queryToDocument(q dal.StructuredQuery) (document, error) {
 		return document{}, fmt.Errorf("invalid aggregation: %w", err)
 	}
 	if q.StartFrom() != "" {
-		return document{}, fmt.Errorf("cursor (StartFrom) is not supported by DTQL")
+		return document{}, fmt.Errorf("cursor (StartFrom) is not supported by TugQL")
 	}
 	if q.StartAfter() != "" {
-		return document{}, fmt.Errorf("cursor (StartAfter) is not supported by DTQL")
+		return document{}, fmt.Errorf("cursor (StartAfter) is not supported by TugQL")
 	}
 	if q.Limit() < 0 || q.Offset() < 0 {
 		return document{}, fmt.Errorf("limit and offset must be non-negative")
@@ -193,7 +193,7 @@ func fromToYAML(from dal.FromSource) (fromYAML, error) {
 		return fromYAML{}, fmt.Errorf("unsupported From source %T", from.Base())
 	}
 	if base.Parent() != nil {
-		return fromYAML{}, fmt.Errorf("parented collection reference %q is not supported by DTQL (only root collections)", base.Path())
+		return fromYAML{}, fmt.Errorf("parented collection reference %q is not supported by TugQL (only root collections)", base.Path())
 	}
 	result := fromYAML{Name: base.Name(), Alias: base.Alias()}
 	if base.ScanLimit() > 0 {

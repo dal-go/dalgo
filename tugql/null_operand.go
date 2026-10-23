@@ -20,7 +20,7 @@ func validateNullTests(condition dal.Condition, path string, having bool) error 
 			key = ".isNotNull"
 		}
 		if reason := nullOperandProblem(c.Operand(), having); reason != "" {
-			return fmt.Errorf("invalid DTQL: query_shape at %s%s: %s", path, key, reason)
+			return fmt.Errorf("invalid TugQL: query_shape at %s%s: %s", path, key, reason)
 		}
 	case dal.GroupCondition:
 		key := ".and"

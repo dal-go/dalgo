@@ -213,7 +213,7 @@ func TestTugQLFinalBoundaryDelegatesExecutableOperatorValidation(t *testing.T) {
 		Version: "v1", Tables: []TugQLTable{{Name: "T", Fields: []TugQLField{{Name: "Id", Type: "integer", Authorized: true}}}},
 	}}}
 	resolved, diagnostics := ResolveTugQL(doc, context)
-	if resolved.Query != nil || len(diagnostics) != 1 || diagnostics[0].Code != "invalid_resolved_query" || diagnostics[0].Message != `invalid DTQL: unknown comparison operator "bogus"` {
+	if resolved.Query != nil || len(diagnostics) != 1 || diagnostics[0].Code != "invalid_resolved_query" || diagnostics[0].Message != `invalid TugQL: unknown comparison operator "bogus"` {
 		t.Fatalf("unsupported comparison resolved=%+v diagnostics=%+v", resolved, diagnostics)
 	}
 }

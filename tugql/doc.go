@@ -1,8 +1,8 @@
-// Package dtql provides TugQL query authoring, validation, resolution, formatting,
+// Package tugql provides TugQL query authoring, validation, resolution, formatting,
 // and serialization for dal.StructuredQuery.
 //
-// Decision: DTQL has been renamed to TugQL. TugQL is the canonical name of the
-// SQL-like query language and TugQL.org is its canonical public home. DTQL.org
+// Decision: TugQL has been renamed to TugQL. TugQL is the canonical name of the
+// SQL-like query language and TugQL.org is its canonical public home. TugQL.org
 // is retained as a permanent redirect for backwards compatibility and discovery.
 // TugQT (Tug Query Tree) is the intended name for the structured query-tree concept.
 //
@@ -21,8 +21,8 @@
 // serialization over dal.StructuredQuery (corresponding to the TugQT concept).
 //
 // TugQL syntax, resolution, and formatting are described in
-// spec/features/dtql/README.md. The YAML subset and node mapping are
-// documented in dtql/README.md.
+// spec/features/tugql/README.md. The YAML subset and node mapping are
+// documented in tugql/README.md.
 //
 // This package imports dal but adds no YAML dependency to dal.
 package tugql

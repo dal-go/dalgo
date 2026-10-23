@@ -8,11 +8,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// SchemaID is the canonical $id of the published DTQL JSON Schema.
-const SchemaID = "https://dal-go.github.io/dtql/schema.json"
+// SchemaID is the canonical $id of the published TugQL JSON Schema.
+const SchemaID = "https://dal-go.github.io/tugql/schema.json"
 
 // schemaDocument builds the JSON Schema (draft 2020-12) describing the in-scope
-// DTQL-YAML, derived from the dtql Go shape types and the in-scope operator set
+// TugQL YAML, derived from the tugql Go shape types and the in-scope operator set
 // (the single source of truth). It is rendered to schema.json and schema.yaml by
 // the gen-schema command and re-derived by the freshness test, so the committed
 // schema cannot drift from the types.
@@ -250,7 +250,7 @@ func schemaDocument() map[string]any {
 	return map[string]any{
 		"$schema":     "https://json-schema.org/draft/2020-12/schema",
 		"$id":         SchemaID,
-		"title":       "DTQL",
+		"title":       "TugQL",
 		"description": "YAML serialization of dalgo's dal.StructuredQuery (core relational read-only subset).",
 		"$ref":        "#/$defs/queryDocument",
 		"$defs":       defs,
@@ -283,7 +283,7 @@ func comparisonOpEnum() []any {
 	return enum
 }
 
-// SchemaJSON renders the DTQL JSON Schema as canonical, indented JSON. The
+// SchemaJSON renders the TugQL JSON Schema as canonical, indented JSON. The
 // schema document holds only strings, bools, ints, slices and maps, so
 // marshaling cannot fail.
 func SchemaJSON() []byte {
@@ -291,7 +291,7 @@ func SchemaJSON() []byte {
 	return append(b, '\n')
 }
 
-// SchemaYAML renders the DTQL JSON Schema as canonical YAML (identical content).
+// SchemaYAML renders the TugQL JSON Schema as canonical YAML (identical content).
 func SchemaYAML() []byte {
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)

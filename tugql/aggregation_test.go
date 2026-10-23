@@ -33,7 +33,7 @@ func TestAggregationYAMLRoundTrip(t *testing.T) {
 		}
 	}
 	if strings.Index(text, "columns:") < strings.Index(text, "orderBy:") {
-		t.Fatalf("columns must be the final DTQL pipeline stage:\n%s", text)
+		t.Fatalf("columns must be the final TugQL pipeline stage:\n%s", text)
 	}
 	decoded, err := Deserialize(encoded)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestQualifiedFieldYAMLRejectsEmptyAndWildcardSiblingSource(t *testing.T) {
 }
 
 // The TugQL-named entry points are Serialize and Deserialize under the new name.
-func TestTugQLEntryPointsRoundTripLikeTheDTQLOnes(t *testing.T) {
+func TestTugQLEntryPointsRoundTripLikeTheTugQLOnes(t *testing.T) {
 	q := dal.From(dal.NewRootCollectionRef("customers", "")).NewQuery().Limit(3).SelectColumns(dal.Column{Expression: dal.Field("country")})
 	encoded, err := SerializeTugQL(q)
 	if err != nil {

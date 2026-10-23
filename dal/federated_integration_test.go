@@ -88,7 +88,7 @@ columns:
 	}
 }
 
-func TestFederatedMoneyFromDTQL(t *testing.T) {
+func TestFederatedMoneyFromTugQL(t *testing.T) {
 	const document = `from:
   database: orders
   name: Invoice

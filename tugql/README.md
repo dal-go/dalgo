@@ -1,17 +1,18 @@
-# DTQL YAML and TugQL text authoring
+# TugQL YAML and TugQL text authoring
 
-The existing DTQL `Serialize` and `Deserialize` APIs provide a 1:1,
+The existing TugQL `Serialize` and `Deserialize` APIs provide a 1:1,
 human-readable **YAML serialization** of dalgo's `dal.StructuredQuery` for the
-core relational read-only subset. DTQL-YAML remains plain YAML over the
+core relational read-only subset. TugQL YAML remains plain YAML over the
 existing `dal` query model and uses the standard `gopkg.in/yaml.v3` library.
 
-TugQL is a separate, additive text-authoring adapter with a versioned
+The TugQL text form is an additive text-authoring adapter with a versioned
 `TugQLDocument`/`TugQLTree` model. `ParseTugQL` parses source,
 `ResolveTugQL` validates it against caller-authorized schemas and lowers
 supported constructs into the same `dal.StructuredQuery`, and `FormatTugQL`
-formats the source. It does not replace or change the existing DTQL-YAML APIs.
+formats the source. It does not replace or change the TugQL YAML
+`Serialize`/`Deserialize` APIs.
 The TugQL grammar, supported resolution profile, and approval record are in
-[`spec/features/dtql/README.md`](../spec/features/dtql/README.md).
+[`spec/features/tugql/README.md`](../spec/features/tugql/README.md).
 
 ```go
 package main
@@ -19,25 +20,25 @@ package main
 import (
 	"fmt"
 
-	"github.com/dal-go/dalgo/dtql"
+	"github.com/dal-go/dalgo/tugql"
 )
 
 func main() {
-	doc, diagnostics := dtql.ParseTugQL("from Invoice as i\nselect i.Id\n")
+	doc, diagnostics := tugql.ParseTugQL("from Invoice as i\nselect i.Id\n")
 	if len(diagnostics) != 0 {
 		fmt.Println(diagnostics)
 		return
 	}
-	context := dtql.TugQLResolveContext{
-		AuthorizedSchemas: []dtql.TugQLAuthorizedSchema{{
+	context := tugql.TugQLResolveContext{
+		AuthorizedSchemas: []tugql.TugQLAuthorizedSchema{{
 			Version: "schema-r1",
-			Tables: []dtql.TugQLTable{{
+			Tables: []tugql.TugQLTable{{
 				Name: "Invoice",
-				Fields: []dtql.TugQLField{{Name: "Id", Type: "integer", Authorized: true}},
+				Fields: []tugql.TugQLField{{Name: "Id", Type: "integer", Authorized: true}},
 			}},
 		}},
 	}
-	resolved, diagnostics := dtql.ResolveTugQL(doc, context)
+	resolved, diagnostics := tugql.ResolveTugQL(doc, context)
 	if len(diagnostics) != 0 {
 		fmt.Println(diagnostics)
 		return
@@ -113,6 +114,64 @@ executor applies `WHERE` to invoice rows, computes each customer's `COUNT(*)`,
 keeps groups whose count is at least the threshold, then orders and projects
 the result. This count example avoids assumptions about exact money arithmetic.
 
+### Comments
+
+In the text form `--` and `//` each start a comment that runs to the end of the
+line. They are recognised only outside string literals and quoted identifiers,
+so `'https://example.com/x'` and `"a//b"` contain no comment. `#` is not a
+comment in the text form. `FormatTugQL` keeps every comment and the author's
+marker.
+
+Comments are carried on the parsed tree (`TugQLTree.Comments`), not on
+`dal.StructuredQuery`, and never influence resolution or generated SQL. SQL
+emitters must not write `//`; a comment an emitter carries is written as `--`.
+
+The structured YAML form uses YAML `#` comments:
+
+| Text | TugQL YAML |
+| --- | --- |
+| comment lines above a clause | head comment above the clause key |
+| comment after code on a clause line | same-line comment of that clause |
+| comment after the last clause | document-end comment |
+
+```go
+data, diagnostics := tugql.TugQLToYAML("-- invoices\nfrom Invoice // main table\nselect Id")
+// query:
+//     # invoices
+//     from: # main table
+//         name: Invoice
+//     columns:
+//         - field: Id
+text, diagnostics := tugql.YAMLToTugQL(data)
+// -- invoices
+// from Invoice -- main table
+// select Id
+```
+
+Both markers become `#`; `#` becomes `--`. A `//` comment therefore comes back
+as `--` after a text, YAML, text round trip. This is the one documented and
+accepted loss; the comment text and its placement are kept. A comment with no
+clean anchor (inside a multi-line `PARAMETERS`, `WITH` or `SELECT` block, or on
+a YAML node that is not a clause) becomes a leading comment of the nearest
+following clause, and a comment after the last clause becomes a document-end
+comment. A comment is never dropped. Blank lines between comments of one group
+are kept; a blank line before the first comment or between the last comment and
+its clause is not. The text after the marker loses one leading space and
+trailing whitespace; `--x` and `-- x` carry the same text.
+
+The anchors are `parameters`, `definitions[i]`, `query.from`,
+`query.from.joins[k]`, `query.from.joins[k].on[j]`, `query.where`,
+`query.groupBy`, `query.having`, `query.orderBy`, `query.limit` and
+`query.columns`.
+
+`YAMLToTugQL` and `PrintTugQL` print the canonical layout (lowercase keywords,
+two-space indentation, one-line `SELECT` list) and fail closed with a diagnostic
+for tree features that have no text spelling (for example `offset`, `money`,
+`DISTINCT` aggregates, `IN`/`EXISTS` conditions, negative literals).
+
+The shared Go/TypeScript conformance vectors are
+`testdata/tugql/v1/comments.json`, listed in `testdata/tugql/v1/manifest.sha256`.
+
 ### Resolution limits
 
 TugQL resolution uses a 128-level structural-depth limit and a 5,000-node
@@ -124,19 +183,19 @@ and 128 levels before another recursive walk or copy. Version 1 validates all
 declared definitions eagerly, including unused ones, and caps import expansion
 at 128 documents.
 
-The sections below document the legacy DTQL-YAML mapping and behavior.
+The sections below document the TugQL YAML mapping and behavior.
 
 ```go
-data, err := dtql.Serialize(q)   // dal.StructuredQuery -> DTQL-YAML
-q2, err := dtql.Deserialize(data) // DTQL-YAML -> dal.StructuredQuery
-dtql.Equal(q, q2)                 // structural equality over the covered surface
+data, err := tugql.Serialize(q)   // dal.StructuredQuery -> TugQL YAML
+q2, err := tugql.Deserialize(data) // TugQL YAML -> dal.StructuredQuery
+tugql.Equal(q, q2)                 // structural equality over the covered surface
 ```
 
 This package imports `dal` but adds **no YAML dependency to `dal`**.
 
 ## Covered subset
 
-DTQL represents a recursive `From` relation tree over **root** `CollectionRef`
+TugQL represents a recursive `From` relation tree over **root** `CollectionRef`
 (`Parent() == nil`), `Where`, `GroupBy`, `Having`, `OrderBy`, `Limit`/`Offset`,
 and the final `Columns` projection. Expressions include fields, constants,
 arrays, parameters, arithmetic, aggregate functions and `COUNT(*)`. Anything
@@ -231,7 +290,7 @@ the query is joined, while `having` treats null as a value. That `where` versus
 `having` inconsistency predates null tests and this change leaves it alone;
 `isNull` / `isNotNull` are the one spelling whose meaning is the same in every
 row of that table. The serializer never rewrites an existing `== null`
-comparison, and `!=` does not exist in DTQL, so `isNotNull` is the only way to
+comparison, and `!=` does not exist in TugQL, so `isNotNull` is the only way to
 ask for non-null values. Rendered as SQL a null test is `x IS NULL` /
 `x IS NOT NULL`.
 
@@ -314,7 +373,7 @@ types require schema or execution data and are validated by later layers.
 
 ## Aggregation
 
-DTQL keeps projection at the end of the YAML pipeline:
+TugQL keeps projection at the end of the YAML pipeline:
 
 ```yaml
 from:
@@ -403,7 +462,7 @@ unmatched exclusions without changing query semantics.
 
 ## Document shape
 
-A DTQL-YAML document has this canonical key order (top-level keys are omitted
+A TugQL YAML document has this canonical key order (top-level keys are omitted
 when empty/zero, except `from` which is required):
 
 ```yaml
@@ -466,7 +525,7 @@ with no table rule needs an explicit `OpaqueQueryScope` rule for it.
 
 - **Structural** — `Deserialize(Serialize(q))` reconstructs a `StructuredQuery`
   structurally equal to `q` across `From`, `Where`, `GroupBy`, `Having`,
-  `OrderBy`, `Limit`/`Offset`, and `Columns` (see `dtql.Equal`).
+  `OrderBy`, `Limit`/`Offset`, and `Columns` (see `tugql.Equal`).
 - **Canonical** — `Serialize` emits a canonical document (stable key order and
   2-space indentation). `Serialize(Deserialize(d))` normalizes accepted input
   aliases (`as` to `alias`, `eq` to `==`) and omitted INNER types, then remains
@@ -482,8 +541,8 @@ condition that mixes the comparison and group forms.
 
 ## Published artifacts
 
-The package also publishes DTQL as a tool-validatable artifact: a JSON Schema
+The package also publishes TugQL as a tool-validatable artifact: a JSON Schema
 (draft 2020-12) generated from the Go types — `schema/schema.json` (canonical
-`$id` `https://dal-go.github.io/dtql/schema.json`) and `schema/schema.yaml` — a
+`$id` `https://dal-go.github.io/tugql/schema.json`) and `schema/schema.yaml` — a
 set of example documents under `examples/`, and a styled index page, served at
-**https://dal-go.github.io/dtql/**.
+**https://dal-go.github.io/tugql/**.

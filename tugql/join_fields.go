@@ -6,7 +6,7 @@ import (
 	"github.com/dal-go/dalgo/dal"
 )
 
-// DTQL has no schema provider at parse or serialization time. In a JOIN
+// TugQL has no schema provider at parse or serialization time. In a JOIN
 // document every clause field must therefore carry its source; Go builder
 // callers may still use an empty source for the base collection.
 func validateJoinClauseFields(q dal.StructuredQuery) error {

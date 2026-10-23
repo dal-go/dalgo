@@ -40,7 +40,7 @@ func TestSerialize_subsetNodesRepresented(t *testing.T) {
 		t.Fatalf("Serialize failed: %v", err)
 	}
 	yamlStr := string(out)
-	t.Logf("DTQL-YAML:\n%s", yamlStr)
+	t.Logf("TugQL YAML:\n%s", yamlStr)
 
 	// The output must be plain YAML parseable by a standard library.
 	var generic map[string]any
@@ -59,7 +59,7 @@ func TestSerialize_subsetNodesRepresented(t *testing.T) {
 		"limit: 10", "offset: 20",
 	} {
 		if !strings.Contains(yamlStr, want) {
-			t.Errorf("serialized DTQL is missing representation %q", want)
+			t.Errorf("serialized TugQL is missing representation %q", want)
 		}
 	}
 }

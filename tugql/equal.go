@@ -7,7 +7,7 @@ import (
 )
 
 // Equal reports whether two in-scope dal.StructuredQuery values are structurally
-// equal across the DTQL-covered surface: From, Columns, the Where condition tree
+// equal across the TugQL-covered surface: From, Columns, the Where condition tree
 // (including inline Constant/Array values), OrderBy, Limit and Offset. It compares
 // via the dal accessor interface, so it is agnostic to the concrete query type
 // (e.g. a builder query vs. a deserialized one). It is the equality mechanism

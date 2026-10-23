@@ -260,27 +260,27 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 		{
 			name:    "unknown key",
 			yaml:    "from:\n  name: users\nbogus: 1\n",
-			wantErr: "invalid DTQL-YAML",
+			wantErr: "invalid TugQL YAML",
 		},
 		{
 			name:    "unknown from key",
 			yaml:    "from:\n  namespace: main\n  name: users\n",
-			wantErr: "invalid DTQL-YAML",
+			wantErr: "invalid TugQL YAML",
 		},
 		{
 			name:    "quoted merge token is an unknown key",
 			yaml:    "from: {\"<<\": {name: ignored}, name: users}\n",
-			wantErr: "invalid DTQL-YAML",
+			wantErr: "invalid TugQL YAML",
 		},
 		{
 			name:    "unknown merged from key",
 			yaml:    "from:\n  <<: {name: users, namespace: main}\n",
-			wantErr: "invalid DTQL-YAML",
+			wantErr: "invalid TugQL YAML",
 		},
 		{
 			name:    "unknown key in merge sequence",
 			yaml:    "from:\n  <<: [{name: users}, {namespace: main}]\n",
-			wantErr: "invalid DTQL-YAML",
+			wantErr: "invalid TugQL YAML",
 		},
 		{
 			name:    "non-string merged schema",
@@ -315,7 +315,7 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 		{
 			name:    "from name has wrong type",
 			yaml:    "from:\n  name: [users]\n",
-			wantErr: "invalid DTQL-YAML",
+			wantErr: "invalid TugQL YAML",
 		},
 		{
 			name:    "empty schema",
@@ -340,7 +340,7 @@ func TestDeserialize_invalidInputRejected(t *testing.T) {
 		{
 			name:    "wrong value type for limit",
 			yaml:    "from:\n  name: users\nlimit: notanint\n",
-			wantErr: "invalid DTQL-YAML",
+			wantErr: "invalid TugQL YAML",
 		},
 		{
 			name:    "unknown operator",

@@ -16,7 +16,7 @@ status: Implementing
 
 Extend [hierarchical access policies](../README.md) so that an **allow rule may
 carry a row condition**. The condition is a `dal.Condition` — the same
-expression tree `dal.StructuredQuery` uses and DTQL serialises — over the
+expression tree `dal.StructuredQuery` uses and TugQL serialises — over the
 record's fields, with **runtime variables** (`$currentUser`, `$now`, `$principal.roles`,
 named variables, and **path captures** such as `$path.spaceID` bound from a
 named wildcard segment) resolved from the operation's `context.Context`. Two slots follow the
@@ -31,7 +31,7 @@ The secured wrapper enforces the condition in the way each operation needs:
 evaluated on the record after a point read; **AND-rewritten into the structured
 query** before execution so the engine filters; evaluated on the pre-image and
 post-image of writes inside the same transaction. Policy documents carry
-conditions in DTQL's condition syntax plus a `param` node.
+conditions in TugQL's condition syntax plus a `param` node.
 
 The product promise is: **say which rows once, and every adapter — including the
 in-memory one — enforces it, engine-side where the engine can.**
@@ -53,7 +53,7 @@ evaluates a record's fields today.
 ## Design Principles
 
 - **One expression vocabulary.** Conditions are `dal.Condition` values. No second
-  predicate language, no parser; DTQL already serialises the tree.
+  predicate language, no parser; TugQL already serialises the tree.
 - **Engine-side when possible, wrapper-side always.** `Query` is rewritten so the
   engine filters and paging stays correct; point reads and writes are checked by
   the wrapper because there is nothing to rewrite.
@@ -301,12 +301,12 @@ another.
 ### REQ: portable-condition-documents
 
 YAML and JSON policy documents MUST accept `where` and `check` on a rule, each
-holding a condition in the **DTQL condition syntax** (`op`/`left`/`right`
+holding a condition in the **TugQL condition syntax** (`op`/`left`/`right`
 comparisons, `and`/`or` groups, `field`/`value`/`values` expressions) extended
 with a `param: <name>` expression. Documents without conditions MUST remain
-valid unchanged. DTQL MUST gain the same `param` expression so a saved query and
-a policy condition are written identically; that DTQL change is specified as a
-change request on the [`dtql`](../../dtql/README.md) feature and referenced here.
+valid unchanged. TugQL MUST gain the same `param` expression so a saved query and
+a policy condition are written identically; that TugQL change is specified as a
+change request on the [`tugql`](../../tugql/README.md) feature and referenced here.
 
 ```yaml
 scopes:
@@ -466,7 +466,7 @@ field value of the record.
   opens); it is designed to be shared with the pre-image the triggers idea
   needs.
 - **Codecs** extend the versioned document model with `where`/`check` using
-  DTQL's condition mapping plus `param`.
+  TugQL's condition mapping plus `param`.
 
 No adapter is modified.
 
@@ -503,6 +503,6 @@ No adapter is modified.
 ## Open Questions
 
 - Default behaviour of a denied conditional point read: *Decided 2026-09-03 (founder):* `DeniedError` by default (consistent and explainable); the policy option to hide denied records as `ErrRecordNotFound` remains available for enumeration-sensitive collections.
-- Should the parameter expression live in `dal` (usable by any query) or in `access` only? Recommended: `dal`, because DTQL and DataTug need it independently.
-- Should the `dtql` change (the `param` node) be filed as a change request on the `dtql` feature before this feature leaves Draft?
+- Should the parameter expression live in `dal` (usable by any query) or in `access` only? Recommended: `dal`, because TugQL and DataTug need it independently.
+- Should the `tugql` change (the `param` node) be filed as a change request on the `tugql` feature before this feature leaves Draft?
 - Which named variables, beyond `currentUser` and `now`, deserve a built-in convenience?

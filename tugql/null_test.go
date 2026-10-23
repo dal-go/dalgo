@@ -121,7 +121,7 @@ func TestNullTestCanonicalRoundTrip(t *testing.T) {
 			if err != nil || !Equal(q, again) {
 				t.Fatalf("round trip not structurally equal: %v", err)
 			}
-			// Same document as JSON: DTQL-JSON is plain JSON over the YAML shapes.
+			// Same document as JSON: TugQL-JSON is plain JSON over the YAML shapes.
 			var tree any
 			if err := yaml.Unmarshal([]byte(doc), &tree); err != nil {
 				t.Fatal(err)
@@ -137,7 +137,7 @@ func TestNullTestCanonicalRoundTrip(t *testing.T) {
 			if !Equal(q, fromJSON) {
 				t.Fatalf("JSON form differs from YAML form: %s", asJSON)
 			}
-			if err := validateDTQL(compileSchema(t), []byte(doc)); err != nil {
+			if err := validateTugQL(compileSchema(t), []byte(doc)); err != nil {
 				t.Fatalf("schema rejects %s: %v", name, err)
 			}
 		})

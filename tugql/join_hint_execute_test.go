@@ -13,7 +13,7 @@ import (
 )
 
 // This provider intentionally ignores JOINs. The DALgo executor must pass it
-// one source scan at a time, even when the DTQL tree carries physical hints.
+// one source scan at a time, even when the TugQL tree carries physical hints.
 type chinookHintScanBackend struct {
 	dal.Backend
 	data  map[string][]record.Record
@@ -36,7 +36,7 @@ func chinookHintRecord(table, id string, fields map[string]any) record.Record {
 
 func TestCanonicalHintedChinookExecutesLikeOriginal(t *testing.T) {
 	fixtures := map[string][]byte{}
-	for _, name := range []string{"chinook-nested.dtql.yaml", "chinook-hinted.dtql.yaml"} {
+	for _, name := range []string{"chinook-nested.tugql.yaml", "chinook-hinted.tugql.yaml"} {
 		data, err := os.ReadFile("testdata/joins/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -65,7 +65,7 @@ func TestCanonicalHintedChinookExecutesLikeOriginal(t *testing.T) {
 		},
 		"Employee": {chinookHintRecord("Employee", "e7", map[string]any{"EmployeeId": 7, "FirstName": "Evan"})},
 	}
-	for _, name := range []string{"chinook-nested.dtql.yaml", "chinook-hinted.dtql.yaml"} {
+	for _, name := range []string{"chinook-nested.tugql.yaml", "chinook-hinted.tugql.yaml"} {
 		t.Run(name, func(t *testing.T) {
 			query, err := Deserialize(fixtures[name])
 			if err != nil {
@@ -88,7 +88,7 @@ func TestCanonicalHintedChinookExecutesLikeOriginal(t *testing.T) {
 				t.Fatalf("canonical ordered rows = %#v, want %#v", rows, expected)
 			}
 			wantReads := map[string]int{"i": 1, "c": 1, "e": 1}
-			if name == "chinook-hinted.dtql.yaml" {
+			if name == "chinook-hinted.tugql.yaml" {
 				wantReads["c2"] = 1
 			}
 			if !reflect.DeepEqual(backend.reads, wantReads) {

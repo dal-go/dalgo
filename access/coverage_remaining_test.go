@@ -110,12 +110,12 @@ func TestRemainingCoordinatorHelpers(t *testing.T) {
 }
 
 func TestPolicyEnvelopeDefaultsVisibility(t *testing.T) {
-	document, err := ParseDTQLPolicy([]byte(portablePolicy("default-visibility", "public", validPortableScopes)))
+	document, err := ParseTugQLPolicy([]byte(portablePolicy("default-visibility", "public", validPortableScopes)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	document.Metadata.Visibility = ""
-	policy, err := policyFromDTQLDocument(document, "db1", "policy.yaml")
+	policy, err := policyFromTugQLDocument(document, "db1", "policy.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

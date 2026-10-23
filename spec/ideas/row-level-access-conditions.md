@@ -16,7 +16,7 @@ status: Implementing
 How might we let people declare, in one portable document, what a user, a
 group or a role may do — down to *which rows* ("records where `createdBy` is
 the current user", "orders where `tenantID` is the caller's tenant") and *which
-fields* — using wildcard paths and DTQL conditions the way Firestore security
+fields* — using wildcard paths and TugQL conditions the way Firestore security
 rules read, so that ownership, tenant isolation and field exposure are enforced
 once across every DALgo adapter, and ad-hoc reporting built on DALgo can be
 granted a safe slice of a collection without a data-model change?
@@ -50,13 +50,13 @@ adapter.
 The founder's direction (2026-09-02): row-level conditions are "super useful for
 DataTug and any ad-hoc reporting built on top of dalgo"; **internally use
 `dal.Condition`, but users should declare policies declaratively, per
-user/group/role, using DTQL**; add wildcard patterns for tables and fields;
+user/group/role, using TugQL**; add wildcard patterns for tables and fields;
 "think Firestore rules". Tracked as
 [dal-go/dalgo#133](https://github.com/dal-go/dalgo/issues/133).
 
 ## Recommended Direction
 
-**One declarative policy document — YAML, conditions in DTQL, bound to
+**One declarative policy document — YAML, conditions in TugQL, bound to
 principals — compiled to the existing `access` model plus `dal.Condition`, and
 enforced by the secured wrapper in the way each operation needs.** Three parts,
 each its own child feature of access-policies, shipped in this order.
@@ -65,7 +65,7 @@ each its own child feature of access-policies, shipped in this order.
 rule may carry `where` (the rows it applies to — `resource.data` in Firestore
 terms) and `check` (the shape a written row must have afterwards —
 `request.resource.data`; defaults to `where`). Both are `dal.Condition` trees:
-`Comparison` and And/Or groups, the same AST `dal.StructuredQuery` uses and DTQL
+`Comparison` and And/Or groups, the same AST `dal.StructuredQuery` uses and TugQL
 serialises — no second predicate language. Variables are a new parameter
 expression resolved from the context and substituted before any adapter sees a
 query: `$currentUser`, `$now`, `$principal.roles`, named variables, and
@@ -121,7 +121,7 @@ query rewriting, and the in-memory adapter enforcing the same document in tests.
   as a later push-down capability an adapter may advertise.
 - **A separate predicate language for policies** (CEL, a Firestore-rules-like
   grammar, a mini-DSL). Adds a parser, an evaluator and a second thing to
-  learn; the query AST already has the operators the use cases need and DTQL
+  learn; the query AST already has the operators the use cases need and TugQL
   already serialises it. The Firestore-rules *concepts* are adopted; its syntax
   is not.
 - **Union across all policies (Directus-style additive everywhere).** Would let
@@ -138,7 +138,7 @@ query rewriting, and the in-memory adapter enforcing the same document in tests.
 Part 1 in full: `where`/`check` on allow rules with `Comparison` and And/Or
 groups, `$currentUser`, `$now`, `$principal.*`, named variables and path
 captures; enforced for `Get`, `Exists`, `Query` (AND-rewrite), `Insert`, `Set`,
-`Update`, `Delete`; YAML/JSON codec support; DTQL `param` node; conformance on
+`Update`, `Delete`; YAML/JSON codec support; TugQL `param` node; conformance on
 `dalgo2memory` and the `end2end` suite; denial explanations without values.
 Parts 2 and 3 are specified alongside and follow in the next two releases, in
 that order: bindings first because a reporting tool needs "this role may query
@@ -147,7 +147,7 @@ these rows" before it needs field masks. Timebox: one `dalgo` release per part.
 ## Not Doing (and Why)
 
 - Conditional **deny** rules — need negation in the query AST first; deferred
-- A Firestore-rules-syntax parser — concepts adopted, syntax not; YAML + DTQL is
+- A Firestore-rules-syntax parser — concepts adopted, syntax not; YAML + TugQL is
   the document
 - Conditions that reference other records or sub-queries (Firestore's `get()`
   in rules) — no sub-query node in the AST and no cost model; single-record
@@ -166,7 +166,7 @@ these rows" before it needs field masks. Timebox: one `dalgo` release per part.
 | Must-be-true | AND-rewriting a rule condition into `dal.StructuredQuery.Where` preserves the caller's results exactly (same rows minus the forbidden ones), including `Limit`, `Offset`, `OrderBy` and cursors, on every adapter. | Extend the `end2end` conformance suite with conditional-policy cases per adapter; compare rewritten results against an unconstrained query filtered in memory. |
 | Must-be-true | Pre-image reads for conditional `Set`/`Update`/`Delete` can run inside the same read-write transaction on every transactional adapter without changing adapter code. | Prove through the secured wrapper against `dalgo2memory`, `dalgo2sql` (SQLite/PostgreSQL) and `dalgo2firestore`; a concurrent writer changing ownership between read and write must be rejected by the transaction, not slip through. |
 | Must-be-true | Union-within-principal, intersection-across-layers keeps the parent feature's guarantees: order independence, most-specific wins, deny on tie, and no widening of a database denial. | Re-run the whole access-policies acceptance suite with bindings and conditions added at every depth; no decision may change for unconditional requests; add widening-attempt cases that must deny. |
-| Should-be-true | The DTQL condition syntax plus `param` and path captures is enough for policy documents; no separate grammar is needed. | Author the Sneat extension policies, a DataTug tenant-reporting policy and a Firestore-rules sample translated one-to-one, in YAML; round-trip through the codec and compare decisions. |
+| Should-be-true | The TugQL condition syntax plus `param` and path captures is enough for policy documents; no separate grammar is needed. | Author the Sneat extension policies, a DataTug tenant-reporting policy and a Firestore-rules sample translated one-to-one, in YAML; round-trip through the codec and compare decisions. |
 | Should-be-true | Field patterns can be enforced as projection on reads and touched-field checks on writes without adapter changes. | Prototype on `dalgo2memory` and `dalgo2sql`; a query for `*` under a `fields: [name]` rule must reach the adapter as a projection of `name`. |
 | Should-be-true | `Exists` upgraded to a read for conditional rules is an acceptable cost. | Measure on `dalgo2firestore`; document the cost; keep unconditional `Exists` untouched. |
 | Might-be-true | Adapters with native row-level security can accept a push-down of the same condition later without changing the policy documents. | Defer; keep the condition as a `dal.Condition` value the adapter can inspect. |
@@ -174,7 +174,7 @@ these rows" before it needs field masks. Timebox: one `dalgo` release per part.
 ## SpecScore Integration
 
 - **New Features this would create:** [access-policies/row-level-conditions](../features/access-policies/row-level-conditions/README.md), [access-policies/principal-bindings](../features/access-policies/principal-bindings/README.md), [access-policies/field-patterns](../features/access-policies/field-patterns/README.md)
-- **Existing Features affected:** [access-policies](../features/access-policies/README.md) (rule model, secured wrapper, codecs, path patterns gain named captures), [dtql](../features/dtql/README.md) (parameter expression node), the query builder (`dal.Condition` gains a parameter expression)
+- **Existing Features affected:** [access-policies](../features/access-policies/README.md) (rule model, secured wrapper, codecs, path patterns gain named captures), [tugql](../features/tugql/README.md) (parameter expression node), the query builder (`dal.Condition` gains a parameter expression)
 - **Dependencies:** none beyond the shipped access-policies feature; shares the pre-image read mechanism and the condition/parameter machinery with [triggers-and-webhooks](triggers-and-webhooks.md)
 
 ## Open Questions
@@ -185,9 +185,9 @@ these rows" before it needs field masks. Timebox: one `dalgo` release per part.
 - Where do role and group *memberships* come from — always the host via the
   context, or may a binding document also declare group membership? Recommendation:
   host only; DALgo stays identity-agnostic.
-- Should the DTQL parameter node be specified inside the `dtql` feature as a
+- Should the TugQL parameter node be specified inside the `tugql` feature as a
   change request, or inside the row-level-conditions feature? Recommendation:
-  change request on `dtql`, referenced from the feature.
+  change request on `tugql`, referenced from the feature.
 - Should a bounded cross-record lookup (Firestore's `get()` in rules) be
   designed into the condition vocabulary now, so the slot exists, or left
   entirely to a later idea?

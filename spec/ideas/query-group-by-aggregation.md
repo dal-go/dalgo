@@ -44,7 +44,7 @@ A build that lands GROUP BY end to end in the in-memory adapter: `dal.QueryBuild
 
 ## Not Doing (and Why)
 
-- DTQL serialization of GROUP BY -- dtql/serialize.go already rejects GroupBy as unsupported; left unchanged
+- TugQL serialization of GROUP BY -- tugql/serialize.go already rejects GroupBy as unsupported; left unchanged
 - SQL adapters (dalgo2sql, dalgo2sqlite) -- separate repos, unblocked by the shared dal capability
 - DISTINCT, GROUPING SETS / ROLLUP / CUBE, window functions -- only flat GROUP BY is in scope
 - New aggregate functions beyond the existing SUM/COUNT/MIN/MAX/AVG -- no new function builders added
@@ -59,7 +59,7 @@ A build that lands GROUP BY end to end in the in-memory adapter: `dal.QueryBuild
 | Must-be-true | `validateColumns`/`projectRow` can be extended to evaluate `function` aggregate expressions per group and to enforce "every non-aggregate SELECT column appears in GROUP BY", without breaking the ungrouped projection path. | Project a grouped query mixing a group-key column and `CountAs`/`SumAs`; assert values; assert a non-grouped, non-aggregate column is rejected; rerun the existing projection suite unchanged. |
 | Should-be-true | `Having()` can reuse `dal.Condition` evaluated over the aggregated/aliased output row (same shape `matchesWhere` already consumes) rather than needing a new clause type. | Add a HAVING that filters on a `COUNT` alias; confirm groups are dropped post-aggregation and the condition evaluator needs no special-casing. |
 | Should-be-true | An empty `GroupBy()` preserves today's exact behavior for every existing query (no grouping, full or projected records as before). | Run the full dalgo2memory suite unchanged; only queries built with `GroupBy(...)` take the grouping path. |
-| Might-be-true | Consumers actually want aggregation executed by the in-memory adapter (tests, datatug previews) rather than only by real SQL backends. | Review DTQL/datatug for a concrete in-memory aggregation use before widening past the five existing aggregate functions. |
+| Might-be-true | Consumers actually want aggregation executed by the in-memory adapter (tests, datatug previews) rather than only by real SQL backends. | Review TugQL/datatug for a concrete in-memory aggregation use before widening past the five existing aggregate functions. |
 
 
 ## SpecScore Integration

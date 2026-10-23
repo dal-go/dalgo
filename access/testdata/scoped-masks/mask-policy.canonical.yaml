@@ -1,4 +1,4 @@
-apiVersion: dtql.org/access/v1
+apiVersion: tugql.org/access/v1
 collectionMask:
   stages:
   - include:
@@ -13,7 +13,7 @@ composition: dalgo-hierarchical-v1
 default: deny
 execution:
   allow:
-  - class: dtql
+  - class: tugql
   - class: stored_procedure
     mask:
       stages:

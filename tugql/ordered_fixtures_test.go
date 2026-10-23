@@ -355,7 +355,7 @@ func TestOrderedAggregateFixtureManifestAndTypedDataset(t *testing.T) {
 // misordering values with different offsets. This control deliberately makes
 // the two loader representations produce different answers.
 func TestOrderedAggregateFixtureTimestampLoaderHasAStringRedControl(t *testing.T) {
-	input, err := os.ReadFile(filepath.Join(orderedFixtureDir, "timestamp-key-offsets.dtql.yaml"))
+	input, err := os.ReadFile(filepath.Join(orderedFixtureDir, "timestamp-key-offsets.tugql.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

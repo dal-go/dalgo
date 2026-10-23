@@ -1,6 +1,6 @@
 ## JOIN algorithm hints
 
-DTQL JOINs may provide an ordered list of preferred physical JOIN algorithms.
+TugQL JOINs may provide an ordered list of preferred physical JOIN algorithms.
 
 Hints affect **execution only**. They MUST NOT change query semantics or results.
 

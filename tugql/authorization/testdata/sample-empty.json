@@ -1,5 +1,5 @@
 {
-  "apiVersion": "dtql.org/authorization/v1",
+  "apiVersion": "tugql.org/authorization/v1",
   "requestId": "req-1",
   "mode": "sample",
   "scope": "sample",

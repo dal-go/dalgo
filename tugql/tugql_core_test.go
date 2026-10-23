@@ -625,7 +625,7 @@ func TestTugQLPublicTreeIsVersionedAndKeepsCallsNonExecutable(t *testing.T) {
 	}
 	legacy, err := Deserialize([]byte("from: {name: Invoice}\ncolumns: [{call: {function: COALESCE, args: [{field: Note}]}}]\n"))
 	if err == nil || legacy != nil {
-		t.Fatalf("legacy DTQL made a scalar call executable: %v %v", legacy, err)
+		t.Fatalf("legacy TugQL made a scalar call executable: %v %v", legacy, err)
 	}
 	doc.Tree.Query["unsupported"] = true
 	if _, err := yaml.Marshal(*doc.Tree); err == nil {

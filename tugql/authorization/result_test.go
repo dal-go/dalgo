@@ -11,8 +11,8 @@ import (
 )
 
 const inspectResultFixture = `{
-  "apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"inspect","scope":"request","result":"allow","allowed":true,"hypothetical":false,
-  "operations":[{"id":"u1","requestOperationId":"u1","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"allow","restrictionIds":[],"allOf":[],"executionClass":"dtql"}],
+  "apiVersion":"tugql.org/authorization/v1","requestId":"req-1","mode":"inspect","scope":"request","result":"allow","allowed":true,"hypothetical":false,
+  "operations":[{"id":"u1","requestOperationId":"u1","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"allow","restrictionIds":[],"allOf":[],"executionClass":"tugql"}],
   "layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"allow","decisions":[{"operationId":"u1","result":"allow","scope":"operation","restrictionIds":[]}]}],
   "blockers":[],"coverage":{"evaluation":"complete","disclosure":"full","truncated":false,"unevaluated":[]},"restrictions":[]
 }`
@@ -140,13 +140,16 @@ func TestCompatibleDecodePreservesFutureDenialCode(t *testing.T) {
 }
 
 func TestTugQLAPIVersionAndExecution(t *testing.T) {
-	source := strings.Replace(inspectResultFixture, `"apiVersion":"dtql.org/authorization/v1"`, `"apiVersion":"tugql.org/authorization/v1"`, 1)
-	res, err := ParseResult([]byte(source))
+	res, err := ParseResult([]byte(inspectResultFixture))
 	if err != nil {
 		t.Fatalf("failed to parse TugQL apiVersion: %v", err)
 	}
-	if res.APIVersion != APIVersion {
-		t.Fatalf("expected APIVersion %q, got %q", APIVersion, res.APIVersion)
+	if res.APIVersion != APIVersion || res.Operations[0].ExecutionClass != ExecutionTugQL {
+		t.Fatalf("expected APIVersion %q and execution class %q, got %q and %q", APIVersion, ExecutionTugQL, res.APIVersion, res.Operations[0].ExecutionClass)
+	}
+	other := strings.Replace(inspectResultFixture, `"apiVersion":"`+APIVersion+`"`, `"apiVersion":"example.org/authorization/v1"`, 1)
+	if _, err := ParseResult([]byte(other)); err == nil {
+		t.Fatal("expected an unsupported apiVersion error")
 	}
 }
 

@@ -28,7 +28,7 @@ func TestPrivateAggregateSourceMarkerIsNotSerialized(t *testing.T) {
 	}
 	got, err := Serialize(markedAggregateSourceQuery{plain})
 	if err != nil || string(got) != string(want) || strings.Contains(string(got), "OrderedAggregateSourceFields") {
-		t.Fatalf("marked DTQL bytes = %q, err = %v; want %q", got, err, want)
+		t.Fatalf("marked TugQL bytes = %q, err = %v; want %q", got, err, want)
 	}
 }
 

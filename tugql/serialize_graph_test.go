@@ -9,7 +9,7 @@ import (
 
 // Serialize returns on a query whose condition holds itself. The validation of the aggregates of a
 // query ends on it as the inspection of the query tree does: a group held by pointer ends where it
-// meets itself and is refused as a condition DTQL does not cover, and a group held by value in
+// meets itself and is refused as a condition TugQL does not cover, and a group held by value in
 // where is followed to the bound of the walk and refused as nested too deeply to be checked.
 func TestSerializeEndsOnAConditionGroupThatHoldsItself(t *testing.T) {
 	byPointer := make([]dal.Condition, 2)

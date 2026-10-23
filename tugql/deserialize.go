@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Deserialize reconstructs a dal.StructuredQuery from a DTQL-YAML document.
+// Deserialize reconstructs a dal.StructuredQuery from a TugQL YAML document.
 // Malformed or schema-invalid input — unknown keys, wrong value types, missing
 // required fields, or an unknown operator — yields a descriptive error and no
 // (partially-populated) query.
@@ -18,14 +18,14 @@ func Deserialize(data []byte) (dal.StructuredQuery, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true) // reject unknown keys
 	if err := dec.Decode(&doc); err != nil {
-		return nil, fmt.Errorf("invalid DTQL-YAML: %w", err)
+		return nil, fmt.Errorf("invalid TugQL YAML: %w", err)
 	}
 	var extra any
 	if err := dec.Decode(&extra); err != io.EOF {
 		if err == nil {
-			return nil, fmt.Errorf("invalid DTQL-YAML: multiple documents are not allowed")
+			return nil, fmt.Errorf("invalid TugQL YAML: multiple documents are not allowed")
 		}
-		return nil, fmt.Errorf("invalid DTQL-YAML: %w", err)
+		return nil, fmt.Errorf("invalid TugQL YAML: %w", err)
 	}
 	return documentToQuery(doc)
 }
@@ -42,7 +42,7 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 	}
 	if dal.HasSubquery(query) {
 		if err := dal.ValidateQueryScope(query); err != nil {
-			return nil, fmt.Errorf("invalid DTQL: %w", err)
+			return nil, fmt.Errorf("invalid TugQL: %w", err)
 		}
 	}
 	return query, nil
@@ -50,7 +50,7 @@ func documentToQuery(doc document) (dal.StructuredQuery, error) {
 
 func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 	if doc.Limit < 0 || doc.Offset < 0 {
-		return nil, fmt.Errorf("invalid DTQL: query_shape at %slimit and offset must be non-negative", pathPrefix(path))
+		return nil, fmt.Errorf("invalid TugQL: query_shape at %slimit and offset must be non-negative", pathPrefix(path))
 	}
 	fromPath := "from"
 	if path != "" {
@@ -61,7 +61,7 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 		return nil, err
 	}
 	if err := dal.ValidateJoinTree(from); err != nil {
-		return nil, fmt.Errorf("invalid DTQL: %w", err)
+		return nil, fmt.Errorf("invalid TugQL: %w", err)
 	}
 	qb := from.NewQuery()
 
@@ -80,7 +80,7 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 		for i, encoded := range doc.GroupBy {
 			expr, err := exprFromYAMLAt(encoded, fmt.Sprintf("%s[%d]", pathJoin(path, "groupBy"), i))
 			if err != nil {
-				return nil, fmt.Errorf("invalid DTQL: groupBy #%d: %w", i, err)
+				return nil, fmt.Errorf("invalid TugQL: groupBy #%d: %w", i, err)
 			}
 			groups[i] = expr
 		}
@@ -89,7 +89,7 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 	if doc.Having != nil {
 		condition, err := condFromYAMLAt(*doc.Having, pathJoin(path, "having"))
 		if err != nil {
-			return nil, fmt.Errorf("invalid DTQL: having: %w", err)
+			return nil, fmt.Errorf("invalid TugQL: having: %w", err)
 		}
 		if err := validateNullTests(condition, pathJoin(path, "having"), true); err != nil {
 			return nil, err
@@ -115,17 +115,17 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 	base := reconstructedQuery{StructuredQuery: qb.SelectIntoRecordset(), columns: columns}
 	if doc.Money != nil {
 		if doc.Money.MinorUnitScale == nil || *doc.Money.MinorUnitScale < 0 || *doc.Money.MinorUnitScale > 18 || doc.Money.DivisionScale < 0 || doc.Money.DivisionScale > 18 || doc.Money.Rounding != "halfEven" {
-			return nil, fmt.Errorf("invalid DTQL: money requires minorUnitScale and divisionScale 0..18 and rounding halfEven")
+			return nil, fmt.Errorf("invalid TugQL: money requires minorUnitScale and divisionScale 0..18 and rounding halfEven")
 		}
 		base.money = &dal.MoneyConfig{MinorUnitScale: *doc.Money.MinorUnitScale, DivisionScale: doc.Money.DivisionScale, Rounding: doc.Money.Rounding}
 	}
 	if len(from.Joins()) > 0 && !dal.HasSubquery(base) {
 		if err := validateJoinClauseFields(base); err != nil {
-			return nil, fmt.Errorf("invalid DTQL: %w", err)
+			return nil, fmt.Errorf("invalid TugQL: %w", err)
 		}
 	}
 	if err := dal.ValidateAggregation(base); err != nil {
-		return nil, fmt.Errorf("invalid DTQL: aggregation: %w", err)
+		return nil, fmt.Errorf("invalid TugQL: aggregation: %w", err)
 	}
 	return base, nil
 }
@@ -133,20 +133,20 @@ func documentToQueryAt(doc document, path string) (dal.StructuredQuery, error) {
 func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 	if encoded.Name == "" && encoded.Query == nil {
 		if path == "from" {
-			return nil, fmt.Errorf("invalid DTQL: from.name is required")
+			return nil, fmt.Errorf("invalid TugQL: from.name is required")
 		}
-		return nil, fmt.Errorf("invalid DTQL: join_shape at %s.name: name is required", path)
+		return nil, fmt.Errorf("invalid TugQL: join_shape at %s.name: name is required", path)
 	}
 	if encoded.Name != "" && encoded.Query != nil {
-		return nil, fmt.Errorf("invalid DTQL: query_shape at %s: exactly one of name or query is required", path)
+		return nil, fmt.Errorf("invalid TugQL: query_shape at %s: exactly one of name or query is required", path)
 	}
 	var source dal.RecordsetSource
 	if encoded.Query != nil {
 		if encoded.Database != nil || encoded.Scan != nil || encoded.Schema != nil || encoded.Alias != "" {
-			return nil, fmt.Errorf("invalid DTQL: query_shape at %s: query source cannot set database, schema or alias", path)
+			return nil, fmt.Errorf("invalid TugQL: query_shape at %s: query source cannot set database, schema or alias", path)
 		}
 		if encoded.Query.As == "" {
-			return nil, fmt.Errorf("invalid DTQL: query_shape at %s.query.as: as is required", path)
+			return nil, fmt.Errorf("invalid TugQL: query_shape at %s.query.as: as is required", path)
 		}
 		query, err := documentToQueryAt(*encoded.Query, path+".query")
 		if err != nil {
@@ -155,13 +155,13 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 		source = dal.NewQuerySource(query, encoded.Query.As)
 	} else if encoded.Database != nil {
 		if *encoded.Database == "" {
-			return nil, fmt.Errorf("invalid DTQL: %s.database must not be empty", path)
+			return nil, fmt.Errorf("invalid TugQL: %s.database must not be empty", path)
 		}
 		schema := ""
 		if encoded.Schema != nil {
 			schema = *encoded.Schema
 			if schema == "" {
-				return nil, fmt.Errorf("invalid DTQL: %s.schema must not be empty", path)
+				return nil, fmt.Errorf("invalid TugQL: %s.schema must not be empty", path)
 			}
 		}
 		source = dal.NewDatabaseCollectionRef(*encoded.Database, schema, encoded.Name, encoded.Alias)
@@ -169,20 +169,20 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 		source = dal.NewRootCollectionRef(encoded.Name, encoded.Alias)
 	} else {
 		if *encoded.Schema == "" {
-			return nil, fmt.Errorf("invalid DTQL: %s.schema must not be empty (join_shape at %s.schema)", path, path)
+			return nil, fmt.Errorf("invalid TugQL: %s.schema must not be empty (join_shape at %s.schema)", path, path)
 		}
 		source = dal.NewQualifiedRootCollectionRef(*encoded.Schema, encoded.Name, encoded.Alias)
 	}
 	if encoded.Scan != nil {
 		if encoded.Scan.Limit <= 0 {
-			return nil, fmt.Errorf("invalid DTQL: %s.scan.limit must be positive", path)
+			return nil, fmt.Errorf("invalid TugQL: %s.scan.limit must be positive", path)
 		}
 		orders, err := orderFromYAMLAt(encoded.Scan.OrderBy, path+".scan.orderBy")
 		if err != nil {
 			return nil, err
 		}
 		if len(orders) == 0 {
-			return nil, fmt.Errorf("invalid DTQL: %s.scan.orderBy is required", path)
+			return nil, fmt.Errorf("invalid TugQL: %s.scan.orderBy is required", path)
 		}
 		source = source.(dal.CollectionRef).WithScan(encoded.Scan.Limit, orders...)
 	}
@@ -190,17 +190,17 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 	for i, join := range encoded.Joins {
 		joinPath := fmt.Sprintf("%s.joins[%d]", path, i)
 		if join.From == nil {
-			return nil, fmt.Errorf("invalid DTQL: join_shape at %s.from: from is required", joinPath)
+			return nil, fmt.Errorf("invalid TugQL: join_shape at %s.from: from is required", joinPath)
 		}
 		if len(join.On) == 0 {
-			return nil, fmt.Errorf("invalid DTQL: join_shape at %s.on: on must contain at least one predicate", joinPath)
+			return nil, fmt.Errorf("invalid TugQL: join_shape at %s.on: on must contain at least one predicate", joinPath)
 		}
 		if join.hintsRepeated {
 			return nil, &dal.JoinValidationError{Category: "join_algorithm", Path: joinPath + ".hints.algorithms", Message: "hints must appear once"}
 		}
 		algorithms, err := algorithmsFromYAML(join.Hints, joinPath)
 		if err != nil {
-			return nil, fmt.Errorf("invalid DTQL: %w", err)
+			return nil, fmt.Errorf("invalid TugQL: %w", err)
 		}
 		child, err := fromFromYAML(*join.From, joinPath+".from")
 		if err != nil {
@@ -212,7 +212,7 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 		case "left":
 			joinType = dal.JoinLeft
 		default:
-			return nil, fmt.Errorf("invalid DTQL: join_type at %s.type: unsupported join type %q", joinPath, join.Type)
+			return nil, fmt.Errorf("invalid TugQL: join_type at %s.type: unsupported join type %q", joinPath, join.Type)
 		}
 		on := make([]dal.Condition, 0, len(join.On))
 		for j, predicate := range join.On {
@@ -221,7 +221,7 @@ func fromFromYAML(encoded fromYAML, path string) (dal.FromSource, error) {
 			}
 			condition, err := condFromYAML(predicate)
 			if err != nil {
-				return nil, fmt.Errorf("invalid DTQL: join_shape at %s.on[%d]: %w", joinPath, j, err)
+				return nil, fmt.Errorf("invalid TugQL: join_shape at %s.on[%d]: %w", joinPath, j, err)
 			}
 			on = append(on, condition)
 		}
@@ -246,20 +246,20 @@ func columnsFromYAMLAt(cols []columnYAML, from fromYAML, path string) ([]dal.Col
 	for i, c := range cols {
 		if c.Wildcard != nil {
 			if c.expressionKeyCount != 0 || c.sourcePresent {
-				return nil, fmt.Errorf("invalid DTQL: column #%d mixes wildcard and expression forms", i)
+				return nil, fmt.Errorf("invalid TugQL: column #%d mixes wildcard and expression forms", i)
 			}
 			if c.asPresent {
-				return nil, fmt.Errorf("invalid DTQL: column #%d wildcard cannot have an alias", i)
+				return nil, fmt.Errorf("invalid TugQL: column #%d wildcard cannot have an alias", i)
 			}
 			if err := validateWildcardYAML(*c.Wildcard, from); err != nil {
-				return nil, fmt.Errorf("invalid DTQL: column #%d: %w", i, err)
+				return nil, fmt.Errorf("invalid TugQL: column #%d: %w", i, err)
 			}
 			out = append(out, dal.AllColumnsExceptFrom(c.Wildcard.Source, c.Wildcard.Exclude...))
 			continue
 		}
 		expr, err := exprFromYAMLAt(c.exprYAML, fmt.Sprintf("%s[%d]", path, i))
 		if err != nil {
-			return nil, fmt.Errorf("invalid DTQL: column #%d: %w", i, err)
+			return nil, fmt.Errorf("invalid TugQL: column #%d: %w", i, err)
 		}
 		out = append(out, dal.Column{Expression: expr, Alias: c.As})
 	}
@@ -345,7 +345,7 @@ func orderFromYAMLAt(orders []orderYAML, path string) ([]dal.OrderExpression, er
 	for i, o := range orders {
 		expr, err := exprFromYAMLAt(o.exprYAML, fmt.Sprintf("%s[%d]", path, i))
 		if err != nil {
-			return nil, fmt.Errorf("invalid DTQL: orderBy #%d: %w", i, err)
+			return nil, fmt.Errorf("invalid TugQL: orderBy #%d: %w", i, err)
 		}
 		if o.Desc {
 			out = append(out, dal.Descending(expr))
@@ -391,7 +391,7 @@ func exprFromYAMLAt(e exprYAML, path string) (dal.Expression, error) {
 			return nil, fmt.Errorf("aggregate.function is required")
 		}
 		if e.Aggregate.orderPresent && len(e.Aggregate.OrderBy) == 0 {
-			return nil, fmt.Errorf("invalid DTQL: aggregate.orderBy must contain at least one item")
+			return nil, fmt.Errorf("invalid TugQL: aggregate.orderBy must contain at least one item")
 		}
 		args := make([]dal.Expression, len(e.Aggregate.Args))
 		for i, encoded := range e.Aggregate.Args {
@@ -408,11 +408,11 @@ func exprFromYAMLAt(e exprYAML, path string) (dal.Expression, error) {
 			}
 			for _, order := range e.Aggregate.OrderBy {
 				if order.Field == "" || expressionFieldsSet(order.exprYAML) != 1 {
-					return nil, fmt.Errorf("invalid DTQL: aggregate.orderBy key must be a field")
+					return nil, fmt.Errorf("invalid TugQL: aggregate.orderBy key must be a field")
 				}
 			}
 			if e.Aggregate.Distinct {
-				return nil, fmt.Errorf("invalid DTQL: aggregate.orderBy does not support distinct")
+				return nil, fmt.Errorf("invalid TugQL: aggregate.orderBy does not support distinct")
 			}
 			return dal.NewOrderedAggregate(e.Aggregate.Function, orders, args...), nil
 		}
@@ -487,9 +487,9 @@ func condFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	}
 	switch {
 	case forms == 0:
-		return nil, fmt.Errorf("invalid DTQL: condition must be a comparison (op/left/right), a group (and/or), exists/notExists or isNull/isNotNull")
+		return nil, fmt.Errorf("invalid TugQL: condition must be a comparison (op/left/right), a group (and/or), exists/notExists or isNull/isNotNull")
 	case forms > 1:
-		return nil, fmt.Errorf("invalid DTQL: condition mixes forms: exactly one of comparison (op/left/right), and, or, exists, notExists, isNull or isNotNull is allowed")
+		return nil, fmt.Errorf("invalid TugQL: condition mixes forms: exactly one of comparison (op/left/right), and, or, exists, notExists, isNull or isNotNull is allowed")
 	}
 
 	if isComparison {
@@ -504,20 +504,20 @@ func condFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	if hasIsNull {
 		operand, err := exprFromYAMLAt(*c.IsNull, path+".isNull")
 		if err != nil {
-			return nil, fmt.Errorf("invalid DTQL: isNull operand: %w", err)
+			return nil, fmt.Errorf("invalid TugQL: isNull operand: %w", err)
 		}
 		return dal.NewIsNullCondition(operand), nil
 	}
 	if hasIsNotNull {
 		operand, err := exprFromYAMLAt(*c.IsNotNull, path+".isNotNull")
 		if err != nil {
-			return nil, fmt.Errorf("invalid DTQL: isNotNull operand: %w", err)
+			return nil, fmt.Errorf("invalid TugQL: isNotNull operand: %w", err)
 		}
 		return dal.NewIsNotNullCondition(operand), nil
 	}
 	if c.Exists != nil {
 		if c.Exists.Query == nil {
-			return nil, fmt.Errorf("invalid DTQL: query_shape at %s.exists.query: query is required", path)
+			return nil, fmt.Errorf("invalid TugQL: query_shape at %s.exists.query: query is required", path)
 		}
 		query, err := documentToQueryAt(*c.Exists.Query, path+".exists.query")
 		if err != nil {
@@ -526,7 +526,7 @@ func condFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 		return dal.NewExistsCondition(query), nil
 	}
 	if c.NotExists.Query == nil {
-		return nil, fmt.Errorf("invalid DTQL: query_shape at %s.notExists.query: query is required", path)
+		return nil, fmt.Errorf("invalid TugQL: query_shape at %s.notExists.query: query is required", path)
 	}
 	query, err := documentToQueryAt(*c.NotExists.Query, path+".notExists.query")
 	if err != nil {
@@ -541,18 +541,18 @@ func comparisonFromYAML(c condYAML) (dal.Condition, error) {
 func comparisonFromYAMLAt(c condYAML, path string) (dal.Condition, error) {
 	op := dal.Operator(c.Op)
 	if !inScopeComparisonOps[op] {
-		return nil, fmt.Errorf("invalid DTQL: unknown comparison operator %q", c.Op)
+		return nil, fmt.Errorf("invalid TugQL: unknown comparison operator %q", c.Op)
 	}
 	if c.Left == nil || c.Right == nil {
-		return nil, fmt.Errorf("invalid DTQL: comparison requires both left and right")
+		return nil, fmt.Errorf("invalid TugQL: comparison requires both left and right")
 	}
 	left, err := exprFromYAMLAt(*c.Left, path+".left")
 	if err != nil {
-		return nil, fmt.Errorf("invalid DTQL: comparison left: %w", err)
+		return nil, fmt.Errorf("invalid TugQL: comparison left: %w", err)
 	}
 	right, err := exprFromYAMLAt(*c.Right, path+".right")
 	if err != nil {
-		return nil, fmt.Errorf("invalid DTQL: comparison right: %w", err)
+		return nil, fmt.Errorf("invalid TugQL: comparison right: %w", err)
 	}
 	return dal.NewComparison(left, op, right), nil
 }
@@ -562,7 +562,7 @@ func groupFromYAML(op dal.Operator, subs []condYAML) (dal.Condition, error) {
 }
 func groupFromYAMLAt(op dal.Operator, subs []condYAML, path string) (dal.Condition, error) {
 	if len(subs) == 0 {
-		return nil, fmt.Errorf("invalid DTQL: %q group must have at least one condition", op)
+		return nil, fmt.Errorf("invalid TugQL: %q group must have at least one condition", op)
 	}
 	conditions := make([]dal.Condition, 0, len(subs))
 	for i, sub := range subs {

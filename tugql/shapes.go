@@ -7,7 +7,7 @@ import (
 )
 
 // document is the YAML representation of an in-scope dal.StructuredQuery.
-// Field order here defines the canonical key order of a DTQL-YAML document.
+// Field order here defines the canonical key order of a TugQL YAML document.
 type document struct {
 	As      string      `yaml:"as,omitempty"`
 	From    fromYAML    `yaml:"from"`
@@ -18,7 +18,7 @@ type document struct {
 	OrderBy []orderYAML `yaml:"orderBy,omitempty"`
 	Limit   int         `yaml:"limit,omitempty"`
 	Offset  int         `yaml:"offset,omitempty"`
-	// Columns is deliberately last: DTQL's SELECT/projection stage remains at
+	// Columns is deliberately last: TugQL's SELECT/projection stage remains at
 	// the end of the pipeline rather than inheriting SQL's textual order.
 	Columns []columnYAML `yaml:"columns,omitempty"`
 	// Source spans are parser-only metadata used to report resource-limit

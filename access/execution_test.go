@@ -14,7 +14,7 @@ func TestExecutionGateAssessmentAndClassification(t *testing.T) {
 	body := portablePolicy("gated", "public", `scopes: [{path: /customers, rules: [{id: query, effect: allow, operations: [query]}]}]
 execution:
   allow:
-    - class: dtql
+    - class: tugql
     - class: stored_procedure
       namespace: public
       mask:
@@ -31,7 +31,7 @@ execution:
 		target  ExecutionTarget
 		allowed bool
 	}{
-		{ExecutionTarget{Class: ExecutionDTQL}, true},
+		{ExecutionTarget{Class: ExecutionTugQL}, true},
 		{ExecutionTarget{Class: ExecutionNativeSQL}, false},
 		{ExecutionTarget{Class: ExecutionNativeGraphQL}, false},
 		{ExecutionTarget{Class: ExecutionStoredProcedure, Namespace: "public", Name: "User_Read"}, true},
@@ -54,16 +54,16 @@ execution:
 	request.Execution = &ExecutionTarget{Class: ExecutionNativeSQL}
 	require.False(t, policies[0].Decide(context.Background(), request).Allowed, "caller label cannot change a structured query")
 	request.Execution = nil
-	require.True(t, policies[0].Decide(context.Background(), request).Allowed, "internal SQL compilation remains typed DTQL")
+	require.True(t, policies[0].Decide(context.Background(), request).Allowed, "internal SQL compilation remains typed TugQL")
 	request.Query = dal.NewTextQuery("CALL public.User_Read()", nil)
-	request.Execution = &ExecutionTarget{Class: ExecutionDTQL}
-	require.False(t, policies[0].Decide(context.Background(), request).Allowed, "opaque SQL cannot claim the DTQL surface")
+	request.Execution = &ExecutionTarget{Class: ExecutionTugQL}
+	require.False(t, policies[0].Decide(context.Background(), request).Allowed, "opaque SQL cannot claim the TugQL surface")
 
 }
 
 func TestExecutionGateEmptyAndLayerIntersection(t *testing.T) {
 	root := t.TempDir()
-	for name, entries := range map[string]string{"deny": "[]", "allow": "[{class: dtql}]"} {
+	for name, entries := range map[string]string{"deny": "[]", "allow": "[{class: tugql}]"} {
 		writePolicyFile(t, root, name+".yaml", portablePolicy(name, "public", `scopes: [{path: /users, rules: [{id: query, effect: allow, operations: [query]}]}]
 execution: {allow: `+entries+"}\n"))
 	}
@@ -99,7 +99,7 @@ func TestExecutionClassificationBoundaries(t *testing.T) {
 	for name, request := range map[string]Request{
 		"opaque":                  {Query: dal.NewTextQuery("select 1", nil)},
 		"structured relabeled":    {Query: structured, Execution: &ExecutionTarget{Class: ExecutionNativeSQL}},
-		"nonprocedure names":      {Execution: &ExecutionTarget{Class: ExecutionDTQL, Name: "x"}},
+		"nonprocedure names":      {Execution: &ExecutionTarget{Class: ExecutionTugQL, Name: "x"}},
 		"bad procedure namespace": {Execution: &ExecutionTarget{Class: ExecutionStoredProcedure, Namespace: "bad/name", Name: "x"}},
 		"unknown class":           {Execution: &ExecutionTarget{Class: ExecutionClass("future")}},
 	} {

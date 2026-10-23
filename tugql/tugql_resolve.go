@@ -35,7 +35,7 @@ type tugqlBudgetNode struct {
 
 // ResolveTugQL validates caller-provided semantic trees against authorized
 // schema and bindings, lowers supported authoring constructs, then delegates
-// executable query validation to the existing DTQL deserializer.
+// executable query validation to the existing TugQL deserializer.
 func ResolveTugQL(doc TugQLDocument, context TugQLResolveContext) (TugQLResolved, []TugQLDiagnostic) {
 	var parsed *TugQLDocument
 	if doc.Source != "" {

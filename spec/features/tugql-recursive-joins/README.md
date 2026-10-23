@@ -3,19 +3,19 @@ format: https://specscore.md/feature-specification
 status: Draft
 ---
 
-# Feature: Recursive DTQL JOINs across DALgo Go and TypeScript
+# Feature: Recursive TugQL JOINs across DALgo Go and TypeScript
 
-> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-recursive-joins?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-recursive-joins?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-recursive-joins?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/dtql-recursive-joins?op=request-change) |
+> [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/tugql-recursive-joins?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/tugql-recursive-joins?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/tugql-recursive-joins?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/tugql-recursive-joins?op=request-change) |
 **Status:** Draft
 **Source Ideas:** —
 
 ## Summary
 
-DTQL defines an ordered recursive `from` relation tree with `inner` and `left` joins. DALgo Go and DALgo-JS parse, validate, and execute the same tree without changing existing single-source documents. Per-JOIN ordered algorithm hints express execution preferences without changing results. The supplied [JOIN brief](../../../docs/engineering/dtql-recursive-joins-brief.md) and [algorithm hint brief](../../../docs/engineering/dtql-join-algorithm-hints-brief.md) record the originating design intent.
+TugQL defines an ordered recursive `from` relation tree with `inner` and `left` joins. DALgo Go and DALgo-JS parse, validate, and execute the same tree without changing existing single-source documents. Per-JOIN ordered algorithm hints express execution preferences without changing results. The supplied [JOIN brief](../../../docs/engineering/tugql-recursive-joins-brief.md) and [algorithm hint brief](../../../docs/engineering/tugql-join-algorithm-hints-brief.md) record the originating design intent.
 
 ## Problem
 
-The Go AST and memory adapter support one flat join; Go DTQL rejects joins. DALgo-JS has a flat query model, and its unlanded browser parser supports only single-source DTQL. A query cannot express the required nested Invoice/Customer/Employee relation, and adapters could otherwise ignore unsupported joins. This Feature extends the authoritative DTQL contract and requires explicit execution or rejection.
+The Go AST and memory adapter support one flat join; Go TugQL rejects joins. DALgo-JS has a flat query model, and its unlanded browser parser supports only single-source TugQL. A query cannot express the required nested Invoice/Customer/Employee relation, and adapters could otherwise ignore unsupported joins. This Feature extends the authoritative TugQL contract and requires explicit execution or rejection.
 
 ## Behavior
 
@@ -23,15 +23,15 @@ The Go AST and memory adapter support one flat join; Go DTQL rejects joins. DALg
 
 #### REQ: recursive-from
 
-`from` MUST be one relation node containing a required root collection identity (`name`, optional `schema`), optional alias, and ordered `joins` sequence. Parented collections and collection groups remain outside DTQL's current subset. Each JOIN MUST contain a recursively shaped `from`, whose children may themselves have multiple ordered joins. There is no top-level `joins` key or textual SQL syntax. Missing/empty `joins` preserves existing single-source behavior. The grammar leaves room for a future `from.ref` and cross-source identity without implementing them now.
+`from` MUST be one relation node containing a required root collection identity (`name`, optional `schema`), optional alias, and ordered `joins` sequence. Parented collections and collection groups remain outside TugQL's current subset. Each JOIN MUST contain a recursively shaped `from`, whose children may themselves have multiple ordered joins. There is no top-level `joins` key or textual SQL syntax. Missing/empty `joins` preserves existing single-source behavior. The grammar leaves room for a future `from.ref` and cross-source identity without implementing them now.
 
 #### REQ: join-shape
 
-Each JOIN has optional `type`, required `from`, and nonempty `on` sequence. Omitted type means `inner`; only `inner` and `left` execute in MVP. Each ON item has `left`, `op`, `right`; both operands MUST be qualified field references from the own subtree or the parent-visible scope, in either orientation. Equality is required and multiple items are ANDed. Fields use Go DTQL's canonical `{field: CustomerId, source: c}` form. `op: '=='` is canonical output and `op: eq` an accepted input alias. Existing `alias` remains canonical output, and `as` is an accepted input alias; both spellings together are invalid. DTQL lowercase join types map to existing uppercase Go `dal.JoinType` values without changing them. Unsupported types/operators fail.
+Each JOIN has optional `type`, required `from`, and nonempty `on` sequence. Omitted type means `inner`; only `inner` and `left` execute in MVP. Each ON item has `left`, `op`, `right`; both operands MUST be qualified field references from the own subtree or the parent-visible scope, in either orientation. Equality is required and multiple items are ANDed. Fields use Go TugQL's canonical `{field: CustomerId, source: c}` form. `op: '=='` is canonical output and `op: eq` an accepted input alias. Existing `alias` remains canonical output, and `as` is an accepted input alias; both spellings together are invalid. TugQL lowercase join types map to existing uppercase Go `dal.JoinType` values without changing them. Unsupported types/operators fail.
 
 #### REQ: round-trip-and-schema
 
-Go DTQL MUST serialize one stable canonical YAML form, deserialize it losslessly, accept equivalent YAML/JSON, update its generated JSON Schema and examples, and preserve existing documents. Go and TypeScript MUST agree on defaults, type names, ON, aliases, and error **category and path**, though human-readable wording may differ. Stable categories are `join_shape`, `join_type`, `join_operator`, `join_scope`, `join_field`, `join_cycle`, `join_key_type`, and `join_plan`; paths use zero-based notation such as `from.joins[1].from.joins[0].on[0]`. Recursive YAML aliases or cyclic in-memory/JSON-like objects MUST fail before unbounded traversal; finite nesting has no arbitrary depth cap.
+Go TugQL MUST serialize one stable canonical YAML form, deserialize it losslessly, accept equivalent YAML/JSON, update its generated JSON Schema and examples, and preserve existing documents. Go and TypeScript MUST agree on defaults, type names, ON, aliases, and error **category and path**, though human-readable wording may differ. Stable categories are `join_shape`, `join_type`, `join_operator`, `join_scope`, `join_field`, `join_cycle`, `join_key_type`, and `join_plan`; paths use zero-based notation such as `from.joins[1].from.joins[0].on[0]`. Recursive YAML aliases or cyclic in-memory/JSON-like objects MUST fail before unbounded traversal; finite nesting has no arbitrary depth cap.
 
 ### Scope and semantics
 
@@ -41,7 +41,7 @@ At a relation node, begin with parent-visible aliases and the node's own alias. 
 
 #### REQ: field-resolution
 
-Qualified fields use `{field: <name>, source: <alias-or-unaliased-name>}`. ON always requires qualification. WHERE, GROUP BY, HAVING, ORDER BY, and explicit projection may use an unqualified field only when schema metadata available at validation proves exactly one visible owner; without it, validation fails before execution. Existing Go API calls with empty `FieldRef.Source()` retain base-source meaning for compatibility; DTQL validation is stricter. Schema-known missing fields or safely detectable incompatible key types fail before execution. An unknown qualifier never silently resolves to the base.
+Qualified fields use `{field: <name>, source: <alias-or-unaliased-name>}`. ON always requires qualification. WHERE, GROUP BY, HAVING, ORDER BY, and explicit projection may use an unqualified field only when schema metadata available at validation proves exactly one visible owner; without it, validation fails before execution. Existing Go API calls with empty `FieldRef.Source()` retain base-source meaning for compatibility; TugQL validation is stricter. Schema-known missing fields or safely detectable incompatible key types fail before execution. An unknown qualifier never silently resolves to the base.
 
 #### REQ: nested-semantics
 
@@ -59,13 +59,13 @@ DALgo MUST execute supported INNER/LEFT trees when a provider lacks native JOINs
 
 #### REQ: algorithm-hints
 
-Each JOIN MAY contain `hints: {algorithms: [...]}`. `algorithms` is a nonempty ordered sequence of distinct, case-sensitive identifiers from exactly `hash`, `merge`, `lookup`, `batchedLookup`, and `nestedLoop`. Go DTQL and DALgo-JS MUST preserve its order and each JOIN's independent value through parse/serialize/parse; omission remains omission and does not change existing unhinted serialization. Empty lists, duplicates, unknown identifiers, and malformed hint shapes fail before execution with `join_algorithm` at the offending `from.joins[i].hints.algorithms` path (including `[i]` for an invalid entry). The same validation applies to direct in-memory model queries before provider reads. A defensive copy of the list MUST be exposed to callers. The exported Go model addition is justified by the brief's requirement to retain structured per-edge preferences for future policy while keeping the existing builders valid.
+Each JOIN MAY contain `hints: {algorithms: [...]}`. `algorithms` is a nonempty ordered sequence of distinct, case-sensitive identifiers from exactly `hash`, `merge`, `lookup`, `batchedLookup`, and `nestedLoop`. Go TugQL and DALgo-JS MUST preserve its order and each JOIN's independent value through parse/serialize/parse; omission remains omission and does not change existing unhinted serialization. Empty lists, duplicates, unknown identifiers, and malformed hint shapes fail before execution with `join_algorithm` at the offending `from.joins[i].hints.algorithms` path (including `[i]` for an invalid entry). The same validation applies to direct in-memory model queries before provider reads. A defensive copy of the list MUST be exposed to callers. The exported Go model addition is justified by the brief's requirement to retain structured per-edge preferences for future policy while keeping the existing builders valid.
 
 The identifiers describe physical strategies: `hash` indexes one input's equality keys in memory; `merge` walks both inputs ordered by the key and correctly handles duplicate key groups; `lookup` asks the joined source for each distinct key where efficient; `batchedLookup` asks it for bounded batches and respects source request limits; `nestedLoop` evaluates each candidate pair. A naive `nestedLoop` costs approximately O(N × M) predicate evaluations (100,000 by 100,000 can require billions), so it SHOULD only be selected deliberately for small relations, nonindexable predicates, testing, or debugging. Existing row, memory, result, and candidate bounds remain mandatory for all strategies.
 
 An executor MUST validate the vocabulary, then consider the ordered list for each JOIN independently. It MAY honor, ignore, warn about, or reject a recognized preference according to its documented capabilities; a policy rejection of a valid preference is `join_plan` at that JOIN path. It MUST NOT claim to have honored an algorithm it did not run. The initial Go and JS generic executors honor `hash` when a direct cross-side equality key admits their existing index and honor bounded `nestedLoop` when requested. They skip currently unavailable `merge`, `lookup`, and `batchedLookup`; if no listed algorithm is applicable, they use their ordinary unhinted strategy (`hash` where applicable, bounded candidate evaluation otherwise). A preferred `nestedLoop` deliberately bypasses an otherwise applicable hash index; its candidate bound may reject an expensive query before output, even when the same unhinted query succeeds under `hash`. Resource limits therefore can change success versus rejection, but every successful strategy MUST return equivalent logical rows in the same order. The executor MUST NOT silently retry another algorithm after a selected strategy exhausts a bound. No hint may change matching, multiplicity, LEFT extension, output order, projections, diagnostics for invalid keys, or query clause stages. Future source- and environment-specific honor/ignore/warn/reject policies are outside this Feature; retain the structured hints for them.
 
-Native planning and execution MUST receive the complete relation tree with each JOIN's ordered hints intact. An adapter that supports physical JOIN hints MUST consider supported and applicable preferences for each edge in order, translating its choice through its own dialect or driver contract. It MUST document which choices it can express and its behavior when none apply; it MUST NOT silently discard a preference that it claims to support. An adapter may ignore hints it cannot express, including SQLite's current native path, while preserving logical results. SQL Server and Oracle are examples of engines with native hint mechanisms, not a claim that DALgo currently ships their translators. Dialect-specific syntax and eligibility belong to the adapter, never to DTQL parsing or generic execution.
+Native planning and execution MUST receive the complete relation tree with each JOIN's ordered hints intact. An adapter that supports physical JOIN hints MUST consider supported and applicable preferences for each edge in order, translating its choice through its own dialect or driver contract. It MUST document which choices it can express and its behavior when none apply; it MUST NOT silently discard a preference that it claims to support. An adapter may ignore hints it cannot express, including SQLite's current native path, while preserving logical results. SQL Server and Oracle are examples of engines with native hint mechanisms, not a claim that DALgo currently ships their translators. Dialect-specific syntax and eligibility belong to the adapter, never to TugQL parsing or generic execution.
 
 #### REQ: native-and-mixed-plans
 
@@ -91,13 +91,13 @@ The error contract is category plus path, with wording free to differ by languag
 ## Dependencies
 
 - query-joins
-- dtql
+- tugql
 
 ## Acceptance Criteria
 
 ### AC: recursive-round-trip (verifies REQ:recursive-from, REQ:join-shape, REQ:round-trip-and-schema)
 
-**Given** a three-level Invoice/Customer/Employee tree and a two-sibling tree in DTQL
+**Given** a three-level Invoice/Customer/Employee tree and a two-sibling tree in TugQL
 **When** Go and TypeScript parse, validate, serialize, and parse each document
 **Then** both preserve join order, aliases, ON keys, omitted-inner defaults, and structure, and the generated schema accepts them.
 
@@ -122,7 +122,7 @@ The error contract is category plus path, with wording free to differ by languag
 ### AC: native-and-unsupported (verifies REQ:native-and-mixed-plans, REQ:diagnostics-and-compatibility)
 
 **Given** an ordinary SQLite tree and an adapter with no native JOIN capability
-**When** each executes the same DTQL query
+**When** each executes the same TugQL query
 **Then** SQLite returns joined rows and the other executes generically when it can scan the relations; an unscannable source or exceeded bound returns `join_plan` before rows, and neither silently returns unjoined rows.
 
 ### AC: malformed-input (verifies REQ:round-trip-and-schema, REQ:diagnostics-and-compatibility)
@@ -152,7 +152,7 @@ The error contract is category plus path, with wording free to differ by languag
 ## Architecture & Components
 
 - `dal`: additive recursive model, validation, capabilities, and generic execution seam.
-- `dtql`: recursive shape, serialization, schema and examples; backend independent.
+- `tugql`: recursive shape, serialization, schema and examples; backend independent.
 - `dalgo2memory`: generic reference executor with per-relation reads and equality indexing.
 - `dalgo2sql`/`dalgo2sqlite`: native translation for representable same-database trees.
 - `dalgo-js`: matching model/parser, validation, generic executor, and explicit adapter behavior.

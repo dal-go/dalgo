@@ -8,7 +8,7 @@ import (
 )
 
 // updateSchema regenerates the committed golden schema files instead of
-// asserting them. Run: go test ./dtql/ -run TestSchemaIsFresh -update
+// asserting them. Run: go test ./tugql/ -run TestSchemaIsFresh -update
 var updateSchema = flag.Bool("update", false, "regenerate committed schema/schema.{json,yaml}")
 
 // TestSchemaIsFresh re-derives the schema from the Go types and asserts the
@@ -39,10 +39,10 @@ func assertFileEquals(t *testing.T, path string, want []byte) {
 	t.Helper()
 	got, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read %s: %v (regenerate: go test ./dtql/ -run TestSchemaIsFresh -update)", path, err)
+		t.Fatalf("read %s: %v (regenerate: go test ./tugql/ -run TestSchemaIsFresh -update)", path, err)
 	}
 	if string(got) != string(want) {
-		t.Fatalf("%s is stale; regenerate: go test ./dtql/ -run TestSchemaIsFresh -update", path)
+		t.Fatalf("%s is stale; regenerate: go test ./tugql/ -run TestSchemaIsFresh -update", path)
 	}
 }
 

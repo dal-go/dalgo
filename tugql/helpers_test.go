@@ -5,7 +5,7 @@ import "github.com/dal-go/dalgo/dal"
 // fakeQuery is a configurable dal.StructuredQuery used by tests to construct
 // queries (in-scope and out-of-scope) that the dal QueryBuilder cannot build
 // directly — notably ones with Columns, GroupBy, or a cursor. It embeds a nil
-// dal.StructuredQuery; only the accessors the dtql package reads are overridden.
+// dal.StructuredQuery; only the accessors the tugql package reads are overridden.
 type fakeQuery struct {
 	dal.StructuredQuery
 	from       dal.FromSource
@@ -36,7 +36,7 @@ func rootFrom() dal.FromSource {
 	return dal.From(dal.NewRootCollectionRef("users", ""))
 }
 
-// unsupportedExpr is a dal.Expression (fmt.Stringer) that DTQL does not cover —
+// unsupportedExpr is a dal.Expression (fmt.Stringer) that TugQL does not cover —
 // used to drive the "unsupported expression" rejection paths.
 type unsupportedExpr struct{}
 

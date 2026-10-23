@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-// TestExamplesValid asserts every example .dtql.yaml document deserializes to a
+// TestExamplesValid asserts every example .tugql.yaml document deserializes to a
 // dal.StructuredQuery and validates against the generated schema. The set
 // together exercises source, columns, comparison + And/Or group filters,
 // ordering and limit/offset.
 func TestExamplesValid(t *testing.T) {
-	files, err := filepath.Glob("examples/*.dtql.yaml")
+	files, err := filepath.Glob("examples/*.tugql.yaml")
 	if err != nil {
 		t.Fatalf("glob examples: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestExamplesValid(t *testing.T) {
 			if q == nil {
 				t.Fatalf("%s deserialized to a nil query", f)
 			}
-			if err := validateDTQL(sch, data); err != nil {
+			if err := validateTugQL(sch, data); err != nil {
 				t.Fatalf("%s fails schema validation: %v", f, err)
 			}
 		})
