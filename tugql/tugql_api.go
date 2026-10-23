@@ -60,6 +60,9 @@ type TugQLTree struct {
 	Parameters  []TugQLParameter  `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	Definitions []TugQLDefinition `json:"definitions,omitempty" yaml:"definitions,omitempty"`
 	Query       map[string]any    `json:"query" yaml:"-"`
+	// Comments holds the author's comments. They are not semantics: resolution,
+	// authorization and SQL generation never read them.
+	Comments *TugQLComments `json:"comments,omitempty" yaml:"-"`
 }
 
 type TugQLParameter struct {
@@ -296,6 +299,7 @@ func exportTugQLTree(in tugqlTree) TugQLTree {
 		out.Definitions = append(out.Definitions, exportTugQLDefinition(d))
 	}
 	out.Query = documentMap(in.Query)
+	out.Comments = in.Comments
 	return out
 }
 
@@ -344,6 +348,9 @@ func (tree TugQLTree) MarshalYAML() (any, error) {
 	if err := validateTugQLTreeValues(tree, &tugqlResolveBudget{}); err != nil {
 		return nil, err
 	}
+	if err := validateTugQLComments(tree.Comments); err != nil {
+		return nil, err
+	}
 	internal, err := importTugQLTree(tree)
 	if err != nil {
 		return nil, err
@@ -354,17 +361,28 @@ func (tree TugQLTree) MarshalYAML() (any, error) {
 	// so it always emits a single YAML mapping. Public inputs are validated before
 	// reaching this conversion.
 	_ = yaml.Unmarshal(query, &qRoot)
-	return struct {
+	envelope := struct {
 		Format      string            `yaml:"format"`
 		Version     int               `yaml:"version"`
 		Parameters  []tugqlParameter  `yaml:"parameters,omitempty"`
 		Definitions []tugqlDefinition `yaml:"definitions,omitempty"`
 		Query       *yaml.Node        `yaml:"query"`
-	}{internal.Format, internal.Version, internal.Parameters, internal.Definitions, qRoot.Content[0]}, nil
+	}{internal.Format, internal.Version, internal.Parameters, internal.Definitions, qRoot.Content[0]}
+	if tugqlCommentsEmpty(tree.Comments) {
+		return envelope, nil
+	}
+	var node yaml.Node
+	// The envelope holds only parser-owned closed types, so encoding cannot fail.
+	_ = node.Encode(envelope)
+	applyTugQLCommentsToNode(&node, tree.Comments)
+	return &node, nil
 }
 
 // UnmarshalYAML validates the envelope shape but leaves query validation to
-// ResolveTugQL, which also checks a caller-mutated public tree.
+// ResolveTugQL, which also checks a caller-mutated public tree. It also reads
+// the YAML comments into Comments. yaml.Unmarshal passes only the root mapping,
+// so comments attached to the YAML document node (above a blank line at the top,
+// or the document-end comments) are visible only through YAMLToTugQL.
 func (tree *TugQLTree) UnmarshalYAML(node *yaml.Node) error {
 	if tree == nil {
 		return fmt.Errorf("nil TugQTree receiver")
@@ -399,7 +417,7 @@ func (tree *TugQLTree) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&wire); err != nil {
 		return err
 	}
-	*tree = TugQLTree(wire)
+	*tree = TugQLTree{Format: wire.Format, Version: wire.Version, Parameters: wire.Parameters, Definitions: wire.Definitions, Query: wire.Query, Comments: readTugQLCommentsFromNode(nil, node)}
 	return nil
 }
 
@@ -495,7 +513,7 @@ func importTugQLTree(tree TugQLTree) (tugqlTree, error) {
 	if err := validateTugQLQueryYAML(queryBytes); err != nil {
 		return tugqlTree{}, err
 	}
-	out := tugqlTree{Format: tree.Format, Version: tree.Version, Query: queryDoc}
+	out := tugqlTree{Format: tree.Format, Version: tree.Version, Query: queryDoc, Comments: tree.Comments}
 	for _, p := range tree.Parameters {
 		out.Parameters = append(out.Parameters, tugqlParameter{Name: p.Name, Type: p.Type, Required: p.Required, Default: normalizeTugQLParameterDefault(p.Type, p.Default)})
 	}

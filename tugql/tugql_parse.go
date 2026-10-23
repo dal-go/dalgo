@@ -232,13 +232,14 @@ func parseTugQLDocumentAt(source string, allowParameters bool, depth int) (tugql
 	if depth > maxTugQLDepth {
 		return tree, sourceDoc, []tugqlDiagnostic{diagnostic("nesting_limit", "TugQL nested query depth exceeds the supported limit", tugqlSpan{Start: tugqlPosition{1, 1}, End: tugqlPosition{1, 1}})}
 	}
-	tokens, diags := lexTugQL(source)
+	tokens, comments, diags := lexTugQLWithComments(source)
 	if hasErrors(diags) {
 		return tree, sourceDoc, diags
 	}
 	diags = append(diags, validateTugQLKeywordStyle(tokens)...)
 	lines := linesFromTokens(source, tokens)
 	rawLines := strings.Split(normalizeTugQLNewlines(source), "\n")
+	var units []tugqlCommentUnit
 	diags = append(diags, validateDocumentIndentation(lines)...)
 	index := 0
 	for index < len(lines) && len(lines[index].Tokens) == 0 {
@@ -254,6 +255,7 @@ func parseTugQLDocumentAt(source string, allowParameters bool, depth int) (tugql
 		parameters, next, blockDiags := parseTugQLParameters(rawLines, lines, index)
 		tree.Parameters = parameters
 		diags = append(diags, blockDiags...)
+		units = append(units, tugqlCommentUnit{path: "parameters", first: lines[index].Number, last: lines[next-1].Number})
 		index = next
 	}
 	for index < len(lines) {
@@ -266,6 +268,7 @@ func parseTugQLDocumentAt(source string, allowParameters bool, depth int) (tugql
 		definition, next, defDiags := parseTugQLDefinition(rawLines, lines, index, depth)
 		diags = append(diags, defDiags...)
 		if definition.Name != "" {
+			units = append(units, tugqlCommentUnit{path: "definitions[" + strconv.Itoa(len(tree.Definitions)) + "]", first: lines[index].Number, last: lines[next-1].Number})
 			tree.Definitions = append(tree.Definitions, definition)
 		}
 		// parseTugQLDefinition always consumes at least its WITH header, even
@@ -285,8 +288,48 @@ func parseTugQLDocumentAt(source string, allowParameters bool, depth int) (tugql
 	}
 	if depth == 0 && len(diags) == 0 {
 		diags = append(diags, preflightTugQLTree(tree)...)
+		if len(diags) == 0 && len(comments) > 0 {
+			clauses, _ := collectTugQLClauses(lines[index:])
+			units = append(units, tugqlClauseCommentUnits(clauses)...)
+			tree.Comments = attachTugQLComments(rawLines, comments, units)
+		}
 	}
 	return tree, sourceDoc, diags
+}
+
+// tugqlClauseCommentUnits names the main query's clause lines as comment
+// anchors. A JOIN clause is joins[k]; each ON clause is on[j] of the latest JOIN.
+func tugqlClauseCommentUnits(clauses []tugqlClause) []tugqlCommentUnit {
+	var units []tugqlCommentUnit
+	joins, ons := -1, 0
+	for _, clause := range clauses {
+		path := ""
+		switch clause.name {
+		case "from":
+			path = "query.from"
+		case "join", "left join":
+			joins++
+			ons = 0
+			path = "query.from.joins[" + strconv.Itoa(joins) + "]"
+		case "on":
+			path = "query.from.joins[" + strconv.Itoa(joins) + "].on[" + strconv.Itoa(ons) + "]"
+			ons++
+		case "where":
+			path = "query.where"
+		case "group by":
+			path = "query.groupBy"
+		case "having":
+			path = "query.having"
+		case "order by":
+			path = "query.orderBy"
+		case "limit":
+			path = "query.limit"
+		case "select":
+			path = "query.columns"
+		}
+		units = append(units, tugqlCommentUnit{path: path, first: clause.span.Start.Line, last: clause.span.End.Line})
+	}
+	return units
 }
 
 func shiftTugQLQueryMetadata(query *document, precedingLines, columnOffset int) {

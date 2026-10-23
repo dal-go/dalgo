@@ -61,6 +61,8 @@ type tugqlTree struct {
 	Parameters  []tugqlParameter  `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	Definitions []tugqlDefinition `json:"definitions,omitempty" yaml:"definitions,omitempty"`
 	Query       document          `json:"query" yaml:"query"`
+	// Comments are carried beside the semantics; they never reach resolution.
+	Comments *TugQLComments `json:"-" yaml:"-"`
 }
 
 type tugqlSource struct {
@@ -92,26 +94,47 @@ type tugqlLine struct {
 }
 
 type tugqlLexer struct {
-	source string
-	runes  []rune
-	i      int
-	line   int
-	column int
-	tokens []tugqlToken
-	diags  []tugqlDiagnostic
+	source   string
+	runes    []rune
+	i        int
+	line     int
+	column   int
+	tokens   []tugqlToken
+	comments []tugqlComment
+	diags    []tugqlDiagnostic
 }
 
 const maxTugQLRunes = 1 << 20
 const maxTugQLTokens = 1 << 18
 const maxTugQLDepth = 128
 
+// tugqlComment is one end-of-line comment collected by the lexer. Text has the
+// marker removed, one optional leading space removed and trailing whitespace
+// trimmed. Marker records which of the two spellings the author used.
+type tugqlComment struct {
+	Marker   string
+	Text     string
+	Line     int
+	Column   int
+	Trailing bool
+}
+
 func lexTugQL(source string) ([]tugqlToken, []tugqlDiagnostic) {
+	tokens, _, diags := lexTugQLWithComments(source)
+	return tokens, diags
+}
+
+// lexTugQLWithComments lexes source and also returns its comments in source
+// order. Both `--` and `//` start an end-of-line comment; neither is
+// recognised inside string literals or quoted identifiers because those are
+// consumed whole by scanQuoted before the comment check can see them.
+func lexTugQLWithComments(source string) ([]tugqlToken, []tugqlComment, []tugqlDiagnostic) {
 	runeCount, invalid, validUTF8 := scanTugQLUTF8(source)
 	if !validUTF8 {
-		return nil, []tugqlDiagnostic{{Code: "invalid_utf8", Message: "TugQL source must be valid UTF-8", Span: tugqlSpan{Start: invalid, End: tugqlPosition{Line: invalid.Line, Column: invalid.Column + 1}}}}
+		return nil, nil, []tugqlDiagnostic{{Code: "invalid_utf8", Message: "TugQL source must be valid UTF-8", Span: tugqlSpan{Start: invalid, End: tugqlPosition{Line: invalid.Line, Column: invalid.Column + 1}}}}
 	}
 	if runeCount > maxTugQLRunes {
-		return nil, []tugqlDiagnostic{{Code: "input_too_large", Message: "TugQL source exceeds the input limit", Span: tugqlSpan{Start: tugqlPosition{1, 1}, End: tugqlPosition{1, 1}}}}
+		return nil, nil, []tugqlDiagnostic{{Code: "input_too_large", Message: "TugQL source exceeds the input limit", Span: tugqlSpan{Start: tugqlPosition{1, 1}, End: tugqlPosition{1, 1}}}}
 	}
 	l := tugqlLexer{source: source, runes: []rune(source), line: 1, column: 1}
 	for l.i < len(l.runes) {
@@ -124,10 +147,8 @@ func lexTugQL(source string) ([]tugqlToken, []tugqlDiagnostic) {
 			l.advance()
 			continue
 		}
-		if ch == '-' && l.peek(1) == '-' {
-			for l.i < len(l.runes) && l.runes[l.i] != '\n' && l.runes[l.i] != '\r' {
-				l.advance()
-			}
+		if (ch == '-' && l.peek(1) == '-') || (ch == '/' && l.peek(1) == '/') {
+			l.scanComment()
 			continue
 		}
 		start := tugqlPosition{Line: l.line, Column: l.column}
@@ -156,10 +177,25 @@ func lexTugQL(source string) ([]tugqlToken, []tugqlDiagnostic) {
 		}
 		if len(l.tokens) > maxTugQLTokens {
 			l.diags = append(l.diags, tugqlDiagnostic{Code: "too_many_tokens", Message: "TugQL source exceeds the token limit", Span: tugqlSpan{Start: start, End: l.position()}})
-			return nil, l.diags
+			return nil, nil, l.diags
 		}
 	}
-	return l.tokens, l.diags
+	return l.tokens, l.comments, l.diags
+}
+
+func (l *tugqlLexer) scanComment() {
+	line, column := l.line, l.column
+	marker := string(l.runes[l.i : l.i+2])
+	trailing := len(l.tokens) > 0 && l.tokens[len(l.tokens)-1].Span.End.Line == line
+	l.advance()
+	l.advance()
+	start := l.i
+	for l.i < len(l.runes) && l.runes[l.i] != '\n' && l.runes[l.i] != '\r' {
+		l.advance()
+	}
+	text := strings.TrimRightFunc(string(l.runes[start:l.i]), unicode.IsSpace)
+	text = strings.TrimPrefix(text, " ")
+	l.comments = append(l.comments, tugqlComment{Marker: marker, Text: text, Line: line, Column: column, Trailing: trailing})
 }
 
 func scanTugQLUTF8(source string) (int, tugqlPosition, bool) {
