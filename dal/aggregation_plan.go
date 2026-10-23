@@ -118,7 +118,7 @@ func HasAggregation(q StructuredQuery) bool {
 }
 
 // ValidateAggregation applies SQL-compatible grouping rules without imposing
-// SQL syntax or alias restrictions on DTQL.
+// SQL syntax or alias restrictions on TugQL.
 func ValidateAggregation(q StructuredQuery) error {
 	if q == nil {
 		return nil
@@ -177,7 +177,7 @@ func ValidateAggregation(q StructuredQuery) error {
 }
 
 // EffectiveAggregationColumns supplies GROUP BY expressions as the implicit
-// projection when a grouped DTQL query omits columns.
+// projection when a grouped TugQL query omits columns.
 func EffectiveAggregationColumns(q StructuredQuery) []Column {
 	return effectiveAggregationColumns(q)
 }

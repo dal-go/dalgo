@@ -452,7 +452,7 @@ targets.
 - [`dbschema`](./dbschema) - schema definitions for collections, fields,
   indexes, constraints, and defaults.
 - [`ddl`](./ddl) - schema modification operations and applier interfaces.
-- [`dtql`](./dtql) - serialized query format and schema for DALgo queries.
+- [`tugql`](./tugql) - serialized query format and schema for DALgo queries.
 - [`update`](./update) - field update helpers.
 - [`mocks`](./mocks) - generated mocks for tests.
 

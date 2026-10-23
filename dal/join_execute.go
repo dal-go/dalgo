@@ -123,7 +123,7 @@ func joinProviderFor(q StructuredQuery, capabilities QueryCapabilities, provider
 	return nil
 }
 
-// executeGenericRecursive materializes a recursive DTQL query through ordinary
+// executeGenericRecursive materializes a recursive TugQL query through ordinary
 // QueryExecutor leaf reads. It deliberately has no native capability route:
 // adapters must opt into a complete recursive implementation in a later
 // capability contract.
@@ -142,7 +142,7 @@ func executeGenericRecursiveBudget(ctx context.Context, executor QueryExecutor, 
 	return e.execute()
 }
 
-// ExecuteRecursiveQuery evaluates a recursive DTQL query through executor's
+// ExecuteRecursiveQuery evaluates a recursive TugQL query through executor's
 // ordinary leaf-read surface. Callers that enforce access policy should pass
 // their secured executor so every nested source is authorized independently.
 func ExecuteRecursiveQuery(ctx context.Context, executor QueryExecutor, q StructuredQuery) (RecordsReader, error) {

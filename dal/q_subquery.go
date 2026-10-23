@@ -113,7 +113,7 @@ type QueryValidationError struct {
 }
 
 // RecursiveQueryStrategy records the execution boundary chosen for a query
-// containing recursive nodes. Providers do not receive recursive DTQL as a
+// containing recursive nodes. Providers do not receive recursive TugQL as a
 // native query unless a future capability explicitly supports it.
 type RecursiveQueryStrategy string
 

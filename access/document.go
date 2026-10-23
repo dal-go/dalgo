@@ -65,7 +65,7 @@ type DocumentRule struct {
 	Effect     string   `json:"effect" yaml:"effect"`
 	Operations []string `json:"operations" yaml:"operations"`
 	// Where is an optional row condition on an allow rule, written in the
-	// DTQL condition syntax with a `param` expression for runtime variables.
+	// TugQL condition syntax with a `param` expression for runtime variables.
 	Where *DocumentCondition `json:"where,omitempty" yaml:"where,omitempty"`
 	// Check is an optional post-image condition on an allow rule: what a row
 	// written under the rule must satisfy afterwards. Defaults to Where.
@@ -247,7 +247,7 @@ func EncodePrincipalPolicySet(writer io.Writer, codec Codec, set *PrincipalPolic
 		return fmt.Errorf("access: principal policy set is required")
 	}
 	if set.collectionMask != nil || set.execution != nil {
-		return fmt.Errorf("%w: portable gates require DTQL serialization", ErrNotSerializable)
+		return fmt.Errorf("%w: portable gates require TugQL serialization", ErrNotSerializable)
 	}
 	document := Document{
 		APIVersion: DocumentAPIVersion,
@@ -356,7 +356,7 @@ func EncodeAccessPolicy(writer io.Writer, codec Codec, policy *AccessPolicy) err
 		return fmt.Errorf("access: policy is required")
 	}
 	if policy.collectionMask != nil || policy.execution != nil {
-		return fmt.Errorf("%w: portable gates require DTQL serialization", ErrNotSerializable)
+		return fmt.Errorf("%w: portable gates require TugQL serialization", ErrNotSerializable)
 	}
 	document, err := documentFromRules(AccessPolicyKind, policy.name, effectDeny, policy.rules)
 	if err != nil {
@@ -652,7 +652,7 @@ func documentScopeFromRule(rule Rule) (DocumentScope, error) {
 
 func documentRuleFromRule(rule Rule) (DocumentRule, error) {
 	if rule.fieldMask != nil {
-		return DocumentRule{}, fmt.Errorf("%w: scoped masks require DTQL serialization", ErrNotSerializable)
+		return DocumentRule{}, fmt.Errorf("%w: scoped masks require TugQL serialization", ErrNotSerializable)
 	}
 	if rule.kind != directiveRule || strings.TrimSpace(rule.name) == "" {
 		return DocumentRule{}, fmt.Errorf("%w: every encoded directive requires an explicit rule name", ErrNotSerializable)

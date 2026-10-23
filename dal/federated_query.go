@@ -26,7 +26,7 @@ type FederatedQueryOptions struct {
 	Money      *MoneyConfig
 }
 
-// ExecuteFederatedQuery evaluates a DTQL query across named databases. Joined
+// ExecuteFederatedQuery evaluates a TugQL query across named databases. Joined
 // rows and expressions are evaluated by DALgo; only single-source reads reach
 // the resolved executors. A missing database name fails closed.
 func ExecuteFederatedQuery(ctx context.Context, query StructuredQuery, resolve DatabaseResolver) (RecordsReader, error) {

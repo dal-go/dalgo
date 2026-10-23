@@ -1,0 +1,377 @@
+{
+  "schemaVersion": 1,
+  "schema": "schema.json",
+  "dataset": "dataset.json",
+  "cases": [
+    {
+      "name": "first-last-by-date",
+      "input": "first-last-by-date.tugql.yaml",
+      "rows": "first-last-by-date.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "no-group",
+      "input": "no-group.tugql.yaml",
+      "rows": "no-group.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "empty-no-group",
+      "input": "empty-no-group.tugql.yaml",
+      "rows": "empty-no-group.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "empty-group",
+      "input": "empty-group.tugql.yaml",
+      "rows": "empty-group.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "null-key-first",
+      "input": "null-key-first.tugql.yaml",
+      "rows": "null-key-first.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "null-key-desc",
+      "input": "null-key-desc.tugql.yaml",
+      "rows": "null-key-desc.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "null-x",
+      "input": "null-x.tugql.yaml",
+      "rows": "null-x.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-null-key",
+      "input": "x-null-key.tugql.yaml",
+      "rows": "x-null-key.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "tie-broken-by-x",
+      "input": "tie-broken-by-x.tugql.yaml",
+      "rows": "tie-broken-by-x.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "last-is-not-first-desc",
+      "input": "last-is-not-first-desc.tugql.yaml",
+      "rows": "last-is-not-first-desc.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "two-keys-mixed-direction",
+      "input": "two-keys-mixed-direction.tugql.yaml",
+      "rows": "two-keys-mixed-direction.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "text-key-code-point",
+      "input": "text-key-code-point.tugql.yaml",
+      "rows": "text-key-code-point.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "number-key-as-float",
+      "input": "number-key-as-float.tugql.yaml",
+      "rows": "number-key-as-float.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "boolean-key",
+      "input": "boolean-key.tugql.yaml",
+      "rows": "boolean-key.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "timestamp-key",
+      "input": "timestamp-key.tugql.yaml",
+      "rows": "timestamp-key.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "timestamp-key-offsets",
+      "input": "timestamp-key-offsets.tugql.yaml",
+      "rows": "timestamp-key-offsets.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "text-that-looks-like-timestamp",
+      "input": "text-that-looks-like-timestamp.tugql.yaml",
+      "rows": "text-that-looks-like-timestamp.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-text",
+      "input": "x-text.tugql.yaml",
+      "rows": "x-text.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-boolean",
+      "input": "x-boolean.tugql.yaml",
+      "rows": "x-boolean.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-timestamp",
+      "input": "x-timestamp.tugql.yaml",
+      "rows": "x-timestamp.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-uuid",
+      "input": "x-uuid.tugql.yaml",
+      "rows": "x-uuid.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-citext",
+      "input": "x-citext.tugql.yaml",
+      "rows": "x-citext.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "x-json",
+      "input": "x-json.tugql.yaml",
+      "rows": "x-json.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "dalgo"
+      }
+    },
+    {
+      "name": "key-enum",
+      "input": "key-enum.tugql.yaml",
+      "rows": "key-enum.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "in-having",
+      "input": "in-having.tugql.yaml",
+      "rows": "in-having.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "in-order-by",
+      "input": "in-order-by.tugql.yaml",
+      "rows": "in-order-by.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "by-alias",
+      "input": "by-alias.tugql.yaml",
+      "rows": "by-alias.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "inside-arithmetic",
+      "input": "inside-arithmetic.tugql.yaml",
+      "rows": "inside-arithmetic.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "with-other-aggregates",
+      "input": "with-other-aggregates.tugql.yaml",
+      "rows": "with-other-aggregates.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "after-where",
+      "input": "after-where.tugql.yaml",
+      "rows": "after-where.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "joined",
+      "input": "joined.tugql.yaml",
+      "rows": "joined.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "native"
+      }
+    },
+    {
+      "name": "with-subquery",
+      "input": "with-subquery.tugql.yaml",
+      "rows": "with-subquery.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "dalgo"
+      }
+    },
+    {
+      "name": "unaliased-long-name",
+      "input": "unaliased-long-name.tugql.yaml",
+      "rows": "unaliased-long-name.rows.json",
+      "strategy": {
+        "memory": "dalgo",
+        "sqlite": "dalgo",
+        "postgres": "dalgo"
+      }
+    },
+    {
+      "name": "refused-empty-order",
+      "input": "refused-empty-order.tugql.yaml",
+      "error": "refused-empty-order.error.json"
+    },
+    {
+      "name": "refused-nonfield-key",
+      "input": "refused-nonfield-key.tugql.yaml",
+      "error": "refused-nonfield-key.error.json"
+    },
+    {
+      "name": "refused-other-function",
+      "input": "refused-other-function.tugql.yaml",
+      "error": "refused-other-function.error.json"
+    },
+    {
+      "name": "refused-distinct",
+      "input": "refused-distinct.tugql.yaml",
+      "error": "refused-distinct.error.json"
+    },
+    {
+      "name": "refused-unknown-key",
+      "input": "refused-unknown-key.tugql.yaml",
+      "error": "refused-unknown-key.error.json"
+    },
+    {
+      "name": "refused-where",
+      "input": "refused-where.tugql.yaml",
+      "error": "refused-where.error.json"
+    },
+    {
+      "name": "refused-group-by",
+      "input": "refused-group-by.tugql.yaml",
+      "error": "refused-group-by.error.json"
+    },
+    {
+      "name": "refused-unsupported-name",
+      "input": "refused-unsupported-name.tugql.yaml",
+      "error": "refused-unsupported-name.error.json"
+    }
+  ]
+}

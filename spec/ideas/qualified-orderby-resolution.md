@@ -50,7 +50,7 @@ A short spike: dalgo2memory orders both join and single-source results by one or
 | Must-be-true | Folding single-source ordering into the source-aware comparator does not change existing single-source results. | Run the existing `dalgo2memory` ordering tests unchanged; an empty-`Source()` field must resolve to the one base recordset and sort identically to today. |
 | Should-be-true | `compare()` plus key-by-key short-circuit gives deterministic multi-key ordering across mixed value types. | Table test: order by (numeric asc, string desc); assert stable, total order with the base-id tiebreak. |
 | Should-be-true | An ORDER BY key naming no recordset should error, consistent with the join WHERE `unresolvable-source` behavior. | Decide and test: a qualified key with an unknown source returns a descriptive error rather than silently sorting by base id. |
-| Might-be-true | Consumers (DTQL, datatug) actually need multi-key join ordering now rather than single-key. | Review intended consumers before committing to multi-key over the simpler single-key match to today's `sortRows`. |
+| Might-be-true | Consumers (TugQL, datatug) actually need multi-key join ordering now rather than single-key. | Review intended consumers before committing to multi-key over the simpler single-key match to today's `sortRows`. |
 
 
 ## SpecScore Integration

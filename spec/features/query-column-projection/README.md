@@ -19,7 +19,7 @@ Adds a `SelectColumns` terminal to `dal.QueryBuilder` so a caller can select a s
 
 ## Problem
 
-`dalgo2memory` never consumes `q.Columns()` — but the deeper gap is upstream: `dal.QueryBuilder` exposes only `SelectIntoRecord`/`SelectIntoRecordset`/`SelectKeysOnly` and has no way to set columns, and `structuredQuery.columns` is never assigned anywhere in `dal`. So column selection is unreachable from normal code, and the only producer of a query with non-empty `Columns()` is DTQL's deserialized `reconstructedQuery`. This Feature makes column selection a first-class builder capability and gives it a real executor in the in-memory adapter, reusing the source-aware field resolver the join `WHERE`/`ORDER BY` already use.
+`dalgo2memory` never consumes `q.Columns()` — but the deeper gap is upstream: `dal.QueryBuilder` exposes only `SelectIntoRecord`/`SelectIntoRecordset`/`SelectKeysOnly` and has no way to set columns, and `structuredQuery.columns` is never assigned anywhere in `dal`. So column selection is unreachable from normal code, and the only producer of a query with non-empty `Columns()` is TugQL's deserialized `reconstructedQuery`. This Feature makes column selection a first-class builder capability and gives it a real executor in the in-memory adapter, reusing the source-aware field resolver the join `WHERE`/`ORDER BY` already use.
 
 ## Behavior
 
@@ -57,9 +57,9 @@ When projecting, a selected column whose expression is not a `FieldRef` MUST pro
 
 DALgo MUST represent an ordered wildcard projection explicitly as a projection item containing an optional source and the caller's requested exclusion names. It MUST distinguish ordinary wildcard selection, unqualified wildcard exclusion, and source-qualified wildcard exclusion without expanding the wildcard into an explicit field list. Duplicate and unmatched exclusion names MUST remain non-errors, and the model MUST retain the requested names so future diagnostic metadata can report unmatched exclusions.
 
-#### REQ: dtql-wildcard-exclusion
+#### REQ: tugql-wildcard-exclusion
 
-DTQL YAML MUST represent negative projection under `columns` as `wildcard: {source?: <alias-or-name>, exclude: [<name>, ...]}`. `exclude` MUST be nonempty, its entries MUST be nonempty unqualified names, an optional source MUST match the `from` name or alias, and a wildcard item MUST NOT also carry an expression or result alias. Serialization and deserialization MUST preserve source, exclusion spelling, order, and duplicates.
+TugQL YAML MUST represent negative projection under `columns` as `wildcard: {source?: <alias-or-name>, exclude: [<name>, ...]}`. `exclude` MUST be nonempty, its entries MUST be nonempty unqualified names, an optional source MUST match the `from` name or alias, and a wildcard item MUST NOT also carry an expression or result alias. Serialization and deserialization MUST preserve source, exclusion spelling, order, and duplicates.
 
 #### REQ: sql-wildcard-exclusion
 
@@ -103,9 +103,9 @@ DALgo2SQL MUST execute a single-source wildcard exclusion by selecting the sourc
 **When** it is executed
 **Then** it returns a descriptive error and yields no result rows.
 
-### AC: wildcard-exclusion-round-trip (verifies REQ:wildcard-exclusion-model, REQ:dtql-wildcard-exclusion)
+### AC: wildcard-exclusion-round-trip (verifies REQ:wildcard-exclusion-model, REQ:tugql-wildcard-exclusion)
 
-**Given** unqualified and source-qualified DTQL YAML wildcard projections containing existing, missing, and duplicate exclusion names
+**Given** unqualified and source-qualified TugQL YAML wildcard projections containing existing, missing, and duplicate exclusion names
 **When** each query is deserialized and serialized
 **Then** its explicit wildcard AST and canonical YAML preserve the source and requested exclusion sequence without converting it to explicit columns or raising an error for a missing or duplicate name.
 

@@ -256,7 +256,7 @@ ordinary collection, which a path rule names. A rule under a table scope may car
 path scope does. A condition that uses `$path.x` is refused, because a table scope
 captures nothing. A name is compared as written, with no SQL quoting: a dot is part
 of the name, so the schema `a` and the name `b.c` are not the schema `a.b` and the
-name `c`. The portable file format of the DTQL policy loader keeps path scopes only.
+name `c`. The portable file format of the TugQL policy loader keeps path scopes only.
 
 A rule written for a collection (`/Customer`) keeps its meaning: it governs the
 source that writes no schema, and nothing else. It never applies to
@@ -432,7 +432,7 @@ Conversely, a trusted database console must receive an explicit
 read-only connections, and query limits as defense in depth for such tools.
 
 The policy `Request` retains the original `dal.Query`, which is the extension
-seam for a trusted SQL/DTQL analyzer. A future analyzer can turn supported SQL
+seam for a trusted SQL/TugQL analyzer. A future analyzer can turn supported SQL
 into a canonical query shape and authorize every table, join, subquery, CTE,
 predicate, and projection. This must be proof-based rather than best-effort:
 unsupported syntax, a dialect mismatch, dynamic identifiers, stored

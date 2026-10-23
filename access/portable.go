@@ -24,52 +24,40 @@ type ExecutionEntry struct {
 type ExecutionClass string
 
 const (
-	ExecutionTugQL ExecutionClass = "tugql"
-	// Deprecated: ExecutionDTQL is the legacy name for ExecutionTugQL.
-	ExecutionDTQL            ExecutionClass = "dtql"
+	ExecutionTugQL           ExecutionClass = "tugql"
 	ExecutionNativeSQL       ExecutionClass = "native_sql"
 	ExecutionNativeGraphQL   ExecutionClass = "native_graphql"
 	ExecutionStoredProcedure ExecutionClass = "stored_procedure"
 )
 
-// ParseTugQLPolicy validates a portable editable document.
-func ParseTugQLPolicy(data []byte) (TugQLDocument, error) {
-	return ParseDTQLPolicy(data)
-}
-
-// NormalizeTugQLPolicy returns a validated deep copy with canonical scoped masks.
-func NormalizeTugQLPolicy(document TugQLDocument) (TugQLDocument, error) {
-	return NormalizeDTQLPolicy(document)
-}
-
-// ParseDTQLPolicy validates a portable editable document. JSON is accepted as
+// ParseTugQLPolicy validates a portable editable document. JSON is accepted as
 // the JSON subset of YAML. Parsing does not activate policy or authorize data.
-func ParseDTQLPolicy(data []byte) (DTQLDocument, error) {
+func ParseTugQLPolicy(data []byte) (TugQLDocument, error) {
 	if len(data) > maxPolicyFileBytes {
-		return DTQLDocument{}, fmt.Errorf("access: policy exceeds %d bytes", maxPolicyFileBytes)
+		return TugQLDocument{}, fmt.Errorf("access: policy exceeds %d bytes", maxPolicyFileBytes)
 	}
 	if err := validatePolicySyntax(data, true); err != nil {
-		return DTQLDocument{}, err
+		return TugQLDocument{}, err
 	}
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
-	var document DTQLDocument
+	var document TugQLDocument
 	if err := decoder.Decode(&document); err != nil {
-		return DTQLDocument{}, err
+		return TugQLDocument{}, err
 	}
 	if err := ensureSingleDocument(func(v any) error { return decoder.Decode(v) }); err != nil {
-		return DTQLDocument{}, err
+		return TugQLDocument{}, err
 	}
-	return NormalizeDTQLPolicy(document)
+	return NormalizeTugQLPolicy(document)
 }
 
-// NormalizeDTQLPolicy returns a validated deep copy with canonical scoped
+// NormalizeTugQLPolicy returns a validated deep copy with canonical scoped
 // masks. It preserves policy/rule identity and stage action-change order.
-func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
+func NormalizeTugQLPolicy(document TugQLDocument) (TugQLDocument, error) {
 	// Check presence before encoding: omitempty must not turn an explicitly
 	// supplied empty fields list into an absent list beside a fieldMask.
-	var checkFields func([]DTQLScope) error
-	checkFields = func(scopes []DTQLScope) error {
+	var checkFields func([]TugQLScope) error
+	checkFields = func(scopes []TugQLScope) error {
 		for _, scope := range scopes {
 			for _, rule := range scope.Rules {
 				if rule.FieldMask != nil && rule.Fields != nil {
@@ -83,22 +71,22 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 		return nil
 	}
 	if err := checkFields(document.Scopes); err != nil {
-		return DTQLDocument{}, err
+		return TugQLDocument{}, err
 	}
 	for _, scopes := range document.RuleSets {
 		if err := checkFields(scopes); err != nil {
-			return DTQLDocument{}, err
+			return TugQLDocument{}, err
 		}
 	}
 	// Reusing the document's JSON shape supplies a defensive deep copy, including
 	// row predicates and principal binding slices.
 	data, err := json.Marshal(document)
 	if err != nil {
-		return DTQLDocument{}, err
+		return TugQLDocument{}, err
 	}
-	// data was produced by json.Marshal immediately above and DTQLDocument has
+	// data was produced by json.Marshal immediately above and TugQLDocument has
 	// no custom JSON decoder, so decoding the same shape cannot fail.
-	result := decodeNormalizedDTQLPolicy(data)
+	result := decodeNormalizedTugQLPolicy(data)
 	// Preserve integer precision in untyped predicate constants.
 	var restore func(any) (any, error)
 	restore = func(value any) (any, error) {
@@ -162,8 +150,8 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 		}
 		return nil
 	}
-	var restoreScopes func([]DTQLScope) error
-	restoreScopes = func(scopes []DTQLScope) error {
+	var restoreScopes func([]TugQLScope) error
+	restoreScopes = func(scopes []TugQLScope) error {
 		for i := range scopes {
 			for j := range scopes[i].Rules {
 				r := &scopes[i].Rules[j]
@@ -181,15 +169,15 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 		return nil
 	}
 	if err = restoreScopes(result.Scopes); err != nil {
-		return DTQLDocument{}, err
+		return TugQLDocument{}, err
 	}
 	for _, scopes := range result.RuleSets {
 		if err = restoreScopes(scopes); err != nil {
-			return DTQLDocument{}, err
+			return TugQLDocument{}, err
 		}
 	}
 	if strings.TrimSpace(result.Target.Database) == "" {
-		return DTQLDocument{}, fmt.Errorf("access: target.database is required")
+		return TugQLDocument{}, fmt.Errorf("access: target.database is required")
 	}
 	if result.Metadata.Visibility == "" {
 		result.Metadata.Visibility = "public"
@@ -215,10 +203,10 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 		return nil
 	}
 	if err = normalize(&result.CollectionMask, NameMask); err != nil {
-		return DTQLDocument{}, err
+		return TugQLDocument{}, err
 	}
-	var scopes func([]DTQLScope) error
-	scopes = func(items []DTQLScope) error {
+	var scopes func([]TugQLScope) error
+	scopes = func(items []TugQLScope) error {
 		for i := range items {
 			scope := &items[i]
 			if scope.CollectionMask != nil {
@@ -245,42 +233,42 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 		return nil
 	}
 	if err = scopes(result.Scopes); err != nil {
-		return DTQLDocument{}, err
+		return TugQLDocument{}, err
 	}
 	for _, items := range result.RuleSets {
 		if err = scopes(items); err != nil {
-			return DTQLDocument{}, err
+			return TugQLDocument{}, err
 		}
 	}
 	if gate := result.Execution; gate != nil {
 		if gate.Allow == nil || len(gate.Allow) > 32 {
-			return DTQLDocument{}, fmt.Errorf("access: execution.allow requires an array of at most 32 entries")
+			return TugQLDocument{}, fmt.Errorf("access: execution.allow requires an array of at most 32 entries")
 		}
 		seen := map[string]bool{}
 		for i := range gate.Allow {
 			entry := &gate.Allow[i]
 			key := string(entry.Class) + "\x00" + entry.Namespace
 			if seen[key] {
-				return DTQLDocument{}, fmt.Errorf("access: duplicate execution class/namespace")
+				return TugQLDocument{}, fmt.Errorf("access: duplicate execution class/namespace")
 			}
 			seen[key] = true
 			switch entry.Class {
-			case ExecutionDTQL, ExecutionNativeSQL, ExecutionNativeGraphQL:
+			case ExecutionTugQL, ExecutionNativeSQL, ExecutionNativeGraphQL:
 				if entry.Namespace != "" || entry.Mask != nil {
-					return DTQLDocument{}, fmt.Errorf("access: only procedure entries have namespace and mask")
+					return TugQLDocument{}, fmt.Errorf("access: only procedure entries have namespace and mask")
 				}
 			case ExecutionStoredProcedure:
 				if entry.Mask == nil || entry.Namespace == "" || strings.ContainsAny(entry.Namespace, "*./\\") {
-					return DTQLDocument{}, fmt.Errorf("access: procedure requires a literal namespace and mask")
+					return TugQLDocument{}, fmt.Errorf("access: procedure requires a literal namespace and mask")
 				}
 				if _, err := normalizeMaskPattern(entry.Namespace, NameMask); err != nil {
-					return DTQLDocument{}, err
+					return TugQLDocument{}, err
 				}
 				if err := normalize(&entry.Mask, NameMask); err != nil {
-					return DTQLDocument{}, err
+					return TugQLDocument{}, err
 				}
 			default:
-				return DTQLDocument{}, fmt.Errorf("access: unsupported execution class %q", entry.Class)
+				return TugQLDocument{}, fmt.Errorf("access: unsupported execution class %q", entry.Class)
 			}
 		}
 	}
@@ -289,11 +277,11 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 	baseline := result
 	baseline.CollectionMask = nil
 	baseline.Execution = nil
-	var clearMasks func([]DTQLScope) []DTQLScope
-	clearMasks = func(items []DTQLScope) []DTQLScope {
-		copied := append([]DTQLScope(nil), items...)
+	var clearMasks func([]TugQLScope) []TugQLScope
+	clearMasks = func(items []TugQLScope) []TugQLScope {
+		copied := append([]TugQLScope(nil), items...)
 		for i := range copied {
-			copied[i].Rules = append([]DTQLRule(nil), items[i].Rules...)
+			copied[i].Rules = append([]TugQLRule(nil), items[i].Rules...)
 			for j := range copied[i].Rules {
 				copied[i].Rules[j].FieldMask = nil
 			}
@@ -303,35 +291,35 @@ func NormalizeDTQLPolicy(document DTQLDocument) (DTQLDocument, error) {
 	}
 	baseline.Scopes = clearMasks(result.Scopes)
 	if result.RuleSets != nil {
-		baseline.RuleSets = map[string][]DTQLScope{}
+		baseline.RuleSets = map[string][]TugQLScope{}
 		for name, items := range result.RuleSets {
 			baseline.RuleSets[name] = clearMasks(items)
 		}
 	}
-	if _, err = policyFromDTQLDocument(baseline, baseline.Target.Database, ""); err != nil {
-		return DTQLDocument{}, err
+	if _, err = policyFromTugQLDocument(baseline, baseline.Target.Database, ""); err != nil {
+		return TugQLDocument{}, err
 	}
 	return result, nil
 }
 
-func decodeNormalizedDTQLPolicy(data []byte) (result DTQLDocument) {
+func decodeNormalizedTugQLPolicy(data []byte) (result TugQLDocument) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	_ = decoder.Decode(&result)
 	return
 }
 
-// MarshalDTQLPolicyYAML emits normalized policy text. Formatting and comments
+// MarshalTugQLPolicyYAML emits normalized policy text. Formatting and comments
 // from the original document are deliberately not preserved in this version.
-func MarshalDTQLPolicyYAML(document DTQLDocument) ([]byte, error) {
+func MarshalTugQLPolicyYAML(document TugQLDocument) ([]byte, error) {
 	var output bytes.Buffer
-	if err := writeDTQLPolicyYAML(&output, document); err != nil {
+	if err := writeTugQLPolicyYAML(&output, document); err != nil {
 		return nil, err
 	}
 	return output.Bytes(), nil
 }
-func writeDTQLPolicyYAML(writer io.Writer, document DTQLDocument) error {
-	normalized, err := NormalizeDTQLPolicy(document)
+func writeTugQLPolicyYAML(writer io.Writer, document TugQLDocument) error {
+	normalized, err := NormalizeTugQLPolicy(document)
 	if err != nil {
 		return err
 	}
@@ -342,27 +330,17 @@ func writeDTQLPolicyYAML(writer io.Writer, document DTQLDocument) error {
 	}
 	return encoder.Close()
 }
-func MarshalDTQLPolicyJSON(document DTQLDocument) ([]byte, error) {
-	normalized, err := NormalizeDTQLPolicy(document)
+func MarshalTugQLPolicyJSON(document TugQLDocument) ([]byte, error) {
+	normalized, err := NormalizeTugQLPolicy(document)
 	if err != nil {
 		return nil, err
 	}
 	return json.MarshalIndent(normalized, "", "  ")
 }
 
-// MarshalTugQLPolicyYAML emits normalized policy text using TugQLDocument.
-func MarshalTugQLPolicyYAML(document TugQLDocument) ([]byte, error) {
-	return MarshalDTQLPolicyYAML(document)
-}
-
-// MarshalTugQLPolicyJSON emits normalized policy JSON using TugQLDocument.
-func MarshalTugQLPolicyJSON(document TugQLDocument) ([]byte, error) {
-	return MarshalDTQLPolicyJSON(document)
-}
-
 // Explicit null is not absence for security-bearing selectors. The typed
 // decoders otherwise collapse null pointers and empty collections.
-func validateDTQLShape(root *yaml.Node) error {
+func validateTugQLShape(root *yaml.Node) error {
 	mask := func(node *yaml.Node) error {
 		if node == nil {
 			return nil

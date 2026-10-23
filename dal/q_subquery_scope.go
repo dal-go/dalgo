@@ -7,7 +7,7 @@ import (
 
 // maxQueryTreeDepth bounds how many nodes (queries, source trees, conditions and
 // expressions) the walk of a query tree follows along one path. It is far past
-// any query written by hand or parsed from DTQL, so the bound is reached only by
+// any query written by hand or parsed from TugQL, so the bound is reached only by
 // a tree that holds itself by value. The access layer applies its own, much
 // smaller bound to a query's structure.
 const maxQueryTreeDepth = 10000

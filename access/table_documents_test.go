@@ -208,6 +208,6 @@ scopes:
 // file is refused, as any key it does not know is.
 func TestPortableFilePolicyRefusesATableScope(t *testing.T) {
 	body := "scopes:\n  - table: {schema: sales, name: Customer}\n    rules: [{id: r, effect: allow, operations: [query]}]\n"
-	_, err := ParseDTQLPolicy([]byte(portablePolicy("p", "public", body)))
+	_, err := ParseTugQLPolicy([]byte(portablePolicy("p", "public", body)))
 	require.Error(t, err)
 }

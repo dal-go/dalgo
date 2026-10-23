@@ -2,7 +2,7 @@
 format: https://specscore.md/plan-specification
 status: Executing
 ---
-# Plan: Layered ACL MVP across DTQL, DALgo, OpenVaultDB, InGitDB and DataTug
+# Plan: Layered ACL MVP across TugQL, DALgo, OpenVaultDB, InGitDB and DataTug
 
 **Status:** Executing
 **Source:** none
@@ -14,18 +14,18 @@ status: Executing
 ## Summary
 
 One cross-repository implementation plan for the approved layered ACL design.
-DTQL owns the interoperable contracts; DALgo evolves its existing ACL evaluator;
+TugQL owns the interoperable contracts; DALgo evolves its existing ACL evaluator;
 each data owner enforces mandatory policies; DataTug uses the remote APIs and
 explains effective access. The initial real read slice is already implemented
 locally. Its completed tasks below are reconciled with actual commit/test evidence,
 not represented as new work or as the complete MVP.
 
 User approval covers implementation. Latest scope excludes the policy viewer/editor,
-prioritizes DTQL over OpenVaultDB to InGitDB and SQLite, uses local dependency
+prioritizes TugQL over OpenVaultDB to InGitDB and SQLite, uses local dependency
 rewrites, and avoids frequent remote pushes/merges. No new sign-off is required to
 execute these authorized tasks. Deployment/publication is distinct from implementation.
 
-The approved design is `datatug/dtql@c2d0487` on `layered-acl-design`, including
+The approved design is `datatug/tugql@c2d0487` on `layered-acl-design`, including
 `design/layered-acl/01-current-state.md` through `19-scoped-mask-stages.md`,
 `contracts/acl.schema.json`, acceptance vectors and `reviews/round-3`.
 The original reviewed work packages remain design evidence; this plan is the
@@ -63,11 +63,11 @@ bounded compatibility notes and a future provider seam for those topics.
 **Id:** acl-01
 **Depends-On:** —
 **Status:** complete
-**Implemented-by:** datatug/dtql@c2d0487 (layered-acl-design)
+**Implemented-by:** datatug/tugql@c2d0487 (layered-acl-design)
 **Note:** Prior work verified locally; not published. Approved A3 design packet and independent round-3 review evidence.
-**Evidence:** datatug/dtql@c2d0487
+**Evidence:** datatug/tugql@c2d0487
 
-**Repositories:** datatug/dtql
+**Repositories:** datatug/tugql
 
 Preserve the approved A3 design packet, dual independent reviews, reconciliation and human approval. This task records existing work; it does not claim later implementation is reviewed.
 
@@ -81,16 +81,16 @@ Preserve the approved A3 design packet, dual independent reviews, reconciliation
 **Depends-On:** 1
 **Status:** complete
 **Implemented-by:** dal-go/dalgo@11cbf50 (layered-acl-query)
-**Note:** Prior work verified locally; not published. Full Go suite; access and DTQL codec/security tests.
+**Note:** Prior work verified locally; not published. Full Go suite; access and TugQL codec/security tests.
 **Evidence:** dal-go/dalgo@11cbf50
 
 **Repositories:** dal-go/dalgo
 
-Load bounded owner-selected DTQL policy files using existing policies and principal bindings; reject malformed documents and unsupported features; guard caller filter/order/projection fields across nested secure layers.
+Load bounded owner-selected TugQL policy files using existing policies and principal bindings; reject malformed documents and unsupported features; guard caller filter/order/projection fields across nested secure layers.
 
 **Acceptance:** Enabled invalid configuration fails closed; original caller query remains distinct from policy-injected predicates; legacy DALgo behavior is retained.
 
-**Validation:** access and dtql suites, including hidden-field and strict codec regressions.
+**Validation:** access and tugql suites, including hidden-field and strict codec regressions.
 
 ### Task 3: InGitDB owner enforcement for the first query slice
 
@@ -132,16 +132,16 @@ Provide the opt-in SQLite compiler with quoted identifiers, bound values, correc
 **Depends-On:** 3, 4
 **Status:** complete
 **Implemented-by:** openvaultdb/openvaultdb-go@5e4bc80 (layered-acl-query)
-**Note:** Prior work verified locally; not published. Full Go suite; TestLayeredACL_DTQL; standalone HTTP smoke before and after remount.
+**Note:** Prior work verified locally; not published. Full Go suite; TestLayeredACL_TugQL; standalone HTTP smoke before and after remount.
 **Evidence:** openvaultdb/openvaultdb-go@5e4bc80
 
 **Repositories:** openvaultdb/openvaultdb-go
 
-Load upper-owner policies, authenticate and resolve principals, scope token checks to the parsed collection, and execute DTQL through all mandatory layers. Provide a runnable local demonstration.
+Load upper-owner policies, authenticate and resolve principals, scope token checks to the parsed collection, and execute TugQL through all mandatory layers. Provide a runnable local demonstration.
 
 **Acceptance:** Real reads against InGitDB and SQLite enforce rows before pagination and column restrictions; owner token cannot bypass data ACL; policy viewer/editor absent.
 
-**Validation:** TestLayeredACL_DTQL, full server suite, standalone HTTP smoke before and after remount.
+**Validation:** TestLayeredACL_TugQL, full server suite, standalone HTTP smoke before and after remount.
 
 ### Task 6: Query-profile and enforcement boundary completion
 
@@ -169,7 +169,7 @@ Finish the supported-profile matrix, resource limits, cancellation behavior and 
 **Note:** Portable model, canonical scoped masks, defensive normalization and approved fixture round trips implemented; enforcement activation remains acl-08/09.
 **Evidence:** access/mask_test.go, access/portable_test.go, go test ./..., go vet ./access
 
-**Repositories:** dal-go/dalgo; datatug/dtql
+**Repositories:** dal-go/dalgo; datatug/tugql
 
 Implement the A3 ordered include/exclude stage AST and arbitrary-position segment globs. Merge adjacent same-action runs before evaluation; normalize stars and canonical pattern order; expose parse/validate/serialize through one portable model.
 
@@ -184,7 +184,7 @@ Implement the A3 ordered include/exclude stage AST and arbitrary-position segmen
 **Status:** complete
 **Implemented-by:** dal-go/dalgo@4e7aa78 (layered-acl-query)
 **Note:** Scoped masks enforce collection admission, redaction, query evidence and affected parent-write descendants; opaque containers fail closed. Persisted masks pass both HTTP adapters and remount tests.
-**Evidence:** access/mask_enforcement_test.go, go test ./access, go vet ./access, openvaultdb/openvaultdb-go@73919a4, TestLayeredACL_DTQL
+**Evidence:** access/mask_enforcement_test.go, go test ./access, go vet ./access, openvaultdb/openvaultdb-go@73919a4, TestLayeredACL_TugQL
 
 **Repositories:** dal-go/dalgo
 
@@ -200,12 +200,12 @@ Integrate collectionMask and fieldMask into existing policy decisions, field-set
 **Depends-On:** 7, 8
 **Status:** complete
 **Implemented-by:** dal-go/dalgo@cd81e2a (layered-acl-query)
-**Note:** Conjunctive execution gates load and enforce on typed DTQL; opaque text cannot relabel itself. Namespaced procedure masks assess only; native/procedure effects remain unsupported.
-**Evidence:** access/execution_test.go, go test ./access, go vet ./access, openvaultdb/openvaultdb-go@c05a411, TestLayeredACL_DTQL, TestLayeredACL_UpperOnlySuppressesInGitDBDerivedValues
+**Note:** Conjunctive execution gates load and enforce on typed TugQL; opaque text cannot relabel itself. Namespaced procedure masks assess only; native/procedure effects remain unsupported.
+**Evidence:** access/execution_test.go, go test ./access, go vet ./access, openvaultdb/openvaultdb-go@c05a411, TestLayeredACL_TugQL, TestLayeredACL_UpperOnlySuppressesInGitDBDerivedValues
 
 **Repositories:** dal-go/dalgo; openvaultdb/openvaultdb-go
 
-Classify DTQL, caller-native SQL/GraphQL and stored-procedure requests at trusted boundaries; apply execution gates and namespaced callable masks. Internally compiled SQL remains DTQL. Native execution remains unsupported until its safe adapter path exists.
+Classify TugQL, caller-native SQL/GraphQL and stored-procedure requests at trusted boundaries; apply execution gates and namespaced callable masks. Internally compiled SQL remains TugQL. Native execution remains unsupported until its safe adapter path exists.
 
 **Acceptance:** An administrator can prohibit native queries or all procedures with scoped exceptions represented consistently; caller labels cannot conceal native/procedure operations.
 
@@ -245,16 +245,16 @@ Evolve the initial file snapshots into the approved owner generation/revision co
 
 **Validation:** CAS conflicts, invalid generation, remount, interrupted activation and disabled/enabled transition tests.
 
-### Task 12: DTQL structured decision and blocker types
+### Task 12: TugQL structured decision and blocker types
 
 **Id:** acl-12
 **Depends-On:** 1, 2
 **Status:** complete
 **Implemented-by:** dal-go/dalgo@cc54080 (layered-acl-query)
 **Note:** Frozen wire fixtures, strict and compatible decoding, complete independent policy decisions and immutable provider snapshots verified.
-**Evidence:** dtql/authorization/result_test.go, access/provider_test.go, go test ./..., go vet ./access ./dtql/authorization
+**Evidence:** tugql/authorization/result_test.go, access/provider_test.go, go test ./..., go vet ./access ./tugql/authorization
 
-**Repositories:** datatug/dtql; dal-go/dalgo
+**Repositories:** datatug/tugql; dal-go/dalgo
 
 Implement the reviewed C2 wire contract and equivalent reusable internal decisions: operation/resources, participating sources, policy references, blockers, restrictions and completeness. Collect safe independent blockers instead of only first failure.
 
