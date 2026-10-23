@@ -388,7 +388,7 @@ func printTugQLColumns(columns []columnYAML, indent string) ([]string, error) {
 		if column.Wildcard != nil {
 			return nil, fmt.Errorf("wildcard column options have no text spelling")
 		}
-		if column.exprYAML.Query != nil {
+		if column.Query != nil {
 			block = true
 		}
 	}
@@ -405,7 +405,7 @@ func printTugQLColumns(columns []columnYAML, indent string) ([]string, error) {
 	}
 	lines := []string{indent + "select ("}
 	for _, column := range columns {
-		if column.exprYAML.Query == nil {
+		if column.Query == nil {
 			text, err := printTugQLColumn(column)
 			if err != nil {
 				return nil, err
@@ -416,9 +416,9 @@ func printTugQLColumns(columns []columnYAML, indent string) ([]string, error) {
 		if column.As == "" {
 			return nil, fmt.Errorf("a scalar subquery column needs an alias")
 		}
-		body := tugqlBody{Query: *column.exprYAML.Query}
-		if column.exprYAML.tugqlQueryBody != nil {
-			body = *column.exprYAML.tugqlQueryBody
+		body := tugqlBody{Query: *column.Query}
+		if column.tugqlQueryBody != nil {
+			body = *column.tugqlQueryBody
 		}
 		bodyLines, err := printTugQLBody(body, indent+"    ")
 		if err != nil {

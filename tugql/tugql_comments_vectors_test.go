@@ -120,7 +120,7 @@ func TestTugQLCommentVectorsText(t *testing.T) {
 			_, comments, _ := lexTugQLWithComments(c.Text)
 			tokens := []commentVectorToken{}
 			for _, comment := range comments {
-				tokens = append(tokens, commentVectorToken{comment.Marker, comment.Text, comment.Line, comment.Column, comment.Trailing})
+				tokens = append(tokens, commentVectorToken(comment))
 			}
 			if !reflect.DeepEqual(tokens, c.Expected.CommentTokens) {
 				t.Fatalf("comment tokens=%+v want=%+v", tokens, c.Expected.CommentTokens)
