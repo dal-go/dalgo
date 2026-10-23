@@ -223,7 +223,8 @@ func TestDiff_ConsumerBreaksEarly(t *testing.T) {
 	cand := SliceToSeq([]record.WithID[string]{})
 
 	count := 0
-	for range Diff[string](baseline, []RecordSeq[string]{cand}) {
+	for _, err := range Diff[string](baseline, []RecordSeq[string]{cand}) {
+		require.NoError(t, err)
 		count++
 		break
 	}
