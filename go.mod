@@ -2,16 +2,16 @@ module github.com/dal-go/dalgo
 
 go 1.26.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 require github.com/dal-go/record v0.1.5
 
 require (
-	github.com/RoaringBitmap/roaring/v2 v2.29.0
+	github.com/RoaringBitmap/roaring/v2 v2.30.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/stretchr/testify v1.12.1
 	github.com/strongo/random v0.0.3
-	github.com/strongo/validation v0.0.16
+	github.com/strongo/validation v0.0.17
 	go.uber.org/mock v0.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )
