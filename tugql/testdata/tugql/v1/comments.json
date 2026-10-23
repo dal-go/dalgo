@@ -1,0 +1,1270 @@
+{
+  "format": "tugql-comments-suite",
+  "version": 1,
+  "notes": [
+    "TugQL comment conformance vectors, shared by dal-go/dalgo (Go) and dal-go/dalgo-js (TypeScript). Both implementations must satisfy every case; yaml and roundTripText must match byte for byte.",
+    "Text form: `--` and `//` each start a comment that runs to the end of the line. They are recognised only outside string literals ('...') and quoted identifiers (\"...\" and `...`). `#` is NOT a comment in the text form.",
+    "Comment text: the characters after the marker with ONE leading space removed and trailing whitespace trimmed. `--x`, `-- x` and `// x` all carry the text `x`; `--` alone carries the empty text.",
+    "commentTokens: the lexer output for text, in source order. marker is the author's spelling; line and column are the 1-based position of the marker (columns count code points; the vectors use no characters outside the BMP); trailing is true when a token of the same line precedes the comment.",
+    "Anchors. A comment attaches to a clause-level element: `parameters`, `definitions[i]`, `query.from`, `query.from.joins[k]`, `query.from.joins[k].on[j]`, `query.where`, `query.groupBy`, `query.having`, `query.orderBy`, `query.limit`, `query.columns` (the SELECT clause). Comment lines above a clause are its leading comments; a comment after code on the clause's first line is its trailing comment.",
+    "No clean anchor: a comment on a continuation line of a multi-line clause (inside PARAMETERS, a WITH body, a multi-line SELECT block) and a comment on a YAML node that is not an anchor becomes a leading comment of the nearest FOLLOWING anchor; with no following anchor it becomes a document-end comment. A comment is never dropped.",
+    "Blank lines: a blank line between two comments of the same group is kept; a blank line before the first comment of a group, between the last comment and its element, or between the last code line and the document-end comments is not.",
+    "Structured YAML form: comments are `#` comments. A leading comment is the head comment above the clause key (or above the `- ` of a sequence item). A trailing comment is the same-line comment: after the scalar value when the clause value is a scalar (`limit: 5 # c`), after the key's colon when the value is a block (`from: # c`), and for a sequence item (join, on, definition) after the first entry of the item's mapping. An empty comment is a bare `#`. A blank line inside a comment block is an empty line. Document-end comments follow a blank line at the end of the document, one `# text` line per comment, with an empty line where blankBefore is set.",
+    "yaml bytes: the output of Go yaml.v3 yaml.Marshal with its default 4-space indentation. Key order: format, version, parameters, definitions, query; inside query: from, where, groupBy, having, orderBy, limit, columns. Scalars are plain except where YAML requires quoting; in particular the YAML 1.1 reserved word `on` is emitted double-quoted (\"on\") as a mapping key. The vectors avoid other quoting-sensitive scalars.",
+    "roundTripText: the text produced from yaml. It uses the canonical layout: lowercase keywords, no indentation except ON lines (two spaces), the SELECT list on one line, every comment spelled `--` (`-- ` + text, bare `--` for empty text). The `//` spelling is therefore lost on a text, YAML, text round trip: this is documented and accepted.",
+    "format: the output of the formatter for text with formatOptions (default options when empty), or null when text has diagnostics. The formatter keeps each comment's marker and text.",
+    "sql: for every case that parses, SQL emitted for any dialect from the query resolved against the top-level schema must not contain `//` outside string literals and quoted identifiers. Comments never reach SQL; an emitter that ever carries a comment writes it as `--`. stringLiterals and quotedIdentifiers list the only places `//` may legitimately appear.",
+    "yamlCases: structured YAML input to expected text. They also pin the reading rules: `--` inside a YAML scalar is not a comment, and `#` inside a quoted YAML scalar is not a comment."
+  ],
+  "schema": [
+    {
+      "version": "s1",
+      "tables": [
+        {
+          "name": "T",
+          "fields": [
+            {
+              "name": "Id",
+              "type": "integer",
+              "authorized": true
+            },
+            {
+              "name": "Name",
+              "type": "string",
+              "authorized": true
+            },
+            {
+              "name": "Url",
+              "type": "string",
+              "authorized": true
+            },
+            {
+              "name": "a",
+              "type": "string",
+              "authorized": true
+            },
+            {
+              "name": "a//b",
+              "type": "string",
+              "authorized": true
+            },
+            {
+              "name": "n",
+              "type": "integer",
+              "authorized": true
+            },
+            {
+              "name": "x",
+              "type": "integer",
+              "authorized": true
+            }
+          ]
+        },
+        {
+          "name": "U",
+          "fields": [
+            {
+              "name": "Id",
+              "type": "integer",
+              "authorized": true
+            },
+            {
+              "name": "x",
+              "type": "integer",
+              "authorized": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "textCases": [
+    {
+      "name": "leading-dash",
+      "description": "A comment on its own line above a clause is the head comment of that clause.",
+      "text": "-- lead\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "lead",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "-- lead\nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # lead\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- lead\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "leading-slash",
+      "description": "The // marker behaves like --.",
+      "text": "// lead\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "lead",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "// lead\nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # lead\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- lead\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "trailing-dash",
+      "description": "A comment after code is the same-line comment of that clause.",
+      "text": "from T -- trail\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "trail",
+            "line": 1,
+            "column": 8,
+            "trailing": true
+          }
+        ],
+        "format": "from T -- trail\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from: # trail\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "from T -- trail\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "trailing-slash",
+      "description": "Trailing // comment.",
+      "text": "from T // trail\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "trail",
+            "line": 1,
+            "column": 8,
+            "trailing": true
+          }
+        ],
+        "format": "from T // trail\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from: # trail\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "from T -- trail\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "trailing-on-scalar-clause",
+      "description": "A trailing comment on a clause whose YAML value is a scalar sits after the scalar.",
+      "text": "from T\nlimit 5 // five\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "five",
+            "line": 2,
+            "column": 9,
+            "trailing": true
+          }
+        ],
+        "format": "from T\nlimit 5 // five\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    limit: 5 # five\n    columns:\n        - field: Id\n",
+        "roundTripText": "from T\nlimit 5 -- five\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "leading-and-trailing-on-clauses",
+      "description": "Leading and trailing comments on several clauses.",
+      "text": "// lead\nfrom T -- on from\nwhere Id = 1 // on where\n-- before select\nselect Id, Name",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "lead",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "on from",
+            "line": 2,
+            "column": 8,
+            "trailing": true
+          },
+          {
+            "marker": "//",
+            "text": "on where",
+            "line": 3,
+            "column": 14,
+            "trailing": true
+          },
+          {
+            "marker": "--",
+            "text": "before select",
+            "line": 4,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "// lead\nfrom T -- on from\nwhere Id = 1 // on where\n-- before select\nselect Id, Name",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # lead\n    from: # on from\n        name: T\n    where: # on where\n        op: ==\n        left:\n            field: Id\n        right:\n            value: 1\n    # before select\n    columns:\n        - field: Id\n        - field: Name\n",
+        "roundTripText": "-- lead\nfrom T -- on from\nwhere Id = 1 -- on where\n-- before select\nselect Id, Name",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "blank-line-separated",
+      "description": "Blank lines between comment groups are kept (blankBefore); the blank line between the last comment and its clause is not.",
+      "text": "-- one\n\n-- two\n\n\n// three\n\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "one",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "two",
+            "line": 3,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "three",
+            "line": 6,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "-- one\n\n-- two\n\n\n// three\n\nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # one\n\n    # two\n\n    # three\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- one\n\n-- two\n\n-- three\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "multiple-consecutive",
+      "description": "Consecutive comment lines stay one ordered list.",
+      "text": "-- a\n-- b\n-- c\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "a",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "b",
+            "line": 2,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "c",
+            "line": 3,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "-- a\n-- b\n-- c\nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # a\n    # b\n    # c\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- a\n-- b\n-- c\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "dash-alone",
+      "description": "A marker with no text is an empty comment, not dropped.",
+      "text": "--\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "--\nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    #\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "--\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "slash-alone",
+      "description": "A marker with no text after code.",
+      "text": "from T //\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "",
+            "line": 1,
+            "column": 8,
+            "trailing": true
+          }
+        ],
+        "format": "from T //\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from: #\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "from T --\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "mixed-markers",
+      "description": "Both markers in one document, trailing and leading.",
+      "text": "-- a\n// b\nfrom T // c\nselect Id -- d",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "a",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "b",
+            "line": 2,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "c",
+            "line": 3,
+            "column": 8,
+            "trailing": true
+          },
+          {
+            "marker": "--",
+            "text": "d",
+            "line": 4,
+            "column": 11,
+            "trailing": true
+          }
+        ],
+        "format": "-- a\n// b\nfrom T // c\nselect Id -- d",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # a\n    # b\n    from: # c\n        name: T\n    columns: # d\n        - field: Id\n",
+        "roundTripText": "-- a\n-- b\nfrom T -- c\nselect Id -- d",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "consecutive-lines-different-markers",
+      "description": "Consecutive lines with different markers form one list.",
+      "text": "// a\n-- b\n// c\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "a",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "b",
+            "line": 2,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "c",
+            "line": 3,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "// a\n-- b\n// c\nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # a\n    # b\n    # c\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- a\n-- b\n-- c\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "url-in-string-literal",
+      "description": "// inside a string literal is not a comment.",
+      "text": "from T\nwhere Url = 'https://example.com/x'\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [],
+        "format": "from T\nwhere Url = 'https://example.com/x'\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    where:\n        op: ==\n        left:\n            field: Url\n        right:\n            value: https://example.com/x\n    columns:\n        - field: Id\n",
+        "roundTripText": "from T\nwhere Url = 'https://example.com/x'\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true,
+          "stringLiterals": [
+            "https://example.com/x"
+          ]
+        }
+      }
+    },
+    {
+      "name": "url-in-string-literal-then-real-comment",
+      "description": "A real comment after a string literal containing //.",
+      "text": "from T\nwhere Url = 'https://example.com/x' // real\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "real",
+            "line": 2,
+            "column": 37,
+            "trailing": true
+          }
+        ],
+        "format": "from T\nwhere Url = 'https://example.com/x' // real\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    where: # real\n        op: ==\n        left:\n            field: Url\n        right:\n            value: https://example.com/x\n    columns:\n        - field: Id\n",
+        "roundTripText": "from T\nwhere Url = 'https://example.com/x' -- real\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true,
+          "stringLiterals": [
+            "https://example.com/x"
+          ]
+        }
+      }
+    },
+    {
+      "name": "dash-in-string-literal",
+      "description": "-- inside a string literal is not a comment.",
+      "text": "from T\nwhere Name = 'a -- b'\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [],
+        "format": "from T\nwhere Name = 'a -- b'\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    where:\n        op: ==\n        left:\n            field: Name\n        right:\n            value: a -- b\n    columns:\n        - field: Id\n",
+        "roundTripText": "from T\nwhere Name = 'a -- b'\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true,
+          "stringLiterals": [
+            "a -- b"
+          ]
+        }
+      }
+    },
+    {
+      "name": "slash-in-quoted-identifier",
+      "description": "// inside a quoted identifier is not a comment.",
+      "text": "from T\nselect \"a//b\"",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [],
+        "format": "from T\nselect \"a//b\"",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    columns:\n        - field: a//b\n",
+        "roundTripText": "from T\nselect \"a//b\"",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true,
+          "quotedIdentifiers": [
+            "a//b"
+          ]
+        }
+      }
+    },
+    {
+      "name": "slash-in-backtick-identifier",
+      "description": "// inside a backtick identifier is not a comment.",
+      "text": "from T\nselect `a//b` // real",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "real",
+            "line": 2,
+            "column": 15,
+            "trailing": true
+          }
+        ],
+        "format": "from T\nselect `a//b` // real",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    columns: # real\n        - field: a//b\n",
+        "roundTripText": "from T\nselect \"a//b\" -- real",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true,
+          "quotedIdentifiers": [
+            "a//b"
+          ]
+        }
+      }
+    },
+    {
+      "name": "no-space-before-marker",
+      "description": "A comment right after a token with no space.",
+      "text": "from T\nselect a// c",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "c",
+            "line": 2,
+            "column": 9,
+            "trailing": true
+          }
+        ],
+        "format": "from T\nselect a// c",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    columns: # c\n        - field: a\n",
+        "roundTripText": "from T\nselect a -- c",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "no-space-after-marker",
+      "description": "No space after the marker: the text is the same as with one space.",
+      "text": "from T\nselect a//c\n--d",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "c",
+            "line": 2,
+            "column": 9,
+            "trailing": true
+          },
+          {
+            "marker": "--",
+            "text": "d",
+            "line": 3,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "from T\nselect a//c\n--d",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    columns: # c\n        - field: a\n\n# d\n",
+        "roundTripText": "from T\nselect a -- c\n-- d",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "extra-spaces-keep-all-but-one",
+      "description": "Only one leading space is dropped; trailing whitespace is trimmed.",
+      "text": "--   wide   \nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "  wide",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "--   wide   \nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    #   wide\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "--   wide\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "marker-text-inside-comment",
+      "description": "Markers inside comment text are plain text.",
+      "text": "// a -- b // c\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "a -- b // c",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "// a -- b // c\nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # a -- b // c\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- a -- b // c\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "hash-is-not-a-comment-trailing",
+      "description": "# is not a comment in the text form.",
+      "text": "from T # c\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": [
+          {
+            "code": "invalid_from",
+            "message": "aliases require AS followed by one identifier",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 11
+              }
+            }
+          }
+        ],
+        "commentTokens": [],
+        "format": null,
+        "yaml": null,
+        "roundTripText": null,
+        "sql": null
+      }
+    },
+    {
+      "name": "hash-is-not-a-comment-leading",
+      "description": "# is not a comment in the text form.",
+      "text": "# c\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": [
+          {
+            "code": "unsupported_statement",
+            "message": "unrecognized or unsupported TugQL construct",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 2
+              }
+            }
+          }
+        ],
+        "commentTokens": [],
+        "format": null,
+        "yaml": null,
+        "roundTripText": null,
+        "sql": null
+      }
+    },
+    {
+      "name": "crlf-line-endings",
+      "description": "CRLF line endings.",
+      "text": "// lead\r\nfrom T -- trail\r\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "lead",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "trail",
+            "line": 2,
+            "column": 8,
+            "trailing": true
+          }
+        ],
+        "format": "// lead\nfrom T -- trail\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # lead\n    from: # trail\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- lead\nfrom T -- trail\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "no-clean-anchor-inside-select-block",
+      "description": "A comment inside a multi-line SELECT block has no clean anchor; with no following element it becomes a document-end comment.",
+      "text": "from T\nselect (\n  -- inside\n  Id // after id\n  Name\n)",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "inside",
+            "line": 3,
+            "column": 3,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "after id",
+            "line": 4,
+            "column": 6,
+            "trailing": true
+          }
+        ],
+        "format": "from T\nselect (\n  -- inside\n  Id // after id\n  Name\n)",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    columns:\n        - field: Id\n        - field: Name\n\n# inside\n# after id\n",
+        "roundTripText": "from T\nselect Id, Name\n-- inside\n-- after id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "no-clean-anchor-inside-parameters-block",
+      "description": "A comment inside the PARAMETERS block becomes the leading comment of the nearest following element (the FROM).",
+      "text": "parameters (\n  -- about cap\n  @cap integer default 5 // five\n)\nfrom T\nwhere Id = @cap\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "about cap",
+            "line": 2,
+            "column": 3,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "five",
+            "line": 3,
+            "column": 26,
+            "trailing": true
+          }
+        ],
+        "format": "parameters (\n  -- about cap\n  @cap integer default 5 // five\n)\nfrom T\nwhere Id = @cap\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nparameters:\n    - name: cap\n      type: integer\n      default: 5\nquery:\n    # about cap\n    # five\n    from:\n        name: T\n    where:\n        op: ==\n        left:\n            field: Id\n        right:\n            param: cap\n    columns:\n        - field: Id\n",
+        "roundTripText": "parameters (\n  @cap integer default 5\n)\n-- about cap\n-- five\nfrom T\nwhere Id = @cap\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "no-clean-anchor-inside-cte",
+      "description": "A comment inside a WITH body becomes the leading comment of the nearest following element.",
+      "text": "-- cte\nwith A as (\n  from U // inner\n  select Id\n)\nfrom A\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "cte",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "inner",
+            "line": 3,
+            "column": 10,
+            "trailing": true
+          }
+        ],
+        "format": "-- cte\nwith A as (\n  from U // inner\n  select Id\n)\nfrom A\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\ndefinitions:\n    # cte\n    - kind: cte\n      name: A\n      query:\n        query:\n            from:\n                name: U\n            columns:\n                - field: Id\nquery:\n    # inner\n    from:\n        name: A\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- cte\nwith A as (\n  from U\n  select Id\n)\n-- inner\nfrom A\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "document-trailing",
+      "description": "Comments after the last clause become document-end comments.",
+      "text": "from T\nselect Id\n-- the end\n\n// really the end",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "the end",
+            "line": 3,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "really the end",
+            "line": 5,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "from T\nselect Id\n-- the end\n\n// really the end",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    columns:\n        - field: Id\n\n# the end\n\n# really the end\n",
+        "roundTripText": "from T\nselect Id\n-- the end\n\n-- really the end",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "join-and-on",
+      "description": "Comments on JOIN and ON lines anchor to the join and its ON.",
+      "text": "from T as t\n// join lead\njoin U as u -- join trail\n  // on lead\n  on t.Id = u.Id // on trail\nselect t.Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "join lead",
+            "line": 2,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "join trail",
+            "line": 3,
+            "column": 13,
+            "trailing": true
+          },
+          {
+            "marker": "//",
+            "text": "on lead",
+            "line": 4,
+            "column": 3,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "on trail",
+            "line": 5,
+            "column": 18,
+            "trailing": true
+          }
+        ],
+        "format": "from T as t\n// join lead\njoin U as u -- join trail\n// on lead\n  on t.Id = u.Id // on trail\nselect t.Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n        alias: t\n        joins:\n            # join lead\n            - from: # join trail\n                name: U\n                alias: u\n              \"on\":\n                # on lead\n                - op: == # on trail\n                  left:\n                    field: Id\n                    source: t\n                  right:\n                    field: Id\n                    source: u\n    columns:\n        - field: Id\n          source: t\n",
+        "roundTripText": "from T as t\n-- join lead\njoin U as u -- join trail\n  -- on lead\n  on t.Id = u.Id -- on trail\nselect t.Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "where-group-having-order",
+      "description": "Every clause line accepts a comment.",
+      "text": "from T\n-- w\nwhere Id = 0\n// g\ngroup by Id\n-- h\nhaving Id = 1\n// o\norder by Id desc\n-- l\nlimit 3\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "w",
+            "line": 2,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "g",
+            "line": 4,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "h",
+            "line": 6,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "o",
+            "line": 8,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "l",
+            "line": 10,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "from T\n-- w\nwhere Id = 0\n// g\ngroup by Id\n-- h\nhaving Id = 1\n// o\norder by Id desc\n-- l\nlimit 3\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    # w\n    where:\n        op: ==\n        left:\n            field: Id\n        right:\n            value: 0\n    # g\n    groupBy:\n        - field: Id\n    # h\n    having:\n        op: ==\n        left:\n            field: Id\n        right:\n            value: 1\n    # o\n    orderBy:\n        - field: Id\n          desc: true\n    # l\n    limit: 3\n    columns:\n        - field: Id\n",
+        "roundTripText": "from T\n-- w\nwhere Id = 0\n-- g\ngroup by Id\n-- h\nhaving Id = 1\n-- o\norder by Id desc\n-- l\nlimit 3\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "unicode-text",
+      "description": "Non-ASCII comment text.",
+      "text": "-- café → ok\nfrom T\nselect Id",
+      "formatOptions": {},
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "--",
+            "text": "café → ok",
+            "line": 1,
+            "column": 1,
+            "trailing": false
+          }
+        ],
+        "format": "-- café → ok\nfrom T\nselect Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    # café → ok\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+        "roundTripText": "-- café → ok\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "formatter-keeps-markers",
+      "description": "The formatter re-cases and re-indents code but keeps each author's marker and text (formatOptions applies).",
+      "text": "FROM T AS t // keep\n-- one\nJOIN U AS u\n\t// two\n\tON t.Id = u.Id -- on\nSELECT t.Id",
+      "formatOptions": {
+        "keywordCase": "lowercase",
+        "indentation": "two-spaces"
+      },
+      "expected": {
+        "diagnostics": null,
+        "commentTokens": [
+          {
+            "marker": "//",
+            "text": "keep",
+            "line": 1,
+            "column": 13,
+            "trailing": true
+          },
+          {
+            "marker": "--",
+            "text": "one",
+            "line": 2,
+            "column": 1,
+            "trailing": false
+          },
+          {
+            "marker": "//",
+            "text": "two",
+            "line": 4,
+            "column": 2,
+            "trailing": false
+          },
+          {
+            "marker": "--",
+            "text": "on",
+            "line": 5,
+            "column": 17,
+            "trailing": true
+          }
+        ],
+        "format": "from T as t // keep\n-- one\njoin U as u\n// two\n  on t.Id = u.Id -- on\nselect t.Id",
+        "yaml": "format: tugqtree\nversion: 1\nquery:\n    from: # keep\n        name: T\n        alias: t\n        joins:\n            # one\n            - from:\n                name: U\n                alias: u\n              \"on\":\n                # two\n                - op: == # on\n                  left:\n                    field: Id\n                    source: t\n                  right:\n                    field: Id\n                    source: u\n    columns:\n        - field: Id\n          source: t\n",
+        "roundTripText": "from T as t -- keep\n-- one\njoin U as u\n  -- two\n  on t.Id = u.Id -- on\nselect t.Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    }
+  ],
+  "yamlCases": [
+    {
+      "name": "head-comment-above-clause",
+      "description": "A # head comment above a clause key becomes a -- line above the clause.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    # lead\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "-- lead\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "same-line-comment-after-block-key",
+      "description": "A # comment on the key line of a block value becomes a trailing -- comment.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    from: # trail\n        name: T\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "from T -- trail\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "same-line-comment-after-scalar",
+      "description": "A # comment after a scalar value becomes a trailing -- comment.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    limit: 5 # five\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "from T\nlimit 5 -- five\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "comment-at-non-anchor-position",
+      "description": "A comment on a node that is not a clause (inside a condition) becomes the leading comment of the nearest following clause.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    where:\n        # about the operator\n        op: ==\n        left:\n            field: Id # the id\n        right:\n            value: 1\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "from T\nwhere Id = 1\n-- about the operator\n-- the id\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "comment-before-document",
+      "description": "A comment above the whole document, separated by a blank line, leads the first clause.",
+      "yaml": "# top of file\n\nformat: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "-- top of file\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "comment-after-document",
+      "description": "A comment after the last node is a document-end comment.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    columns:\n        - field: Id\n\n# the end\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "from T\nselect Id\n-- the end",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "dashes-inside-yaml-scalar",
+      "description": "-- inside a YAML scalar is not a comment; it is part of a string literal.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    where:\n        op: ==\n        left:\n            field: Name\n        right:\n            value: a -- b\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "from T\nwhere Name = 'a -- b'\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "hash-inside-yaml-scalar",
+      "description": "# inside a quoted YAML scalar is not a comment.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    where:\n        op: ==\n        left:\n            field: Name\n        right:\n            value: \"a # b\"\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "from T\nwhere Name = 'a # b'\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "slashes-inside-yaml-scalar",
+      "description": "// inside a YAML scalar is a plain string literal, not a comment.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    from:\n        name: T\n    where:\n        op: ==\n        left:\n            field: Url\n        right:\n            value: https://example.com/x\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "from T\nwhere Url = 'https://example.com/x'\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true,
+          "stringLiterals": [
+            "https://example.com/x"
+          ]
+        }
+      }
+    },
+    {
+      "name": "blank-line-between-comments",
+      "description": "A blank line between head comments is kept.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    # one\n\n    # two\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "-- one\n\n-- two\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    },
+    {
+      "name": "empty-comment",
+      "description": "An empty # comment becomes a marker alone.",
+      "yaml": "format: tugqtree\nversion: 1\nquery:\n    #\n    from:\n        name: T\n    columns:\n        - field: Id\n",
+      "expected": {
+        "diagnostics": null,
+        "text": "--\nfrom T\nselect Id",
+        "sql": {
+          "forbid": "//",
+          "ignoringStringLiterals": true,
+          "ignoringQuotedIdentifiers": true
+        }
+      }
+    }
+  ]
+}

@@ -6834,7 +6834,7 @@
         "diagnostics": [
           {
             "code": "invalid_tree",
-            "message": "invalid TugQTree query: yaml: unmarshal errors:\n  line 9: field definitions not found in type dtql.existsYAML",
+            "message": "invalid TugQTree query: yaml: unmarshal errors:\n  line 9: field definitions not found in type tugql.existsYAML",
             "span": {
               "start": {
                 "line": 1,
