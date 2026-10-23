@@ -1,5 +1,5 @@
 {
-  "apiVersion": "dtql.org/access/v1",
+  "apiVersion": "tugql.org/access/v1",
   "kind": "AccessPolicy",
   "metadata": {
     "name": "surface-masks",
@@ -34,7 +34,7 @@
   "execution": {
     "allow": [
       {
-        "class": "dtql"
+        "class": "tugql"
       },
       {
         "class": "stored_procedure",

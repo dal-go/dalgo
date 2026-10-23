@@ -8,9 +8,9 @@ import (
 var _ Expression = Param{}
 
 // Param is a named parameter expression, written "$<name>" in query text and
-// DTQL. It stands for a runtime value that is substituted before a query or a
+// TugQL. It stands for a runtime value that is substituted before a query or a
 // policy condition is executed: access policies resolve it from the operation
-// context ($currentUser, $now, named variables), and a saved DTQL query can
+// context ($currentUser, $now, named variables), and a saved TugQL query can
 // carry it until execution time. Adapters never receive a Param; the layer that
 // owns the values replaces it with a Constant (scalar) or an Array (slice).
 type Param struct {

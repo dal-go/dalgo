@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "schema": "schema.json",
+  "dataset": "dataset.json",
+  "cases": [
+    {"name": "legacy-flat-json", "input": "legacy-flat.tugql.json", "rows": "legacy-flat.rows.json"},
+    {"name": "legacy-join-hints", "input": "legacy-join-hints.tugql.yaml", "rows": "legacy-join-hints.rows.json"},
+    {"name": "scalar-zero-null-one", "input": "scalar-values.tugql.yaml", "rows": "scalar-values.rows.json"},
+    {"name": "scalar-many-rows", "input": "scalar-many-rows.tugql.yaml", "error": "scalar-many-rows.error.json"},
+    {"name": "scalar-many-columns", "input": "scalar-many-columns.tugql.yaml", "error": "scalar-many-columns.error.json"},
+    {"name": "derived-from-and-join", "input": "derived-from-join.tugql.yaml", "rows": "derived-from-join.rows.json"},
+    {"name": "inner-order-and-limit", "input": "pipeline-order-limit.tugql.yaml", "rows": "pipeline-order-limit.rows.json"},
+    {"name": "inner-order-offset-and-limit", "input": "pipeline-order-offset.tugql.yaml", "rows": "pipeline-order-offset.rows.json"},
+    {"name": "in-not-in-null-table", "expectation": "membership-null-table.expect.json"},
+    {"name": "in-correlated", "input": "membership-in.tugql.yaml", "rows": "membership-in.rows.json"},
+    {"name": "not-in-correlated", "input": "membership-not-in.tugql.yaml", "rows": "membership-not-in.rows.json"},
+    {"name": "exists-short-circuit", "input": "exists-short-circuit.tugql.yaml", "rows": "exists-short-circuit.rows.json", "expectation": "exists-short-circuit.expect.json"},
+    {"name": "not-exists-correlated", "input": "not-exists.tugql.yaml", "rows": "not-exists.rows.json"},
+    {"name": "scope-shadowing", "input": "scope-shadowing.tugql.yaml", "rows": "scope-shadowing.rows.json"},
+    {"name": "scope-multi-level-correlation", "input": "scope-multilevel.tugql.yaml", "rows": "scope-multilevel.rows.json"},
+    {"name": "scope-ambiguous", "input": "scope-ambiguous.tugql.yaml", "error": "scope-ambiguous.error.json"},
+    {"name": "scope-forward-join", "input": "scope-forward-join.tugql.yaml", "error": "scope-forward-join.error.json"},
+    {"name": "scope-unknown-qualifier", "input": "scope-unknown-qualifier.tugql.yaml", "error": "scope-unknown-qualifier.error.json"},
+    {"name": "customer-invoice-composition", "input": "customer-invoice-composition.tugql.yaml", "rows": "customer-invoice-composition.rows.json"}
+  ]
+}

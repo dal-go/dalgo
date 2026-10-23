@@ -97,7 +97,7 @@ func TestLoadPolicyFiles(t *testing.T) {
 func TestLoadPolicyFilesPrincipalBindings(t *testing.T) {
 	root := t.TempDir()
 	writePolicyFile(t, root, "bindings.json", `{
-  "apiVersion":"dtql.org/access/v1", "kind":"AccessPolicy",
+  "apiVersion":"tugql.org/access/v1", "kind":"AccessPolicy",
   "metadata":{"name":"bound"}, "target":{"database":"db1"},
   "composition":"dalgo-hierarchical-v1", "default":"deny",
   "ruleSets":{"reader":[{"path":"/cities/*","rules":[{"id":"read","effect":"allow","operations":["get"]}]}]},
@@ -160,7 +160,7 @@ func TestLoadPolicyFilesRejectsDuplicateIDsAndEscapes(t *testing.T) {
 func TestLoadPolicyFilesRejectsAmbiguousYAML(t *testing.T) {
 	root := t.TempDir()
 	tests := map[string]string{
-		"duplicate.json": `{"apiVersion":"dtql.org/access/v1","apiVersion":"dtql.org/access/v1"}`,
+		"duplicate.json": `{"apiVersion":"tugql.org/access/v1","apiVersion":"tugql.org/access/v1"}`,
 		"alias.yaml":     "common: &common {name: p}\nmetadata: *common\n",
 		"merge.yaml":     "common: &common {name: p}\nmetadata:\n  <<: *common\n",
 	}
@@ -250,38 +250,38 @@ func TestPortablePolicySyntaxAndEnvelopeValidation(t *testing.T) {
 	}
 }
 
-func TestPolicyFromDTQLDocumentRejectsUnsupportedEnvelope(t *testing.T) {
+func TestPolicyFromTugQLDocumentRejectsUnsupportedEnvelope(t *testing.T) {
 	source := []byte(portablePolicy("p", "public", validPortableScopes))
-	tests := map[string]func(DTQLDocument) DTQLDocument{
-		"api":         func(d DTQLDocument) DTQLDocument { d.APIVersion = "future"; return d },
-		"visibility":  func(d DTQLDocument) DTQLDocument { d.Metadata.Visibility = "secret"; return d },
-		"target":      func(d DTQLDocument) DTQLDocument { d.Target.Database = "other"; return d },
-		"composition": func(d DTQLDocument) DTQLDocument { d.Composition = "future"; return d },
-		"opaque":      func(d DTQLDocument) DTQLDocument { d.Scopes[0].OpaqueQuery = true; return d },
-		"group":       func(d DTQLDocument) DTQLDocument { d.Scopes[0].CollectionGroup = "g"; return d },
-		"scope mask":  func(d DTQLDocument) DTQLDocument { d.Scopes[0].CollectionMask = &Mask{}; return d },
-		"execution": func(d DTQLDocument) DTQLDocument {
+	tests := map[string]func(TugQLDocument) TugQLDocument{
+		"api":         func(d TugQLDocument) TugQLDocument { d.APIVersion = "future"; return d },
+		"visibility":  func(d TugQLDocument) TugQLDocument { d.Metadata.Visibility = "secret"; return d },
+		"target":      func(d TugQLDocument) TugQLDocument { d.Target.Database = "other"; return d },
+		"composition": func(d TugQLDocument) TugQLDocument { d.Composition = "future"; return d },
+		"opaque":      func(d TugQLDocument) TugQLDocument { d.Scopes[0].OpaqueQuery = true; return d },
+		"group":       func(d TugQLDocument) TugQLDocument { d.Scopes[0].CollectionGroup = "g"; return d },
+		"scope mask":  func(d TugQLDocument) TugQLDocument { d.Scopes[0].CollectionMask = &Mask{}; return d },
+		"execution": func(d TugQLDocument) TugQLDocument {
 			d.Execution = &ExecutionGate{Allow: []ExecutionEntry{{Class: ExecutionStoredProcedure, Namespace: "public", Mask: &Mask{}}}}
 			return d
 		},
-		"collection mask": func(d DTQLDocument) DTQLDocument { d.CollectionMask = &Mask{}; return d },
-		"ruleset scope": func(d DTQLDocument) DTQLDocument {
-			d.RuleSets = map[string][]DTQLScope{"r": {{OpaqueQuery: true}}}
+		"collection mask": func(d TugQLDocument) TugQLDocument { d.CollectionMask = &Mask{}; return d },
+		"ruleset scope": func(d TugQLDocument) TugQLDocument {
+			d.RuleSets = map[string][]TugQLScope{"r": {{OpaqueQuery: true}}}
 			d.Scopes = nil
 			d.Bindings = &DocumentBindings{Everyone: []string{"r"}}
 			return d
 		},
-		"nested scope": func(d DTQLDocument) DTQLDocument { d.Scopes[0].Scopes = []DTQLScope{{OpaqueQuery: true}}; return d },
-		"canonical": func(d DTQLDocument) DTQLDocument {
+		"nested scope": func(d TugQLDocument) TugQLDocument { d.Scopes[0].Scopes = []TugQLScope{{OpaqueQuery: true}}; return d },
+		"canonical": func(d TugQLDocument) TugQLDocument {
 			d.Scopes[0].Rules[0].Where = &DocumentCondition{Op: "==", Left: &DocumentExpression{Field: "id"}, Right: &DocumentExpression{Value: make(chan int)}}
 			return d
 		},
 	}
 	for name, mutate := range tests {
 		t.Run(name, func(t *testing.T) {
-			base, err := ParseDTQLPolicy(source)
+			base, err := ParseTugQLPolicy(source)
 			require.NoError(t, err)
-			if _, err := policyFromDTQLDocument(mutate(base), "db1", "policy.yaml"); err == nil {
+			if _, err := policyFromTugQLDocument(mutate(base), "db1", "policy.yaml"); err == nil {
 				t.Fatal("unsupported envelope accepted")
 			}
 		})
@@ -294,7 +294,7 @@ const validPortableScopes = `scopes:
 `
 
 func portablePolicy(name, visibility, body string) string {
-	return "apiVersion: dtql.org/access/v1\nkind: AccessPolicy\nmetadata:\n  name: " + name + "\n  visibility: " + visibility + "\ntarget:\n  database: db1\ncomposition: dalgo-hierarchical-v1\ndefault: deny\n" + body
+	return "apiVersion: tugql.org/access/v1\nkind: AccessPolicy\nmetadata:\n  name: " + name + "\n  visibility: " + visibility + "\ntarget:\n  database: db1\ncomposition: dalgo-hierarchical-v1\ndefault: deny\n" + body
 }
 
 func writePolicyFile(t *testing.T, root, name, body string) {
@@ -307,29 +307,7 @@ func TestTugQLDocumentAPIVersion(t *testing.T) {
 	doc, err := ParseTugQLPolicy(source)
 	require.NoError(t, err)
 	assert.Equal(t, TugQLDocumentAPIVersion, doc.APIVersion)
-	policy, err := policyFromDTQLDocument(doc, "db1", "p1.yaml")
+	policy, err := policyFromTugQLDocument(doc, "db1", "p1.yaml")
 	require.NoError(t, err)
 	assert.NotNil(t, policy)
-}
-
-// The TugQL-named entry points are the DTQL ones under the new name.
-func TestTugQLPolicyAliasesMatchTheDTQLEntryPoints(t *testing.T) {
-	source := []byte("apiVersion: tugql.org/access/v1\nkind: AccessPolicy\nmetadata:\n  name: p1\n  visibility: private\ntarget:\n  database: db1\ncomposition: dalgo-hierarchical-v1\ndefault: deny\n" + validPortableScopes)
-	doc, err := ParseTugQLPolicy(source)
-	require.NoError(t, err)
-	normalized, err := NormalizeTugQLPolicy(doc)
-	require.NoError(t, err)
-	wantNormalized, err := NormalizeDTQLPolicy(doc)
-	require.NoError(t, err)
-	assert.Equal(t, wantNormalized, normalized)
-	gotYAML, err := MarshalTugQLPolicyYAML(doc)
-	require.NoError(t, err)
-	wantYAML, err := MarshalDTQLPolicyYAML(doc)
-	require.NoError(t, err)
-	assert.Equal(t, wantYAML, gotYAML)
-	gotJSON, err := MarshalTugQLPolicyJSON(doc)
-	require.NoError(t, err)
-	wantJSON, err := MarshalDTQLPolicyJSON(doc)
-	require.NoError(t, err)
-	assert.Equal(t, wantJSON, gotJSON)
 }

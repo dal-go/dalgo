@@ -3,7 +3,7 @@ format: https://specscore.md/idea-specification
 status: Draft
 ---
 
-# Idea: Window functions in DTQL
+# Idea: Window functions in TugQL
 
 **Status:** Draft
 **Date:** 2026-10-04
@@ -14,34 +14,34 @@ status: Draft
 
 ## Problem Statement
 
-How might DTQL express window functions (ranking, running totals, lag and lead) so
+How might TugQL express window functions (ranking, running totals, lag and lead) so
 that a server which supports them computes them natively, and DALgo computes them in
 memory for providers that do not?
 
 ## Context
 
 The founder's words, 2026-10-04: "We also probably should add support for native
-analytical window functions", "Window furncrioms should be supported by DTQL" and
+analytical window functions", "Window furncrioms should be supported by TugQL" and
 "I'd also add window functions on dalgo side for providers that do not support them
 natively". These three sentences are the founder's words in this idea; the first is
 hedged ("probably"). Everything else below is the PostgreSQL launch plan's design or
 this idea's own proposal, marked as such.
 
-Today DTQL has no window functions, and `query-group-by-aggregation` lists them as out
-of scope. Every DTQL feature exists in two engines: native in the SQL compiler and in
+Today TugQL has no window functions, and `query-group-by-aggregation` lists them as out
+of scope. Every TugQL feature exists in two engines: native in the SQL compiler and in
 the bounded generic engine in DALgo. Aggregation functions already run natively on
 servers that support them (founder, 2026-10-04: "Aggregation functions should be run
 natively on servers that support them."); windows follow the same rule.
 
 ## Recommended Direction
 
-Use one spelling for an order inside an expression: DTQL `orderBy` items carry
+Use one spelling for an order inside an expression: TugQL `orderBy` items carry
 an expression and optional `desc`, and the Go model uses `[]dal.OrderExpression`.
 The aggregate-local order and a future window order share that shape; a window
 adds `partitionBy` without introducing a second order syntax. A future NULL
 placement option belongs on the shared order item.
 
-Founder rulings: window functions are part of DTQL, and DALgo computes them in memory
+Founder rulings: window functions are part of TugQL, and DALgo computes them in memory
 for providers without native support. Native execution where the server supports
 windows rests on the founder's hedged "We also probably should add support for native
 analytical window functions" and on the aggregation rule; it is not an unhedged ruling.
@@ -51,7 +51,7 @@ launch window ends 2026-10-25 and the document format is being frozen; adding
 document nodes now would change it just before the freeze.
 
 Seam now (the plan's design): the typed SQL compiler in dalgo2sql reserves one window
-hook on its dialect and a planned capability flag. No window syntax is added to DTQL
+hook on its dialect and a planned capability flag. No window syntax is added to TugQL
 yet.
 
 Delivery, in order (the plan's design):
@@ -83,7 +83,7 @@ plan).
 
 ## Not Doing (and Why)
 
-- Window syntax in DTQL before the PostgreSQL launch — the format is being frozen and
+- Window syntax in TugQL before the PostgreSQL launch — the format is being frozen and
   the work is sequenced after parity.
 - Proposal: frame clauses (ROWS or RANGE BETWEEN) in the first slice — most uses need
   only partition and order.
@@ -101,7 +101,7 @@ plan).
 
 ## SpecScore Integration
 
-- **New Features this would create:** a DTQL window-functions feature and a generic
+- **New Features this would create:** a TugQL window-functions feature and a generic
   engine window executor feature, to be specified after PostgreSQL parity.
 - **Existing Features affected:** `query-group-by-aggregation`, `query-joins`.
 - **Dependencies:** the PostgreSQL typed compiler in dalgo2sql.

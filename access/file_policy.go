@@ -14,12 +14,8 @@ import (
 
 const (
 	TugQLDocumentAPIVersion = "tugql.org/access/v1"
-	// Deprecated: DTQLDocumentAPIVersion is the legacy API version for TugQL access policies.
-	DTQLDocumentAPIVersion = "dtql.org/access/v1"
-	maxPolicyFileBytes     = 1 << 20
+	maxPolicyFileBytes      = 1 << 20
 )
-
-type TugQLDocument = DTQLDocument
 
 // FilePolicyConfig selects portable policy files relative to a trusted root.
 // Loading is opt-in: a zero value disables file policies.
@@ -30,40 +26,40 @@ type FilePolicyConfig struct {
 	Policies []string `json:"policies" yaml:"policies"`
 }
 
-type DTQLDocument struct {
-	APIVersion     string                 `json:"apiVersion" yaml:"apiVersion"`
-	Kind           string                 `json:"kind" yaml:"kind"`
-	Metadata       DTQLMetadata           `json:"metadata" yaml:"metadata"`
-	Target         DTQLTarget             `json:"target" yaml:"target"`
-	Composition    string                 `json:"composition" yaml:"composition"`
-	Default        string                 `json:"default" yaml:"default"`
-	Scopes         []DTQLScope            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
-	RuleSets       map[string][]DTQLScope `json:"ruleSets,omitempty" yaml:"ruleSets,omitempty"`
-	Bindings       *DocumentBindings      `json:"bindings,omitempty" yaml:"bindings,omitempty"`
-	Execution      *ExecutionGate         `json:"execution,omitempty" yaml:"execution,omitempty"`
-	CollectionMask *Mask                  `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
+type TugQLDocument struct {
+	APIVersion     string                  `json:"apiVersion" yaml:"apiVersion"`
+	Kind           string                  `json:"kind" yaml:"kind"`
+	Metadata       TugQLMetadata           `json:"metadata" yaml:"metadata"`
+	Target         TugQLTarget             `json:"target" yaml:"target"`
+	Composition    string                  `json:"composition" yaml:"composition"`
+	Default        string                  `json:"default" yaml:"default"`
+	Scopes         []TugQLScope            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
+	RuleSets       map[string][]TugQLScope `json:"ruleSets,omitempty" yaml:"ruleSets,omitempty"`
+	Bindings       *DocumentBindings       `json:"bindings,omitempty" yaml:"bindings,omitempty"`
+	Execution      *ExecutionGate          `json:"execution,omitempty" yaml:"execution,omitempty"`
+	CollectionMask *Mask                   `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
 }
 
-type DTQLMetadata struct {
+type TugQLMetadata struct {
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 	Visibility  string `json:"visibility,omitempty" yaml:"visibility,omitempty"`
 }
 
-type DTQLTarget struct {
+type TugQLTarget struct {
 	Database string `json:"database" yaml:"database"`
 }
 
-type DTQLScope struct {
-	Path            string      `json:"path,omitempty" yaml:"path,omitempty"`
-	CollectionGroup string      `json:"collectionGroup,omitempty" yaml:"collectionGroup,omitempty"`
-	OpaqueQuery     bool        `json:"opaqueQuery,omitempty" yaml:"opaqueQuery,omitempty"`
-	Rules           []DTQLRule  `json:"rules,omitempty" yaml:"rules,omitempty"`
-	Scopes          []DTQLScope `json:"scopes,omitempty" yaml:"scopes,omitempty"`
-	CollectionMask  *Mask       `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
+type TugQLScope struct {
+	Path            string       `json:"path,omitempty" yaml:"path,omitempty"`
+	CollectionGroup string       `json:"collectionGroup,omitempty" yaml:"collectionGroup,omitempty"`
+	OpaqueQuery     bool         `json:"opaqueQuery,omitempty" yaml:"opaqueQuery,omitempty"`
+	Rules           []TugQLRule  `json:"rules,omitempty" yaml:"rules,omitempty"`
+	Scopes          []TugQLScope `json:"scopes,omitempty" yaml:"scopes,omitempty"`
+	CollectionMask  *Mask        `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
 }
 
-type DTQLRule struct {
+type TugQLRule struct {
 	ID         string             `json:"id" yaml:"id"`
 	Effect     string             `json:"effect" yaml:"effect"`
 	Operations []string           `json:"operations" yaml:"operations"`
@@ -73,7 +69,7 @@ type DTQLRule struct {
 	FieldMask  *Mask              `json:"fieldMask,omitempty" yaml:"fieldMask,omitempty"`
 }
 
-// LoadPolicyFiles loads enabled DTQL portable policy documents from root.
+// LoadPolicyFiles loads enabled TugQL portable policy documents from root.
 // Every configured file must be valid; errors fail the complete load closed.
 func LoadPolicyFiles(root string, config FilePolicyConfig) ([]Policy, error) {
 	if !config.Enabled {
@@ -181,12 +177,12 @@ func loadPolicyFile(root policyRoot, name, database string) (Policy, error) {
 	default:
 		return nil, fmt.Errorf("access: policy file %q must use .yaml, .yml, or .json", name)
 	}
-	document, err := ParseDTQLPolicy(data)
+	document, err := ParseTugQLPolicy(data)
 	if err != nil {
 		return nil, fmt.Errorf("access: decode policy file %q: %w", name, err)
 	}
 
-	return policyFromDTQLDocument(document, database, name)
+	return policyFromTugQLDocument(document, database, name)
 }
 
 func validatePortablePolicyYAML(data []byte) error { return validatePolicySyntax(data, false) }
@@ -234,7 +230,7 @@ func validatePolicySyntax(data []byte, allowExtensions bool) error {
 	}
 	root := document.Content[0]
 	if allowExtensions {
-		return validateDTQLShape(root)
+		return validateTugQLShape(root)
 	}
 	if feature := mappingFeature(root, "execution", "collectionMask"); feature != "" {
 		return fmt.Errorf("%s is not supported by this loader", feature)
@@ -297,8 +293,8 @@ func scopedPolicyFeature(scopes *yaml.Node) string {
 	return ""
 }
 
-func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Policy, error) {
-	if source.APIVersion != TugQLDocumentAPIVersion && source.APIVersion != DTQLDocumentAPIVersion {
+func policyFromTugQLDocument(source TugQLDocument, database, reference string) (Policy, error) {
+	if source.APIVersion != TugQLDocumentAPIVersion {
 		return nil, fmt.Errorf("access: unsupported apiVersion %q", source.APIVersion)
 	}
 	visibility := source.Metadata.Visibility
@@ -332,14 +328,14 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 		}
 	}
 	document := Document{APIVersion: DocumentAPIVersion, Kind: source.Kind, Metadata: DocumentMetadata{Name: source.Metadata.Name}, Default: source.Default, Bindings: source.Bindings}
-	document.Scopes, err = convertDTQLScopes(source.Scopes)
+	document.Scopes, err = convertTugQLScopes(source.Scopes)
 	if err != nil {
 		return nil, err
 	}
 	if source.RuleSets != nil {
 		document.RuleSets = make(map[string][]DocumentScope, len(source.RuleSets))
 		for name, scopes := range source.RuleSets {
-			document.RuleSets[name], err = convertDTQLScopes(scopes)
+			document.RuleSets[name], err = convertTugQLScopes(scopes)
 			if err != nil {
 				return nil, fmt.Errorf("access: ruleSets[%s]: %w", name, err)
 			}
@@ -366,7 +362,7 @@ func policyFromDTQLDocument(source DTQLDocument, database, reference string) (Po
 	return policy, err
 }
 
-func convertDTQLScopes(scopes []DTQLScope) ([]DocumentScope, error) {
+func convertTugQLScopes(scopes []TugQLScope) ([]DocumentScope, error) {
 	result := make([]DocumentScope, len(scopes))
 	for i, scope := range scopes {
 		if scope.CollectionGroup != "" || scope.OpaqueQuery {
@@ -379,7 +375,7 @@ func convertDTQLScopes(scopes []DTQLScope) ([]DocumentScope, error) {
 		for j, rule := range scope.Rules {
 			rules[j] = DocumentRule{ID: rule.ID, Effect: rule.Effect, Operations: rule.Operations, Where: rule.Where, Check: rule.Check, Fields: rule.Fields, fieldMask: rule.FieldMask}
 		}
-		children, err := convertDTQLScopes(scope.Scopes)
+		children, err := convertTugQLScopes(scope.Scopes)
 		if err != nil {
 			return nil, fmt.Errorf("access: scopes[%d]: %w", i, err)
 		}

@@ -5,8 +5,8 @@ status: queued
 ---
 # dalgo needs first-class join support in its query model
 
-DTQL deferred joins because `dal.StructuredQuery`'s join model cannot yet
-express a real join losslessly. Before DTQL (or any consumer) can serialize
+TugQL deferred joins because `dal.StructuredQuery`'s join model cannot yet
+express a real join losslessly. Before TugQL (or any consumer) can serialize
 joins without losing semantics, dal's query AST needs first-class join support.
 
 Three concrete gaps in `dal` today:
@@ -24,6 +24,6 @@ Three concrete gaps in `dal` today:
    ripples into every adapter that renders `FieldRef`.
 
 Scope to decide later: which join types (inner+left likely the 90%), equality-only vs
-richer ON conditions, and multiple/chained joins. Once dal can express joins, the DTQL
+richer ON conditions, and multiple/chained joins. Once dal can express joins, the TugQL
 side is small: add `from.joins[]` with `type`, the joined source, and qualified field
 refs in ON, then drop the subset-gate rejection.

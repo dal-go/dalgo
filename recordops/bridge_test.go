@@ -94,7 +94,10 @@ func TestReaderToSeq_ClosesOnAllPaths(t *testing.T) {
 				return &fakeReader{records: []record.Record{rec}}
 			},
 			consume: func(seq RecordSeq[string]) {
-				for range seq { /* drain */
+				for _, err := range seq { /* drain */
+					if err != nil {
+						break
+					}
 				}
 			},
 		},
@@ -106,7 +109,8 @@ func TestReaderToSeq_ClosesOnAllPaths(t *testing.T) {
 				return &fakeReader{records: []record.Record{rec1, rec2}}
 			},
 			consume: func(seq RecordSeq[string]) {
-				for range seq {
+				for _, err := range seq {
+					_ = err
 					break /* take first only */
 				}
 			},
@@ -121,7 +125,10 @@ func TestReaderToSeq_ClosesOnAllPaths(t *testing.T) {
 				}
 			},
 			consume: func(seq RecordSeq[string]) {
-				for range seq { /* drain — error terminates */
+				for _, err := range seq { /* drain — error terminates */
+					if err != nil {
+						break
+					}
 				}
 			},
 		},

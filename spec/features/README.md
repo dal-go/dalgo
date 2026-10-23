@@ -20,7 +20,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [`recordops` package](recordops/README.md) | Implemented | Umbrella for the `recordops` package — pure, dependency-free analytical / inspection helpers over dalgo record collections. MVP introduces one child: [diff](recordops/diff/README.md) — one baseline vs. N candidates via K-way merge over ID-sorted `iter.Seq2` streams, with four renderers (git-style YAML, by-ID YAML, plain YAML, JSON) and bridge helpers `SliceToSeq` + `ReaderToSeq`. |
 | [Transaction Message](transaction-message/README.md) | Approved | — |
 | [Computed Columns in recordset (neutral evaluator contract)](recordset-computed-columns/README.md) | Approved | — |
-| [DTQL — YAML serialization of dal.StructuredQuery](dtql/README.md) | Approved | — |
+| [TugQL — YAML serialization of dal.StructuredQuery](tugql/README.md) | Approved | — |
 | [First-class INNER/LEFT joins in dal's query model](query-joins/README.md) | Approved | — |
 | [Source-qualified, multi-key ORDER BY resolution in dalgo2memory](qualified-orderby-resolution/README.md) | Approved | — |
 | [Column selection in the query builder, projected by dalgo2memory](query-column-projection/README.md) | Stable | — |
@@ -35,8 +35,8 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [dalgo2namecheap: NameCheap API Adapter](dalgo2namecheap-namecheap-api-adapter/README.md) | Approved | — |
 | [Hierarchical access and audit policies](access-policies/README.md) | Stable | — |
 | [Triggers and webhooks: change events, transactional outbox, dispatcher](triggers/README.md) | Draft | — |
-| [Recursive DTQL JOINs across DALgo Go and TypeScript](dtql-recursive-joins/README.md) | Draft | — |
-| [Recursive DTQL subqueries across DALgo Go and TypeScript](dtql-subqueries/README.md) | Implementing | — |
+| [Recursive TugQL JOINs across DALgo Go and TypeScript](tugql-recursive-joins/README.md) | Draft | — |
+| [Recursive TugQL subqueries across DALgo Go and TypeScript](tugql-subqueries/README.md) | Implementing | — |
 
 ## Open Questions
 

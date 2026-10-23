@@ -9,7 +9,7 @@ import (
 
 // ExecutionTarget describes an assessment's execution surface. Real secured
 // query sessions derive the class from the query; callers cannot relabel an
-// opaque query as DTQL. Namespace and Name apply only to procedure assessment.
+// opaque query as TugQL. Namespace and Name apply only to procedure assessment.
 type ExecutionTarget struct {
 	Class     ExecutionClass
 	Namespace string
@@ -43,10 +43,10 @@ func compileExecutionGate(gate *ExecutionGate) (*compiledExecutionGate, error) {
 }
 
 // classifyExecution is shared by policy assessment and real enforcement.
-// With no query object, ordinary DAL operations default to the typed DTQL
+// With no query object, ordinary DAL operations default to the typed TugQL
 // surface. Explicit native/procedure targets are assessment only in this MVP.
 func classifyExecution(request Request) (ExecutionTarget, error) {
-	target := ExecutionTarget{Class: ExecutionDTQL}
+	target := ExecutionTarget{Class: ExecutionTugQL}
 	if request.Execution != nil {
 		target = *request.Execution
 	}
@@ -54,12 +54,12 @@ func classifyExecution(request Request) (ExecutionTarget, error) {
 		if _, ok := request.Query.(dal.StructuredQuery); !ok {
 			return ExecutionTarget{}, fmt.Errorf("opaque query execution cannot be safely classified")
 		}
-		if target.Class != ExecutionDTQL {
+		if target.Class != ExecutionTugQL {
 			return ExecutionTarget{}, fmt.Errorf("execution class conflicts with structured query")
 		}
 	}
 	switch target.Class {
-	case ExecutionDTQL, ExecutionNativeSQL, ExecutionNativeGraphQL:
+	case ExecutionTugQL, ExecutionNativeSQL, ExecutionNativeGraphQL:
 		if target.Namespace != "" || target.Name != "" {
 			return ExecutionTarget{}, fmt.Errorf("only procedure targets have namespace and name")
 		}

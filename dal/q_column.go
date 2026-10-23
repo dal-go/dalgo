@@ -65,7 +65,7 @@ func wildcardMaskMatches(mask, name string) bool {
 	return states[len(value)]
 }
 
-// String renders the wildcard projection in DTQL's compact notation.
+// String renders the wildcard projection in TugQL's compact notation.
 func (v WildcardProjection) String() string {
 	prefix := "*"
 	if v.Source != "" {

@@ -15,8 +15,8 @@ status: Implemented
 Implement the read side of `access-policies/row-level-conditions`: a parameter
 expression in `dal`, a shared record-condition evaluator, `where` conditions on
 allow rules with runtime variables, enforcement for `Get`, `Exists` and `Query`
-(AND-rewrite), portable documents in DTQL condition syntax with a `param` node,
-and the DTQL `param` node itself. Conditions are evaluated against record values
+(AND-rewrite), portable documents in TugQL condition syntax with a `param` node,
+and the TugQL `param` node itself. Conditions are evaluated against record values
 only; no lookups into other collections. The write side (`check`, pre-image and
 post-image checks) and path captures are deliberately left to a second plan.
 
@@ -25,7 +25,7 @@ post-image checks) and path captures are deliberately left to a second plan.
 Bottom-up, each task independently testable at 100% statement coverage (the
 CI gate). Pure pieces first (`dal.Param`, the evaluator), then the policy engine
 (rules, precedence-aware residual conditions, variables), then the secured
-wrappers, then documents and DTQL, then integration against `dalgo2memory`.
+wrappers, then documents and TugQL, then integration against `dalgo2memory`.
 
 Precedence keeps the parent feature's order: matching rules are walked in
 order; conditional allows encountered before the first unconditional rule
@@ -35,7 +35,7 @@ policies intersect with AND. The residual is what the wrapper enforces: after
 the read for point operations, by query rewrite for `Query`.
 
 Founder decisions applied: a denied conditional `Get` returns `DeniedError`
-(the hide option is a follow-up); `dal.Condition` inside, DTQL outside;
+(the hide option is a follow-up); `dal.Condition` inside, TugQL outside;
 read and write levels differ by declaring two rules on one path.
 
 ## Tasks
@@ -88,15 +88,15 @@ denial; `Exists` upgrades to a read; `Query` is wrapped with the residual ANDed
 into `Where()`; residuals from several policies conjoin; queries with joins under
 a conditional rule are denied in this slice.
 
-### Task 5: Portable documents and the DTQL param node
+### Task 5: Portable documents and the TugQL param node
 
 **Id:** task-5
 **Verifies:** access-policies/row-level-conditions#ac:yaml-roundtrip
 **Depends-On:** 3
 **Status:** complete
 
-`where` on `DocumentRule` in DTQL condition syntax with `param`; encode and
-decode both directions in YAML and JSON; DTQL gains the `param` expression and
+`where` on `DocumentRule` in TugQL condition syntax with `param`; encode and
+decode both directions in YAML and JSON; TugQL gains the `param` expression and
 its generated schema is refreshed.
 
 ### Task 6: Integration against dalgo2memory and coverage gate

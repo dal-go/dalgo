@@ -15,18 +15,18 @@ status: Stable
 
 ## Summary
 
-DTQL and DALgo represent, validate, plan, and execute aggregation independently
-of any one provider. DTQL uses YAML pipeline order with `columns` last. DALgo
+TugQL and DALgo represent, validate, plan, and execute aggregation independently
+of any one provider. TugQL uses YAML pipeline order with `columns` last. DALgo
 chooses full native execution, ordered streaming, or hash aggregation from
 granular provider capabilities. SQLite renders its supported subset natively.
 
-Alexander Trakhimenok, 2026-10-05: "It is OK to add ordered aggregates to DALgo and DTQL: DataTug and OVDB need the aggregate capabilities users expect from PostgreSQL, run natively where the server supports them and in DALgo's engine elsewhere."
+Alexander Trakhimenok, 2026-10-05: "It is OK to add ordered aggregates to DALgo and TugQL: DataTug and OVDB need the aggregate capabilities users expect from PostgreSQL, run natively where the server supports them and in DALgo's engine elsewhere."
 
 ## Behavior
 
 ### REQ: yaml-aggregation
 
-DTQL MUST serialize and deserialize `groupBy`, aggregate/binary expressions,
+TugQL MUST serialize and deserialize `groupBy`, aggregate/binary expressions,
 `having`, aliases, and aggregate-local `orderBy` on `first` and `last`. Its
 nonempty order list contains field keys with optional source and descending
 direction. Canonical YAML MUST keep `columns`
@@ -179,7 +179,7 @@ rows is returned unchanged to the caller.
   scalar expression model.
 - `dal/aggregation_plan.go`: validation, capabilities and inspectable strategy.
 - `dal/aggregation_execute.go`: framework wrapper, ordered stream and hash state.
-- `dtql`: canonical recursive YAML codec and generated schema.
+- `tugql`: canonical recursive YAML codec and generated schema.
 - `dalgo2sql/sqlite_emit.go`: native SQLite compilation and alias rewriting.
 
 ## Error Handling & Failure Modes

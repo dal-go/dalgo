@@ -77,7 +77,7 @@ func matchesJoinWhere(cond dal.Condition, sources map[string]map[string]any, kno
 }
 
 // matchesJoinCondition evaluates one ON condition, which must be a Comparison
-// (ValidateJoinTree enforces the same for DTQL). A nil condition matches.
+// (ValidateJoinTree enforces the same for TugQL). A nil condition matches.
 func matchesJoinCondition(cond dal.Condition, sources map[string]map[string]any, known map[string]bool) (bool, error) {
 	switch c := cond.(type) {
 	case nil:

@@ -3,7 +3,7 @@ package dal
 import "fmt"
 
 // JoinValidationError is a stable structural JOIN diagnostic. Category is one
-// of the DTQL JOIN categories and Path addresses the offending tree node.
+// of the TugQL JOIN categories and Path addresses the offending tree node.
 type JoinValidationError struct {
 	Category string
 	Path     string

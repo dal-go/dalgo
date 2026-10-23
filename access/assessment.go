@@ -11,7 +11,7 @@ import (
 )
 
 // ReasonCode is a stable authorization result code. Hosts may safely project
-// it onto the DTQL authorization wire contract without inspecting prose.
+// it onto the TugQL authorization wire contract without inspecting prose.
 type ReasonCode string
 
 const (
