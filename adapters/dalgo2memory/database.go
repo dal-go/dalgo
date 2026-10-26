@@ -775,7 +775,12 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		func(r memoryRow) map[string]map[string]any {
 			return baseSources(base, r.data)
 		},
-		func(r memoryRow) string { return r.id })
+		func(r memoryRow) string {
+			if collectionGroupSource(base) && r.key != nil {
+				return keyPath(r.key)
+			}
+			return r.id
+		})
 	rows, err = applySingleSourceCursor(rows, q)
 	if err != nil {
 		return nil, err
@@ -829,6 +834,17 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	return dal.NewRecordsReader(records), nil
 }
 
+// Collection-group DocumentID is the full physical record path, including its
+// parent chain. Collection-scoped identities keep their existing local-ID shape.
+func collectionGroupSource(source dal.RecordsetSource) bool {
+	switch source.(type) {
+	case dal.CollectionGroupRef, *dal.CollectionGroupRef:
+		return true
+	default:
+		return false
+	}
+}
+
 // applySingleSourceCursor implements the cursor shape that DALgo can prove
 // without an adapter-specific encoded tuple: one typed DocumentID order. A
 // deleted cursor document still advances lexically, matching a Firestore
@@ -858,7 +874,11 @@ func applySingleSourceCursor(rows []memoryRow, q dal.StructuredQuery) ([]memoryR
 	for i, row := range rows {
 		id := row.id
 		if row.key != nil {
-			id = fmt.Sprint(row.key.ID)
+			if collectionGroupSource(q.From().Base()) {
+				id = keyPath(row.key)
+			} else {
+				id = fmt.Sprint(row.key.ID)
+			}
 		}
 		include := id >= cursor
 		if descending {
