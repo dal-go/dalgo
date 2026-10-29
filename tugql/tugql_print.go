@@ -368,18 +368,59 @@ func printTugQLQueryUnits(query document, indent, base string) ([]printUnit, err
 
 // printTugQLSource renders a validated source: importTugQLTree guarantees a name.
 func printTugQLSource(from fromYAML) string {
-	var parts []string
-	if from.Schema != nil {
-		for _, part := range strings.Split(*from.Schema, ".") {
-			parts = append(parts, identText(part, true))
+	text, ok := printTugQLSlashPath(from)
+	if !ok {
+		var parts []string
+		if from.Schema != nil {
+			for _, part := range strings.Split(*from.Schema, ".") {
+				parts = append(parts, identText(part, true))
+			}
 		}
+		parts = append(parts, identText(from.Name, true))
+		text = strings.Join(parts, ".")
 	}
-	parts = append(parts, identText(from.Name, true))
-	text := strings.Join(parts, ".")
 	if from.Alias != "" {
 		text += " as " + identText(from.Alias, true)
 	}
 	return text
+}
+
+// printTugQLSlashPath renders a source in slash form when its schema contains
+// '/' or a segment is a {name} substitution, and every segment can be spelled
+// in a slash path. Otherwise the caller falls back to the dotted form.
+func printTugQLSlashPath(from fromYAML) (string, bool) {
+	if from.Schema == nil {
+		return "", false
+	}
+	segments := append(strings.Split(*from.Schema, "/"), from.Name)
+	slash := strings.Contains(*from.Schema, "/")
+	parts := make([]string, len(segments))
+	for i, segment := range segments {
+		switch {
+		case isSubstitutedSegment(segment):
+			slash = true
+			parts[i] = segment
+		case segment == "" || strings.ContainsAny(segment, "{}/"):
+			return "", false
+		default:
+			parts[i] = identText(segment, true)
+		}
+	}
+	return strings.Join(parts, "/"), slash
+}
+
+// isSubstitutedSegment reports whether segment is `{word}`.
+func isSubstitutedSegment(segment string) bool {
+	if len(segment) < 3 || segment[0] != '{' || segment[len(segment)-1] != '}' {
+		return false
+	}
+	word := segment[1 : len(segment)-1]
+	for i, r := range word {
+		if !isIdentContinue(r) || i == 0 && !unicode.IsLetter(r) && r != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func printTugQLColumns(columns []columnYAML, indent string) ([]string, error) {

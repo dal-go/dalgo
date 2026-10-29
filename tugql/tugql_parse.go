@@ -17,7 +17,7 @@ type tugqlClause struct {
 }
 
 func parseTugQLQueryAt(source string, depth int) (document, []tugqlDiagnostic) {
-	tokens, diags := lexTugQL(source)
+	tokens, comments, diags := lexTugQLWithComments(source)
 	if hasErrors(diags) {
 		return document{}, diags
 	}
@@ -65,9 +65,9 @@ func parseTugQLQueryAt(source string, depth int) (document, []tugqlDiagnostic) {
 			break
 		}
 	}
-	rootFrom, err := parseTugQLFrom(clauses[0].tokens)
+	rootFrom, err := parseTugQLFrom(clauses[0].tokens, comments)
 	if err != nil {
-		diags = append(diags, diagnostic("invalid_from", err.Error(), clauses[0].span))
+		diags = append(diags, sourceDiagnostic("invalid_from", err, clauses[0].span))
 		return document{}, diags
 	}
 	doc.From = rootFrom
@@ -76,9 +76,9 @@ func parseTugQLQueryAt(source string, depth int) (document, []tugqlDiagnostic) {
 		clause := clauses[i]
 		switch clause.name {
 		case "join", "left join":
-			from, err := parseTugQLFrom(clause.tokens)
+			from, err := parseTugQLFrom(clause.tokens, comments)
 			if err != nil {
-				diags = append(diags, diagnostic("invalid_join", err.Error(), clause.span))
+				diags = append(diags, sourceDiagnostic("invalid_join", err, clause.span))
 				continue
 			}
 			join := joinYAML{From: &from}
@@ -1106,26 +1106,16 @@ func tugqlClauseStart(tokens []tugqlToken) (string, int) {
 	return "", 0
 }
 
-func parseTugQLFrom(tokens []tugqlToken) (fromYAML, error) {
+func parseTugQLFrom(tokens []tugqlToken, comments []tugqlComment) (fromYAML, error) {
 	if len(tokens) == 0 {
 		return fromYAML{}, fmt.Errorf("source name is required")
 	}
-	if tokens[0].Kind != tugqlIdentifier {
+	if tokens[0].Kind != tugqlIdentifier && !isSymbolToken(tokens[0], "{") && !isSymbolToken(tokens[0], "/") {
 		return fromYAML{}, fmt.Errorf("source name must be an identifier")
 	}
-	parts := []string{unquoteIdentifier(tokens[0].Text)}
-	i := 1
-	for i+1 < len(tokens) && tokens[i].Text == "." {
-		if tokens[i+1].Kind != tugqlIdentifier {
-			return fromYAML{}, fmt.Errorf("expected identifier after '.'")
-		}
-		parts = append(parts, unquoteIdentifier(tokens[i+1].Text))
-		i += 2
-	}
-	from := fromYAML{Name: parts[len(parts)-1]}
-	if len(parts) > 1 {
-		schema := strings.Join(parts[:len(parts)-1], ".")
-		from.Schema = &schema
+	from, i, err := parseTugQLSourcePath(tokens, comments)
+	if err != nil {
+		return fromYAML{}, err
 	}
 	if i < len(tokens) {
 		if !isKeyword(tokens[i], "as") || i+1 >= len(tokens) || tokens[i+1].Kind != tugqlIdentifier || i+2 != len(tokens) {
