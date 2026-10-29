@@ -2,19 +2,22 @@
   "format": "tugql-slash-paths-suite",
   "version": 1,
   "notes": [
-    "TugQL FROM slash-path conformance vectors, shared by dal-go/dalgo (Go) and dal-go/dalgo-js (TypeScript, vendored into test/parity/cases/). Both implementations must satisfy every case.",
+    "TugQL FROM slash-path conformance vectors, shared by dal-go/dalgo (Go) and dal-go/dalgo-js (TypeScript), which vendors this file byte for byte at test/testdata/tugql/slash-paths/cases.json. Both implementations must satisfy every case. The file is protected by manifest.sha256 in this directory.",
     "Spec: datatug/backstage spec/features/my-data-project REQ slash-path-from. In FROM (and JOIN) a source path may use `/` as its segment separator. The last segment is `name`; the earlier segments joined with `/` are `schema`. Mixing `.` and `/` in one path is an error.",
-    "A segment is a bare word, a quoted identifier, or `{name}` (the tokens `{`, word, `}` with no whitespace between them). A quoted segment of a slash path may not contain `{`, `}` or `/`. `/` must touch the segments on both sides. `//` touching a path segment is an empty-segment error (not a comment); `//` after whitespace is still a comment.",
+    "A segment is a bare word, a quoted identifier (\"...\" or `...`), or `{name}` (the tokens `{`, word, `}` with no whitespace between them); `{name}` must be a whole segment and is allowed only in a `/` path. A quoted segment (in a `/` or a `.` path) may not be empty and may not contain `{`, `}` or `/`. `/` must touch the segments on both sides, so a path cannot break across lines. `//` touching a path segment is an empty-segment error (not a comment); `//` after whitespace is still a comment. A clause keyword (from, join, select, ...) used as a bare segment is rejected by the one-clause-per-line rule; quote it.",
     "Each case has `text` and exactly one of `expected.from` or `expected.error`.",
-    "expected.from: the parsed tree's query.from object, compared for deep equality (keys absent here are absent from the tree; a tree without an alias key exposes the collection name as its alias). expected.alias: the alias the source exposes, i.e. from.alias when present, otherwise from.name. expected.print: the text produced by printing the parsed tree (Go PrintTugQL); it must re-parse to the same tree. The tree does not record which separator the author used: a source prints in slash form when its schema contains `/` or a segment is `{name}` (and every segment can be spelled in a slash path); otherwise it prints in the dotted form, so `users/projects` prints as `users.projects`. expected.comments: the texts of the comments the parse keeps, in order (omitted means none).",
-    "expected.error: the parse fails; the diagnostics contain one with this `code` whose span starts at 1-based `line` and `column` (columns count code points). Messages are not compared."
+    "expected.from: the parsed tree's query.from object (including joins), compared for deep equality (keys absent here are absent from the tree; a tree without an alias key exposes the collection name as its alias). expected.alias: the alias the source exposes, i.e. from.alias when present, otherwise from.name. expected.print: the text produced by printing the parsed tree (Go PrintTugQL); it must re-parse to the same tree. The tree does not record which separator the author used: a source prints in slash form when its schema contains `/` or a segment is `{name}` (and every segment can be spelled in a slash path); otherwise it prints in the dotted form, so `users/projects` prints as `users.projects`. expected.comments: the texts of the comments the parse keeps, in order (omitted means none).",
+    "expected.error: the parse fails and the FIRST diagnostic (diagnostics[0]) has this `code` and its span starts at 1-based `line` and `column` (columns count code points). Later diagnostics and messages are not compared."
   ],
   "cases": [
     {
       "name": "slash-from-parses-to-schema-and-name",
       "text": "FROM spaces/{SneatUserPersonalSpaceID}/ext/datatug/projects",
       "expected": {
-        "from": {"schema": "spaces/{SneatUserPersonalSpaceID}/ext/datatug", "name": "projects"},
+        "from": {
+          "schema": "spaces/{SneatUserPersonalSpaceID}/ext/datatug",
+          "name": "projects"
+        },
         "alias": "projects",
         "print": "from spaces/{SneatUserPersonalSpaceID}/ext/datatug/projects"
       }
@@ -23,7 +26,11 @@
       "name": "slash-from-with-alias",
       "text": "FROM spaces/{SneatUserPersonalSpaceID}/ext/datatug/projects AS p",
       "expected": {
-        "from": {"schema": "spaces/{SneatUserPersonalSpaceID}/ext/datatug", "name": "projects", "alias": "p"},
+        "from": {
+          "schema": "spaces/{SneatUserPersonalSpaceID}/ext/datatug",
+          "name": "projects",
+          "alias": "p"
+        },
         "alias": "p",
         "print": "from spaces/{SneatUserPersonalSpaceID}/ext/datatug/projects as p"
       }
@@ -32,7 +39,10 @@
       "name": "quoted-last-segment",
       "text": "FROM spaces/abc/ext/datatug/\"user projects\"",
       "expected": {
-        "from": {"schema": "spaces/abc/ext/datatug", "name": "user projects"},
+        "from": {
+          "schema": "spaces/abc/ext/datatug",
+          "name": "user projects"
+        },
         "alias": "user projects",
         "print": "from spaces/abc/ext/datatug/\"user projects\""
       }
@@ -41,7 +51,10 @@
       "name": "two-segment-path",
       "text": "FROM users/projects",
       "expected": {
-        "from": {"schema": "users", "name": "projects"},
+        "from": {
+          "schema": "users",
+          "name": "projects"
+        },
         "alias": "projects",
         "print": "from users.projects"
       }
@@ -50,7 +63,10 @@
       "name": "substituted-collection-name",
       "text": "FROM spaces/{space}",
       "expected": {
-        "from": {"schema": "spaces", "name": "{space}"},
+        "from": {
+          "schema": "spaces",
+          "name": "{space}"
+        },
         "alias": "{space}",
         "print": "from spaces/{space}"
       }
@@ -59,7 +75,10 @@
       "name": "dot-path-unchanged",
       "text": "FROM a.b",
       "expected": {
-        "from": {"schema": "a", "name": "b"},
+        "from": {
+          "schema": "a",
+          "name": "b"
+        },
         "alias": "b",
         "print": "from a.b"
       }
@@ -68,10 +87,14 @@
       "name": "spaced-comment-after-source",
       "text": "FROM users // note",
       "expected": {
-        "from": {"name": "users"},
+        "from": {
+          "name": "users"
+        },
         "alias": "users",
         "print": "from users -- note",
-        "comments": ["note"]
+        "comments": [
+          "note"
+        ]
       }
     },
     {
@@ -168,6 +191,165 @@
       "name": "substituted-segment-alone",
       "text": "FROM {x}",
       "expected": {"error": {"code": "invalid_substituted_segment", "line": 1, "column": 6}}
+    },
+    {
+      "name": "backtick-quoted-segment",
+      "text": "FROM spaces/`user projects`",
+      "expected": {
+        "from": {
+          "schema": "spaces",
+          "name": "user projects"
+        },
+        "alias": "user projects",
+        "print": "from spaces.\"user projects\""
+      }
+    },
+    {
+      "name": "quoted-keyword-segment",
+      "text": "FROM spaces/\"from\"/x",
+      "expected": {
+        "from": {
+          "schema": "spaces/from",
+          "name": "x"
+        },
+        "alias": "x",
+        "print": "from spaces/\"from\"/x"
+      }
+    },
+    {
+      "name": "dash-comment-touching-path",
+      "text": "FROM a/b--note",
+      "expected": {
+        "from": {
+          "schema": "a",
+          "name": "b"
+        },
+        "alias": "b",
+        "print": "from a.b -- note",
+        "comments": [
+          "note"
+        ]
+      }
+    },
+    {
+      "name": "join-slash-path",
+      "text": "FROM spaces/{s}/ext/datatug/projects AS p\nJOIN spaces/{s}/ext/datatug/members AS m\n  ON m.project = p.id\nSELECT p.id",
+      "expected": {
+        "from": {
+          "schema": "spaces/{s}/ext/datatug",
+          "name": "projects",
+          "alias": "p",
+          "joins": [
+            {
+              "from": {
+                "schema": "spaces/{s}/ext/datatug",
+                "name": "members",
+                "alias": "m"
+              },
+              "on": [
+                {
+                  "left": {
+                    "source": "m",
+                    "field": "project"
+                  },
+                  "op": "==",
+                  "right": {
+                    "source": "p",
+                    "field": "id"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "alias": "p",
+        "print": "from spaces/{s}/ext/datatug/projects as p\njoin spaces/{s}/ext/datatug/members as m\n  on m.project = p.id\nselect p.id"
+      }
+    },
+    {
+      "name": "double-slash-only-is-a-comment",
+      "text": "FROM //x",
+      "expected": {"error": {"code": "invalid_from", "line": 1, "column": 1}}
+    },
+    {
+      "name": "touching-double-slash-in-dot-path",
+      "text": "FROM a.b//c",
+      "expected": {"error": {"code": "empty_path_segment", "line": 1, "column": 10}}
+    },
+    {
+      "name": "touching-double-slash-at-end",
+      "text": "FROM x//",
+      "expected": {"error": {"code": "empty_path_segment", "line": 1, "column": 8}}
+    },
+    {
+      "name": "bare-clause-keyword-segment",
+      "text": "from spaces/from/x",
+      "expected": {"error": {"code": "multiple_clauses_same_line", "line": 1, "column": 13}}
+    },
+    {
+      "name": "path-broken-after-slash",
+      "text": "FROM spaces/\n  abc/x",
+      "expected": {"error": {"code": "detached_path_separator", "line": 1, "column": 12}}
+    },
+    {
+      "name": "path-broken-before-slash",
+      "text": "FROM spaces/abc\n  /x",
+      "expected": {"error": {"code": "detached_path_separator", "line": 2, "column": 3}}
+    },
+    {
+      "name": "substituted-segment-after-dot",
+      "text": "FROM a.{x}",
+      "expected": {"error": {"code": "invalid_substituted_segment", "line": 1, "column": 8}}
+    },
+    {
+      "name": "substituted-segment-with-suffix",
+      "text": "FROM spaces/{x}y/z",
+      "expected": {"error": {"code": "invalid_substituted_segment", "line": 1, "column": 13}}
+    },
+    {
+      "name": "substituted-segment-with-prefix",
+      "text": "FROM spaces/x{y}/z",
+      "expected": {"error": {"code": "invalid_substituted_segment", "line": 1, "column": 13}}
+    },
+    {
+      "name": "empty-quoted-middle-segment",
+      "text": "FROM a/\"\"/c",
+      "expected": {"error": {"code": "empty_path_segment", "line": 1, "column": 8}}
+    },
+    {
+      "name": "empty-quoted-first-segment",
+      "text": "FROM \"\"/c",
+      "expected": {"error": {"code": "empty_path_segment", "line": 1, "column": 6}}
+    },
+    {
+      "name": "empty-quoted-last-segment",
+      "text": "FROM spaces/\"\"",
+      "expected": {"error": {"code": "empty_path_segment", "line": 1, "column": 13}}
+    },
+    {
+      "name": "empty-quoted-dot-segment",
+      "text": "FROM a.\"\"",
+      "expected": {"error": {"code": "empty_path_segment", "line": 1, "column": 8}}
+    },
+    {
+      "name": "empty-quoted-join-segment",
+      "text": "FROM a\nJOIN a/\"\"/b AS q\n  ON q.x = a.x",
+      "expected": {"error": {"code": "empty_path_segment", "line": 2, "column": 8}}
+    },
+    {
+      "name": "touching-double-slash-in-join",
+      "text": "FROM a\nJOIN b//c\n  ON b.x = a.x",
+      "expected": {"error": {"code": "empty_path_segment", "line": 2, "column": 8}}
+    },
+    {
+      "name": "dot-path-quoted-segment-contains-brace",
+      "text": "FROM a.\"{x}\"",
+      "expected": {"error": {"code": "invalid_quoted_segment", "line": 1, "column": 8}}
+    },
+    {
+      "name": "dot-path-quoted-segment-contains-slash",
+      "text": "FROM \"a/b\".c",
+      "expected": {"error": {"code": "invalid_quoted_segment", "line": 1, "column": 6}}
     }
   ]
 }

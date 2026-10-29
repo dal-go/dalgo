@@ -51,12 +51,10 @@ func TestTugQLSlashPathVectors(t *testing.T) {
 			doc, diags := ParseTugQL(tc.Text)
 			if tc.Expected.Error != nil {
 				want := tc.Expected.Error
-				for _, d := range diags {
-					if d.Code == want.Code && d.Span.Start.Line == want.Line && d.Span.Start.Column == want.Column {
-						return
-					}
+				if len(diags) == 0 || diags[0].Code != want.Code || diags[0].Span.Start != (TugQLPosition{Line: want.Line, Column: want.Column}) {
+					t.Fatalf("want first diagnostic %s at %d:%d, got %#v", want.Code, want.Line, want.Column, diags)
 				}
-				t.Fatalf("want diagnostic %s at %d:%d, got %#v", want.Code, want.Line, want.Column, diags)
+				return
 			}
 			if len(diags) != 0 {
 				t.Fatalf("unexpected diagnostics: %#v", diags)
@@ -125,48 +123,58 @@ func treeFromObject(t *testing.T, query map[string]any) map[string]any {
 	return from
 }
 
-func TestTugQLSlashPathInJoin(t *testing.T) {
-	doc, diags := ParseTugQL("FROM spaces/{s}/ext/datatug/projects AS p\nJOIN spaces/{s}/ext/datatug/members AS m\n  ON m.project = p.id\nSELECT p.id")
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %#v", diags)
-	}
-	printed, printDiags := PrintTugQL(*doc.Tree)
-	want := "from spaces/{s}/ext/datatug/projects as p\njoin spaces/{s}/ext/datatug/members as m\n  on m.project = p.id\nselect p.id"
-	if len(printDiags) != 0 || printed != want {
-		t.Fatalf("print = %q %#v, want %q", printed, printDiags, want)
-	}
-	_, diags = ParseTugQL("FROM a\nJOIN b//c\n  ON b.x = a.x")
-	if len(diags) == 0 || diags[0].Code != "empty_path_segment" || diags[0].Span.Start != (TugQLPosition{Line: 2, Column: 8}) {
-		t.Fatalf("join diagnostics = %#v", diags)
-	}
-}
-
 func TestTugQLSlashPathErrorText(t *testing.T) {
 	if err := pathError("code", "message", tugqlSpan{}); err.Error() != "message" {
 		t.Fatalf("Error() = %q", err.Error())
 	}
 }
 
-func TestTugQLPrintSourceSlashFormFallback(t *testing.T) {
+// TestTugQLPrintSourcePaths covers trees built directly (not parsed from
+// text): segments the text form cannot spell fail closed instead of printing
+// text that would re-parse to a different tree or not at all.
+func TestTugQLPrintSourcePaths(t *testing.T) {
 	schema := func(s string) *string { return &s }
 	for _, tc := range []struct {
 		from fromYAML
 		want string
 	}{
+		{fromYAML{Name: "c"}, "c"},
 		{fromYAML{Schema: schema("a/b"), Name: "c"}, "a/b/c"},
-		{fromYAML{Schema: schema("a/b{c"), Name: "d"}, `"a/b{c".d`},
-		{fromYAML{Schema: schema("a/b"), Name: "x/y"}, `"a/b"."x/y"`},
-		{fromYAML{Schema: schema("a//b"), Name: "c"}, `"a//b".c`},
-		{fromYAML{Schema: schema("a"), Name: "{1a}"}, `a."{1a}"`},
-		{fromYAML{Schema: schema("a"), Name: "{a-b}"}, `a."{a-b}"`},
-		{fromYAML{Schema: schema("a"), Name: "{}"}, `a."{}"`},
+		{fromYAML{Schema: schema("a.b"), Name: "c"}, "a.b.c"},
 		{fromYAML{Schema: schema("{_s}"), Name: "from"}, `{_s}/"from"`},
+		{fromYAML{Schema: schema("a/b{c"), Name: "d"}, ""},
+		{fromYAML{Schema: schema("a/b"), Name: "x/y"}, ""},
+		{fromYAML{Schema: schema("a//b"), Name: "c"}, ""},
+		{fromYAML{Schema: schema("a"), Name: "{1a}"}, ""},
+		{fromYAML{Schema: schema("a"), Name: "{a-b}"}, ""},
+		{fromYAML{Schema: schema("a"), Name: "{}"}, ""},
+		{fromYAML{Schema: schema("{x}.y"), Name: "z"}, ""},
+		{fromYAML{Name: "{x}"}, ""},
+		{fromYAML{Schema: schema(""), Name: "c"}, ""},
 	} {
-		if got := printTugQLSource(tc.from); got != tc.want {
-			t.Errorf("printTugQLSource(%v/%s) = %s, want %s", *tc.from.Schema, tc.from.Name, got, tc.want)
+		got, err := printTugQLSource(tc.from)
+		if tc.want == "" {
+			if err == nil {
+				t.Errorf("printTugQLSource(%+v) = %q, want an error", tc.from, got)
+			}
+			continue
+		}
+		if err != nil || got != tc.want {
+			t.Errorf("printTugQLSource(%+v) = %q, %v, want %q", tc.from, got, err, tc.want)
 		}
 		if _, diags := ParseTugQL("FROM " + tc.want); len(diags) != 0 {
 			t.Errorf("%s does not re-parse: %#v", tc.want, diags)
+		}
+	}
+}
+
+func TestTugQLPrintRejectsUnspellableSourcePaths(t *testing.T) {
+	for _, query := range []map[string]any{
+		{"from": map[string]any{"schema": "a", "name": "{}"}},
+		{"from": map[string]any{"name": "a", "joins": []any{map[string]any{"from": map[string]any{"schema": "a", "name": "x/y"}}}}},
+	} {
+		if text, diags := PrintTugQL(TugQLTree{Format: "tugqtree", Version: 1, Query: query}); len(diags) == 0 || diags[0].Code != "unsupported_print" {
+			t.Errorf("PrintTugQL(%v) = %q, %#v, want unsupported_print", query, text, diags)
 		}
 	}
 }

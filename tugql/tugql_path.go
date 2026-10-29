@@ -54,12 +54,25 @@ func parseTugQLPathSegment(tokens []tugqlToken, i int) (tugqlPathSegment, int, e
 			return tugqlPathSegment{}, 0, pathError("invalid_substituted_segment", "a substituted segment is written {name} with no spaces", token.Span)
 		}
 		span := tugqlSpan{Start: token.Span.Start, End: tokens[i+2].Span.End}
+		if touchesNonSeparator(tokens, i+3) {
+			return tugqlPathSegment{}, 0, pathError("invalid_substituted_segment", "{name} must be a whole path segment", span)
+		}
 		return tugqlPathSegment{text: "{" + tokens[i+1].Text + "}", span: span, substituted: true}, i + 3, nil
 	}
 	if token.Kind != tugqlIdentifier {
 		return tugqlPathSegment{}, 0, pathError("invalid_path_segment", "a path segment must be a word, a quoted identifier or {name}", token.Span)
 	}
+	if i+1 < len(tokens) && isSymbolToken(tokens[i+1], "{") && tokensTouch(token, tokens[i+1]) {
+		return tugqlPathSegment{}, 0, pathError("invalid_substituted_segment", "{name} must be a whole path segment", token.Span)
+	}
 	return tugqlPathSegment{text: unquoteIdentifier(token.Text), span: token.Span, quoted: isQuotedIdentifier(token.Text)}, i + 1, nil
+}
+
+// touchesNonSeparator reports whether tokens[next] exists, touches the token
+// before it, and is not a path separator.
+func touchesNonSeparator(tokens []tugqlToken, next int) bool {
+	return next < len(tokens) && tokensTouch(tokens[next-1], tokens[next]) &&
+		!isSymbolToken(tokens[next], "/") && !isSymbolToken(tokens[next], ".")
 }
 
 func isQuotedIdentifier(text string) bool {
@@ -98,7 +111,7 @@ func parseTugQLSourcePath(tokens []tugqlToken, comments []tugqlComment) (fromYAM
 			if !tokensTouch(sep, tokens[i+1]) {
 				return fromYAML{}, 0, pathError("detached_path_separator", "'/' must touch the path segments on both sides", sep.Span)
 			}
-		} else if i+1 >= len(tokens) || tokens[i+1].Kind != tugqlIdentifier {
+		} else if i+1 >= len(tokens) || tokens[i+1].Kind != tugqlIdentifier && !isSymbolToken(tokens[i+1], "{") {
 			return fromYAML{}, 0, fmt.Errorf("expected identifier after '.'")
 		}
 		segment, i, err = parseTugQLPathSegment(tokens, i+1)
@@ -116,7 +129,10 @@ func parseTugQLSourcePath(tokens []tugqlToken, comments []tugqlComment) (fromYAM
 		if s.substituted && separator != "/" {
 			return fromYAML{}, 0, pathError("invalid_substituted_segment", "{name} segments are allowed only in a '/' path", s.span)
 		}
-		if s.quoted && separator == "/" && strings.ContainsAny(s.text, "{}/") {
+		if s.quoted && s.text == "" {
+			return fromYAML{}, 0, pathError("empty_path_segment", "a quoted path segment may not be empty", s.span)
+		}
+		if s.quoted && strings.ContainsAny(s.text, "{}/") {
 			return fromYAML{}, 0, pathError("invalid_quoted_segment", "a quoted path segment may not contain '{', '}' or '/'", s.span)
 		}
 		parts[k] = s.text

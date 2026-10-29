@@ -94,12 +94,15 @@ equal INNER-join keys while preserving both fields' lineage.
 A `from` or `join` source is a dotted path (`sales.Invoice`) or a slash path
 (`spaces/{SpaceID}/ext/datatug/projects`); one path may not mix `.` and `/`. The
 last segment is the collection `name` and the earlier ones are its `schema`
-(`spaces/{SpaceID}/ext/datatug`). A slash-path segment is a word, a quoted
-identifier without `{`, `}` or `/`, or a `{name}` substitution kept literally in
-the tree. `/` must touch both neighbouring segments, and a `//` touching a path
+(`spaces/{SpaceID}/ext/datatug`). A segment is a word, a non-empty quoted
+identifier without `{`, `}` or `/`, or (in a slash path only) a whole `{name}`
+substitution kept literally in the tree. A clause keyword used as a segment
+must be quoted (`spaces/"from"/x`). `/` must touch both neighbouring segments, and a `//` touching a path
 segment is an `empty_path_segment` error rather than a comment (`from users // x`
 is still a comment). A schema containing `/` prints back in slash form. The
-shared parser vectors are in `testdata/slash-paths/cases.json`.
+shared parser vectors are in `testdata/slash-paths/cases.json`, listed in
+`testdata/slash-paths/manifest.sha256`. A tree segment the text form cannot
+spell fails `PrintTugQL` with `unsupported_print`.
 
 `WHERE` filters source rows before grouping; `HAVING` filters completed groups
 after `GROUP BY`. The clause order is `FROM`, optional `WHERE`, optional

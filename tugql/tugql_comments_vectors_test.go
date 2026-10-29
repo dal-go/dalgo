@@ -183,7 +183,16 @@ func TestTugQLCommentVectorsYAML(t *testing.T) {
 }
 
 func TestTugQLCorpusManifest(t *testing.T) {
-	dir := filepath.Join("testdata", "tugql", "v1")
+	for _, tc := range []struct{ dir, required string }{
+		{filepath.Join("testdata", "tugql", "v1"), "comments.json"},
+		{filepath.Join("testdata", "slash-paths"), "cases.json"},
+	} {
+		checkTugQLManifest(t, tc.dir, tc.required)
+	}
+}
+
+func checkTugQLManifest(t *testing.T, dir, required string) {
+	t.Helper()
 	data, err := os.ReadFile(filepath.Join(dir, "manifest.sha256"))
 	if err != nil {
 		t.Fatal(err)
@@ -210,10 +219,10 @@ func TestTugQLCorpusManifest(t *testing.T) {
 	}
 	for _, entry := range entries {
 		if entry.Name() != "manifest.sha256" && !listed[entry.Name()] {
-			t.Fatalf("%s is not listed in manifest.sha256", entry.Name())
+			t.Fatalf("%s is not listed in %s/manifest.sha256", entry.Name(), dir)
 		}
 	}
-	if !listed["comments.json"] {
-		t.Fatal("comments.json missing from manifest.sha256")
+	if !listed[required] {
+		t.Fatalf("%s missing from %s/manifest.sha256", required, dir)
 	}
 }
