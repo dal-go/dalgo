@@ -18,6 +18,15 @@ go get github.com/dal-go/dalgo
 [![GoDoc](https://godoc.org/github.com/dal-go/dalgo?status.svg)](https://godoc.org/github.com/dal-go/dalgo)
 [![Sourcegraph](https://sourcegraph.com/github.com/dal-go/dalgo/-/badge.svg)](https://sourcegraph.com/github.com/dal-go/dalgo?badge)
 
+## Video
+
+<p>
+  <a href="https://youtu.be/wtkqlcjfzQA"><img src="assets/video/dalgo-en-poster.webp" alt="Play the 1:45 film: DALgo — swap the adapter" width="640"></a><br>
+  ▶ <b><a href="https://youtu.be/wtkqlcjfzQA">Watch the DALgo film (1:45)</a></b>
+</p>
+
+Русская версия: https://youtu.be/ekU0IUfgkGY
+
 <!-- dev-approach:v1 -->
 
 ## Our approach to development
