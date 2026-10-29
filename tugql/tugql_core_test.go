@@ -498,11 +498,11 @@ func TestTugQLConditionsAndLists(t *testing.T) {
 }
 
 func TestTugQLFromColumnsAndOrder(t *testing.T) {
-	from, err := parseTugQLFrom([]tugqlToken{{Kind: tugqlIdentifier, Text: `"sales"`}, {Kind: tugqlSymbol, Text: "."}, {Kind: tugqlIdentifier, Text: `"Order"`}, {Kind: tugqlIdentifier, Text: "AS"}, {Kind: tugqlIdentifier, Text: "o"}})
+	from, err := parseTugQLFrom([]tugqlToken{{Kind: tugqlIdentifier, Text: `"sales"`}, {Kind: tugqlSymbol, Text: "."}, {Kind: tugqlIdentifier, Text: `"Order"`}, {Kind: tugqlIdentifier, Text: "AS"}, {Kind: tugqlIdentifier, Text: "o"}}, nil)
 	if err != nil || from.Name != "Order" || from.Schema == nil || *from.Schema != "sales" || from.Alias != "o" {
 		t.Fatalf("from=%+v err=%v", from, err)
 	}
-	if _, err := parseTugQLFrom([]tugqlToken{{Kind: tugqlIdentifier, Text: "t"}, {Kind: tugqlIdentifier, Text: "badAlias"}}); err == nil {
+	if _, err := parseTugQLFrom([]tugqlToken{{Kind: tugqlIdentifier, Text: "t"}, {Kind: tugqlIdentifier, Text: "badAlias"}}, nil); err == nil {
 		t.Fatal("alias without AS was accepted")
 	}
 	cols, err := parseTugQLColumns([]tugqlToken{{Kind: tugqlIdentifier, Text: "o"}, {Kind: tugqlSymbol, Text: "."}, {Kind: tugqlIdentifier, Text: "id"}, {Kind: tugqlIdentifier, Text: "AS"}, {Kind: tugqlIdentifier, Text: "ID"}, {Kind: tugqlSymbol, Text: ","}, {Kind: tugqlIdentifier, Text: "COUNT"}, {Kind: tugqlSymbol, Text: "("}, {Kind: tugqlSymbol, Text: "*"}, {Kind: tugqlSymbol, Text: ")"}})

@@ -295,7 +295,11 @@ func printTugQLQueryUnits(query document, indent, base string) ([]printUnit, err
 	if from.Database != nil || from.Scan != nil || from.Query != nil {
 		return nil, fmt.Errorf("from database, scan and query have no text spelling")
 	}
-	units := []printUnit{{path: anchor(".from"), lines: []string{indent + "from " + printTugQLSource(from)}}}
+	source, err := printTugQLSource(from)
+	if err != nil {
+		return nil, err
+	}
+	units := []printUnit{{path: anchor(".from"), lines: []string{indent + "from " + source}}}
 	for k, join := range from.Joins {
 		if join.From == nil || join.From.Name == "" || join.Hints != nil || (join.Type != "" && join.Type != "left") || len(join.From.Joins) != 0 || join.From.Database != nil || join.From.Scan != nil || join.From.Query != nil {
 			return nil, fmt.Errorf("join %d has no text spelling", k)
@@ -305,7 +309,11 @@ func printTugQLQueryUnits(query document, indent, base string) ([]printUnit, err
 			keyword = "left join "
 		}
 		joinPath := anchor(".from.joins[" + strconv.Itoa(k) + "]")
-		units = append(units, printUnit{path: joinPath, lines: []string{indent + keyword + printTugQLSource(*join.From)}})
+		joinSource, err := printTugQLSource(*join.From)
+		if err != nil {
+			return nil, err
+		}
+		units = append(units, printUnit{path: joinPath, lines: []string{indent + keyword + joinSource}})
 		for j, condition := range join.On {
 			text, err := printTugQLCondition(condition, "")
 			if err != nil {
@@ -366,20 +374,56 @@ func printTugQLQueryUnits(query document, indent, base string) ([]printUnit, err
 	return units, nil
 }
 
-// printTugQLSource renders a validated source: importTugQLTree guarantees a name.
-func printTugQLSource(from fromYAML) string {
-	var parts []string
+// printTugQLSource renders a validated source (importTugQLTree guarantees a
+// name). A schema containing '/' or a {name} segment prints in slash form,
+// any other source in dotted form. A segment the text form cannot spell (empty,
+// or containing '{', '}' or '/' other than a whole {name} in a slash path) has
+// no text spelling.
+func printTugQLSource(from fromYAML) (string, error) {
+	segments := []string{from.Name}
+	separator := "."
 	if from.Schema != nil {
-		for _, part := range strings.Split(*from.Schema, ".") {
-			parts = append(parts, identText(part, true))
+		separator = "/"
+		segments = append(strings.Split(*from.Schema, "/"), from.Name)
+		slash := len(segments) > 2
+		for _, segment := range segments {
+			slash = slash || isSubstitutedSegment(segment)
+		}
+		if !slash {
+			separator = "."
+			segments = append(strings.Split(*from.Schema, "."), from.Name)
 		}
 	}
-	parts = append(parts, identText(from.Name, true))
-	text := strings.Join(parts, ".")
+	parts := make([]string, len(segments))
+	for i, segment := range segments {
+		switch {
+		case separator == "/" && isSubstitutedSegment(segment):
+			parts[i] = segment
+		case segment == "" || strings.ContainsAny(segment, "{}/"):
+			return "", fmt.Errorf("source path segment %q has no text spelling", segment)
+		default:
+			parts[i] = identText(segment, true)
+		}
+	}
+	text := strings.Join(parts, separator)
 	if from.Alias != "" {
 		text += " as " + identText(from.Alias, true)
 	}
-	return text
+	return text, nil
+}
+
+// isSubstitutedSegment reports whether segment is `{word}`.
+func isSubstitutedSegment(segment string) bool {
+	if len(segment) < 3 || segment[0] != '{' || segment[len(segment)-1] != '}' {
+		return false
+	}
+	word := segment[1 : len(segment)-1]
+	for i, r := range word {
+		if !isIdentContinue(r) || i == 0 && !unicode.IsLetter(r) && r != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func printTugQLColumns(columns []columnYAML, indent string) ([]string, error) {

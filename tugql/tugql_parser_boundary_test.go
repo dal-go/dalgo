@@ -165,7 +165,7 @@ func TestTugQLParserBoundarySourceAndColumnHelpers(t *testing.T) {
 	if len(diagnostics) != 0 {
 		t.Fatalf("test input must lex: %+v", diagnostics)
 	}
-	if _, err := parseTugQLFrom(tokens); err == nil || !strings.Contains(err.Error(), "expected identifier after '.'") {
+	if _, err := parseTugQLFrom(tokens, nil); err == nil || !strings.Contains(err.Error(), "expected identifier after '.'") {
 		t.Fatalf("source path error=%v", err)
 	}
 
