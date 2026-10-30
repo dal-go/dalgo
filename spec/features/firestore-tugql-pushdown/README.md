@@ -1,12 +1,12 @@
 ---
 format: https://specscore.md/feature-specification
-status: Draft
+status: Approved
 ---
 
 # Feature: Firestore adapter: TugQL runs as Firestore queries; in-memory evaluation only by opt-in
 
 > [SpecScore.**Studio**](https://specscore.studio): | [Explore](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/firestore-tugql-pushdown?op=explore) | [Edit](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/firestore-tugql-pushdown?op=edit) | [Ask question](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/firestore-tugql-pushdown?op=ask) | [Request change](https://specscore.studio/app/github.com/dal-go/dalgo/spec/features/firestore-tugql-pushdown?op=request-change) |
-**Status:** Draft
+**Status:** Approved
 **Source Ideas:** —
 
 ## Summary
