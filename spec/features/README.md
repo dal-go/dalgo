@@ -37,6 +37,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [Triggers and webhooks: change events, transactional outbox, dispatcher](triggers/README.md) | Draft | — |
 | [Recursive TugQL JOINs across DALgo Go and TypeScript](tugql-recursive-joins/README.md) | Draft | — |
 | [Recursive TugQL subqueries across DALgo Go and TypeScript](tugql-subqueries/README.md) | Implementing | — |
+| [Firestore adapter: TugQL runs as Firestore queries; in-memory evaluation only by opt-in](firestore-tugql-pushdown/README.md) | Draft | — |
 
 ## Open Questions
 
