@@ -3,6 +3,7 @@ package access
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/dal-go/dalgo/dal"
 )
@@ -185,6 +186,9 @@ func (w *querySourceWalk) node(node fmt.Stringer, depth int) {
 	defer leave()
 	switch node := node.(type) {
 	case dal.AggregateFunc:
+		if !aggregateFunctions[strings.ToUpper(node.FuncName())] {
+			w.unknown("unrecognised aggregate function")
+		}
 		// Before the leaf case: a type that is both an aggregate and a star
 		// still holds the arguments it was given.
 		for _, argument := range node.FuncArgs() {

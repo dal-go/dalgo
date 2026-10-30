@@ -219,6 +219,10 @@ An insert whose record key has no ID yet MUST be authorized against its parent a
 
 `Get`, `Exists`, and `Query` MUST remain independently authorizable. For a `dal.StructuredQuery`, the secured query executor MUST authorize the base source and every joined source before execution. Parent-scoped collections MUST be represented by their full logical collection path. A collection-group query MUST require an explicit matching collection-group rule. A non-structured or otherwise opaque query MUST require an explicit opaque-query rule and MUST NOT be authorized by inspecting query text. A query filter alone MUST NOT make an otherwise forbidden source authorized.
 
+Unknown aggregate function names MUST be classified as opaque, while their arguments and ordering keys remain subject to the same source walk. Ordinary path or table grants MUST NOT admit them; an explicit opaque-query grant is required, and it MUST NOT bypass independently denied nested sources. The existing aggregate-name allow-list is matched without regard to case.
+
+Human authorization for this behavior hardening — Alex, 2026-10-30: "Approve: unknown functions must fail closed before execution".
+
 #### AC-1: query-only-does-not-grant-get
 
 **Given** a policy that allows only `Query` on `/events`
