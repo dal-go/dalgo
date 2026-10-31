@@ -18,8 +18,10 @@ const maxQueryNesting = 64
 // ResourcesForQuery returns the resources analysed by DALgo for query execution.
 // This is inspection metadata, not an authorization decision. Every returned
 // resource still requires policy evaluation when the operation executes.
-// An opaque entry means analysis is incomplete; callers must not treat a
-// partial list of known resources as permission to execute the query.
+// An opaque entry without Table metadata represents opaque or incomplete
+// analysis; callers must not authorize only the known subset. Qualified table
+// resources retain DALgo's opaque kind with Table metadata; inspect both rather
+// than treating kind alone as an unknown source.
 // Nil queries are represented as opaque. DALgo executes no query here.
 // Query-supplied methods are invoked and must be side-effect free; custom Go
 // implementations are not sandboxed.

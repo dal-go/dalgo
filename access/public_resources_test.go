@@ -44,3 +44,38 @@ func (inspectionChannelQuery) GetRecordsReader(context.Context, dal.QueryExecuto
 func (inspectionChannelQuery) GetRecordsetReader(context.Context, dal.QueryExecutor) (dal.RecordsetReader, error) {
 	return nil, nil
 }
+
+func TestResourcesForQueryQualifiedIdentityAndResultIsolation(t *testing.T) {
+	ref := dal.NewDatabaseCollectionRef("app", "sales", "Customer", "c")
+	query := dal.From(ref).NewQuery().SelectKeysOnly(reflect.String)
+	got := ResourcesForQuery(query)
+	want := TableName{Database: "app", Schema: "sales", Name: "Customer"}
+	if len(got) != 1 || got[0].Kind() != OpaqueQueryResource {
+		t.Fatalf("qualified source representation changed: %v", got)
+	}
+	table, ok := got[0].Table()
+	if !ok || table != want {
+		t.Fatalf("qualified identity lost: %v, %v", table, ok)
+	}
+	table.Name = "mutated"
+	again, ok := got[0].Table()
+	if !ok || again != want {
+		t.Fatalf("Table returned shared mutable identity: %v, %v", again, ok)
+	}
+	got[0] = OpaqueQuery("mutated")
+	fresh := ResourcesForQuery(query)
+	if len(fresh) != 1 {
+		t.Fatalf("unexpected fresh resources: %v", fresh)
+	}
+	table, ok = fresh[0].Table()
+	if !ok || table != want {
+		t.Fatalf("inspection results share mutable storage: %v, %v", table, ok)
+	}
+	raw := ResourcesForQuery(dal.NewTextQuery("SELECT 1", nil))
+	if len(raw) != 1 || raw[0].Kind() != OpaqueQueryResource {
+		t.Fatalf("raw query must remain opaque: %v", raw)
+	}
+	if table, ok = raw[0].Table(); ok {
+		t.Fatalf("raw query acquired table authority: %v", table)
+	}
+}
