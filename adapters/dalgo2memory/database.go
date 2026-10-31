@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/dalgo/recordset"
@@ -975,6 +976,17 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 	case dal.FieldRef:
 		switch right := comparison.Right.(type) {
 		case dal.Constant:
+			if bound, ok := right.Value.(time.Time); ok {
+				// JSON rows lose the Go timestamp type. Only a typed query
+				// bound opts into time comparison; string queries stay lexical.
+				value, _ := fieldValue(data, left.Name())
+				text, ok := value.(string)
+				if !ok {
+					return false
+				}
+				at, err := time.Parse(time.RFC3339Nano, text)
+				return err == nil && compareOp(comparison.Operator, at.Compare(bound), 0)
+			}
 			norm := normalizeConstant(right.Value)
 			switch comparison.Operator {
 			case dal.Equal:
@@ -1058,10 +1070,9 @@ func elementEquals(a, b any) bool {
 	return a == b
 }
 
-// normalizeConstant normalizes a query constant the same way stored row values
-// are normalized (JSON marshal then unmarshal into any). This ensures that
-// time.Time constants (marshaled to RFC3339 strings) compare correctly against
-// the strings stored in serialized rows.
+// normalizeConstant normalizes ordinary query constants like serialized rows
+// (JSON marshal then unmarshal into any). Typed timestamp WHERE bounds are
+// handled before this function to avoid lexical RFC3339 comparison.
 func normalizeConstant(v any) any {
 	b, err := json.Marshal(v)
 	if err != nil {
