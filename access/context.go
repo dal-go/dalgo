@@ -172,24 +172,35 @@ func (g guard) authorizeWrite(ctx context.Context, operation Operations, resourc
 // request is allowed only by at least one policy in force: with none, it is
 // denied.
 func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]residual, [][]writeResidual, error) {
+	policies, err := g.requestPolicies(ctx, request)
+	if err != nil {
+		return nil, nil, err
+	}
+	return settleAssessment(request, assessPolicies(ctx, request, policies))
+}
+
+// requestPolicies is the single collection path for execution and pure
+// inspection. Providers are pinned once; database, bound and dynamic context
+// policies all remain mandatory and retain existing require-context semantics.
+func (g guard) requestPolicies(ctx context.Context, request Request) ([]Policy, error) {
 	var err error
 	g, err = g.pinDatabasePolicies(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	dynamicPolicies := policiesFromContext(ctx)
 	contextPolicyCount := len(g.boundPolicies) + len(dynamicPolicies)
 	if err := g.requireContextPolicy(request.Operation, contextPolicyCount); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	policies := make([]Policy, 0, len(g.databasePolicies)+contextPolicyCount)
 	policies = append(policies, g.databasePolicies...)
 	policies = append(policies, g.boundPolicies...)
 	policies = append(policies, dynamicPolicies...)
 	if len(policies) == 0 {
-		return nil, nil, &DeniedError{Decision: requestDecision(request, CodeConfigurationInvalid, "no access policy is in force")}
+		return nil, &DeniedError{Decision: requestDecision(request, CodeConfigurationInvalid, "no access policy is in force")}
 	}
-	return settleAssessment(request, assessPolicies(ctx, request, policies))
+	return policies, nil
 }
 
 // settleAssessment turns the assessment of a request into the residuals the
