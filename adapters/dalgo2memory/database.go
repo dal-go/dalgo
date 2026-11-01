@@ -772,8 +772,15 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 		}
 		return executeGroupedReader(q, srcs, collectionName, known)
 	}
+	orderedValues, err := orderedTimestampSources(rows, q, factory)
+	if err != nil {
+		return nil, err
+	}
 	orderBySources(rows, q.OrderBy(),
 		func(r memoryRow) map[string]map[string]any {
+			if values := orderedValues[r.id]; values != nil {
+				return baseSources(base, values)
+			}
 			return baseSources(base, r.data)
 		},
 		func(r memoryRow) string {
@@ -1086,6 +1093,11 @@ func normalizeConstant(v any) any {
 }
 
 func compare(a, b any) int {
+	if left, ok := a.(time.Time); ok {
+		if right, ok := b.(time.Time); ok {
+			return left.Compare(right)
+		}
+	}
 	af, aOK := number(a)
 	bf, bOK := number(b)
 	if aOK && bOK {
