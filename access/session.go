@@ -81,6 +81,11 @@ func (s securedReadSession) GetMulti(ctx context.Context, records []record.Recor
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
+	ctx, err := s.guard.nativeContext(ctx, Request{Operation: Query})
+	if err != nil {
+		return nil, err
+	}
+
 	if structured, ok := query.(dal.StructuredQuery); ok && dal.HasSubquery(structured) {
 		nested, err := s.enterNestedRoute(ctx, structured)
 		if err != nil {
@@ -112,6 +117,11 @@ func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, que
 }
 
 func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
+	ctx, err := s.guard.nativeContext(ctx, Request{Operation: Query})
+	if err != nil {
+		return nil, err
+	}
+
 	if structured, ok := query.(dal.StructuredQuery); ok && dal.HasSubquery(structured) {
 		nested, err := s.enterNestedRoute(ctx, structured)
 		if err != nil {

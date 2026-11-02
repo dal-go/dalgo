@@ -146,7 +146,7 @@ type PolicyAssessment struct {
 // mode it is complete metadata, not missing evidence.
 type AssessmentRestriction struct {
 	OperationID   string
-	PolicyIndex   int
+	PolicyIndex   int // Index into Assessment.Policies, including opt-in canonical delegates.
 	ResourceIndex int
 	Rule          string
 	Slot          DecisionSlot
@@ -275,6 +275,8 @@ func assessPoliciesForInspection(ctx context.Context, request Request, policies 
 }
 
 func assessPoliciesMode(ctx context.Context, request Request, policies []Policy, inspection bool) policyAssessment {
+	policies, boundNativeTables := nativeTablePolicies(ctx, request, policies)
+	inspection = inspection || boundNativeTables
 	a := policyAssessment{assessment: Assessment{Outcome: AssessmentAllow, Complete: true}}
 	for policyIndex, policy := range policies {
 		if isNilNode(policy) {

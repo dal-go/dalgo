@@ -141,12 +141,18 @@ type guard struct {
 	databasePolicies []Policy
 	policyProvider   PolicyProvider
 	boundPolicies    []Policy
+	nativeNamespaces []string
 	requireContext   bool
 }
 
 func (g guard) bind(ctx context.Context) guard {
 	bound := policiesFromContext(ctx)
 	g.boundPolicies = append(append([]Policy(nil), g.boundPolicies...), bound...)
+	if ctx != nil {
+		if namespace, ok := ctx.Value(nativeTableNamespaceKey{}).(string); ok {
+			g.nativeNamespaces = append(append([]string(nil), g.nativeNamespaces...), namespace)
+		}
+	}
 	return g
 }
 
@@ -172,11 +178,28 @@ func (g guard) authorizeWrite(ctx context.Context, operation Operations, resourc
 // request is allowed only by at least one policy in force: with none, it is
 // denied.
 func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]residual, [][]writeResidual, error) {
+	ctx, err := g.nativeContext(ctx, request)
+	if err != nil {
+		return nil, nil, err
+	}
 	policies, err := g.requestPolicies(ctx, request)
 	if err != nil {
 		return nil, nil, err
 	}
 	return settleAssessment(request, assessPolicies(ctx, request, policies))
+}
+
+// nativeContext reapplies handle-owned constraints to the context used for both
+// authorization and delegated query execution, including nested secured handles.
+func (g guard) nativeContext(ctx context.Context, request Request) (context.Context, error) {
+	for _, namespace := range g.nativeNamespaces {
+		bound, err := WithNativeTableNamespace(ctx, namespace)
+		if err != nil {
+			return nil, &DeniedError{Decision: requestDecision(request, CodeConfigurationInvalid, "native table namespace cannot be applied")}
+		}
+		ctx = bound
+	}
+	return ctx, nil
 }
 
 // requestPolicies is the single collection path for execution and pure

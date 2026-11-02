@@ -31,6 +31,9 @@ type TableName struct {
 // read carry none. A session that resolves no name, which is every session of this
 // version, gives none to a collection source with neither a schema nor a database,
 // and none to a key.
+// WithNativeTableNamespace additionally assesses internal canonical path-kind
+// resources carrying the original table identity, without changing the original
+// resource assessment or the public resource constructors.
 func (r Resource) Table() (TableName, bool) {
 	if r.table == nil {
 		return TableName{}, false
@@ -51,6 +54,11 @@ func (r Resource) Table() (TableName, bool) {
 // names it, an ignore-audit rule included, and otherwise by its rule for opaque
 // queries, as it did before it held a table rule. A policy that holds no table
 // rule decides every source as it always did.
+// WithNativeTableNamespace preserves this original decision and intersects it
+// with a complete canonical path assessment: missing path grants deny and a
+// collection-path denial can also deny. Otherwise matching table rules retain
+// precedence, so path allow row/field clauses do not constrain a winning table
+// rule.
 func TableScope(table TableName, rules ...Rule) Rule {
 	return Rule{kind: tableScopeRule, table: table, children: append([]Rule(nil), rules...)}
 }
