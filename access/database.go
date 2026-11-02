@@ -116,7 +116,8 @@ func MustSecureDB(db dal.DB, options ...DBOption) dal.DB {
 }
 
 // BindDB captures context policies on the returned DB handle. Passing a later
-// operation context cannot remove them, while additional policies still narrow
+// operation context cannot remove them or a native table namespace bound with
+// WithNativeTableNamespace, while additional policies still narrow
 // the capability. A handle over a database that was not secured denies every
 // request when the context it is bound to, and the context of the request,
 // holds no policy.

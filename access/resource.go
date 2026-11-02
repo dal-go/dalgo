@@ -42,7 +42,9 @@ type Resource struct {
 	name string
 	// table is the identity of the table a query source denotes, when the source
 	// writes a schema or a database. It travels beside the kind and the text, which
-	// are the same with or without it; see Table.
+	// are the same with or without it for ordinary resources. The opt-in
+	// canonical delegates of WithNativeTableNamespace additionally use path-kind
+	// resources with this identity; see Table.
 	table *TableName
 }
 
