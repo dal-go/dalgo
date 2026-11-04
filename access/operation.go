@@ -10,19 +10,29 @@ import (
 type Operations uint16
 
 const (
+	// Get is the leaf operation that reads one record.
 	Get Operations = 1 << iota
+	// Exists is the leaf operation that checks whether a record exists.
 	Exists
+	// Query is the leaf operation that reads through a query.
 	Query
+	// Insert is the leaf operation that inserts a record.
 	Insert
+	// Set is the leaf operation that sets a record.
 	Set
+	// Update is the leaf operation that updates fields of a record.
 	Update
+	// Delete is the leaf operation that deletes a record.
 	Delete
 	// Truncate is reserved for collection-wide deletion. DALgo does not expose
 	// a truncate session method yet, but policies can grant and evaluate it now.
 	Truncate
 
-	Read      = Get | Exists | Query
-	Write     = Insert | Set | Update | Delete | Truncate
+	// Read is Get, Exists, and Query.
+	Read = Get | Exists | Query
+	// Write is Insert, Set, Update, Delete, and Truncate.
+	Write = Insert | Set | Update | Delete | Truncate
+	// ReadWrite is Read and Write.
 	ReadWrite = Read | Write
 
 	knownOperations = ReadWrite

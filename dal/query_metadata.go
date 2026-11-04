@@ -10,6 +10,7 @@ import (
 // Providers must freeze the planned rights inventory before output and report
 // actual used source IDs independently of row counts.
 type QueryMetadataProvider interface {
+	// QueryMetadata returns the metadata for the query being read.
 	QueryMetadata() datarights.QueryMetadata
 }
 
@@ -39,6 +40,7 @@ type recordsMetadataReader struct {
 	metadata datarights.QueryMetadata
 }
 
+// QueryMetadata returns a clone of the attached metadata.
 func (r *recordsMetadataReader) QueryMetadata() datarights.QueryMetadata { return r.metadata.Clone() }
 
 type recordsetMetadataReader struct {
@@ -46,6 +48,7 @@ type recordsetMetadataReader struct {
 	metadata datarights.QueryMetadata
 }
 
+// QueryMetadata returns a clone of the attached metadata.
 func (r *recordsetMetadataReader) QueryMetadata() datarights.QueryMetadata { return r.metadata.Clone() }
 
 // Generic transforms currently cannot preflight a complete rights inventory.

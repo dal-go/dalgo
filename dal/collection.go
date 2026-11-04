@@ -21,6 +21,8 @@ var ErrInsertOptionNotHonored = errors.New("dal: insert option not honored: reco
 // name. The CollectionName method MUST be declared on a value receiver so that
 // CollectionOf[K, T]() can resolve the name from the zero value of T.
 type CollectionNamer interface {
+	// CollectionName returns the collection name for this record type.
+	// CollectionOf calls it on the zero value of T, so the method needs a value receiver.
 	CollectionName() string
 }
 
@@ -228,6 +230,8 @@ func (c collection[K, T]) guardParent(key *record.Key) error {
 	return nil
 }
 
+// GetRecord loads id through s.Get into a record whose data is a new T and returns that record.
+// idToKey builds the key. A key error is returned with a nil record; a Get error is returned with the record.
 func (c collection[K, T]) GetRecord(ctx context.Context, s ReadSession, id K) (record.Record, error) {
 	key, err := c.idToKey(id)
 	if err != nil {
@@ -240,6 +244,8 @@ func (c collection[K, T]) GetRecord(ctx context.Context, s ReadSession, id K) (r
 	return rec, nil
 }
 
+// GetData loads the record at id through GetRecord and returns its data as T.
+// On error it returns the zero T and that error.
 func (c collection[K, T]) GetData(ctx context.Context, s ReadSession, id K) (T, error) {
 	rec, err := c.GetRecord(ctx, s, id)
 	if err != nil {
@@ -249,6 +255,8 @@ func (c collection[K, T]) GetData(ctx context.Context, s ReadSession, id K) (T, 
 	return *rec.Data().(*T), nil
 }
 
+// GetRecordWithID loads the record at id and returns a record.WithID carrying id, the key, and the record.
+// On error it returns the zero value and that error.
 func (c collection[K, T]) GetRecordWithID(ctx context.Context, s ReadSession, id K) (record.WithID[K], error) {
 	rec, err := c.GetRecord(ctx, s, id)
 	if err != nil {
@@ -257,6 +265,8 @@ func (c collection[K, T]) GetRecordWithID(ctx context.Context, s ReadSession, id
 	return record.WithID[K]{ID: id, Key: rec.Key(), Record: rec}, nil
 }
 
+// GetRecordWithDataAndID loads the record at id and returns a record.DataWithID whose Data is the decoded *T.
+// On error it returns the zero value and that error.
 func (c collection[K, T]) GetRecordWithDataAndID(ctx context.Context, s ReadSession, id K) (record.DataWithID[K, *T], error) {
 	rec, err := c.GetRecord(ctx, s, id)
 	if err != nil {
@@ -268,10 +278,14 @@ func (c collection[K, T]) GetRecordWithDataAndID(ctx context.Context, s ReadSess
 	}, nil
 }
 
+// Get delegates to GetData.
+//
+// Deprecated: use GetData.
 func (c collection[K, T]) Get(ctx context.Context, s ReadSession, id K) (T, error) {
 	return c.GetData(ctx, s, id)
 }
 
+// All reads every record of the collection through ExecuteQueryAndReadAllToRecords and returns each value as T.
 func (c collection[K, T]) All(ctx context.Context, s ReadSession) ([]T, error) {
 	query := NewQueryBuilder(From(c.ref)).SelectIntoRecord(func() record.Record {
 		return record.NewRecordWithIncompleteKey(c.ref.Name(), reflect.String, new(T))
@@ -287,6 +301,9 @@ func (c collection[K, T]) All(ctx context.Context, s ReadSession) ([]T, error) {
 	return values, nil
 }
 
+// Insert inserts value under a generated id and returns the key.
+// With no options it uses WithRandomStringKey(DefaultRandomStringIDLength, 5).
+// When the key ID is still nil or empty after InsertRecord, it returns ErrInsertOptionNotHonored.
 func (c collection[K, T]) Insert(ctx context.Context, s WriteSession, value T, opts ...InsertOption) (*record.Key, error) {
 	key := record.NewIncompleteKey(c.ref.Name(), reflect.String, c.ref.Parent())
 	rec := record.NewRecordWithData(key, &value)
@@ -302,6 +319,7 @@ func (c collection[K, T]) Insert(ctx context.Context, s WriteSession, value T, o
 	return rec.Key(), nil
 }
 
+// Count reads the collection keys through ExecuteQueryAndReadAllToRecords and returns how many records were read.
 func (c collection[K, T]) Count(ctx context.Context, s ReadSession) (int, error) {
 	query := NewQueryBuilder(From(c.ref)).SelectKeysOnly(reflect.String)
 	records, err := ExecuteQueryAndReadAllToRecords(ctx, query, s)
@@ -311,6 +329,8 @@ func (c collection[K, T]) Count(ctx context.Context, s ReadSession) (int, error)
 	return len(records), nil
 }
 
+// Exists reports whether a record exists at id.
+// A not-found error from Get is returned as false and a nil error. Any other Get error is returned as false and that error.
 func (c collection[K, T]) Exists(ctx context.Context, s ReadSession, id K) (bool, error) {
 	key, err := c.idToKey(id)
 	if err != nil {
@@ -326,6 +346,8 @@ func (c collection[K, T]) Exists(ctx context.Context, s ReadSession, id K) (bool
 	return true, nil
 }
 
+// First returns the first record of the collection using a limit of 1.
+// An empty result is the zero T, false, and a nil error.
 func (c collection[K, T]) First(ctx context.Context, s ReadSession) (T, bool, error) {
 	var zero T
 	query := NewQueryBuilder(From(c.ref)).Limit(1).SelectIntoRecord(func() record.Record {
@@ -341,6 +363,7 @@ func (c collection[K, T]) First(ctx context.Context, s ReadSession) (T, bool, er
 	return *records[0].Data().(*T), true, nil
 }
 
+// InsertRecord checks the record's parent key and delegates to s.Insert.
 func (c collection[K, T]) InsertRecord(ctx context.Context, s WriteSession, r record.Record, opts ...InsertOption) error {
 	if err := c.guardParent(r.Key()); err != nil {
 		return err
@@ -348,6 +371,7 @@ func (c collection[K, T]) InsertRecord(ctx context.Context, s WriteSession, r re
 	return s.Insert(ctx, r, opts...)
 }
 
+// InsertWithID inserts value at id through InsertRecord and returns the record's key.
 func (c collection[K, T]) InsertWithID(ctx context.Context, s WriteSession, id K, value T) (*record.Key, error) {
 	key, err := c.idToKey(id)
 	if err != nil {
@@ -360,6 +384,7 @@ func (c collection[K, T]) InsertWithID(ctx context.Context, s WriteSession, id K
 	return rec.Key(), nil
 }
 
+// SetRecord checks the record's parent key and delegates to s.Set.
 func (c collection[K, T]) SetRecord(ctx context.Context, s WriteSession, r record.Record) error {
 	if err := c.guardParent(r.Key()); err != nil {
 		return err
@@ -367,6 +392,7 @@ func (c collection[K, T]) SetRecord(ctx context.Context, s WriteSession, r recor
 	return s.Set(ctx, r)
 }
 
+// SetByID stores value at id by delegating to SetRecord.
 func (c collection[K, T]) SetByID(ctx context.Context, s WriteSession, id K, value T) error {
 	key, err := c.idToKey(id)
 	if err != nil {
@@ -375,10 +401,14 @@ func (c collection[K, T]) SetByID(ctx context.Context, s WriteSession, id K, val
 	return c.SetRecord(ctx, s, record.NewRecordWithData(key, &value))
 }
 
+// Set delegates to SetByID.
+//
+// Deprecated: use SetByID.
 func (c collection[K, T]) Set(ctx context.Context, s WriteSession, id K, value T) error {
 	return c.SetByID(ctx, s, id, value)
 }
 
+// UpdateByKey checks the key's parent and delegates to s.Update.
 func (c collection[K, T]) UpdateByKey(ctx context.Context, s WriteSession, k *record.Key, updates []update.Update, preconditions ...Precondition) error {
 	if err := c.guardParent(k); err != nil {
 		return err
@@ -386,6 +416,7 @@ func (c collection[K, T]) UpdateByKey(ctx context.Context, s WriteSession, k *re
 	return s.Update(ctx, k, updates, preconditions...)
 }
 
+// UpdateByID builds the key for id and delegates to UpdateByKey.
 func (c collection[K, T]) UpdateByID(ctx context.Context, s WriteSession, id K, updates []update.Update, preconditions ...Precondition) error {
 	key, err := c.idToKey(id)
 	if err != nil {
@@ -394,10 +425,14 @@ func (c collection[K, T]) UpdateByID(ctx context.Context, s WriteSession, id K, 
 	return c.UpdateByKey(ctx, s, key, updates, preconditions...)
 }
 
+// Update delegates to UpdateByID.
+//
+// Deprecated: use UpdateByID.
 func (c collection[K, T]) Update(ctx context.Context, s WriteSession, id K, updates []update.Update, preconditions ...Precondition) error {
 	return c.UpdateByID(ctx, s, id, updates, preconditions...)
 }
 
+// DeleteByKey checks the key's parent and delegates to s.Delete.
 func (c collection[K, T]) DeleteByKey(ctx context.Context, s WriteSession, k *record.Key) error {
 	if err := c.guardParent(k); err != nil {
 		return err
@@ -405,6 +440,7 @@ func (c collection[K, T]) DeleteByKey(ctx context.Context, s WriteSession, k *re
 	return s.Delete(ctx, k)
 }
 
+// DeleteByID builds the key for id and delegates to DeleteByKey.
 func (c collection[K, T]) DeleteByID(ctx context.Context, s WriteSession, id K) error {
 	key, err := c.idToKey(id)
 	if err != nil {
@@ -413,10 +449,14 @@ func (c collection[K, T]) DeleteByID(ctx context.Context, s WriteSession, id K) 
 	return c.DeleteByKey(ctx, s, key)
 }
 
+// Delete delegates to DeleteByID.
+//
+// Deprecated: use DeleteByID.
 func (c collection[K, T]) Delete(ctx context.Context, s WriteSession, id K) error {
 	return c.DeleteByID(ctx, s, id)
 }
 
+// In returns a collection with the same name scoped under parent.
 func (c collection[K, T]) In(parent *record.Key) Collection[K, T] {
 	return collection[K, T]{ref: NewCollectionRef(c.ref.Name(), "", parent)}
 }

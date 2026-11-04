@@ -8,8 +8,10 @@ import (
 	"github.com/dal-go/record"
 )
 
+// CitiesCollection is the collection name of the city fixture.
 const CitiesCollection = "DalgoTest_Cities"
 
+// City is one city in the fixture.
 type City struct {
 	Name          string
 	State         string
@@ -22,10 +24,12 @@ type City struct {
 	LastUpdatedAt time.Time
 }
 
+// Year returns midnight UTC on 1 January of year.
 func Year(year int) time.Time {
 	return time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
 }
 
+// Cities holds the city values of the fixture.
 var Cities = []City{
 	{
 		Name:          "Tokyo",
@@ -139,10 +143,13 @@ var Cities = []City{
 	},
 }
 
+// SortedCityIDs holds escaped city IDs in string order. init fills it from Cities.
 var SortedCityIDs []string
 
+// CityIDsSortedByPopulation holds city IDs in ascending population order. init fills it from Cities.
 var CityIDsSortedByPopulation []string
 
+// CityID returns an ID formed from the city's state and name.
 func CityID(city City) string {
 	return fmt.Sprintf("%s_%s", city.State, city.Name)
 }

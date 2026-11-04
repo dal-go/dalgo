@@ -16,6 +16,8 @@ type idGenerator struct {
 	f           func(ctx context.Context, record record.Record) error
 }
 
+// GenerateID calls the wrapped generator.
+// When the number of calls exceeds maxAttempts it clears the record key ID and returns an error wrapping ErrExceedsMaxNumberOfAttempts.
 func (v *idGenerator) GenerateID(ctx context.Context, record record.Record) error {
 	if v.attempts++; v.attempts > v.maxAttempts {
 		record.Key().ID = nil
@@ -24,11 +26,14 @@ func (v *idGenerator) GenerateID(ctx context.Context, record record.Record) erro
 	return v.f(ctx, record)
 }
 
+// NewIDGenerator stores f and maxAttempts on an idGenerator and returns f.
 func NewIDGenerator(f IDGenerator, maxAttempts int) IDGenerator {
 	v := &idGenerator{f: f, maxAttempts: maxAttempts}
 	return v.f
 }
 
+// WithRandomStringKey returns an InsertOption that sets the ID generator through NewIDGenerator.
+// The generator assigns random.ID(length) to the record key ID.
 func WithRandomStringKey(length, maxAttempts int) InsertOption {
 	return func(options *insertOptions) {
 		options.idGenerator = NewIDGenerator(
@@ -41,6 +46,8 @@ func WithRandomStringKey(length, maxAttempts int) InsertOption {
 	}
 }
 
+// WithRandomStringKeyPrefixedByUnixTime returns an InsertOption that sets the ID generator through NewIDGenerator.
+// The generator assigns the current UTC Unix time, an underscore, and random.ID(randomLength) to the record key ID.
 func WithRandomStringKeyPrefixedByUnixTime(randomLength, maxAttempts int) InsertOption {
 	return func(options *insertOptions) {
 		options.idGenerator = NewIDGenerator(
@@ -53,18 +60,29 @@ func WithRandomStringKeyPrefixedByUnixTime(randomLength, maxAttempts int) Insert
 	}
 }
 
+// TimeStampAccuracy selects how finely WithTimeStampStringID reads the current time.
 type TimeStampAccuracy int
 
 const (
+	// TimeStampAccuracyNano reads the time in nanoseconds.
 	TimeStampAccuracyNano TimeStampAccuracy = iota
+	// TimeStampAccuracyMicrosecond reads the time in microseconds.
 	TimeStampAccuracyMicrosecond
+	// TimeStampAccuracyMillisecond reads the time in milliseconds.
 	TimeStampAccuracyMillisecond
+	// TimeStampAccuracySecond reads the time in seconds.
 	TimeStampAccuracySecond
+	// TimeStampAccuracyMinute reads the time in whole minutes.
 	TimeStampAccuracyMinute
+	// TimeStampAccuracyHour reads the time in whole hours.
 	TimeStampAccuracyHour
+	// TimeStampAccuracyDay reads the time in whole days.
 	TimeStampAccuracyDay
 )
 
+// WithTimeStampStringID returns an InsertOption that sets the ID generator through NewIDGenerator.
+// The generator assigns the current UTC time, at the given accuracy, formatted in base.
+// An accuracy outside these constants panics.
 func WithTimeStampStringID(accuracy TimeStampAccuracy, base, maxAttempts int) InsertOption {
 	return func(options *insertOptions) {
 		options.idGenerator = NewIDGenerator(

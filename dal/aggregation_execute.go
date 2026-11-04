@@ -75,6 +75,7 @@ type aggregationSourceQuery struct {
 
 type moneyAggregationSourceQuery struct{ aggregationSourceQuery }
 
+// Where returns nil so the embedded filter is not part of this source scan.
 func (q moneyAggregationSourceQuery) Where() Condition { return nil }
 
 func newAggregationSourceQuery(q StructuredQuery, ordered bool) StructuredQuery {
@@ -92,10 +93,17 @@ func newAggregationSourceQuery(q StructuredQuery, ordered bool) StructuredQuery 
 	return aggregationSourceQuery{StructuredQuery: q, columns: columns, orders: orders}
 }
 
-func (q aggregationSourceQuery) GroupBy() []Expression      { return nil }
-func (q aggregationSourceQuery) Having() Condition          { return nil }
+// GroupBy returns nil. Grouping is applied above this source scan.
+func (q aggregationSourceQuery) GroupBy() []Expression { return nil }
+
+// Having returns nil. The post-aggregation filter is applied above this source scan.
+func (q aggregationSourceQuery) Having() Condition { return nil }
+
+// OrderBy returns the orders stored for this source scan.
 func (q aggregationSourceQuery) OrderBy() []OrderExpression { return q.orders }
-func (q aggregationSourceQuery) Columns() []Column          { return q.columns }
+
+// Columns returns the columns collected for this source scan.
+func (q aggregationSourceQuery) Columns() []Column { return q.columns }
 
 // OrderedAggregateSourceFields identifies the raw timestamp values that the
 // local ordered aggregate must see before a backend converts a typed record
@@ -135,9 +143,17 @@ func (q aggregationSourceQuery) OrderedAggregateSourceValues(raw any) map[string
 	}
 	return values
 }
-func (q aggregationSourceQuery) Offset() int        { return 0 }
-func (q aggregationSourceQuery) Limit() int         { return 0 }
-func (q aggregationSourceQuery) StartFrom() Cursor  { return "" }
+
+// Offset returns 0 so the provider scan does not skip rows.
+func (q aggregationSourceQuery) Offset() int { return 0 }
+
+// Limit returns 0 so the provider scan does not cap rows.
+func (q aggregationSourceQuery) Limit() int { return 0 }
+
+// StartFrom returns an empty cursor.
+func (q aggregationSourceQuery) StartFrom() Cursor { return "" }
+
+// StartAfter returns an empty cursor.
 func (q aggregationSourceQuery) StartAfter() Cursor { return "" }
 
 func collectSourceFields(q StructuredQuery) []FieldRef {
@@ -245,8 +261,10 @@ func newLocalAggregationReader(ctx context.Context, q StructuredQuery, raw Recor
 	return &localAggregationReader{ctx: ctx, query: q, raw: raw, plan: plan, aggregates: aggregates, sortFields: orderedAggregateSortNames(q)}
 }
 
+// Cursor returns an empty cursor and a nil error.
 func (r *localAggregationReader) Cursor() (string, error) { return "", nil }
 
+// Close closes the underlying reader once. A later call returns nil.
 func (r *localAggregationReader) Close() error {
 	if r.closed {
 		return nil
@@ -255,6 +273,9 @@ func (r *localAggregationReader) Close() error {
 	return r.raw.Close()
 }
 
+// Next returns the next aggregated record.
+// A streaming plan with no ORDER BY emits a group as the input is read; any other plan materializes the groups first.
+// It returns ErrNoMoreRecords when the result is exhausted, and closes the reader when the context is done.
 func (r *localAggregationReader) Next() (record.Record, error) {
 	if err := r.ctx.Err(); err != nil {
 		_ = r.Close()

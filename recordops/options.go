@@ -1,4 +1,5 @@
 // specscore: feat-recordops/diff
+
 package recordops
 
 // Option configures Diff/DiffFunc behavior. The package exports four

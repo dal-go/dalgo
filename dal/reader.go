@@ -5,6 +5,7 @@ import (
 	"github.com/dal-go/record"
 )
 
+// Reader is a positioned result that exposes a cursor and can be closed.
 type Reader interface {
 	// Cursor points to a position in the result set. This can be used for pagination.
 	Cursor() (string, error)
@@ -24,6 +25,8 @@ type RecordsReader interface {
 // RecordsetReader reads records one by one into recordset.Recordset
 type RecordsetReader interface {
 	Reader
+	// Recordset returns the recordset being read.
 	Recordset() recordset.Recordset
+	// Next returns the next row and the recordset.
 	Next() (row recordset.Row, rs recordset.Recordset, err error)
 }

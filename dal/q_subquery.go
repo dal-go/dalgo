@@ -20,7 +20,10 @@ func NewQuerySource(query StructuredQuery, as string) QuerySource {
 	return QuerySource{query: query, as: as}
 }
 
-func (s QuerySource) Name() string     { return s.as }
+// Name returns the result name of the derived relation.
+func (s QuerySource) Name() string { return s.as }
+
+// Alias returns the result name of the derived relation.
 func (s QuerySource) Alias() string    { return s.as }
 func (s QuerySource) recordsetSource() {}
 
@@ -56,8 +59,11 @@ func NewQueryExpression(query StructuredQuery, as string) QueryExpression {
 	return QueryExpression{query: query, as: as}
 }
 
+// Query returns the query that produces the scalar value.
 func (e QueryExpression) Query() StructuredQuery { return e.query }
-func (e QueryExpression) As() string             { return e.as }
+
+// As returns the result name of the scalar subquery.
+func (e QueryExpression) As() string { return e.as }
 func (e QueryExpression) String() string {
 	if e.as == "" {
 		return "(SUBQUERY)"
@@ -84,8 +90,11 @@ func NewNotExistsCondition(query StructuredQuery) ExistsCondition {
 	return ExistsCondition{query: query, negated: true}
 }
 
+// Query returns the nested query being tested.
 func (c ExistsCondition) Query() StructuredQuery { return c.query }
-func (c ExistsCondition) Negated() bool          { return c.negated }
+
+// Negated reports whether the condition is NOT EXISTS.
+func (c ExistsCondition) Negated() bool { return c.negated }
 func (c ExistsCondition) String() string {
 	if c.negated {
 		return "NOT EXISTS (SUBQUERY)"
@@ -117,6 +126,7 @@ type QueryValidationError struct {
 // native query unless a future capability explicitly supports it.
 type RecursiveQueryStrategy string
 
+// RecursiveQueryGeneric is the strategy that evaluates nested queries through bounded ordinary leaf scans.
 const RecursiveQueryGeneric RecursiveQueryStrategy = "generic"
 
 // RecursiveQueryPlan is the conservative plan exposed before recursive

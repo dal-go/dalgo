@@ -15,9 +15,12 @@ import (
 type ResourceKind string
 
 const (
-	PathResource            ResourceKind = "path"
+	// PathResource is a structural path resource.
+	PathResource ResourceKind = "path"
+	// CollectionGroupResource is a collection-group query resource.
 	CollectionGroupResource ResourceKind = "collection-group"
-	OpaqueQueryResource     ResourceKind = "opaque-query"
+	// OpaqueQueryResource is a query resource that cannot safely match a path rule.
+	OpaqueQueryResource ResourceKind = "opaque-query"
 )
 
 type segmentKind uint8
@@ -48,6 +51,7 @@ type Resource struct {
 	table *TableName
 }
 
+// Kind returns the resource kind.
 func (r Resource) Kind() ResourceKind { return r.kind }
 
 func (r Resource) String() string {
@@ -83,7 +87,7 @@ func (r Resource) String() string {
 	}
 }
 
-// RecordResource returns the structural path represented by key.
+// RecordResourceForKey builds the structural path resource for key.
 func RecordResourceForKey(key *record.Key) Resource {
 	return Resource{kind: PathResource, path: segmentsForKey(key)}
 }

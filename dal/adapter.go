@@ -22,6 +22,7 @@ type adapter struct {
 	version string
 }
 
+// Equals reports whether v and other have the same name and version.
 func (v adapter) Equals(other Adapter) bool {
 	return v.name == other.Name() && v.version == other.Version()
 }
@@ -30,10 +31,12 @@ func (v adapter) String() string {
 	return v.name + "@" + v.version
 }
 
+// Name returns the adapter name.
 func (v adapter) Name() string {
 	return v.name
 }
 
+// Version returns the adapter version.
 func (v adapter) Version() string {
 	return v.version
 }

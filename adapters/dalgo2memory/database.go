@@ -202,14 +202,17 @@ func (db *database) QueryCapabilities() dal.QueryCapabilities {
 	return dal.QueryCapabilities{OrderBy: true, StableRowOrder: true}
 }
 
+// ID returns the backend name "dalgo2memory".
 func (db *database) ID() string {
 	return "dalgo2memory"
 }
 
+// Adapter returns a dal.Adapter named "memory" at version "0.0.1".
 func (db *database) Adapter() dal.Adapter {
 	return dal.NewAdapter("memory", "0.0.1")
 }
 
+// Schema returns nil.
 func (db *database) Schema() dal.Schema {
 	return nil
 }
@@ -286,6 +289,8 @@ type transactionInProgressKey struct{}
 // returned.
 var ErrNestedTransaction = errors.New("dalgo2memory: nested transactions are not supported: Firestore rejects a transaction started inside another transaction's callback")
 
+// RunReadonlyTransaction runs f under a read lock, passing a session on this database.
+// A context already inside a transaction returns ErrNestedTransaction. Options are ignored.
 func (db *database) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker, _ ...dal.TransactionOption) error {
 	if ctx.Value(transactionInProgressKey{}) != nil {
 		return ErrNestedTransaction
@@ -295,6 +300,9 @@ func (db *database) RunReadonlyTransaction(ctx context.Context, f dal.ROTxWorker
 	return f(context.WithValue(ctx, transactionInProgressKey{}, true), session{db: db})
 }
 
+// RunReadwriteTransaction runs f as an optimistic transaction, or under the database write lock when optimistic concurrency is off.
+// A context already inside a transaction returns ErrNestedTransaction.
+// Attempt options are passed to the optimistic path and ignored by the locked path.
 func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
 	if ctx.Value(transactionInProgressKey{}) != nil {
 		return ErrNestedTransaction
@@ -311,84 +319,98 @@ func (db *database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorke
 	return db.runLockedReadwriteTransaction(ctx, f)
 }
 
+// Exists holds a read lock and delegates to a session on this database.
 func (db *database) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return session{db: db}.Exists(ctx, key)
 }
 
+// Get holds a read lock and delegates to a session on this database.
 func (db *database) Get(ctx context.Context, record record.Record) error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return session{db: db}.Get(ctx, record)
 }
 
+// GetMulti holds a read lock and delegates to a session on this database.
 func (db *database) GetMulti(ctx context.Context, records []record.Record) error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return session{db: db}.GetMulti(ctx, records)
 }
 
+// ExecuteQueryToRecordsReader holds a read lock and delegates to a session on this database.
 func (db *database) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return session{db: db}.ExecuteQueryToRecordsReader(ctx, query)
 }
 
+// ExecuteQueryToRecordsetReader holds a read lock and delegates to a session on this database.
 func (db *database) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 	return session{db: db}.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
+// Set holds the write lock and delegates to a session on this database.
 func (db *database) Set(ctx context.Context, record record.Record) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.Set(ctx, record)
 }
 
+// SetMulti holds the write lock and delegates to a session on this database.
 func (db *database) SetMulti(ctx context.Context, records []record.Record) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.SetMulti(ctx, records)
 }
 
+// Insert holds the write lock and delegates to a session on this database.
 func (db *database) Insert(ctx context.Context, record record.Record, opts ...dal.InsertOption) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.Insert(ctx, record, opts...)
 }
 
+// InsertMulti holds the write lock and delegates to a session on this database.
 func (db *database) InsertMulti(ctx context.Context, records []record.Record, opts ...dal.InsertOption) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.InsertMulti(ctx, records, opts...)
 }
 
+// Delete holds the write lock and delegates to a session on this database.
 func (db *database) Delete(ctx context.Context, key *record.Key) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.Delete(ctx, key)
 }
 
+// DeleteMulti holds the write lock and delegates to a session on this database.
 func (db *database) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.DeleteMulti(ctx, keys)
 }
 
+// Update holds the write lock and delegates to a session on this database.
 func (db *database) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.Update(ctx, key, updates, preconditions...)
 }
 
+// UpdateRecord holds the write lock and delegates to a session on this database.
 func (db *database) UpdateRecord(ctx context.Context, record record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	return session{db: db}.UpdateRecord(ctx, record, updates, preconditions...)
 }
 
+// UpdateMulti holds the write lock and delegates to a session on this database.
 func (db *database) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -459,14 +481,19 @@ func (s session) optimistic() *optimisticState {
 	return s.txState.optimistic
 }
 
+// ID returns an empty transaction id.
 func (s session) ID() string {
 	return ""
 }
 
+// Options returns nil.
 func (s session) Options() dal.TransactionOptions {
 	return nil
 }
 
+// Exists reports whether key is stored.
+// A read after a write returns ErrReadAfterWriteInTransaction when that rule is enabled.
+// An optimistic session uses its optimistic state; otherwise the collection engine is checked.
 func (s session) Exists(_ context.Context, key *record.Key) (bool, error) {
 	if err := s.allowRead(); err != nil {
 		return false, err
@@ -477,6 +504,8 @@ func (s session) Exists(_ context.Context, key *record.Key) (bool, error) {
 	return s.db.engine(key.Collection()).exists(keyID(key)), nil
 }
 
+// Get loads the record from the optimistic state or the collection engine.
+// Read failures, including not-found and read-after-write, are stored with SetError.
 func (s session) Get(_ context.Context, rec record.Record) error {
 	if err := s.allowRead(); err != nil {
 		rec.SetError(err)
@@ -497,6 +526,7 @@ func (s session) Get(_ context.Context, rec record.Record) error {
 	return nil
 }
 
+// GetMulti loads each record with Get and stops on the first error other than not-found.
 func (s session) GetMulti(ctx context.Context, records []record.Record) error {
 	if err := s.allowRead(); err != nil {
 		return err
@@ -509,6 +539,8 @@ func (s session) GetMulti(ctx context.Context, records []record.Record) error {
 	return nil
 }
 
+// Set writes the record over any existing value and marks the session as having written.
+// An optimistic session stages the write; otherwise the record is saved with overwrite.
 func (s session) Set(_ context.Context, rec record.Record) error {
 	if opt := s.optimistic(); opt != nil {
 		if err := opt.stage(rec); err != nil {
@@ -524,6 +556,7 @@ func (s session) Set(_ context.Context, rec record.Record) error {
 	return nil
 }
 
+// SetMulti calls Set for each record and returns the first error.
 func (s session) SetMulti(ctx context.Context, records []record.Record) error {
 	for _, record := range records {
 		if err := s.Set(ctx, record); err != nil {
@@ -540,6 +573,9 @@ func (s session) SetMulti(ctx context.Context, records []record.Record) error {
 // rare, so a generous bound is effectively only hit by deterministic generators.
 const insertWithGeneratorMaxAttempts = 100
 
+// Insert stores a record that must not already exist, generating an id when the insert options ask for one.
+// An optimistic session buffers the insert; otherwise the record is saved without overwrite.
+// A successful insert marks the session as having written.
 func (s session) Insert(ctx context.Context, rec record.Record, opts ...dal.InsertOption) error {
 	options := dal.NewInsertOptions(opts...)
 	gen := options.IDGenerator()
@@ -600,6 +636,7 @@ func (s session) Insert(ctx context.Context, rec record.Record, opts ...dal.Inse
 	return nil
 }
 
+// InsertMulti calls Insert for each record with the same options and returns the first error.
 func (s session) InsertMulti(ctx context.Context, records []record.Record, opts ...dal.InsertOption) error {
 	for _, record := range records {
 		if err := s.Insert(ctx, record, opts...); err != nil {
@@ -609,6 +646,8 @@ func (s session) InsertMulti(ctx context.Context, records []record.Record, opts 
 	return nil
 }
 
+// Delete removes key and marks the session as having written.
+// An optimistic session buffers the delete; otherwise the engine deletes the id and the conflict version is bumped.
 func (s session) Delete(_ context.Context, key *record.Key) error {
 	if opt := s.optimistic(); opt != nil {
 		opt.delete(key)
@@ -622,6 +661,7 @@ func (s session) Delete(_ context.Context, key *record.Key) error {
 	return nil
 }
 
+// DeleteMulti calls Delete for every key, discards each error, and returns nil.
 func (s session) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	for _, key := range keys {
 		_ = s.Delete(ctx, key)
@@ -629,11 +669,14 @@ func (s session) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	return nil
 }
 
+// Update builds a map record for key and calls UpdateRecord with the same updates and preconditions.
 func (s session) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	record := record.NewRecordWithData(key, map[string]any{})
 	return s.UpdateRecord(ctx, record, updates, preconditions...)
 }
 
+// UpdateRecord applies updates to the record and marks a write when they succeed.
+// Preconditions are ignored. An optimistic session buffers the update; otherwise the collection engine applies it and the conflict version is bumped.
 func (s session) UpdateRecord(_ context.Context, record record.Record, updates []update.Update, _ ...dal.Precondition) error {
 	if opt := s.optimistic(); opt != nil {
 		if err := opt.updateRecord(record, updates); err != nil {
@@ -655,6 +698,7 @@ func (s session) UpdateRecord(_ context.Context, record record.Record, updates [
 	return nil
 }
 
+// UpdateMulti calls Update for each key with the same updates and preconditions, and returns the first error.
 func (s session) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	for _, key := range keys {
 		if err := s.Update(ctx, key, updates, preconditions...); err != nil {
@@ -664,6 +708,9 @@ func (s session) UpdateMulti(ctx context.Context, keys []*record.Key, updates []
 	return nil
 }
 
+// ExecuteQueryToRecordsReader evaluates a structured query against in-memory collection rows and returns a records reader.
+// It rejects reads after writes, non-structured queries, queries that cannot see this transaction's uncommitted writes, and joins inside an optimistic read-write transaction.
+// A join is executed separately; a grouped query is aggregated; other rows are ordered, cursored, limited, and projected or materialized.
 func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query) (dal.RecordsReader, error) {
 	if err := s.allowRead(); err != nil {
 		return nil, err

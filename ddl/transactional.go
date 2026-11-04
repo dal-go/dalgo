@@ -26,6 +26,9 @@ import "github.com/dal-go/dalgo/dal"
 // returned by its constructor until it is discarded; the same
 // stability contract as dal.ConcurrencyAware.
 type TransactionalDDL interface {
+	// SupportsTransactionalDDL reports whether the driver guarantees
+	// all-or-nothing atomicity for DDL calls that perform multiple
+	// sub-operations.
 	SupportsTransactionalDDL() bool
 }
 

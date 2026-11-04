@@ -9,10 +9,12 @@ import (
 var _ Expression = Array{}
 var _ Expression = (*Array)(nil)
 
+// Array is an expression that holds a slice in Value.
 type Array struct {
 	Value any `json:"value"`
 }
 
+// NewArray returns an Array holding v for a slice type the switch accepts, and panics for any other type.
 func NewArray(v any) Array {
 	switch value := v.(type) {
 	case []any, []string, []int, []int8, []int16, []int32, []int64, []uint, []uint8, []uint16, []uint32, []uint64, []float32, []float64:
@@ -22,6 +24,8 @@ func NewArray(v any) Array {
 	}
 }
 
+// Equal reports whether v and b contain the same elements in order.
+// Two nil values are equal. A nil and a non-nil are not. Values that are not slices are compared with reflect.DeepEqual.
 func (v Array) Equal(b Array) bool {
 	// Handle nil cases
 	if v.Value == nil && b.Value == nil {

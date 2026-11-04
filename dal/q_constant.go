@@ -11,10 +11,12 @@ import (
 var _ Expression = Constant{}
 var _ Expression = (*Constant)(nil)
 
+// Constant is an expression that holds one literal value.
 type Constant struct {
 	Value any `json:"value"`
 }
 
+// Equal reports whether v and b hold the same value.
 func (v Constant) Equal(b Constant) bool {
 	return v.Value == b.Value
 }
@@ -39,6 +41,9 @@ func quoteString(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
+// NewConstant returns a Constant for v.
+// A Constant argument is returned unchanged. Nil, bool, string, numeric
+// values, and time.Time are stored as the value; any other type panics.
 func NewConstant(v any) Constant {
 	switch v := v.(type) {
 	case

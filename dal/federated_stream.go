@@ -165,7 +165,10 @@ type federatedJoinStream struct {
 	emitted, skipped int
 }
 
+// Cursor returns an empty cursor and a nil error.
 func (s *federatedJoinStream) Cursor() (string, error) { return "", nil }
+
+// Close closes the source reader once. A later call returns nil.
 func (s *federatedJoinStream) Close() error {
 	if s.closed {
 		return nil
@@ -174,6 +177,9 @@ func (s *federatedJoinStream) Close() error {
 	return s.source.Close()
 }
 
+// Next returns the next joined row, reading further source rows when none are pending.
+// It returns ErrNoMoreRecords when a projected limit is reached or the source reader is exhausted.
+// A source row is joined and kept when it passes the query filter.
 func (s *federatedJoinStream) Next() (record.Record, error) {
 	for {
 		if s.limit > 0 && s.emitted >= s.limit {

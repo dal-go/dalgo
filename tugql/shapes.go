@@ -49,6 +49,8 @@ type scanYAML struct {
 	Limit   int         `yaml:"limit,omitempty"`
 }
 
+// UnmarshalYAML validates and decodes a from source.
+// It accepts alias or as, rejects both together, and stores the chosen name in Alias.
 func (from *fromYAML) UnmarshalYAML(node *yaml.Node) error {
 	if err := validateFromYAMLNode(node); err != nil {
 		return err
@@ -89,6 +91,8 @@ type joinYAML struct {
 	hintsRepeated bool
 }
 
+// UnmarshalYAML decodes a join mapping of type, from, on, and hints.
+// Any other field is rejected, and a repeated hints key is recorded on the join.
 func (join *joinYAML) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode {
 		return &yaml.TypeError{Errors: []string{"join must be a mapping"}}
@@ -123,6 +127,8 @@ func (join *joinYAML) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// MarshalYAML encodes the join as type, from, on, and hints.
+// A nil hints node is omitted.
 func (join joinYAML) MarshalYAML() (any, error) {
 	return struct {
 		Type  string     `yaml:"type,omitempty"`
@@ -293,6 +299,8 @@ type aggregateYAML struct {
 	orderPresent bool
 }
 
+// UnmarshalYAML decodes an aggregate mapping.
+// It allows function, distinct, args, and a single orderBy, and rejects every other field.
 func (aggregate *aggregateYAML) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode {
 		return &yaml.TypeError{Errors: []string{"aggregate must be a mapping"}}
@@ -319,10 +327,12 @@ type binaryYAML struct {
 	Right *exprYAML `yaml:"right"`
 }
 
+// UnmarshalYAML decodes one expression mapping into expression.
 func (expression *exprYAML) UnmarshalYAML(node *yaml.Node) error {
 	return decodeExpressionNode(node, expression, nil)
 }
 
+// MarshalYAML encodes the one expression form that is set.
 func (expression exprYAML) MarshalYAML() (any, error) {
 	return encodeExpressionNode(expression, nil)
 }
@@ -344,6 +354,8 @@ type wildcardYAML struct {
 	Exclude []string `yaml:"exclude"`
 }
 
+// UnmarshalYAML decodes a column as an expression plus optional as and wildcard fields.
+// A wildcard must be a mapping, and its source, when set, must be a non-empty string.
 func (column *columnYAML) UnmarshalYAML(node *yaml.Node) error {
 	extra := map[string]func(*yaml.Node) error{
 		"as": func(value *yaml.Node) error {
@@ -382,6 +394,7 @@ func (column *columnYAML) UnmarshalYAML(node *yaml.Node) error {
 	return decodeExpressionNode(node, &column.exprYAML, extra)
 }
 
+// MarshalYAML encodes the column expression and appends wildcard and as when they are set.
 func (column columnYAML) MarshalYAML() (any, error) {
 	extra := []yaml.Node{}
 	if column.Wildcard != nil {
@@ -403,6 +416,7 @@ type orderYAML struct {
 	Desc     bool `yaml:"desc,omitempty"` // descending order
 }
 
+// UnmarshalYAML decodes an order expression and its desc flag.
 func (order *orderYAML) UnmarshalYAML(node *yaml.Node) error {
 	extra := map[string]func(*yaml.Node) error{
 		"desc": func(value *yaml.Node) error { return value.Decode(&order.Desc) },
@@ -410,6 +424,7 @@ func (order *orderYAML) UnmarshalYAML(node *yaml.Node) error {
 	return decodeExpressionNode(node, &order.exprYAML, extra)
 }
 
+// MarshalYAML encodes the order expression and appends desc set to true when Desc is set.
 func (order orderYAML) MarshalYAML() (any, error) {
 	extra := []yaml.Node{}
 	if order.Desc {

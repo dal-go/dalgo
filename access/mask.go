@@ -15,19 +15,26 @@ type Mask struct {
 	Stages []MaskStage `json:"stages" yaml:"stages"`
 }
 
+// MaskStage is one include or exclude step in a Mask.
 type MaskStage struct {
 	Include []string `json:"include,omitempty" yaml:"include,omitempty"`
 	Exclude []string `json:"exclude,omitempty" yaml:"exclude,omitempty"`
 }
 
+// MaskKind selects whether a mask matches names or dotted field paths.
 type MaskKind string
 
 const (
-	NameMask            MaskKind = "name"
-	FieldMask           MaskKind = "field"
-	MaxMaskStages                = 1024
-	MaxMaskPatterns              = 4096
-	MaxMaskPatternBytes          = 128
+	// NameMask is a mask over single-segment names.
+	NameMask MaskKind = "name"
+	// FieldMask is a mask over dotted field paths.
+	FieldMask MaskKind = "field"
+	// MaxMaskStages is the maximum number of raw mask stages CompileMask accepts.
+	MaxMaskStages = 1024
+	// MaxMaskPatterns is the maximum number of raw patterns CompileMask accepts.
+	MaxMaskPatterns = 4096
+	// MaxMaskPatternBytes is the maximum byte length of one mask pattern.
+	MaxMaskPatternBytes = 128
 )
 
 type compiledMaskStage struct {
@@ -155,6 +162,7 @@ func normalizeMaskPattern(pattern string, kind MaskKind) (string, error) {
 	return result, nil
 }
 
+// Canonical returns a copy of the normalized mask. A nil receiver returns an empty mask.
 func (m *CompiledMask) Canonical() Mask {
 	if m == nil {
 		return Mask{}

@@ -117,6 +117,8 @@ func ReadAllToRecords(ctx context.Context, reader RecordsReader, options ...Read
 	)
 }
 
+// ExecuteQueryAndReadAllToRecords executes query through qe and reads every record from the result.
+// The options are passed to ReadAllToRecords.
 func ExecuteQueryAndReadAllToRecords(ctx context.Context, query Query, qe QueryExecutor, options ...ReaderOption) (records []record.Record, err error) {
 	var reader RecordsReader
 	if reader, err = qe.ExecuteQueryToRecordsReader(ctx, query); err != nil {
@@ -125,6 +127,9 @@ func ExecuteQueryAndReadAllToRecords(ctx context.Context, query Query, qe QueryE
 	return ReadAllToRecords(ctx, reader, options...)
 }
 
+// ExecuteQueryAndReadAllToRecordset reads rows through query.GetRecordsetReader into the reader's recordset.
+// It skips the offset from options. A positive limit stops with ErrLimitReached; otherwise it reads until there are no more rows.
+// The reader is closed before return, and a close error is returned when no earlier error was set.
 func ExecuteQueryAndReadAllToRecordset(ctx context.Context, query Query, qe QueryExecutor, options ...ReaderOption) (rs recordset.Recordset, err error) {
 	var reader RecordsetReader
 	if reader, err = query.GetRecordsetReader(ctx, qe); err != nil {

@@ -25,6 +25,7 @@ type IDGenerator = func(ctx context.Context, record record.Record) error
 
 // InsertOptions defines interface for insert options
 type InsertOptions interface {
+	// IDGenerator returns the ID generator, which is nil when none was configured.
 	IDGenerator() IDGenerator
 
 	// PreferAdapterGeneratedID reports whether WithAdapterGeneratedID was passed.
@@ -37,10 +38,12 @@ type insertOptions struct {
 	preferAdapterGeneratedID bool
 }
 
+// IDGenerator returns the configured ID generator.
 func (v insertOptions) IDGenerator() IDGenerator {
 	return v.idGenerator
 }
 
+// PreferAdapterGeneratedID reports whether WithAdapterGeneratedID was set.
 func (v insertOptions) PreferAdapterGeneratedID() bool {
 	return v.preferAdapterGeneratedID
 }
@@ -103,7 +106,9 @@ func (v randomStringOptions) Prefix() string {
 
 // RandomStringOptions defines settings for random string
 type RandomStringOptions interface {
+	// Prefix returns the prefix for the random string.
 	Prefix() string
+	// Length returns the length of the random string.
 	Length() int
 }
 
@@ -133,6 +138,9 @@ func WithIDGenerator(ctx context.Context, g IDGenerator) record.KeyOption {
 	}
 }
 
+// InsertWithIdGenerator generates an ID for r and calls insert when exists reports that the key is not found.
+// It retries while the key is already present, up to maxAttempts, and then returns an error wrapping ErrExceedsMaxNumberOfAttempts.
+// A failure from generateID, from ValidateWithKey when the data implements it, or from exists is returned immediately.
 func InsertWithIdGenerator(
 	ctx context.Context,
 	r record.Record,
@@ -167,4 +175,5 @@ func InsertWithIdGenerator(
 	return fmt.Errorf("not able to generate unique id: %w: %d", ErrExceedsMaxNumberOfAttempts, maxAttempts)
 }
 
+// ErrExceedsMaxNumberOfAttempts is wrapped by InsertWithIdGenerator when every attempt finds an existing key.
 var ErrExceedsMaxNumberOfAttempts = fmt.Errorf("exceeds maximum number of attempts")

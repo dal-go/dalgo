@@ -181,8 +181,11 @@ func clonePaths(paths [][]string) [][]string {
 // Policy is a named access capability. Every Policy applied to a secured
 // request must allow every target resource.
 type Policy interface {
+	// Name returns the policy name.
 	Name() string
+	// Decide evaluates the request and returns the authorization decision.
 	Decide(context.Context, Request) Decision
+	// Authorize returns an error when the request is not allowed.
 	Authorize(context.Context, Request) error
 }
 
@@ -191,12 +194,16 @@ type Policy interface {
 // inspection APIs without performing the represented operation.
 type InspectionPurePolicy interface {
 	Policy
+	// InspectionPure reports whether Decide is safe for plan and inspection evaluation.
 	InspectionPure() bool
 }
 
 type declaredInspectionPurePolicy struct{ Policy }
 
+// InspectionPure reports true.
 func (declaredInspectionPurePolicy) InspectionPure() bool { return true }
+
+// PolicyMetadata returns DescribePolicy for the wrapped policy.
 func (p declaredInspectionPurePolicy) PolicyMetadata() PolicyMetadata {
 	return DescribePolicy(p.Policy)
 }
@@ -251,14 +258,17 @@ func MustPolicy(name string, rules ...Rule) *AccessPolicy {
 	return policy
 }
 
+// Name returns the policy name.
 func (p *AccessPolicy) Name() string { return p.name }
 
+// InspectionPure reports that the policy is safe for plan and inspection evaluation.
 func (*AccessPolicy) InspectionPure() bool { return true }
 
 // Source returns an optional storage-neutral reference supplied while loading
 // a policy document, such as an object key, URL, database key, or file path.
 func (p *AccessPolicy) Source() string { return p.source }
 
+// PolicyMetadata returns owner metadata, using private visibility when none is set.
 func (p *AccessPolicy) PolicyMetadata() PolicyMetadata {
 	visibility := PolicyVisibility(p.visibility)
 	if visibility == "" {
@@ -267,6 +277,9 @@ func (p *AccessPolicy) PolicyMetadata() PolicyMetadata {
 	return PolicyMetadata{ID: p.name, Revision: p.revision, Visibility: visibility, Source: p.source}
 }
 
+// Decide evaluates the request against the compiled rules. It denies when the
+// principal realm, execution gate, operation, or resource list is not
+// acceptable, and otherwise returns the combined decision for every resource.
 func (p *AccessPolicy) Decide(ctx context.Context, request Request) Decision {
 	if !policyRealmAllows(ctx, p.realm) {
 		return principalRealmDenied(ctx, request, p.name, p.source)
@@ -527,6 +540,7 @@ func quoteAll(names []string) string {
 	return strings.Join(quoted, ", ")
 }
 
+// Authorize returns nil when Decide allows the request and a DeniedError otherwise.
 func (p *AccessPolicy) Authorize(ctx context.Context, request Request) error {
 	decision := p.Decide(ctx, request)
 	if decision.Allowed {
@@ -608,6 +622,8 @@ type AuditPolicy struct {
 	compiled []compiledRule
 }
 
+// NewAuditPolicy constructs an audit policy from rules that use audit and
+// ignore-audit effects. An empty name is rejected.
 func NewAuditPolicy(name string, rules ...Rule) (*AuditPolicy, error) {
 	if name == "" {
 		return nil, fmt.Errorf("access: audit policy name is required")
@@ -619,6 +635,7 @@ func NewAuditPolicy(name string, rules ...Rule) (*AuditPolicy, error) {
 	return &AuditPolicy{name: name, rules: append([]Rule(nil), rules...), compiled: compiled}, nil
 }
 
+// MustAuditPolicy constructs an audit policy and panics when NewAuditPolicy returns an error.
 func MustAuditPolicy(name string, rules ...Rule) *AuditPolicy {
 	policy, err := NewAuditPolicy(name, rules...)
 	if err != nil {
@@ -627,12 +644,16 @@ func MustAuditPolicy(name string, rules ...Rule) *AuditPolicy {
 	return policy
 }
 
+// Name returns the audit policy name.
 func (p *AuditPolicy) Name() string { return p.name }
 
 // Source returns the storage-neutral reference supplied while loading the
 // policy document.
 func (p *AuditPolicy) Source() string { return p.source }
 
+// Classify classifies each resource by the first matching rule, or as
+// ignore-audit when none match. An operation that is not a single leaf, or a
+// request with no resources, is ignore-audit. The context is ignored.
 func (p *AuditPolicy) Classify(_ context.Context, request Request) AuditDecision {
 	if !request.Operation.validLeaf() || len(request.Resources) == 0 {
 		return AuditDecision{Operation: request.Operation, Policy: p.name, PolicySource: p.source, Effect: effectIgnoreAudit.String(), Explanation: "invalid operation or no resources"}

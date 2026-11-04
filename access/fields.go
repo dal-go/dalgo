@@ -340,6 +340,9 @@ type redactingReader struct {
 	renames []outputRename
 }
 
+// Next returns the next record from the wrapped reader after redacting fields
+// the allow-list does not permit. An error or a nil record from the wrapped
+// reader is returned unchanged.
 func (r redactingReader) Next() (record.Record, error) {
 	rec, err := r.RecordsReader.Next()
 	if err != nil || rec == nil {
@@ -440,12 +443,20 @@ type renamedAliasQuery struct {
 	orderBy []dal.OrderExpression
 }
 
-func (q renamedAliasQuery) Having() dal.Condition          { return q.having }
+// Having returns the HAVING condition with caller aliases rewritten to the aliases sent to the wrapped session.
+func (q renamedAliasQuery) Having() dal.Condition { return q.having }
+
+// OrderBy returns the order expressions with caller aliases rewritten to the aliases sent to the wrapped session.
 func (q renamedAliasQuery) OrderBy() []dal.OrderExpression { return q.orderBy }
-func (q renamedAliasQuery) String() string                 { return dal.QueryString(q) }
+
+func (q renamedAliasQuery) String() string { return dal.QueryString(q) }
+
+// GetRecordsReader delegates to the executor's ExecuteQueryToRecordsReader with this query.
 func (q renamedAliasQuery) GetRecordsReader(ctx context.Context, executor dal.QueryExecutor) (dal.RecordsReader, error) {
 	return executor.ExecuteQueryToRecordsReader(ctx, q)
 }
+
+// GetRecordsetReader delegates to the executor's ExecuteQueryToRecordsetReader with this query.
 func (q renamedAliasQuery) GetRecordsetReader(ctx context.Context, executor dal.QueryExecutor) (dal.RecordsetReader, error) {
 	return executor.ExecuteQueryToRecordsetReader(ctx, q)
 }

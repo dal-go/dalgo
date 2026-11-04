@@ -41,6 +41,7 @@ type addFieldOp struct {
 
 func (addFieldOp) alterOp() {}
 
+// ApplyTo calls Applier.ApplyAddField with this operation's field and options.
 func (o addFieldOp) ApplyTo(ctx context.Context, a Applier) error {
 	return a.ApplyAddField(ctx, o.field, o.options)
 }
@@ -59,6 +60,7 @@ type dropFieldOp struct {
 
 func (dropFieldOp) alterOp() {}
 
+// ApplyTo calls Applier.ApplyDropField with this operation's field name and options.
 func (o dropFieldOp) ApplyTo(ctx context.Context, a Applier) error {
 	return a.ApplyDropField(ctx, o.name, o.options)
 }
@@ -78,6 +80,7 @@ type modifyFieldOp struct {
 
 func (modifyFieldOp) alterOp() {}
 
+// ApplyTo calls Applier.ApplyModifyField with this operation's name, replacement definition, and options.
 func (o modifyFieldOp) ApplyTo(ctx context.Context, a Applier) error {
 	return a.ApplyModifyField(ctx, o.name, o.newDef, o.options)
 }
@@ -102,6 +105,7 @@ type renameFieldOp struct {
 
 func (renameFieldOp) alterOp() {}
 
+// ApplyTo calls Applier.ApplyRenameField with this operation's old name, new name, and options.
 func (o renameFieldOp) ApplyTo(ctx context.Context, a Applier) error {
 	return a.ApplyRenameField(ctx, o.oldName, o.newName, o.options)
 }
@@ -125,6 +129,7 @@ type addIndexOp struct {
 
 func (addIndexOp) alterOp() {}
 
+// ApplyTo calls Applier.ApplyAddIndex with this operation's index and options.
 func (o addIndexOp) ApplyTo(ctx context.Context, a Applier) error {
 	return a.ApplyAddIndex(ctx, o.index, o.options)
 }
@@ -147,6 +152,7 @@ type dropIndexOp struct {
 
 func (dropIndexOp) alterOp() {}
 
+// ApplyTo calls Applier.ApplyDropIndex with this operation's index name and options.
 func (o dropIndexOp) ApplyTo(ctx context.Context, a Applier) error {
 	return a.ApplyDropIndex(ctx, o.name, o.options)
 }

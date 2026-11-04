@@ -16,17 +16,25 @@ import (
 type ExecutionGate struct {
 	Allow []ExecutionEntry `json:"allow" yaml:"allow"`
 }
+
+// ExecutionEntry is one execution surface an execution gate may allow.
 type ExecutionEntry struct {
 	Class     ExecutionClass `json:"class" yaml:"class"`
 	Namespace string         `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Mask      *Mask          `json:"mask,omitempty" yaml:"mask,omitempty"`
 }
+
+// ExecutionClass names an execution surface a request or gate entry uses.
 type ExecutionClass string
 
 const (
-	ExecutionTugQL           ExecutionClass = "tugql"
-	ExecutionNativeSQL       ExecutionClass = "native_sql"
-	ExecutionNativeGraphQL   ExecutionClass = "native_graphql"
+	// ExecutionTugQL is the TugQL execution class.
+	ExecutionTugQL ExecutionClass = "tugql"
+	// ExecutionNativeSQL is the native SQL execution class.
+	ExecutionNativeSQL ExecutionClass = "native_sql"
+	// ExecutionNativeGraphQL is the native GraphQL execution class.
+	ExecutionNativeGraphQL ExecutionClass = "native_graphql"
+	// ExecutionStoredProcedure is the stored-procedure execution class.
 	ExecutionStoredProcedure ExecutionClass = "stored_procedure"
 )
 
@@ -330,6 +338,8 @@ func writeTugQLPolicyYAML(writer io.Writer, document TugQLDocument) error {
 	}
 	return encoder.Close()
 }
+
+// MarshalTugQLPolicyJSON emits the normalized document as indented JSON.
 func MarshalTugQLPolicyJSON(document TugQLDocument) ([]byte, error) {
 	normalized, err := NormalizeTugQLPolicy(document)
 	if err != nil {

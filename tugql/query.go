@@ -12,5 +12,8 @@ type reconstructedQuery struct {
 	money   *dal.MoneyConfig
 }
 
-func (q reconstructedQuery) Columns() []dal.Column   { return q.columns }
+// Columns returns the selected columns stored on the reconstructed query.
+func (q reconstructedQuery) Columns() []dal.Column { return q.columns }
+
+// Money returns the money configuration stored on the reconstructed query.
 func (q reconstructedQuery) Money() *dal.MoneyConfig { return q.money }

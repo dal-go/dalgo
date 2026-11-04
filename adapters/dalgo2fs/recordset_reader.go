@@ -11,6 +11,8 @@ import (
 
 var _ dal.RecordsetReader = (*dirReader)(nil)
 
+// NewDirReader reads the directory name and returns a recordset reader over its entries.
+// Columns named ColumnFileName, ColumnFileExt, ColumnFileSize, ColumnIsDir, and ColumnFileModified are bound for Next.
 func NewDirReader(name string, columns ...recordset.Column[any]) (reader dal.RecordsetReader, err error) {
 	var entries []os.DirEntry
 	if entries, err = os.ReadDir(name); err != nil {
@@ -56,20 +58,25 @@ type dirReader struct {
 	entries     []os.DirEntry
 }
 
+// Recordset returns the columnar recordset built for this directory.
 func (r *dirReader) Recordset() recordset.Recordset {
 	return r.rs
 }
 
+// Cursor returns dal.ErrNotSupported.
 func (r *dirReader) Cursor() (string, error) {
 	return "", dal.ErrNotSupported
 }
 
+// Close drops the directory entries and the recordset.
 func (r *dirReader) Close() error {
 	r.entries = nil
 	r.rs = nil
 	return nil
 }
 
+// Next appends the next file entry, skipping directories, and fills any bound file columns.
+// It returns dal.ErrNoMoreRecords when no files remain, and returns Info errors for size and modification time.
 func (r *dirReader) Next() (row recordset.Row, rs recordset.Recordset, err error) {
 	if r.nextIndex >= len(r.entries) {
 		return nil, r.rs, dal.ErrNoMoreRecords

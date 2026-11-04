@@ -17,6 +17,9 @@ type securedReadSession struct {
 	guard   guard
 }
 
+// Exists authorizes an exists request for key. With no row residual it
+// delegates to the underlying session; otherwise it checks existence through
+// a filtered read.
 func (s securedReadSession) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	residuals, _, err := s.guard.authorizeRequest(ctx, Request{Operation: Exists, Resources: []Resource{RecordResourceForKey(key)}})
 	if err != nil {
@@ -28,6 +31,8 @@ func (s securedReadSession) Exists(ctx context.Context, key *record.Key) (bool, 
 	return existsThroughRead(ctx, s.session, key, residuals[0])
 }
 
+// Get authorizes a get for the record, reads it from the underlying session,
+// and enforces any row and field residuals.
 func (s securedReadSession) Get(ctx context.Context, record record.Record) error {
 	residuals, writes, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: []Resource{RecordResourceForKey(record.Key())}})
 	if err != nil {
@@ -49,6 +54,9 @@ func first[T any](perResource [][]T) []T {
 	return perResource[0]
 }
 
+// GetMulti authorizes one get covering every record, reads them from the
+// underlying session, and enforces residuals per record. A residual failure
+// clears every record before the error is returned.
 func (s securedReadSession) GetMulti(ctx context.Context, records []record.Record) error {
 	resources := resourcesForRecords(records)
 	residuals, writes, err := s.guard.authorizeRequest(ctx, Request{Operation: Get, Resources: resources})
@@ -80,6 +88,11 @@ func (s securedReadSession) GetMulti(ctx context.Context, records []record.Recor
 	return nil
 }
 
+// ExecuteQueryToRecordsReader binds any native table namespace, then
+// authorizes and reads query. A query with subqueries is executed through the
+// nested route. Otherwise the query is authorized, restrictive field lists are
+// projected and aliased, and the underlying reader is wrapped so disallowed
+// fields are redacted.
 func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	ctx, err := s.guard.nativeContext(ctx, Request{Operation: Query})
 	if err != nil {
@@ -116,6 +129,10 @@ func (s securedReadSession) ExecuteQueryToRecordsReader(ctx context.Context, que
 	return redactingReader{RecordsReader: reader, sets: sets, renames: renames}, nil
 }
 
+// ExecuteQueryToRecordsetReader binds any native table namespace, then
+// authorizes and reads query as a recordset. A query with subqueries is
+// executed through the nested route. A restrictive field list must be fully
+// projected onto the recordset or the query is denied.
 func (s securedReadSession) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	ctx, err := s.guard.nativeContext(ctx, Request{Operation: Query})
 	if err != nil {
@@ -226,6 +243,9 @@ type securedWriteSession struct {
 	coordinator *EnforcementCoordinator
 }
 
+// Set writes record through the enforcement coordinator when one is
+// configured. Otherwise it authorizes and enforces the write, then delegates
+// to the underlying session.
 func (s securedWriteSession) Set(ctx context.Context, record record.Record) error {
 	if s.coordinator != nil {
 		op, err := protectedRecordOperation("op1", Set, record)
@@ -240,6 +260,9 @@ func (s securedWriteSession) Set(ctx context.Context, record record.Record) erro
 	return s.session.Set(ctx, record)
 }
 
+// SetMulti writes records through the enforcement coordinator when one is
+// configured. Otherwise it authorizes and enforces the writes, then delegates
+// to the underlying session.
 func (s securedWriteSession) SetMulti(ctx context.Context, records []record.Record) error {
 	if s.coordinator != nil {
 		ops, err := protectedRecordOperations(Set, records)
@@ -254,6 +277,9 @@ func (s securedWriteSession) SetMulti(ctx context.Context, records []record.Reco
 	return s.session.SetMulti(ctx, records)
 }
 
+// Insert writes record through the enforcement coordinator when one is
+// configured, refusing insert options in that profile. Otherwise it authorizes
+// and enforces the write, then delegates to the underlying session.
 func (s securedWriteSession) Insert(ctx context.Context, record record.Record, options ...dal.InsertOption) error {
 	if s.coordinator != nil {
 		if len(options) > 0 {
@@ -271,6 +297,9 @@ func (s securedWriteSession) Insert(ctx context.Context, record record.Record, o
 	return s.session.Insert(ctx, record, options...)
 }
 
+// InsertMulti writes records through the enforcement coordinator when one is
+// configured, refusing insert options in that profile. Otherwise it authorizes
+// and enforces the writes, then delegates to the underlying session.
 func (s securedWriteSession) InsertMulti(ctx context.Context, records []record.Record, options ...dal.InsertOption) error {
 	if s.coordinator != nil {
 		if len(options) > 0 {
@@ -288,6 +317,9 @@ func (s securedWriteSession) InsertMulti(ctx context.Context, records []record.R
 	return s.session.InsertMulti(ctx, records, options...)
 }
 
+// Update writes the field updates through the enforcement coordinator when
+// one is configured, refusing preconditions in that profile. Otherwise it
+// authorizes and enforces the write, then delegates to the underlying session.
 func (s securedWriteSession) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	if s.coordinator != nil {
 		if len(preconditions) > 0 {
@@ -305,6 +337,9 @@ func (s securedWriteSession) Update(ctx context.Context, key *record.Key, update
 	return s.session.Update(ctx, key, updates, preconditions...)
 }
 
+// UpdateRecord updates the record. When an enforcement coordinator is
+// configured it delegates to Update. Otherwise it authorizes and enforces the
+// write, then delegates to the underlying session.
 func (s securedWriteSession) UpdateRecord(ctx context.Context, record record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
 	if s.coordinator != nil {
 		return s.Update(ctx, record.Key(), updates, preconditions...)
@@ -315,6 +350,9 @@ func (s securedWriteSession) UpdateRecord(ctx context.Context, record record.Rec
 	return s.session.UpdateRecord(ctx, record, updates, preconditions...)
 }
 
+// UpdateMulti writes the field updates through the enforcement coordinator
+// when one is configured, refusing preconditions in that profile. Otherwise it
+// authorizes and enforces the writes, then delegates to the underlying session.
 func (s securedWriteSession) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	if s.coordinator != nil {
 		if len(preconditions) > 0 {
@@ -340,6 +378,9 @@ func (s securedWriteSession) UpdateMulti(ctx context.Context, keys []*record.Key
 	return s.session.UpdateMulti(ctx, keys, updates, preconditions...)
 }
 
+// Delete removes the record through the enforcement coordinator when one is
+// configured. Otherwise it authorizes and enforces the delete, then delegates
+// to the underlying session.
 func (s securedWriteSession) Delete(ctx context.Context, key *record.Key) error {
 	if s.coordinator != nil {
 		op, err := NewProtectedDelete("op1", key, "")
@@ -354,6 +395,9 @@ func (s securedWriteSession) Delete(ctx context.Context, key *record.Key) error 
 	return s.session.Delete(ctx, key)
 }
 
+// DeleteMulti removes the records through the enforcement coordinator when
+// one is configured. Otherwise it authorizes and enforces the deletes, then
+// delegates to the underlying session.
 func (s securedWriteSession) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	if s.coordinator != nil {
 		ops := make([]ProtectedOperation, len(keys))

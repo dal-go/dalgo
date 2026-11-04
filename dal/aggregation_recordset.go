@@ -16,10 +16,12 @@ func (db validatedDB) ExecuteQueryToRecordsetReader(ctx context.Context, query Q
 	return executePlannedRecordset(ctx, db.Backend, query, queryCapabilitiesOf(db.Backend), provider, options...)
 }
 
+// ExecuteQueryToRecordsetReader delegates to executePlannedRecordset with the transaction, its capabilities, and its join provider.
 func (tx *validatedReadTx) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 	return executePlannedRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider, options...)
 }
 
+// ExecuteQueryToRecordsetReader delegates to executePlannedRecordset with the transaction, its capabilities, and its join provider.
 func (tx *validatedTx) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 	return executePlannedRecordset(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider, options...)
 }
@@ -255,9 +257,17 @@ type aggregationRecordsetReader struct {
 	position  int
 }
 
+// Recordset returns the columnar recordset this reader walks.
 func (r *aggregationRecordsetReader) Recordset() recordset.Recordset { return r.recordset }
-func (r *aggregationRecordsetReader) Cursor() (string, error)        { return "", nil }
-func (r *aggregationRecordsetReader) Close() error                   { return nil }
+
+// Cursor returns an empty cursor and a nil error.
+func (r *aggregationRecordsetReader) Cursor() (string, error) { return "", nil }
+
+// Close returns nil.
+func (r *aggregationRecordsetReader) Close() error { return nil }
+
+// Next returns the next row and the recordset, then advances.
+// When position is past the last row it returns ErrNoMoreRecords.
 func (r *aggregationRecordsetReader) Next() (recordset.Row, recordset.Recordset, error) {
 	if r.position >= r.recordset.RowsCount() {
 		return nil, r.recordset, ErrNoMoreRecords

@@ -18,10 +18,14 @@ var _ RecordsetSource = (*CollectionRef)(nil)
 //
 //var _ ICollectionRef = (*CollectionRef)(nil)
 
+// NewCollectionRef returns a collection reference with the given name, alias, and parent.
+// An empty name panics. An alias equal to the name is stored as empty.
 func NewCollectionRef(name, alias string, parent *record.Key) (collectionRef CollectionRef) {
 	return newCollectionRef(name, alias, parent)
 }
 
+// NewRootCollectionRef returns a collection reference with no parent.
+// An empty name panics. An alias equal to the name is stored as empty.
 func NewRootCollectionRef(name, alias string) CollectionRef {
 	return newCollectionRef(name, alias, nil)
 }
@@ -84,12 +88,15 @@ func (v CollectionRef) WithScan(limit int, orders ...OrderExpression) Collection
 	return v
 }
 
+// ScanLimit returns the scan limit set by WithScan, or 0 when no scan is set.
 func (v CollectionRef) ScanLimit() int {
 	if v.scan == nil {
 		return 0
 	}
 	return v.scan.limit
 }
+
+// ScanOrders returns a copy of the scan orders set by WithScan, or nil when no scan is set.
 func (v CollectionRef) ScanOrders() []OrderExpression {
 	if v.scan == nil {
 		return nil
@@ -97,6 +104,7 @@ func (v CollectionRef) ScanOrders() []OrderExpression {
 	return append([]OrderExpression(nil), v.scan.orders...)
 }
 
+// Equal reports whether v and other have the same database, schema, name, parent, and scan, and the same alias unless ignoreAlias is set.
 func (v CollectionRef) Equal(other CollectionRef, ignoreAlias bool) bool {
 	return v.database == other.database && v.schema == other.schema && v.name == other.name && v.parent == other.parent && reflect.DeepEqual(v.scan, other.scan) && (ignoreAlias || v.alias == other.alias)
 }
@@ -105,6 +113,7 @@ func (CollectionRef) recordsetSource() {
 	_ = 0 // marker statement
 }
 
+// Name returns the collection name.
 func (v CollectionRef) Name() string {
 	return v.name
 }
@@ -117,10 +126,12 @@ func (v CollectionRef) Schema() string {
 // Database returns the optional named database used by a federated executor.
 func (v CollectionRef) Database() string { return v.database }
 
+// Alias returns the collection alias.
 func (v CollectionRef) Alias() string {
 	return v.alias
 }
 
+// Parent returns the parent key, or nil for a root collection.
 func (v CollectionRef) Parent() *record.Key {
 	return v.parent
 }
@@ -141,6 +152,9 @@ func (v CollectionRef) String() string {
 	return fmt.Sprintf("%s AS %s", path, v.alias)
 }
 
+// Path returns the collection path.
+// With no parent it is the name, prefixed by the schema and a dot when a schema is set.
+// With a parent it is the parent key's string, a slash, and the name.
 func (v CollectionRef) Path() string {
 	if v.parent == nil {
 		if v.schema != "" {

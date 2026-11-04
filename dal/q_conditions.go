@@ -5,6 +5,7 @@ import (
 	"reflect"
 )
 
+// Condition is a filter that renders itself through String.
 type Condition interface {
 	fmt.Stringer
 }
@@ -16,6 +17,7 @@ type Comparison struct {
 	Right    Expression
 }
 
+// Equal reports whether v and b have the same operator and deeply equal operands.
 func (v Comparison) Equal(b Comparison) bool {
 	return v.Operator == b.Operator && reflect.DeepEqual(v.Left, b.Left) && reflect.DeepEqual(v.Right, b.Right)
 }

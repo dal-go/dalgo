@@ -284,7 +284,9 @@ type PolicyProviderError struct{ Err error }
 func (e *PolicyProviderError) Error() string {
 	return "dalgo access denied: database policy snapshot unavailable"
 }
-func (e *PolicyProviderError) Unwrap() error        { return e.Err }
+func (e *PolicyProviderError) Unwrap() error { return e.Err }
+
+// Is reports whether target is ErrAccessDenied.
 func (e *PolicyProviderError) Is(target error) bool { return target == ErrAccessDenied }
 
 func (g guard) checkContext(ctx context.Context) error {

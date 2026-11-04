@@ -7,7 +7,9 @@ import (
 	"github.com/dal-go/record"
 )
 
+// Query is a query that can be read as records or as a recordset.
 type Query interface {
+	// String returns the textual form of the query.
 	String() string
 
 	// Offset specifies the number of records to skip
@@ -16,14 +18,18 @@ type Query interface {
 	// Limit specifies the maximum number of records to be returned
 	Limit() int
 
+	// GetRecordsReader returns a records reader for this query from qe.
 	GetRecordsReader(ctx context.Context, qe QueryExecutor) (reader RecordsReader, err error)
+	// GetRecordsetReader returns a recordset reader for this query from qe.
 	GetRecordsetReader(ctx context.Context, qe QueryExecutor) (reader RecordsetReader, err error)
 }
 
 // TextQuery defines an interface to represent a query with text and associated arguments.
 type TextQuery interface {
 	Query
+	// Text returns the query text.
 	Text() string
+	// Args returns the arguments bound to the query text.
 	Args() []QueryArg
 }
 
@@ -57,5 +63,6 @@ type StructuredQuery interface {
 
 	// StartFrom specifies the startCursor/point to start from
 	StartFrom() Cursor
+	// StartAfter returns the cursor after which reading starts.
 	StartAfter() Cursor
 }

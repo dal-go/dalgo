@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	// TugQLDocumentAPIVersion is the portable TugQL policy document version.
 	TugQLDocumentAPIVersion = "tugql.org/access/v1"
 	maxPolicyFileBytes      = 1 << 20
 )
@@ -26,6 +27,7 @@ type FilePolicyConfig struct {
 	Policies []string `json:"policies" yaml:"policies"`
 }
 
+// TugQLDocument is a portable TugQL policy document.
 type TugQLDocument struct {
 	APIVersion     string                  `json:"apiVersion" yaml:"apiVersion"`
 	Kind           string                  `json:"kind" yaml:"kind"`
@@ -40,16 +42,19 @@ type TugQLDocument struct {
 	CollectionMask *Mask                   `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
 }
 
+// TugQLMetadata holds the name, description, and visibility of a TugQL document.
 type TugQLMetadata struct {
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 	Visibility  string `json:"visibility,omitempty" yaml:"visibility,omitempty"`
 }
 
+// TugQLTarget names the database a TugQL document applies to.
 type TugQLTarget struct {
 	Database string `json:"database" yaml:"database"`
 }
 
+// TugQLScope selects one resource in a TugQL document and holds its rules and nested scopes.
 type TugQLScope struct {
 	Path            string       `json:"path,omitempty" yaml:"path,omitempty"`
 	CollectionGroup string       `json:"collectionGroup,omitempty" yaml:"collectionGroup,omitempty"`
@@ -59,6 +64,7 @@ type TugQLScope struct {
 	CollectionMask  *Mask        `json:"collectionMask,omitempty" yaml:"collectionMask,omitempty"`
 }
 
+// TugQLRule is one rule in a TugQL scope, including an optional field mask.
 type TugQLRule struct {
 	ID         string             `json:"id" yaml:"id"`
 	Effect     string             `json:"effect" yaml:"effect"`
@@ -128,6 +134,7 @@ type policyRoot interface {
 }
 type osPolicyRoot struct{ *os.Root }
 
+// Open opens name through the underlying root and returns the file.
 func (r osPolicyRoot) Open(name string) (policyFile, error) { return r.Root.Open(name) }
 
 func loadPolicyFile(root policyRoot, name, database string) (Policy, error) {

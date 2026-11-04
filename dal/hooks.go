@@ -13,6 +13,8 @@ import (
 // record reaches the storage adapter, so an adapter never gets the chance to
 // skip it.
 type ValidatableRecord interface {
+	// Validate checks the record data's own invariants.
+	// A non-nil error fails the write before it reaches the adapter.
 	Validate() error
 }
 
