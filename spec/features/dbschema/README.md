@@ -50,6 +50,7 @@ Listed in **dependency order** (implement bottom-up):
 | [collection-def/](collection-def/README.md) | 1 | `CollectionDef` struct — Name, Fields, PrimaryKey, Indexes. Depends on `field-def`, `index-def`. |
 | [errors/](errors/README.md) | 1 | `NotSupportedError` typed error wrapping `dal.ErrNotSupported`. Shared with [`ddl`](../ddl/README.md). |
 | [schema-reader/](schema-reader/README.md) | 1 | `SchemaReader` capability interface (`ListCollections`, `DescribeCollection`, `ListIndexes`, optional `ListConstraints`/`ListReferrers`) + top-level helpers + `ConstraintDef` + `Referrer` types. |
+| [native-access/](native-access/README.md) | 1 | Optional `NativeAccessReader` capability: which native principals can reach a collection, with which privileges, why, and what the catalog cannot show. |
 
 ## Non-Goals
 

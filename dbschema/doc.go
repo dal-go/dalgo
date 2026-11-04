@@ -10,7 +10,9 @@
 // The package also defines the SchemaReader capability interface for
 // schema introspection (the read-side mirror of [ddl.SchemaModifier])
 // and the shared NotSupportedError typed error used by both the read
-// and write sides.
+// and write sides. Optional capabilities sit beside it: SourceViewReader,
+// SourceRowsReader, SourceConstraintChecker and NativeAccessReader (which
+// engine principals can reach a collection natively, and why).
 //
 // dbschema does NOT contain operations. CREATE / DROP / ALTER live in
 // the sibling [ddl] sub-package, which imports dbschema for the types
