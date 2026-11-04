@@ -102,7 +102,7 @@ func applyPathUpdate(data map[string]any, path []string, value any) error {
 	if value == update.DeleteField {
 		delete(current, leaf)
 	} else {
-		current[leaf] = value
+		current[leaf] = truncateTimes(value) // dal.TimePrecision, as real storage does
 	}
 	return nil
 }

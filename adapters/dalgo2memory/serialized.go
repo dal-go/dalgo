@@ -49,7 +49,7 @@ func (e *serializedEngine) store(id string, rec record.Record, overwrite bool) e
 			return fmt.Errorf("%w: %s", record.ErrRecordExists, rec.Key())
 		}
 	}
-	b, err := json.Marshal(rec.Data())
+	b, err := json.Marshal(truncateTimes(rec.Data()))
 	if err != nil {
 		return err
 	}

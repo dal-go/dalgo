@@ -236,6 +236,12 @@ func WithDeclaredColumn[T any](name string) ColumnOption {
 // columnar collection, taking precedence over the schema-wide default
 // (WithoutSchemaRefBreaking). Pass true to force faithful storage, false to
 // store reference-bearing columns without the serialization round-trip.
+//
+// With false, a reference-bearing column is shared with the caller's value
+// only while none of its times needs truncating to dal.TimePrecision: a column
+// holding a time with sub-microsecond digits is stored as a copy along the path
+// to that time (the caller's value is never mutated), so whether a later
+// change by the caller shows through depends on the data written.
 func WithColumnarRefBreaking(refBreaking bool) ColumnOption {
 	return func(cfg *columnarConfig) {
 		cfg.refBreakOver = &refBreaking
@@ -321,7 +327,8 @@ type memorySchema struct {
 // collections store reference-bearing column values without the serialization
 // round-trip unless a collection re-enables it (see WithColumnarRefBreaking).
 // It has no effect on the always-faithful Serialized engine. The default is
-// faithful (ref-breaking on).
+// faithful (ref-breaking on). Times that need truncating are still copied; see
+// WithColumnarRefBreaking.
 func WithoutSchemaRefBreaking() Option {
 	return func(db *database) {
 		db.schemaRefBreaking = false

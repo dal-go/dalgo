@@ -554,6 +554,7 @@ func (e *columnarEngine) freeSlot(slot int) {
 // declared value that cannot be stored as its column type) leaves nothing stored
 // for the record.
 func (e *columnarEngine) prepareWrite(data any) ([]reflect.Value, map[string]any, error) {
+	data = truncateTimes(data) // persist times at dal.TimePrecision, as real storage does
 	if e.mapBacked {
 		return e.decodeMapFields(data)
 	}

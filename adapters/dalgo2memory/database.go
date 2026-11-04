@@ -722,7 +722,8 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err != nil {
 		return nil, err
 	}
-	allRows, err := s.loadCandidateRows(collectionName, q.Where())
+	where := truncateConditionTimes(q.Where()) // bounds at storage precision, once
+	allRows, err := s.loadCandidateRows(collectionName, where)
 	if err != nil {
 		return nil, err
 	}
@@ -748,7 +749,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	}
 	rows := make([]memoryRow, 0, len(allRows))
 	for _, row := range allRows {
-		if where := q.Where(); where != nil {
+		if where != nil {
 			matched, err := matchesWhere(where, baseSources(base, row.data), known)
 			if err != nil {
 				return nil, err
