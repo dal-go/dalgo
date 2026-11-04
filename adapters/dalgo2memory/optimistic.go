@@ -979,7 +979,8 @@ func validateForCommit(collection string, factory func() any, data any) error {
 // engine-independent snapshot to work from, isolated from the original data
 // the caller passed in.
 func normalizeData(data any) (map[string]any, error) {
-	b, err := json.Marshal(data)
+	b, err := json.Marshal(truncateTimes(data)) // dal.TimePrecision, as on commit
+
 	if err != nil {
 		return nil, err
 	}

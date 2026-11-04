@@ -992,6 +992,9 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 					return false
 				}
 				at, err := time.Parse(time.RFC3339Nano, text)
+				// Real storage encodes a query bound at dal.TimePrecision, as it
+				// does a stored value; compare against the bound it would see.
+				bound = dal.NormalizeTime(bound)
 				return err == nil && compareOp(comparison.Operator, at.Compare(bound), 0)
 			}
 			norm := normalizeConstant(right.Value)
@@ -1081,7 +1084,7 @@ func elementEquals(a, b any) bool {
 // (JSON marshal then unmarshal into any). Typed timestamp WHERE bounds are
 // handled before this function to avoid lexical RFC3339 comparison.
 func normalizeConstant(v any) any {
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(truncateTimes(v)) // times at dal.TimePrecision, like stored rows
 	if err != nil {
 		return v
 	}

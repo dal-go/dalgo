@@ -38,6 +38,7 @@ The Feature format follows [SpecScore](https://specscore.md/feature-specificatio
 | [Recursive TugQL JOINs across DALgo Go and TypeScript](tugql-recursive-joins/README.md) | Draft | — |
 | [Recursive TugQL subqueries across DALgo Go and TypeScript](tugql-subqueries/README.md) | Implementing | — |
 | [Firestore adapter: TugQL runs as Firestore queries; in-memory evaluation only by opt-in](firestore-tugql-pushdown/README.md) | Approved | — |
+| [Time precision contract (microseconds); dalgo2memory enforces it](time-precision/README.md) | Approved | — |
 
 ## Open Questions
 
