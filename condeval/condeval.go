@@ -116,7 +116,8 @@ func validate(condition dal.Condition, fields, params map[string]struct{}) error
 // Substitute returns a copy of condition with every parameter replaced by the
 // value resolve returns for its name: a slice or array becomes a dal.Array,
 // anything else a dal.Constant. An unresolved parameter is an error that names
-// it, so callers can fail closed and explain why.
+// it, so callers can fail closed and explain why. A null test holds no
+// parameter and is returned unchanged.
 func Substitute(condition dal.Condition, resolve func(name string) (any, bool)) (dal.Condition, error) {
 	switch c := condition.(type) {
 	case dal.GroupCondition:
@@ -143,6 +144,11 @@ func Substitute(condition dal.Condition, resolve func(name string) (any, bool)) 
 			right = dal.Array{Value: value}
 		}
 		return dal.Comparison{Operator: c.Operator, Left: c.Left, Right: right}, nil
+	case dal.IsNullCondition:
+		// A null test holds no parameter (its operand MUST NOT be a param), so a
+		// query WHERE that also holds a param keeps it unchanged. Validate and
+		// Match still reject it: a policy predicate has no null test (V02).
+		return c, nil
 	default:
 		return nil, fmt.Errorf("condeval: unsupported condition %T", condition)
 	}

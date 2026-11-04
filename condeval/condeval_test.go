@@ -93,6 +93,20 @@ func TestSubstitute(t *testing.T) {
 	if _, err := Substitute(fakeCondition{}, resolve); err == nil {
 		t.Error("unknown condition must fail")
 	}
+	// A query WHERE may hold a param and a null test together; the null test
+	// holds no param and passes through unchanged.
+	withNullTest := dal.NewGroupCondition(dal.And,
+		cmp("createdBy", dal.Equal, dal.NewParam("currentUser")),
+		dal.NewIsNullCondition(dal.Field("deletedAt")),
+		dal.NewIsNotNullCondition(dal.Field("email")),
+	)
+	resolved, err = Substitute(withNullTest, resolve)
+	if err != nil {
+		t.Fatalf("Substitute(with null tests): %v", err)
+	}
+	if got := resolved.String(); got != "(createdBy = 'u1' AND deletedAt IS NULL AND email IS NOT NULL)" {
+		t.Errorf("String() = %q", got)
+	}
 }
 
 func TestMatch(t *testing.T) {
