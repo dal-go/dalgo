@@ -221,14 +221,139 @@ func TestTimePrecision_OptimisticInsertReadsTruncated(t *testing.T) {
 }
 
 func TestTimePrecision_QueryBoundIsTruncatedLikeStorage(t *testing.T) {
-	db := newDatabase()
-	require.NoError(t, db.Insert(context.Background(),
-		record.NewRecordWithData(record.NewKeyWithID("timed", "r1"), &timedThing{DtNext: nanoTime})))
-	for _, op := range []dal.Operator{dal.Equal, dal.GreaterOrEqual, dal.LessOrEqual} {
-		ids := queryTimedThings(t, db, func(q *dal.QueryBuilder) dal.IQueryBuilder { return q.WhereField("DtNext", op, nanoTime) })
-		require.Equal(t, []string{"r1"}, ids, "operator %s", op)
+	for _, tc := range []struct {
+		name string
+		db   func() *database
+	}{
+		{"serialized", func() *database { return newDatabase() }},
+		{"columnar", func() *database {
+			return newDatabase(WithSchema(false, WithCollection[timedThing]("timed", nil, WithColumnarStorage())))
+		}},
+		{"columnar sharing references", func() *database {
+			return newDatabase(WithSchema(false, WithCollection[timedThing]("timed", nil,
+				WithColumnarStorage(WithColumnarRefBreaking(false)))))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := tc.db()
+			require.NoError(t, db.Insert(context.Background(),
+				record.NewRecordWithData(record.NewKeyWithID("timed", "r1"), &timedThing{DtNext: nanoTime})))
+			for _, op := range []dal.Operator{dal.Equal, dal.GreaterOrEqual, dal.LessOrEqual} {
+				ids := queryTimedThings(t, db, func(q *dal.QueryBuilder) dal.IQueryBuilder { return q.WhereField("DtNext", op, nanoTime) })
+				require.Equal(t, []string{"r1"}, ids, "operator %s", op)
+			}
+			// Inside an AND group as well.
+			ids := queryTimedThings(t, db, func(q *dal.QueryBuilder) dal.IQueryBuilder {
+				return q.Where(dal.NewGroupCondition(dal.And,
+					dal.NewComparison(dal.Field("DtNext"), dal.Equal, dal.NewConstant(nanoTime)),
+					dal.NewComparison(dal.Field("DtNext"), dal.LessOrEqual, dal.NewConstant(nanoTime)),
+				))
+			})
+			require.Equal(t, []string{"r1"}, ids)
+		})
 	}
-	require.Equal(t, microTime.Format(time.RFC3339Nano), normalizeConstant(nanoTime))
+}
+
+func TestTruncateConditionTimes(t *testing.T) {
+	require.Nil(t, truncateConditionTimes(nil))
+	isNull := dal.NewIsNullCondition(dal.Field("At"))
+	require.Equal(t, dal.Condition(isNull), truncateConditionTimes(isNull))
+
+	got := truncateConditionTimes(dal.NewGroupCondition(dal.Or,
+		dal.NewComparison(dal.Field("At"), dal.Equal, dal.NewConstant(nanoTime)),
+		dal.NewComparison(dal.NewConstant(nanoTime), dal.In, dal.Field("List")),
+		dal.NewComparison(dal.Field("At"), dal.In, dal.Array{Value: []any{nanoTime, "x"}}),
+	)).(dal.GroupCondition)
+	require.EqualValues(t, dal.Or, got.Operator())
+	children := got.Conditions()
+	require.Equal(t, dal.Field("At"), children[0].(dal.Comparison).Left)
+	require.Equal(t, microTime, children[0].(dal.Comparison).Right.(dal.Constant).Value)
+	require.Equal(t, microTime, children[1].(dal.Comparison).Left.(dal.Constant).Value)
+	require.Equal(t, []any{microTime, "x"}, children[2].(dal.Comparison).Right.(dal.Array).Value)
+}
+
+type hiddenInner struct {
+	At time.Time
+}
+
+type withHiddenEmbedded struct {
+	hiddenInner
+	Name string
+}
+
+type withHiddenEmbeddedPtr struct {
+	*hiddenInner
+	Name string
+}
+
+func TestTimePrecision_UnexportedEmbeddedStructs(t *testing.T) {
+	ctx := context.Background()
+	db := newDatabase()
+
+	byValue := withHiddenEmbedded{hiddenInner: hiddenInner{At: nanoTime}, Name: "v"}
+	key := record.NewKeyWithID("hidden", "v")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &byValue)))
+	require.Equal(t, nanoTime, byValue.At, "input not mutated")
+	var gotValue withHiddenEmbedded
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &gotValue)))
+	require.Equal(t, microTime, gotValue.At)
+
+	byPtr := withHiddenEmbeddedPtr{hiddenInner: &hiddenInner{At: nanoTime}, Name: "p"}
+	key = record.NewKeyWithID("hidden", "p")
+	require.NoError(t, db.Set(ctx, record.NewRecordWithData(key, &byPtr)))
+	require.Equal(t, nanoTime, byPtr.At, "input not mutated")
+	gotPtr := withHiddenEmbeddedPtr{hiddenInner: &hiddenInner{}}
+	require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &gotPtr)))
+	require.Equal(t, microTime, gotPtr.At)
+
+	// A non-addressable value (held by an interface) is walked through a copy.
+	got := truncateTimes([]any{withHiddenEmbedded{hiddenInner: hiddenInner{At: nanoTime}}}).([]any)
+	require.Equal(t, microTime, got[0].(withHiddenEmbedded).At)
+	// Unchanged unexported embedded values are returned as they are.
+	unchanged := &withHiddenEmbeddedPtr{hiddenInner: &hiddenInner{At: microTime}}
+	require.Same(t, unchanged, truncateTimes(unchanged))
+}
+
+type fork struct {
+	A, B *fork
+	At   time.Time
+}
+
+func TestTimePrecision_CyclicValueFailsFast(t *testing.T) {
+	n := &fork{At: nanoTime}
+	n.A, n.B = n, n
+	done := make(chan error, 1)
+	go func() {
+		done <- newDatabase().Set(context.Background(), record.NewRecordWithData(record.NewKeyWithID("fork", "f"), n))
+	}()
+	select {
+	case err := <-done:
+		require.ErrorContains(t, err, "cycle")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Set of a cyclic value did not return")
+	}
+	require.Equal(t, nanoTime, n.At, "input not mutated")
+}
+
+type noTimes struct {
+	Name  string
+	Items []struct{ N int }
+	Next  *noTimes
+	priv  time.Time
+}
+
+func TestMayHoldTime(t *testing.T) {
+	require.True(t, mayHoldTime(timeType))
+	require.True(t, mayHoldTime(reflect.TypeOf([]any{})))
+	require.True(t, mayHoldTime(reflect.TypeOf(map[string]*stampedInner{})))
+	require.True(t, mayHoldTime(reflect.TypeOf(withHiddenEmbeddedPtr{})))
+	require.False(t, mayHoldTime(reflect.TypeOf(noTimes{})))
+	require.False(t, mayHoldTime(reflect.TypeOf(noTimes{})), "cached answer")
+	require.False(t, mayHoldTime(reflect.TypeOf([]byte{})))
+	require.False(t, mayHoldTime(reflect.TypeOf(struct{ hidden int }{})))
+	require.False(t, mayHoldTime(reflect.TypeOf(struct{ int }{})))
+	rec := &noTimes{Name: "n", priv: nanoTime}
+	require.Same(t, rec, truncateTimes(rec))
 }
 
 type selfRef struct {
@@ -269,6 +394,13 @@ func TestTruncateTimes(t *testing.T) {
 		got := truncateTimes(withHidden{At: nanoTime, hidden: nanoTime}).(withHidden)
 		require.Equal(t, microTime, got.At)
 		require.Equal(t, nanoTime, got.hidden)
+	})
+	t.Run("a value shared twice is truncated once and stays shared", func(t *testing.T) {
+		shared := &stampedInner{At: nanoTime}
+		got := truncateTimes([]any{shared, shared, []any{}}).([]any)
+		require.Same(t, got[0], got[1])
+		require.Equal(t, microTime, got[0].(*stampedInner).At)
+		require.Equal(t, nanoTime, shared.At)
 	})
 	t.Run("only changed container entries are replaced", func(t *testing.T) {
 		shared := &stampedInner{At: microTime}

@@ -722,7 +722,8 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err != nil {
 		return nil, err
 	}
-	allRows, err := s.loadCandidateRows(collectionName, q.Where())
+	where := truncateConditionTimes(q.Where()) // bounds at storage precision, once
+	allRows, err := s.loadCandidateRows(collectionName, where)
 	if err != nil {
 		return nil, err
 	}
@@ -748,7 +749,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	}
 	rows := make([]memoryRow, 0, len(allRows))
 	for _, row := range allRows {
-		if where := q.Where(); where != nil {
+		if where != nil {
 			matched, err := matchesWhere(where, baseSources(base, row.data), known)
 			if err != nil {
 				return nil, err
@@ -992,9 +993,6 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 					return false
 				}
 				at, err := time.Parse(time.RFC3339Nano, text)
-				// Real storage encodes a query bound at dal.TimePrecision, as it
-				// does a stored value; compare against the bound it would see.
-				bound = dal.NormalizeTime(bound)
 				return err == nil && compareOp(comparison.Operator, at.Compare(bound), 0)
 			}
 			norm := normalizeConstant(right.Value)
@@ -1084,7 +1082,7 @@ func elementEquals(a, b any) bool {
 // (JSON marshal then unmarshal into any). Typed timestamp WHERE bounds are
 // handled before this function to avoid lexical RFC3339 comparison.
 func normalizeConstant(v any) any {
-	b, err := json.Marshal(truncateTimes(v)) // times at dal.TimePrecision, like stored rows
+	b, err := json.Marshal(v)
 	if err != nil {
 		return v
 	}

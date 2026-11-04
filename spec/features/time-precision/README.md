@@ -11,7 +11,7 @@ status: Approved
 
 ## Summary
 
-DALgo guarantees that a `time.Time` value survives a write and a read only to the microsecond. The `dal` package states the contract as `dal.TimePrecision` and gives consumers `dal.NormalizeTime` to normalise times without naming an engine. `dalgo2memory` truncates every time it stores to that precision, so unit tests observe exactly what production storage returns.
+No DALgo adapter keeps a `time.Time` more precisely than one microsecond, and some keep less. The `dal` package states this ceiling as `dal.TimePrecision` and gives consumers `dal.NormalizeTime` to normalise times without naming an engine. `dalgo2memory` truncates every time it stores to that precision, so unit tests see the precision loss production storage causes.
 
 ## Problem
 
@@ -23,7 +23,7 @@ Founder, 2026-11-04: "We are supposed to use dalgo and backend should know nothi
 
 ### REQ: precision-contract
 
-The `dal` package MUST export `TimePrecision = time.Microsecond` and document that adapters persist `time.Time` values at no better than that precision: callers MUST NOT rely on sub-microsecond precision surviving a write and a read, and MUST normalise a time they also keep elsewhere (a hash, a payload, a cache key).
+The `dal` package MUST export `TimePrecision = time.Microsecond` and document it as a ceiling, not a guarantee: no adapter keeps a `time.Time` more precisely than this, and some keep less (MongoDB's BSON datetime keeps milliseconds). Callers MUST NOT rely on sub-microsecond precision surviving a write and a read, and MUST normalise a time they also keep elsewhere (a hash, a payload, a cache key) to at least this precision.
 
 ### REQ: normalize-helper
 
@@ -31,11 +31,11 @@ The `dal` package MUST export `NormalizeTime(t time.Time) time.Time`, returning 
 
 ### REQ: memory-truncates-on-write
 
-`dalgo2memory` MUST truncate every `time.Time` it persists to `TimePrecision`, on every write path (insert, set, update, and the optimistic transaction buffer) and for every storage engine, wherever the time sits: exported struct fields, nested and embedded structs, pointers, slices, arrays, map values and interface values (`map[string]any`, `[]any`). The caller's value MUST NOT be mutated.
+`dalgo2memory` MUST truncate every `time.Time` it persists to `TimePrecision`, on every write path (insert, set, update, and the optimistic transaction buffer) and for every storage engine, wherever encoding/json persists the time: exported struct fields, nested structs, exported fields promoted from embedded structs (exported or unexported, by value or by pointer), pointers, slices, arrays, map values and interface values (`map[string]any`, `[]any`). The caller's value MUST NOT be mutated. A self-referencing value MUST still fail the write with the encoder's cycle error rather than hang.
 
 ### REQ: memory-truncates-query-bounds
 
-`dalgo2memory` MUST compare a `time.Time` query constant at `TimePrecision`, as production storage encodes a query bound, so filtering by the nanosecond original matches the stored value.
+`dalgo2memory` MUST truncate every `time.Time` in a query's WHERE constants to `TimePrecision` once, before planning, so every engine (including the columnar engine's equality lookup) and the per-row match compare a bound at storage precision, and filtering by the nanosecond original matches the stored value.
 
 ## Acceptance Criteria
 
@@ -68,7 +68,7 @@ The `dal` package MUST export `NormalizeTime(t time.Time) time.Time`, returning 
 **Requirements:** time-precision#req:memory-truncates-query-bounds
 
 **Given** a record stored with a nanosecond time
-**When** it is queried with `==`, `>=` or `<=` against that same nanosecond time
+**When** it is queried with `==`, `>=` or `<=` against that same nanosecond time, on the serialized or the columnar engine
 **Then** the record matches.
 
 ### AC: helper
@@ -82,7 +82,12 @@ The `dal` package MUST export `NormalizeTime(t time.Time) time.Time`, returning 
 ## Out of Scope
 
 - Changing any production adapter: each `dalgo2<engine>` adapter already stores at microsecond or coarser precision.
-- Unexported struct fields, which no adapter persists.
+- Unexported struct fields that are not embedded structs, which encoding/json does not persist.
+
+## Assumption Carryover
+
+- **Assumed:** production adapters compare a query bound at their storage precision, so a nanosecond bound matches the microsecond value it stored. pgx's binary encoding and the Firestore client truncate. Postgres's text input rounds sub-microsecond digits instead of truncating, so a bound sent as text can differ by one microsecond. This is not verified against each engine in this Feature.
+- **Assumed:** a coarser adapter (milliseconds) needs its callers to normalise more coarsely than `dal.NormalizeTime`; `dalgo2memory` models the microsecond ceiling only.
 
 ## Open Questions
 
