@@ -185,8 +185,10 @@ type columnarReader struct {
 
 var _ dal.RecordsetReader = (*columnarReader)(nil)
 
+// Recordset returns the columnar recordset this reader walks.
 func (r *columnarReader) Recordset() recordset.Recordset { return r.rs }
 
+// Next returns the next populated row, or dal.ErrNoMoreRecords after the last row.
 func (r *columnarReader) Next() (recordset.Row, recordset.Recordset, error) {
 	if r.pos >= r.rs.RowsCount() {
 		return nil, r.rs, dal.ErrNoMoreRecords
@@ -196,6 +198,8 @@ func (r *columnarReader) Next() (recordset.Row, recordset.Recordset, error) {
 	return row, r.rs, nil
 }
 
+// Cursor returns an empty cursor and a nil error.
 func (r *columnarReader) Cursor() (string, error) { return "", nil }
 
+// Close returns nil. The rows were already built and nothing is held open.
 func (r *columnarReader) Close() error { return nil }

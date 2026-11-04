@@ -1,4 +1,5 @@
 // specscore: feat-recordops/diff
+
 package recordops
 
 import (

@@ -168,10 +168,12 @@ type txOptions struct {
 
 var _ TransactionOptions = (*txOptions)(nil)
 
+// Message returns the transaction message.
 func (v txOptions) Message() string {
 	return v.message
 }
 
+// SetMessage sets the transaction message.
 func (v *txOptions) SetMessage(message string) {
 	v.message = message
 }
@@ -191,6 +193,7 @@ func (v txOptions) IsCrossGroup() bool {
 	return v.isCrossGroup
 }
 
+// Attempts returns the number of attempts to execute the transaction.
 func (v txOptions) Attempts() int {
 	return v.attempts
 }

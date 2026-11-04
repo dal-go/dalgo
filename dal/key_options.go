@@ -8,6 +8,7 @@ import (
 	"github.com/strongo/random"
 )
 
+// DefaultRandomStringIDLength is the random-string length used when a caller does not pass one.
 var DefaultRandomStringIDLength = 16
 
 // WithRandomStringID sets ID generator to random string

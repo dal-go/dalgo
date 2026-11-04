@@ -6,16 +6,19 @@ import (
 	"time"
 )
 
+// FieldRef names a field by source and name, and can mark that field as an ID.
 type FieldRef struct {
 	source string
 	name   string
 	isID   bool
 }
 
+// IsID reports whether the reference names an ID field.
 func (f FieldRef) IsID() bool {
 	return f.isID
 }
 
+// Name returns the field name.
 func (f FieldRef) Name() string {
 	return f.name
 }
@@ -26,6 +29,7 @@ func (f FieldRef) Source() string {
 	return f.source
 }
 
+// Equal reports whether f and b have the same source, ID flag, and name.
 func (f FieldRef) Equal(b FieldRef) bool {
 	return f.source == b.source && f.isID == b.isID && f.name == b.name
 }
@@ -45,6 +49,8 @@ func (f FieldRef) String() string {
 // Empty string requires escaping!
 var reRegularName = regexp.MustCompile(`^\w+$`)
 
+// RequiresEscaping reports whether s is not a single word of letters, digits, and underscore.
+// An empty string requires escaping.
 func RequiresEscaping(s string) bool {
 	return !reRegularName.MatchString(s)
 }
@@ -54,6 +60,9 @@ func (f FieldRef) EqualTo(v any) Condition {
 	return WhereField(f.name, Equal, v)
 }
 
+// WhereField returns a comparison of the named field with v using operator.
+// Literals become constants. Slices and Array values are accepted only with
+// In or NotIn. Constant, FieldRef, and Param values are kept as given, and any other type panics.
 func WhereField(name string, operator Operator, v any) Condition {
 	var val Expression
 	switch v := v.(type) {

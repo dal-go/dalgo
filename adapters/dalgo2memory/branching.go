@@ -39,6 +39,7 @@ type serializedBranchingProvider struct{}
 
 var _ branching.Provider = serializedBranchingProvider{}
 
+// Capability reports this provider as dalgo2memory version 1 in serialized mode.
 func (serializedBranchingProvider) Capability() branching.Capability {
 	return branching.Capability{
 		Provider: branchingProviderName,
@@ -47,6 +48,9 @@ func (serializedBranchingProvider) Capability() branching.Capability {
 	}
 }
 
+// Capture copies a dalgo2memory database whose collections use serialized storage.
+// It rejects a nil source, a non-memory backend, a cancelled context, and any columnar or custom engine.
+// The checkpoint holds copied record bytes, keys, the schema, and the schema-fidelity and read-after-write flags.
 func (serializedBranchingProvider) Capture(ctx context.Context, source dal.DB) (branching.Checkpoint, error) {
 	if source == nil {
 		return nil, branching.ErrNilSourceDB
@@ -246,10 +250,13 @@ type serializedCheckpoint struct {
 
 var _ branching.Checkpoint = (*serializedCheckpoint)(nil)
 
+// Generation returns the checkpoint id assigned when Capture copied the database.
 func (c *serializedCheckpoint) Generation() string {
 	return c.generation
 }
 
+// Branch builds a new dal.DB from the captured snapshot.
+// It returns ctx.Err when the context is done, and branching.ErrReleased after Release.
 func (c *serializedCheckpoint) Branch(ctx context.Context) (branching.Branch, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -265,6 +272,7 @@ func (c *serializedCheckpoint) Branch(ctx context.Context) (branching.Branch, er
 	return &serializedBranch{db: c.snapshot.newDatabase()}, nil
 }
 
+// Release drops the captured snapshot. A later Branch returns branching.ErrReleased.
 func (c *serializedCheckpoint) Release(context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -313,10 +321,12 @@ type serializedBranch struct {
 
 var _ branching.Branch = (*serializedBranch)(nil)
 
+// DB returns the database restored from the checkpoint.
 func (b *serializedBranch) DB() dal.DB {
 	return b.db
 }
 
+// Close marks the branch closed and returns nil.
 func (b *serializedBranch) Close(context.Context) error {
 	b.closed.Store(true)
 	return nil

@@ -17,9 +17,13 @@ var (
 	// cannot safely checkpoint or branch.
 	ErrUnsupportedCapability = errors.New("dalgo branching: unsupported capability")
 
-	ErrNilSourceDB     = errors.New("dalgo branching: source database is nil")
-	ErrNilBranchDB     = errors.New("dalgo branching: branch database is nil")
-	ErrReleased        = errors.New("dalgo branching: checkpoint is released")
+	// ErrNilSourceDB identifies a nil source database.
+	ErrNilSourceDB = errors.New("dalgo branching: source database is nil")
+	// ErrNilBranchDB identifies a nil branch database.
+	ErrNilBranchDB = errors.New("dalgo branching: branch database is nil")
+	// ErrReleased identifies a checkpoint that has been released.
+	ErrReleased = errors.New("dalgo branching: checkpoint is released")
+	// ErrEmptyGeneration identifies an empty checkpoint generation.
 	ErrEmptyGeneration = errors.New("dalgo branching: checkpoint generation is empty")
 )
 
@@ -49,20 +53,27 @@ type Capability struct {
 
 // Provider captures immutable state from one source database.
 type Provider interface {
+	// Capability returns this provider's stable metadata.
 	Capability() Capability
+	// Capture captures immutable state from the source database.
 	Capture(context.Context, dal.DB) (Checkpoint, error)
 }
 
 // Checkpoint is immutable provider state from which fresh branches are created.
 // Release must be idempotent.
 type Checkpoint interface {
+	// Generation returns the checkpoint generation.
 	Generation() string
+	// Branch returns a fresh branch created from this checkpoint.
 	Branch(context.Context) (Branch, error)
+	// Release releases this checkpoint. Release must be idempotent.
 	Release(context.Context) error
 }
 
 // Branch owns a fresh database handle. Close must be idempotent.
 type Branch interface {
+	// DB returns the branch's database handle.
 	DB() dal.DB
+	// Close closes the branch. Close must be idempotent.
 	Close(context.Context) error
 }

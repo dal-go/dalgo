@@ -15,8 +15,13 @@ import (
 
 const maxProtectedOperations = 100
 
+// ErrDataRevisionConflict is returned when a protected operation's expected data revision does not match the stored revision.
 var ErrDataRevisionConflict = errors.New("access: data revision conflict")
+
+// ErrProtectedResourceUnavailable is returned when a protected get, exists, update, or delete refers to a record that does not exist.
 var ErrProtectedResourceUnavailable = errors.New("access: protected resource unavailable")
+
+// ErrProtectedRecordExists is returned when a protected insert refers to a record that already exists.
 var ErrProtectedRecordExists = errors.New("access: protected record already exists")
 
 // ProtectedOperation is a normalized immutable point operation passed to a
@@ -31,18 +36,24 @@ type ProtectedOperation struct {
 	columns      [][]string
 }
 
+// ProtectedUpdate is one normalized field change: a path, the value, and whether the field is deleted.
 type ProtectedUpdate struct {
 	Path   []string
 	Value  any
 	Delete bool
 }
 
+// NewProtectedRead builds a protected get or exists operation. Any other action is rejected.
 func NewProtectedRead(id string, action Operations, key *record.Key) (ProtectedOperation, error) {
 	if action != Get && action != Exists {
 		return ProtectedOperation{}, fmt.Errorf("access: protected read action must be get or exists")
 	}
 	return newProtectedOperation(id, action, key, nil, nil, "")
 }
+
+// NewProtectedEvidenceRead builds a protected get that records the field paths
+// to return as evidence. The action must be get, and fields must contain
+// between 1 and 32 non-empty paths.
 func NewProtectedEvidenceRead(id string, action Operations, key *record.Key, fields [][]string) (ProtectedOperation, error) {
 	if action != Get {
 		return ProtectedOperation{}, fmt.Errorf("access: field evidence requires get authorization")
@@ -62,12 +73,20 @@ func NewProtectedEvidenceRead(id string, action Operations, key *record.Key, fie
 	op.columns = clonePaths(fields)
 	return op, nil
 }
+
+// NewProtectedInsert builds a protected insert of data at key.
 func NewProtectedInsert(id string, key *record.Key, data map[string]any) (ProtectedOperation, error) {
 	return newProtectedOperation(id, Insert, key, data, nil, "")
 }
+
+// NewProtectedSet builds a protected set of data at key. revision is the expected data revision and may be empty.
 func NewProtectedSet(id string, key *record.Key, data map[string]any, revision string) (ProtectedOperation, error) {
 	return newProtectedOperation(id, Set, key, data, nil, revision)
 }
+
+// NewProtectedUpdate builds a protected update. Each update is normalized to a
+// field path, and a value equal to update.DeleteField is recorded as a
+// deletion. revision is the expected data revision and may be empty.
 func NewProtectedUpdate(id string, key *record.Key, updates []update.Update, revision string) (ProtectedOperation, error) {
 	normalized := make([]ProtectedUpdate, len(updates))
 	for i, item := range updates {
@@ -82,6 +101,8 @@ func NewProtectedUpdate(id string, key *record.Key, updates []update.Update, rev
 	}
 	return newProtectedOperation(id, Update, key, nil, normalized, revision)
 }
+
+// NewProtectedDelete builds a protected delete at key. revision is the expected data revision and may be empty.
 func NewProtectedDelete(id string, key *record.Key, revision string) (ProtectedOperation, error) {
 	return newProtectedOperation(id, Delete, key, nil, nil, revision)
 }
@@ -99,14 +120,29 @@ func newProtectedOperation(id string, action Operations, key *record.Key, data m
 	return ProtectedOperation{id: id, action: action, key: cloneKey(key), target: key.String(), data: cloneMap(data), updates: cloneProtectedUpdates(updates), revision: revision}, nil
 }
 
-func (o ProtectedOperation) ID() string                 { return o.id }
-func (o ProtectedOperation) Action() Operations         { return o.action }
-func (o ProtectedOperation) Key() *record.Key           { return cloneKey(o.key) }
-func (o ProtectedOperation) CanonicalTarget() string    { return o.target }
-func (o ProtectedOperation) Data() map[string]any       { return cloneMap(o.data) }
+// ID returns the operation id.
+func (o ProtectedOperation) ID() string { return o.id }
+
+// Action returns the leaf operation.
+func (o ProtectedOperation) Action() Operations { return o.action }
+
+// Key returns a clone of the record key.
+func (o ProtectedOperation) Key() *record.Key { return cloneKey(o.key) }
+
+// CanonicalTarget returns the key text captured when the operation was built.
+func (o ProtectedOperation) CanonicalTarget() string { return o.target }
+
+// Data returns a clone of the operation data.
+func (o ProtectedOperation) Data() map[string]any { return cloneMap(o.data) }
+
+// Updates returns a clone of the normalized updates.
 func (o ProtectedOperation) Updates() []ProtectedUpdate { return cloneProtectedUpdates(o.updates) }
-func (o ProtectedOperation) IfDataRevision() string     { return o.revision }
-func (o ProtectedOperation) Columns() [][]string        { return clonePaths(o.columns) }
+
+// IfDataRevision returns the expected data revision, or an empty string when none was set.
+func (o ProtectedOperation) IfDataRevision() string { return o.revision }
+
+// Columns returns a clone of the evidence field paths.
+func (o ProtectedOperation) Columns() [][]string { return clonePaths(o.columns) }
 
 func cloneProtectedUpdates(in []ProtectedUpdate) []ProtectedUpdate {
 	out := make([]ProtectedUpdate, len(in))
@@ -165,24 +201,41 @@ type ProtectedEvidence struct {
 	PreparationError                                                             error
 }
 
+// ProtectedInspectionStorage supplies private evidence inside a trusted inspection callback.
 type ProtectedInspectionStorage interface {
+	// Evidence returns private storage evidence for the protected operations.
 	Evidence(context.Context) ([]ProtectedEvidence, error)
 }
+
+// ProtectedExecutionStorage is a ProtectedInspectionStorage that can also perform the protected writes.
 type ProtectedExecutionStorage interface {
 	ProtectedInspectionStorage
+	// Execute performs the protected writes.
 	Execute(context.Context) error
 }
+
+// ProtectedStorage runs protected inspection and execution callbacks inside a trusted storage boundary.
 type ProtectedStorage interface {
+	// WithinProtectedInspection runs the callback inside the trusted inspection boundary.
 	WithinProtectedInspection(context.Context, []ProtectedOperation, func(ProtectedInspectionStorage) error) error
+	// WithinProtectedExecution runs the callback inside the trusted execution boundary.
 	WithinProtectedExecution(context.Context, []ProtectedOperation, func(ProtectedExecutionStorage) error) error
 }
 
+// PolicyLease is a pinned policy snapshot held for one protected inspection or execution.
 type PolicyLease interface {
+	// Policies returns the pinned policies.
 	Policies() []Policy
+	// Revision returns the snapshot revision.
 	Revision() string
+	// Release releases the lease.
 	Release()
 }
+
+// PolicyLeaseProvider acquires a policy lease for the call.
 type PolicyLeaseProvider func(context.Context) (PolicyLease, error)
+
+// MandatoryParticipant names one layer that supplies a policy lease, a candidate validator, or both.
 type MandatoryParticipant struct {
 	LayerID   string
 	Provider  PolicyLeaseProvider
@@ -190,9 +243,16 @@ type MandatoryParticipant struct {
 }
 type staticPolicyLease struct{ policies []Policy }
 
+// Policies returns a copy of the static policies.
 func (l *staticPolicyLease) Policies() []Policy { return append([]Policy(nil), l.policies...) }
-func (*staticPolicyLease) Revision() string     { return "static" }
-func (*staticPolicyLease) Release()             {}
+
+// Revision returns the revision "static".
+func (*staticPolicyLease) Revision() string { return "static" }
+
+// Release does nothing.
+func (*staticPolicyLease) Release() {}
+
+// NewStaticPolicyLease returns a lease holding the given policies. It rejects an empty list and a nil policy.
 func NewStaticPolicyLease(policies ...Policy) (PolicyLease, error) {
 	if len(policies) == 0 {
 		return nil, fmt.Errorf("access: static policy lease requires policies")
@@ -204,6 +264,10 @@ func NewStaticPolicyLease(policies ...Policy) (PolicyLease, error) {
 	}
 	return &staticPolicyLease{policies: append([]Policy(nil), policies...)}, nil
 }
+
+// NewStaticParticipant returns a participant whose provider always yields the
+// same static lease. layerID must be non-empty and policies must be acceptable
+// to NewStaticPolicyLease.
 func NewStaticParticipant(layerID string, policies ...Policy) (MandatoryParticipant, error) {
 	lease, err := NewStaticPolicyLease(policies...)
 	if err != nil {
@@ -215,36 +279,53 @@ func NewStaticParticipant(layerID string, policies ...Policy) (MandatoryParticip
 	return MandatoryParticipant{LayerID: layerID, Provider: func(context.Context) (PolicyLease, error) { return lease, nil }}, nil
 }
 
+// InspectionSession is the callback view of one protected inspection.
 type InspectionSession interface {
+	// Assess returns the assessment for the protected operations.
 	Assess(context.Context) (Assessment, error)
+	// Evidence returns authorized field evidence when the assessment allows it.
 	Evidence(context.Context) ([]AuthorizedPointEvidence, error)
+	// ReadVisibility reports which operation records are visible to the ingress principal.
 	ReadVisibility(context.Context) (map[string]bool, error)
+	// ReadVisibilityFor intersects ingress visibility with visibility for the given principal.
 	ReadVisibilityFor(context.Context, Principal) (map[string]bool, error)
 	isInspectionSession()
 }
+
+// AuthorizedFieldEvidence is one field value released from a protected read: its path, whether it was present, and the value.
 type AuthorizedFieldEvidence struct {
 	Path    []string
 	Present bool
 	Value   any
 }
+
+// AuthorizedPointEvidence is the authorized existence, data revision, and field values for one protected operation.
 type AuthorizedPointEvidence struct {
 	OperationID  string
 	Exists       bool
 	DataRevision string
 	Fields       []AuthorizedFieldEvidence
 }
+
+// ExecutionSession is an InspectionSession that can also perform the protected writes.
 type ExecutionSession interface {
 	InspectionSession
+	// Execute performs the protected writes when the assessment allows them.
 	Execute(context.Context) (Assessment, error)
+	// Receipts returns per-operation data revisions after a successful Execute.
 	Receipts(context.Context) ([]ExecutionReceipt, error)
+	// Revisions maps operation ids to data revisions from Receipts.
 	Revisions(context.Context) (map[string]string, error)
 	executionSession()
 }
+
+// ExecutionReceipt is the data revision recorded for one executed operation.
 type ExecutionReceipt struct {
 	OperationID  string
 	DataRevision string
 }
 
+// EnforcementCoordinator runs protected inspection and execution against mandatory policy participants and a trusted storage boundary.
 type EnforcementCoordinator struct {
 	storage                ProtectedStorage
 	participants           []MandatoryParticipant
@@ -257,9 +338,14 @@ type EnforcementCoordinator struct {
 // evaluation. Implementations must not mutate the image or cause effects.
 type CandidateValidator func(context.Context, ProtectedOperation, map[string]any) error
 
+// NewEnforcementCoordinator builds a coordinator with no candidate validator. It delegates to NewValidatedEnforcementCoordinator.
 func NewEnforcementCoordinator(storage ProtectedStorage, participants ...MandatoryParticipant) (*EnforcementCoordinator, error) {
 	return NewValidatedEnforcementCoordinator(storage, nil, participants...)
 }
+
+// NewValidatedEnforcementCoordinator builds a coordinator. storage is required,
+// and participants must include at least one policy provider. Each participant
+// needs a unique layer id and a provider, a validator, or both.
 func NewValidatedEnforcementCoordinator(storage ProtectedStorage, validator CandidateValidator, participants ...MandatoryParticipant) (*EnforcementCoordinator, error) {
 	if storage == nil {
 		return nil, fmt.Errorf("access: protected storage is required")
@@ -287,6 +373,9 @@ func NewValidatedEnforcementCoordinator(storage ProtectedStorage, validator Cand
 	return &EnforcementCoordinator{storage: storage, participants: append([]MandatoryParticipant(nil), policyParticipants...), validationParticipants: append([]MandatoryParticipant(nil), validationParticipants...), validator: validator}, nil
 }
 
+// WithinInspection validates the operations, then inside the storage
+// inspection boundary acquires policy leases, validates candidate images, and
+// calls inspect with the inspection session.
 func (c *EnforcementCoordinator) WithinInspection(ctx context.Context, operations []ProtectedOperation, inspect func(InspectionSession) error) error {
 	operations = cloneProtectedOperations(operations)
 	if inspect == nil {
@@ -321,6 +410,9 @@ func (c *EnforcementCoordinator) WithinInspection(ctx context.Context, operation
 	return err
 }
 
+// WithinExecution validates the operations, then inside the storage execution
+// boundary acquires policy leases, validates candidate images, and calls
+// execute. It returns an error when the callback returns without a successful Execute.
 func (c *EnforcementCoordinator) WithinExecution(ctx context.Context, operations []ProtectedOperation, execute func(ExecutionSession) error) error {
 	operations = cloneProtectedOperations(operations)
 	if execute == nil {
@@ -442,11 +534,20 @@ type unavailablePolicy struct {
 	cause error
 }
 
-func (p unavailablePolicy) Name() string       { return p.name }
+// Name returns the layer id stored as the policy name.
+func (p unavailablePolicy) Name() string { return p.name }
+
+// InspectionPure reports true.
 func (unavailablePolicy) InspectionPure() bool { return true }
+
+// PolicyMetadata returns private metadata whose ID is the policy name.
 func (p unavailablePolicy) PolicyMetadata() PolicyMetadata {
 	return PolicyMetadata{ID: p.name, Visibility: PolicyVisibilityPrivate}
 }
+
+// Decide returns a denial for the stored reason code with scope
+// DecisionScopeConfiguration. The explanation says the mandatory policy
+// participant is unavailable.
 func (p unavailablePolicy) Decide(_ context.Context, request Request) Decision {
 	decision := Decision{Operation: request.Operation, Policy: p.name, Effect: effectDeny.String(), Code: p.code, Scope: DecisionScopeConfiguration, Explanation: "mandatory policy participant is unavailable"}
 	if len(request.Resources) > 0 {
@@ -454,21 +555,29 @@ func (p unavailablePolicy) Decide(_ context.Context, request Request) Decision {
 	}
 	return decision
 }
+
+// Authorize returns a DeniedError for the decision from Decide.
 func (p unavailablePolicy) Authorize(ctx context.Context, request Request) error {
 	return &DeniedError{Decision: p.Decide(ctx, request)}
 }
 
 type unavailablePolicyLease struct{ policy unavailablePolicy }
 
+// Policies returns the unavailable policy as the lease's only policy.
 func (l *unavailablePolicyLease) Policies() []Policy { return []Policy{l.policy} }
-func (*unavailablePolicyLease) Revision() string     { return "" }
-func (*unavailablePolicyLease) Release()             {}
+
+// Revision returns an empty revision.
+func (*unavailablePolicyLease) Revision() string { return "" }
+
+// Release does nothing.
+func (*unavailablePolicyLease) Release() {}
 
 type pinnedPolicyLease struct {
 	PolicyLease
 	policies []Policy
 }
 
+// Policies returns a copy of the policies pinned when the lease was acquired.
 func (l *pinnedPolicyLease) Policies() []Policy { return append([]Policy(nil), l.policies...) }
 func releaseLeases(leases []PolicyLease) {
 	for i := len(leases) - 1; i >= 0; i-- {
@@ -507,9 +616,16 @@ type inspectionSession struct {
 	leases           []PolicyLease
 }
 
+// ReadVisibility reports which operation records are visible under the ingress
+// principal. It delegates to the session's visibility evaluation with no
+// additional principal.
 func (s *inspectionSession) ReadVisibility(ctx context.Context) (map[string]bool, error) {
 	return s.readVisibility(ctx, nil)
 }
+
+// ReadVisibilityFor reports visibility for the ingress principal intersected
+// with visibility for requester. The requester subject and actor are validated
+// first.
 func (s *inspectionSession) ReadVisibilityFor(ctx context.Context, requester Principal) (map[string]bool, error) {
 	if requester.Subject != nil {
 		if err := requester.Subject.Validate(); err != nil {
@@ -568,6 +684,11 @@ func (s *inspectionSession) evaluateReadVisibility(ctx context.Context) (map[str
 	return result, nil
 }
 
+// Evidence returns authorized field values for operations that requested
+// columns. The session must be open, both contexts must be live, the
+// assessment must allow, and there must be no admission or revision error;
+// otherwise it returns ErrAccessDenied, the admission error, or
+// ErrDataRevisionConflict.
 func (s *inspectionSession) Evidence(ctx context.Context) ([]AuthorizedPointEvidence, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -612,6 +733,11 @@ func (s *inspectionSession) Evidence(ctx context.Context) ([]AuthorizedPointEvid
 }
 
 func (*inspectionSession) isInspectionSession() {}
+
+// Assess returns a copy of the stored assessment when the session is open and
+// both contexts are live. An allow with an admission failure returns that
+// failure, and an allow with a data-revision conflict returns
+// ErrDataRevisionConflict.
 func (s *inspectionSession) Assess(ctx context.Context) (Assessment, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -644,6 +770,11 @@ type executionSession struct {
 }
 
 func (*executionSession) executionSession() {}
+
+// Execute performs the protected writes once when the assessment allows and
+// there is no admission or revision error, then records a receipt per evidence
+// item. A closed, canceled, already-used, denied, or conflicted session returns
+// without calling storage.
 func (s *executionSession) Execute(ctx context.Context) (Assessment, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -678,6 +809,9 @@ func (s *executionSession) Execute(ctx context.Context) (Assessment, error) {
 	}
 	return cloneAssessment(s.assessment), nil
 }
+
+// Receipts returns a copy of the execution receipts. The session must be open,
+// both contexts must be live, and Execute must have succeeded.
 func (s *executionSession) Receipts(ctx context.Context) ([]ExecutionReceipt, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -695,6 +829,8 @@ func (s *executionSession) Receipts(ctx context.Context) ([]ExecutionReceipt, er
 	}
 	return append([]ExecutionReceipt(nil), s.receipts...), nil
 }
+
+// Revisions maps operation ids to data revisions by reading Receipts.
 func (s *executionSession) Revisions(ctx context.Context) (map[string]string, error) {
 	receipts, err := s.Receipts(ctx)
 	if err != nil {

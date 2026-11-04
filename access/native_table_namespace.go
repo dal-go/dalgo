@@ -97,11 +97,19 @@ func (p nativeTablePolicy) mapped(request Request) Request {
 	request.Resources = p.resources
 	return request
 }
+
+// Decide delegates to the wrapped policy with request resources replaced by the canonical collection paths.
 func (p nativeTablePolicy) Decide(ctx context.Context, request Request) Decision {
 	return p.Policy.Decide(ctx, p.mapped(request))
 }
+
+// Authorize delegates to the wrapped policy with request resources replaced by the canonical collection paths.
 func (p nativeTablePolicy) Authorize(ctx context.Context, request Request) error {
 	return p.Policy.Authorize(ctx, p.mapped(request))
 }
+
+// PolicyMetadata returns DescribePolicy for the wrapped policy.
 func (p nativeTablePolicy) PolicyMetadata() PolicyMetadata { return DescribePolicy(p.Policy) }
-func (p nativeTablePolicy) InspectionPure() bool           { return CanInspectPolicy(p.Policy) }
+
+// InspectionPure reports whether the wrapped policy can be inspected.
+func (p nativeTablePolicy) InspectionPure() bool { return CanInspectPolicy(p.Policy) }

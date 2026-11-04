@@ -6,10 +6,14 @@ import "fmt"
 type ArithmeticOperator string
 
 const (
-	Add      ArithmeticOperator = "+"
+	// Add is the portable addition operator.
+	Add ArithmeticOperator = "+"
+	// Subtract is the portable subtraction operator.
 	Subtract ArithmeticOperator = "-"
+	// Multiply is the portable multiplication operator.
 	Multiply ArithmeticOperator = "*"
-	Divide   ArithmeticOperator = "/"
+	// Divide is the portable division operator.
+	Divide ArithmeticOperator = "/"
 )
 
 // BinaryExpression combines two scalar expressions. Keeping operands as

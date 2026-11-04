@@ -8,8 +8,14 @@ import "github.com/dal-go/dalgo/dal"
 type ForeignKeyEnforcement string
 
 const (
-	ForeignKeyEnforcementUnknown  ForeignKeyEnforcement = "unknown"
-	ForeignKeyEnforcementEnabled  ForeignKeyEnforcement = "enabled"
+	// ForeignKeyEnforcementUnknown means the provider cannot establish the
+	// effective state. It must not be interpreted as enabled.
+	ForeignKeyEnforcementUnknown ForeignKeyEnforcement = "unknown"
+	// ForeignKeyEnforcementEnabled means the foreign key is enforced for the
+	// connection used to inspect it.
+	ForeignKeyEnforcementEnabled ForeignKeyEnforcement = "enabled"
+	// ForeignKeyEnforcementDisabled means the foreign key is not enforced for
+	// the connection used to inspect it.
 	ForeignKeyEnforcementDisabled ForeignKeyEnforcement = "disabled"
 )
 

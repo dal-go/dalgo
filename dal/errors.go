@@ -19,6 +19,7 @@ var ErrNotImplementedYet = errors.New("not implemented yet")
 // ErrNoMoreRecords indicates there is no more records
 var ErrNoMoreRecords = fmt.Errorf("%w: no more errors", io.EOF)
 
+// ErrLimitReached reports that a limit stopped the read. It wraps ErrNoMoreRecords.
 var ErrLimitReached = fmt.Errorf("%w: limit reached", ErrNoMoreRecords)
 
 // ErrDuplicateUser indicates there is a duplicate user // TODO: move to strongo/app?
@@ -35,7 +36,9 @@ func (err ErrDuplicateUser) Error() string {
 
 // ErrNotFoundByKey indicates error was not found by value
 type ErrNotFoundByKey interface {
+	// Key returns the key that was not found.
 	Key() *record.Key
+	// Cause returns the error that caused the not-found result.
 	Cause() error
 	error
 }
@@ -47,10 +50,12 @@ type errNotFoundByKey struct {
 	cause error
 }
 
+// Key returns the key stored on the error.
 func (e errNotFoundByKey) Key() *record.Key {
 	return e.key
 }
 
+// Cause returns the stored cause, or record.ErrRecordNotFound when the cause is nil.
 func (e errNotFoundByKey) Cause() error {
 	if e.cause == nil {
 		return record.ErrRecordNotFound
@@ -93,10 +98,12 @@ func (v rollbackError) Error() string {
 	return fmt.Sprintf("rollback failed: %v: original error: %v", v.rollbackErr, v.originalErr)
 }
 
+// OriginalError returns the error that triggered the rollback.
 func (v rollbackError) OriginalError() error {
 	return v.originalErr
 }
 
+// RollbackError returns the error from the rollback itself.
 func (v rollbackError) RollbackError() error {
 	return v.rollbackErr
 }

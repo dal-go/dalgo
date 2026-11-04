@@ -14,6 +14,8 @@ import (
 // JOINs—especially Firestore, document/key-value stores, HTTP/API sources,
 // etc. JOIN support cannot simply be implemented in SQL adapters.”
 type NativeJoinProvider interface {
+	// CanExecuteJoin reports whether the adapter can execute the whole relation tree with DALgo's JOIN semantics.
+	// A non-nil error declines pushdown.
 	CanExecuteJoin(context.Context, StructuredQuery) error
 }
 
@@ -22,16 +24,21 @@ type NativeJoinProvider interface {
 // The approved Feature requires wildcard expansion in schema order and an
 // explicit join_plan error when a source cannot supply that schema.
 type JoinFieldsProvider interface {
+	// JoinFields returns schema-ordered field names for source so a wildcard can be expanded.
 	JoinFields(ctx context.Context, source RecordsetSource) ([]string, error)
 }
 
+// JoinStrategy identifies the physical join implementation chosen by PlanJoin.
 type JoinStrategy string
 
 const (
-	JoinNative  JoinStrategy = "native"
+	// JoinNative means the adapter executes the whole join tree.
+	JoinNative JoinStrategy = "native"
+	// JoinGeneric means DALgo executes the join.
 	JoinGeneric JoinStrategy = "dalgo-generic"
 )
 
+// JoinPlan is the strategy PlanJoin selected and the reason for that choice.
 type JoinPlan struct {
 	Strategy JoinStrategy
 	Reason   string

@@ -30,9 +30,14 @@ type recordLookupStream struct {
 	done              bool
 }
 
+// Cursor returns an empty cursor and a nil error.
 func (r *recordLookupStream) Cursor() (string, error) { return "", nil }
-func (r *recordLookupStream) Close() error            { return r.source.Close() }
 
+// Close closes the source reader.
+func (r *recordLookupStream) Close() error { return r.source.Close() }
+
+// Next returns the next enriched record.
+// It reads the source in batches, runs ExecuteRecordLookups on each batch, and returns ErrNoMoreRecords when the source is exhausted.
 func (r *recordLookupStream) Next() (record.Record, error) {
 	if err := r.ctx.Err(); err != nil {
 		return nil, err
@@ -86,6 +91,8 @@ type LookupProgress struct {
 	RequestsPending   int
 }
 
+// LookupOptions configures ExecuteRecordLookups and ExecuteRecordLookupStream.
+// Concurrency is how many lookups run at once. OnProgress is called with LookupProgress.
 type LookupOptions struct {
 	Concurrency int
 	OnProgress  func(LookupProgress)
@@ -96,6 +103,9 @@ type LookupOptions struct {
 // and keeps the result in source order.
 type LookupValue func(context.Context, record.Record) (map[string]any, error)
 
+// ExecuteRecordLookups calls lookup for each row with bounded concurrency and returns the rows in source order with the lookup fields merged in.
+// A nil lookup is an error. Concurrency defaults to 8 when it is 0 and must be from 1 to 64.
+// The first error cancels the remaining work and is returned.
 func ExecuteRecordLookups(ctx context.Context, rows []record.Record, lookup LookupValue, options LookupOptions) ([]record.Record, error) {
 	if lookup == nil {
 		return nil, fmt.Errorf("lookup function is required")

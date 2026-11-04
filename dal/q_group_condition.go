@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// GroupCondition combines conditions with one group operator, such as And or Or.
 type GroupCondition struct {
 	operator   Operator
 	conditions []Condition
@@ -18,10 +19,12 @@ func NewGroupCondition(operator Operator, conditions ...Condition) GroupConditio
 	return GroupCondition{operator: operator, conditions: conditions}
 }
 
+// Operator returns the operator that combines the conditions.
 func (v GroupCondition) Operator() Operator {
 	return v.operator
 }
 
+// Conditions returns the conditions in the group.
 func (v GroupCondition) Conditions() []Condition {
 	return v.conditions
 }

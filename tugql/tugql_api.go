@@ -47,6 +47,8 @@ func (doc *TugQLDocument) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// TugQLSourceMetadata records the authoring format and version of a TugQLDocument.
+// ResolveTugQL requires format "tugql" and version 1.
 type TugQLSourceMetadata struct {
 	Format  string `json:"format"`
 	Version int    `json:"version"`
@@ -65,6 +67,9 @@ type TugQLTree struct {
 	Comments *TugQLComments `json:"comments,omitempty" yaml:"-"`
 }
 
+// TugQLParameter is a named parameter on a TugQTree.
+// Name and Type are required, names are unique, and Type is integer, decimal, string, boolean, date, datetime, or timestamp.
+// A required parameter cannot also have a default, and a default cannot be null.
 type TugQLParameter struct {
 	Name     string `json:"name" yaml:"name"`
 	Type     string `json:"type" yaml:"type"`
@@ -72,6 +77,9 @@ type TugQLParameter struct {
 	Default  *any   `json:"default,omitempty" yaml:"default,omitempty"`
 }
 
+// TugQLDefinition is a named CTE or import.
+// Kind is cte or import.
+// A CTE has Query and no Path or Using, and an import has Path and no Query.
 type TugQLDefinition struct {
 	Kind  string         `json:"kind" yaml:"kind"`
 	Name  string         `json:"name" yaml:"name"`
@@ -80,11 +88,14 @@ type TugQLDefinition struct {
 	Using []TugQLMapping `json:"using,omitempty" yaml:"using,omitempty"`
 }
 
+// TugQLBody is the body of a CTE or a scalar query.
+// Definitions are optional and Query is required.
 type TugQLBody struct {
 	Definitions []TugQLDefinition `json:"definitions,omitempty" yaml:"definitions,omitempty"`
 	Query       map[string]any    `json:"query" yaml:"-"`
 }
 
+// UnmarshalYAML checks the YAML node budget and body shape, then stores Definitions and Query.
 func (body *TugQLBody) UnmarshalYAML(node *yaml.Node) error {
 	if body == nil {
 		return fmt.Errorf("nil query body receiver")
@@ -106,6 +117,7 @@ func (body *TugQLBody) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// MarshalYAML requires Query, validates the body and its definitions, and returns the definitions and query.
 func (body TugQLBody) MarshalYAML() (any, error) {
 	if body.Query == nil {
 		return nil, fmt.Errorf("query body requires query")
@@ -130,25 +142,36 @@ func (body TugQLBody) MarshalYAML() (any, error) {
 	}{body.Definitions, body.Query}, nil
 }
 
+// TugQLMapping pairs a parameter Name with an Expression in an import Using list.
 type TugQLMapping struct {
 	Name       string         `json:"name" yaml:"name"`
 	Expression map[string]any `json:"expression" yaml:"expression"`
 }
 
+// TugQLPosition is a line and column in TugQL source.
+// Both numbers start at 1.
 type TugQLPosition struct {
 	Line   int `json:"line"`
 	Column int `json:"column"`
 }
+
+// TugQLSpan is the start and end of a range in TugQL source.
 type TugQLSpan struct {
 	Start TugQLPosition `json:"start"`
 	End   TugQLPosition `json:"end"`
 }
+
+// TugQLDiagnostic is one parse, format, or resolve finding.
+// Code and Message describe it, and Span locates it in the source.
 type TugQLDiagnostic struct {
 	Code    string    `json:"code"`
 	Message string    `json:"message"`
 	Span    TugQLSpan `json:"span"`
 }
 
+// TugQLFormatOptions carries keyword-case and indentation preferences for FormatTugQL.
+// An explicit value and the matching project-team value must be equal when both are set, and preserve-existing keeps the style already in the source.
+// Keyword case is lowercase, uppercase, or preserve-existing, and indentation is two-spaces, tab, or preserve-existing.
 type TugQLFormatOptions struct {
 	KeywordCase            string `json:"keywordCase,omitempty"` // explicit lowercase, uppercase, or preserve-existing
 	Indentation            string `json:"indentation,omitempty"` // explicit two-spaces, tab, or preserve-existing
@@ -160,6 +183,8 @@ type TugQLFormatOptions struct {
 	DefaultIndentation     string `json:"defaultIndentation,omitempty"`
 }
 
+// TugQLResolveContext supplies the schemas, relationships, pinned imports, and bindings ResolveTugQL uses.
+// Imports also require ProjectRoot, ImportingPath, and ProjectRevision.
 type TugQLResolveContext struct {
 	AuthorizedSchemas []TugQLAuthorizedSchema `json:"authorizedSchemas,omitempty"`
 	Relationships     []TugQLRelationship     `json:"relationships,omitempty"`
@@ -172,6 +197,8 @@ type TugQLResolveContext struct {
 	tugqlBudget       *tugqlResolveBudget
 }
 
+// TugQLAuthorizedSchema is a schema version ResolveTugQL may read.
+// When the query source names a database or schema, the authorized schema must carry the same value, and Version is joined into the resolved schema version.
 type TugQLAuthorizedSchema struct {
 	Database string       `json:"database,omitempty"`
 	Schema   string       `json:"schema,omitempty"`
@@ -179,23 +206,35 @@ type TugQLAuthorizedSchema struct {
 	Tables   []TugQLTable `json:"tables"`
 }
 
+// TugQLTable is a named table and its fields in an authorized schema.
 type TugQLTable struct {
 	Name   string       `json:"name"`
 	Fields []TugQLField `json:"fields"`
 }
+
+// TugQLField is one field of an authorized table.
+// Authorized reports whether resolution may use the field.
 type TugQLField struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
 	Authorized bool   `json:"authorized"`
 }
+
+// TugQLRelationEndpoint is one side of a relationship.
+// Table matches a query source, and Source matches that source's alias when it is set.
 type TugQLRelationEndpoint struct {
 	Source string `json:"source,omitempty"`
 	Table  string `json:"table"`
 }
+
+// TugQLRelationshipPair names the FromField and ToField compared by a relationship.
 type TugQLRelationshipPair struct {
 	FromField string `json:"fromField"`
 	ToField   string `json:"toField"`
 }
+
+// TugQLRelationship is a join relationship supplied to ResolveTugQL.
+// Resolution uses it only when ExactTypedEquality is set and each pair has the same authorized type on both ends.
 type TugQLRelationship struct {
 	ID                 string                  `json:"id"`
 	Version            string                  `json:"version"`
@@ -204,30 +243,45 @@ type TugQLRelationship struct {
 	Pairs              []TugQLRelationshipPair `json:"pairs"`
 	ExactTypedEquality bool                    `json:"exactTypedEquality"`
 }
+
+// TugQLPinnedImport is the source text of a saved query at a project path and revision.
+// ResolveTugQL parses Source when Path matches the import and Revision equals ProjectRevision.
 type TugQLPinnedImport struct {
 	Path     string `json:"path"`
 	Revision string `json:"revision"`
 	Source   string `json:"source"`
 }
+
+// TugQLBinding is a caller-supplied value for a declared parameter.
+// When Set is false the binding is ignored and does not satisfy a required parameter.
 type TugQLBinding struct {
 	Name  string `json:"name"`
 	Set   bool   `json:"set"`
 	Value any    `json:"value,omitempty"`
 }
 
+// TugQLOutputLineage names a source field that an output column comes from.
 type TugQLOutputLineage struct {
 	Source string `json:"source"`
 	Field  string `json:"field"`
 }
+
+// TugQLOutputColumn is one column reported by ResolveTugQL.
+// Name is the output name, Type is the inferred type, and Lineage lists the source fields behind the column.
 type TugQLOutputColumn struct {
 	Name    string               `json:"name"`
 	Type    string               `json:"type"`
 	Lineage []TugQLOutputLineage `json:"lineage"`
 }
+
+// TugQLDependencyReceipt records the project path and revision of a saved-query import ResolveTugQL expanded.
 type TugQLDependencyReceipt struct {
 	Path     string `json:"path"`
 	Revision string `json:"revision"`
 }
+
+// TugQLRelationshipExpansion records a relationship ResolveTugQL applied to a join.
+// It keeps the relationship id and version, the source aliases, the join type, and the field pairs.
 type TugQLRelationshipExpansion struct {
 	ID         string                  `json:"id"`
 	Version    string                  `json:"version"`
@@ -236,6 +290,10 @@ type TugQLRelationshipExpansion struct {
 	JoinType   string                  `json:"joinType"`
 	Pairs      []TugQLRelationshipPair `json:"pairs"`
 }
+
+// TugQLResolved is the value returned by ResolveTugQL.
+// Query is the lowered dal.StructuredQuery and Columns describe its projection.
+// SchemaVersion joins the matched schema versions with commas, and Dependencies and Relationships list the imports and joins that were applied.
 type TugQLResolved struct {
 	Query         dal.StructuredQuery          `json:"query"`
 	Columns       []TugQLOutputColumn          `json:"columns"`

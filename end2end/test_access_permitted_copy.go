@@ -131,31 +131,37 @@ type readCounter struct {
 	reads *atomic.Int64
 }
 
+// Get counts the read and calls the embedded DB.
 func (c readCounter) Get(ctx context.Context, rec record.Record) error {
 	c.reads.Add(1)
 	return c.DB.Get(ctx, rec)
 }
 
+// GetMulti counts the read and calls the embedded DB.
 func (c readCounter) GetMulti(ctx context.Context, records []record.Record) error {
 	c.reads.Add(1)
 	return c.DB.GetMulti(ctx, records)
 }
 
+// Exists counts the read and calls the embedded DB.
 func (c readCounter) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	c.reads.Add(1)
 	return c.DB.Exists(ctx, key)
 }
 
+// ExecuteQueryToRecordsReader counts the read and calls the embedded DB.
 func (c readCounter) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	c.reads.Add(1)
 	return c.DB.ExecuteQueryToRecordsReader(ctx, query)
 }
 
+// ExecuteQueryToRecordsetReader counts the read and calls the embedded DB.
 func (c readCounter) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	c.reads.Add(1)
 	return c.DB.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
+// RunReadonlyTransaction runs the worker on a transaction that counts its reads.
 func (c readCounter) RunReadonlyTransaction(ctx context.Context, worker dal.ROTxWorker, options ...dal.TransactionOption) error {
 	return c.DB.RunReadonlyTransaction(ctx, func(ctx context.Context, tx dal.ReadTransaction) error {
 		return worker(ctx, readCountingTx{ReadTransaction: tx, reads: c.reads})
@@ -167,26 +173,31 @@ type readCountingTx struct {
 	reads *atomic.Int64
 }
 
+// Get counts the read and calls the embedded ReadTransaction.
 func (t readCountingTx) Get(ctx context.Context, rec record.Record) error {
 	t.reads.Add(1)
 	return t.ReadTransaction.Get(ctx, rec)
 }
 
+// GetMulti counts the read and calls the embedded ReadTransaction.
 func (t readCountingTx) GetMulti(ctx context.Context, records []record.Record) error {
 	t.reads.Add(1)
 	return t.ReadTransaction.GetMulti(ctx, records)
 }
 
+// Exists counts the read and calls the embedded ReadTransaction.
 func (t readCountingTx) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	t.reads.Add(1)
 	return t.ReadTransaction.Exists(ctx, key)
 }
 
+// ExecuteQueryToRecordsReader counts the read and calls the embedded ReadTransaction.
 func (t readCountingTx) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	t.reads.Add(1)
 	return t.ReadTransaction.ExecuteQueryToRecordsReader(ctx, query)
 }
 
+// ExecuteQueryToRecordsetReader counts the read and calls the embedded ReadTransaction.
 func (t readCountingTx) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	t.reads.Add(1)
 	return t.ReadTransaction.ExecuteQueryToRecordsetReader(ctx, query, options...)

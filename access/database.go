@@ -145,40 +145,52 @@ type securedDB struct {
 	coordinator *EnforcementCoordinator
 }
 
+// ID delegates to the wrapped database.
 func (db *securedDB) ID() string { return db.DB.ID() }
 
+// Adapter delegates to the wrapped database.
 func (db *securedDB) Adapter() dal.Adapter { return db.DB.Adapter() }
 
+// Schema delegates to the wrapped database.
 func (db *securedDB) Schema() dal.Schema { return db.DB.Schema() }
 
+// SupportsConcurrentConnections delegates to the wrapped database.
 func (db *securedDB) SupportsConcurrentConnections() bool {
 	return db.DB.SupportsConcurrentConnections()
 }
 
+// Exists delegates the existence check to a secured read session over the wrapped database.
 func (db *securedDB) Exists(ctx context.Context, key *record.Key) (bool, error) {
 	return securedReadSession{session: db.DB, guard: db.guard}.Exists(ctx, key)
 }
 
+// Get delegates the read to a secured read session over the wrapped database.
 func (db *securedDB) Get(ctx context.Context, record record.Record) error {
 	return securedReadSession{session: db.DB, guard: db.guard}.Get(ctx, record)
 }
 
+// GetMulti delegates the read to a secured read session over the wrapped database.
 func (db *securedDB) GetMulti(ctx context.Context, records []record.Record) error {
 	return securedReadSession{session: db.DB, guard: db.guard}.GetMulti(ctx, records)
 }
 
+// ExecuteQueryToRecordsReader delegates the query to a secured read session over the wrapped database.
 func (db *securedDB) ExecuteQueryToRecordsReader(ctx context.Context, query dal.Query) (dal.RecordsReader, error) {
 	return securedReadSession{session: db.DB, guard: db.guard}.ExecuteQueryToRecordsReader(ctx, query)
 }
 
+// ExecuteQueryToRecordsetReader delegates the query to a secured read session over the wrapped database.
 func (db *securedDB) ExecuteQueryToRecordsetReader(ctx context.Context, query dal.Query, options ...recordset.Option) (dal.RecordsetReader, error) {
 	return securedReadSession{session: db.DB, guard: db.guard}.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
+// Select delegates to the secured read session's ExecuteQueryToRecordsReader.
 func (db *securedDB) Select(ctx context.Context, query dal.Query) (dal.Reader, error) {
 	return securedReadSession{session: db.DB, guard: db.guard}.ExecuteQueryToRecordsReader(ctx, query)
 }
 
+// RunReadonlyTransaction requires a context policy when the database demands
+// one, pins database policies, and runs the worker on a secured read transaction.
 func (db *securedDB) RunReadonlyTransaction(ctx context.Context, worker dal.ROTxWorker, options ...dal.TransactionOption) error {
 	if err := db.guard.checkContext(ctx); err != nil {
 		return err
@@ -199,6 +211,9 @@ func (db *securedDB) RunReadonlyTransaction(ctx context.Context, worker dal.ROTx
 	}, options...)
 }
 
+// RunReadwriteTransaction denies the call when an enforcement coordinator is
+// configured. Otherwise it requires a context policy when demanded, pins
+// database policies, and runs the worker on a secured read-write transaction.
 func (db *securedDB) RunReadwriteTransaction(ctx context.Context, worker dal.RWTxWorker, options ...dal.TransactionOption) error {
 	if db.coordinator != nil {
 		return enforcementUnsupported(Update, "dynamic read-write transactions are unavailable under the protected profile")
@@ -233,30 +248,48 @@ type securedWriteDB struct {
 func (db *securedWriteDB) writeSession() securedWriteSession {
 	return securedWriteSession{session: db.writer, guard: db.guard, coordinator: db.coordinator}
 }
+
+// Set delegates to the secured write session.
 func (db *securedWriteDB) Set(ctx context.Context, rec record.Record) error {
 	return db.writeSession().Set(ctx, rec)
 }
+
+// SetMulti delegates to the secured write session.
 func (db *securedWriteDB) SetMulti(ctx context.Context, records []record.Record) error {
 	return db.writeSession().SetMulti(ctx, records)
 }
+
+// Insert delegates to the secured write session.
 func (db *securedWriteDB) Insert(ctx context.Context, rec record.Record, options ...dal.InsertOption) error {
 	return db.writeSession().Insert(ctx, rec, options...)
 }
+
+// InsertMulti delegates to the secured write session.
 func (db *securedWriteDB) InsertMulti(ctx context.Context, records []record.Record, options ...dal.InsertOption) error {
 	return db.writeSession().InsertMulti(ctx, records, options...)
 }
+
+// Update delegates to the secured write session.
 func (db *securedWriteDB) Update(ctx context.Context, key *record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	return db.writeSession().Update(ctx, key, updates, preconditions...)
 }
+
+// UpdateRecord delegates to the secured write session.
 func (db *securedWriteDB) UpdateRecord(ctx context.Context, rec record.Record, updates []update.Update, preconditions ...dal.Precondition) error {
 	return db.writeSession().UpdateRecord(ctx, rec, updates, preconditions...)
 }
+
+// UpdateMulti delegates to the secured write session.
 func (db *securedWriteDB) UpdateMulti(ctx context.Context, keys []*record.Key, updates []update.Update, preconditions ...dal.Precondition) error {
 	return db.writeSession().UpdateMulti(ctx, keys, updates, preconditions...)
 }
+
+// Delete delegates to the secured write session.
 func (db *securedWriteDB) Delete(ctx context.Context, key *record.Key) error {
 	return db.writeSession().Delete(ctx, key)
 }
+
+// DeleteMulti delegates to the secured write session.
 func (db *securedWriteDB) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	return db.writeSession().DeleteMulti(ctx, keys)
 }
@@ -270,10 +303,12 @@ type securedReadTransaction struct {
 	tx dal.ReadTransaction
 }
 
+// Select delegates to ExecuteQueryToRecordsReader.
 func (tx *securedReadTransaction) Select(ctx context.Context, query dal.Query) (dal.Reader, error) {
 	return tx.ExecuteQueryToRecordsReader(ctx, query)
 }
 
+// Options delegates to the underlying transaction.
 func (tx *securedReadTransaction) Options() dal.TransactionOptions { return tx.tx.Options() }
 
 type securedReadwriteTransaction struct {
@@ -281,12 +316,15 @@ type securedReadwriteTransaction struct {
 	tx dal.ReadwriteTransaction
 }
 
+// Select delegates to ExecuteQueryToRecordsReader.
 func (tx *securedReadwriteTransaction) Select(ctx context.Context, query dal.Query) (dal.Reader, error) {
 	return tx.ExecuteQueryToRecordsReader(ctx, query)
 }
 
+// ID delegates to the underlying transaction.
 func (tx *securedReadwriteTransaction) ID() string { return tx.tx.ID() }
 
+// Options delegates to the underlying transaction.
 func (tx *securedReadwriteTransaction) Options() dal.TransactionOptions { return tx.tx.Options() }
 
 var (

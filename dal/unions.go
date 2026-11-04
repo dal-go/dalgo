@@ -7,10 +7,12 @@ type arrayUnion struct {
 	elems []any
 }
 
+// Name returns the transform name ArrayUnion.
 func (arrayUnion) Name() string {
 	return "ArrayUnion"
 }
 
+// Value returns the elements to add to the array.
 func (v arrayUnion) Value() any {
 	return v.elems
 }

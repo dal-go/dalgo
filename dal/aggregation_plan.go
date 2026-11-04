@@ -41,6 +41,7 @@ type QueryCapabilities struct {
 
 // QueryCapabilitiesProvider is an optional adapter capability.
 type QueryCapabilitiesProvider interface {
+	// QueryCapabilities returns the operations this provider can preserve exactly.
 	QueryCapabilities() QueryCapabilities
 }
 
@@ -48,9 +49,12 @@ type QueryCapabilitiesProvider interface {
 type AggregationStrategy string
 
 const (
-	AggregationNative    AggregationStrategy = "native"
+	// AggregationNative means the provider executes the aggregation.
+	AggregationNative AggregationStrategy = "native"
+	// AggregationStreaming means DALgo aggregates in one pass over ordered groups.
 	AggregationStreaming AggregationStrategy = "dalgo-streaming"
-	AggregationHash      AggregationStrategy = "dalgo-hash"
+	// AggregationHash means DALgo aggregates by hashing groups locally.
+	AggregationHash AggregationStrategy = "dalgo-hash"
 )
 
 // AggregationPlan is inspectable so DataTug can expose the decision later.

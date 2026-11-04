@@ -10,13 +10,18 @@ import (
 	"unicode/utf8"
 )
 
+// PrincipalKind classifies a typed principal as a user, service, application, or agent.
 type PrincipalKind string
 
 const (
-	PrincipalKindUser        PrincipalKind = "user"
-	PrincipalKindService     PrincipalKind = "service"
+	// PrincipalKindUser is a user principal.
+	PrincipalKindUser PrincipalKind = "user"
+	// PrincipalKindService is a service principal.
+	PrincipalKindService PrincipalKind = "service"
+	// PrincipalKindApplication is an application principal.
 	PrincipalKindApplication PrincipalKind = "application"
-	PrincipalKindAgent       PrincipalKind = "agent"
+	// PrincipalKindAgent is an agent principal.
+	PrincipalKindAgent PrincipalKind = "agent"
 )
 
 // PrincipalRef is a stable identity in an owner-configured realm.
@@ -26,6 +31,8 @@ type PrincipalRef struct {
 	ID    string        `json:"id" yaml:"id"`
 }
 
+// Validate checks that the realm and id are canonical strings of at most 256
+// bytes and that the kind is one of the known principal kinds.
 func (reference PrincipalRef) Validate() error {
 	if !validPrincipalPart(reference.Realm) {
 		return fmt.Errorf("access: principal realm must be a non-empty canonical string of at most 256 bytes")
@@ -65,6 +72,8 @@ type Principal struct {
 	MembershipRevision string
 }
 
+// NewPrincipal validates subject and returns a principal holding a copy of it
+// together with copies of roles and groups.
 func NewPrincipal(subject PrincipalRef, roles, groups []string) (Principal, error) {
 	if err := subject.Validate(); err != nil {
 		return Principal{}, err
@@ -200,12 +209,14 @@ func MustPrincipalPolicySet(name string, ruleSets map[string][]Rule, bindings Bi
 	return set
 }
 
+// Name returns the policy set name.
 func (p *PrincipalPolicySet) Name() string { return p.name }
 
 // Source returns the storage-neutral reference supplied while loading the
 // document, if any.
 func (p *PrincipalPolicySet) Source() string { return p.source }
 
+// PolicyMetadata returns owner metadata, using private visibility when none is set.
 func (p *PrincipalPolicySet) PolicyMetadata() PolicyMetadata {
 	visibility := PolicyVisibility(p.visibility)
 	if visibility == "" {
@@ -259,8 +270,10 @@ func (p *PrincipalPolicySet) Decide(ctx context.Context, request Request) Decisi
 	return decision
 }
 
+// InspectionPure reports that the policy set is safe for plan and inspection evaluation.
 func (*PrincipalPolicySet) InspectionPure() bool { return true }
 
+// Authorize returns nil when Decide allows the request and a DeniedError otherwise.
 func (p *PrincipalPolicySet) Authorize(ctx context.Context, request Request) error {
 	decision := p.Decide(ctx, request)
 	if decision.Allowed {

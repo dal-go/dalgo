@@ -27,16 +27,21 @@ type recordReader struct {
 	records []record.Record
 }
 
+// Close returns nil.
 func (reader *recordReader) Close() error {
 	return nil
 }
 
+// Cursor clears the records, marks the reader closed, and returns an empty cursor.
 func (reader *recordReader) Cursor() (string, error) {
 	reader.records = nil
 	reader.i = -1
 	return "", nil
 }
 
+// Next returns the next record.
+// It returns an error when the reader is closed or when no records remain,
+// and it sleeps for the reader's delay when that delay is positive.
 func (reader *recordReader) Next() (record record.Record, err error) {
 	if reader.i == -1 {
 		return nil, errors.New("reader is closed")

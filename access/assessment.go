@@ -15,21 +15,36 @@ import (
 type ReasonCode string
 
 const (
-	CodeAccessDenied           ReasonCode = "ACCESS_DENIED"
-	CodeRuleDenied             ReasonCode = "ACL_RULE_DENIED"
-	CodeNoMatch                ReasonCode = "ACL_NO_MATCH"
-	CodeRowPredicateFailed     ReasonCode = "ACL_ROW_PREDICATE_FAILED"
-	CodePostImageFailed        ReasonCode = "ACL_POST_IMAGE_FAILED"
-	CodeColumnDenied           ReasonCode = "ACL_COLUMN_DENIED"
-	CodeEvaluationFailed       ReasonCode = "ACL_EVALUATION_FAILED"
-	CodeConfigurationInvalid   ReasonCode = "ACL_CONFIGURATION_INVALID"
-	CodeSourceUnavailable      ReasonCode = "ACL_SOURCE_UNAVAILABLE"
+	// CodeAccessDenied is the reason code used when a denial does not set its own code.
+	CodeAccessDenied ReasonCode = "ACCESS_DENIED"
+	// CodeRuleDenied is the reason code for a matching rule that denies the request.
+	CodeRuleDenied ReasonCode = "ACL_RULE_DENIED"
+	// CodeNoMatch is the reason code used when no rule allows the resource.
+	CodeNoMatch ReasonCode = "ACL_NO_MATCH"
+	// CodeRowPredicateFailed is the reason code used when a row fails a where condition.
+	CodeRowPredicateFailed ReasonCode = "ACL_ROW_PREDICATE_FAILED"
+	// CodePostImageFailed is the reason code used when a written row fails a check condition.
+	CodePostImageFailed ReasonCode = "ACL_POST_IMAGE_FAILED"
+	// CodeColumnDenied is the reason code used when a field is outside an allow-list.
+	CodeColumnDenied ReasonCode = "ACL_COLUMN_DENIED"
+	// CodeEvaluationFailed is the reason code used when a required policy evaluation fails.
+	CodeEvaluationFailed ReasonCode = "ACL_EVALUATION_FAILED"
+	// CodeConfigurationInvalid is the reason code used when the request or policy configuration is invalid.
+	CodeConfigurationInvalid ReasonCode = "ACL_CONFIGURATION_INVALID"
+	// CodeSourceUnavailable is the reason code used when a required policy source cannot be read.
+	CodeSourceUnavailable ReasonCode = "ACL_SOURCE_UNAVAILABLE"
+	// CodeEnforcementUnsupported is the reason code used when a policy cannot be enforced for the operation.
 	CodeEnforcementUnsupported ReasonCode = "ACL_ENFORCEMENT_UNSUPPORTED"
-	CodePrincipalUnresolved    ReasonCode = "ACL_PRINCIPAL_UNRESOLVED"
-	CodeCapabilityDenied       ReasonCode = "ACL_CAPABILITY_DENIED"
-	CodeExecutionClassDenied   ReasonCode = "ACL_EXECUTION_CLASS_DENIED"
-	CodeCallableDenied         ReasonCode = "ACL_CALLABLE_DENIED"
-	CodeCollectionDenied       ReasonCode = "ACL_COLLECTION_DENIED"
+	// CodePrincipalUnresolved is the reason code used when a realm-bound policy has no typed principal.
+	CodePrincipalUnresolved ReasonCode = "ACL_PRINCIPAL_UNRESOLVED"
+	// CodeCapabilityDenied is the reason code ACL_CAPABILITY_DENIED.
+	CodeCapabilityDenied ReasonCode = "ACL_CAPABILITY_DENIED"
+	// CodeExecutionClassDenied is the reason code used when an execution gate denies the request's execution class.
+	CodeExecutionClassDenied ReasonCode = "ACL_EXECUTION_CLASS_DENIED"
+	// CodeCallableDenied is the reason code used when an execution gate denies a stored procedure in an allowed namespace.
+	CodeCallableDenied ReasonCode = "ACL_CALLABLE_DENIED"
+	// CodeCollectionDenied is the reason code used when a collection mask denies the resource.
+	CodeCollectionDenied ReasonCode = "ACL_COLLECTION_DENIED"
 )
 
 // IsIndeterminate reports codes that represent failed or unavailable required
@@ -43,31 +58,47 @@ func (code ReasonCode) IsIndeterminate() bool {
 	}
 }
 
+// DecisionScope names the part of a request a decision refers to.
 type DecisionScope string
 
 const (
-	DecisionScopeRequest       DecisionScope = "request"
-	DecisionScopeDatabase      DecisionScope = "database"
-	DecisionScopeTable         DecisionScope = "table"
-	DecisionScopeRow           DecisionScope = "row"
-	DecisionScopeColumn        DecisionScope = "column"
-	DecisionScopeOperation     DecisionScope = "operation"
-	DecisionScopePrincipal     DecisionScope = "principal"
+	// DecisionScopeRequest is the decision scope for the request as a whole.
+	DecisionScopeRequest DecisionScope = "request"
+	// DecisionScopeDatabase is the decision scope for a database.
+	DecisionScopeDatabase DecisionScope = "database"
+	// DecisionScopeTable is the decision scope for a table or collection.
+	DecisionScopeTable DecisionScope = "table"
+	// DecisionScopeRow is the decision scope for a row condition.
+	DecisionScopeRow DecisionScope = "row"
+	// DecisionScopeColumn is the decision scope for a field.
+	DecisionScopeColumn DecisionScope = "column"
+	// DecisionScopeOperation is the decision scope for the operation.
+	DecisionScopeOperation DecisionScope = "operation"
+	// DecisionScopePrincipal is the decision scope for the caller.
+	DecisionScopePrincipal DecisionScope = "principal"
+	// DecisionScopeConfiguration is the decision scope for policy or request configuration.
 	DecisionScopeConfiguration DecisionScope = "configuration"
 )
 
+// DecisionSlot names the clause a restriction or denial refers to.
 type DecisionSlot string
 
 const (
-	DecisionSlotWhere  DecisionSlot = "where"
-	DecisionSlotCheck  DecisionSlot = "check"
+	// DecisionSlotWhere is the slot for a row where condition.
+	DecisionSlotWhere DecisionSlot = "where"
+	// DecisionSlotCheck is the slot for a post-image check.
+	DecisionSlotCheck DecisionSlot = "check"
+	// DecisionSlotFields is the slot for a field restriction.
 	DecisionSlotFields DecisionSlot = "fields"
 )
 
+// PolicyVisibility is the owner visibility of a policy, public or private.
 type PolicyVisibility string
 
 const (
-	PolicyVisibilityPublic  PolicyVisibility = "public"
+	// PolicyVisibilityPublic is public owner visibility.
+	PolicyVisibilityPublic PolicyVisibility = "public"
+	// PolicyVisibilityPrivate is private owner visibility.
 	PolicyVisibilityPrivate PolicyVisibility = "private"
 )
 
@@ -80,7 +111,11 @@ type PolicyMetadata struct {
 	Source     string
 }
 
-type PolicyMetadataProvider interface{ PolicyMetadata() PolicyMetadata }
+// PolicyMetadataProvider supplies a policy's trusted owner metadata.
+type PolicyMetadataProvider interface {
+	// PolicyMetadata returns the policy's trusted owner metadata.
+	PolicyMetadata() PolicyMetadata
+}
 
 // DescribePolicy returns a defensive copy of a policy's trusted metadata.
 // Policies without metadata are private by default.
@@ -103,8 +138,11 @@ type describedPolicy struct {
 	metadata PolicyMetadata
 }
 
+// PolicyMetadata returns the owner metadata attached to the policy.
 func (p describedPolicy) PolicyMetadata() PolicyMetadata { return p.metadata }
-func (p describedPolicy) InspectionPure() bool           { return CanInspectPolicy(p.Policy) }
+
+// InspectionPure reports whether the wrapped policy can be inspected.
+func (p describedPolicy) InspectionPure() bool { return CanInspectPolicy(p.Policy) }
 
 // WithPolicyMetadata attaches immutable owner snapshot metadata to a policy.
 func WithPolicyMetadata(policy Policy, metadata PolicyMetadata) (Policy, error) {
@@ -126,15 +164,21 @@ func WithPolicyMetadata(policy Policy, metadata PolicyMetadata) (Policy, error) 
 	return describedPolicy{Policy: policy, metadata: metadata}, nil
 }
 
+// AssessmentOutcome is the combined result of assessing a request against policies.
 type AssessmentOutcome string
 
 const (
-	AssessmentAllow         AssessmentOutcome = "allow"
-	AssessmentConditional   AssessmentOutcome = "conditional"
-	AssessmentDeny          AssessmentOutcome = "deny"
+	// AssessmentAllow is the outcome when every policy allows and no restriction remains.
+	AssessmentAllow AssessmentOutcome = "allow"
+	// AssessmentConditional is the outcome when policies allow with outstanding restrictions.
+	AssessmentConditional AssessmentOutcome = "conditional"
+	// AssessmentDeny is the outcome when a policy denies the request.
+	AssessmentDeny AssessmentOutcome = "deny"
+	// AssessmentIndeterminate is the outcome when evaluation does not complete.
 	AssessmentIndeterminate AssessmentOutcome = "indeterminate"
 )
 
+// PolicyAssessment is one policy's metadata and decision within an assessment.
 type PolicyAssessment struct {
 	OperationID string
 	LayerID     string
@@ -169,6 +213,8 @@ func (restriction AssessmentRestriction) DocumentCondition() (*DocumentCondition
 	return nil, fmt.Errorf("%w: restriction has no policy-source expression", ErrNotSerializable)
 }
 
+// Assessment is the result of assessing a request: the outcome, whether
+// evaluation completed, each policy's decision, and any outstanding restrictions.
 type Assessment struct {
 	Outcome      AssessmentOutcome
 	Complete     bool
@@ -250,8 +296,13 @@ func (a *policyAssessment) applyStaticFieldValidation(request Request) {
 
 type namedPolicy string
 
-func (p namedPolicy) Name() string                           { return string(p) }
+// Name returns the policy name stored in the value.
+func (p namedPolicy) Name() string { return string(p) }
+
+// Decide returns an empty decision. The context and request are ignored.
 func (namedPolicy) Decide(context.Context, Request) Decision { return Decision{} }
+
+// Authorize returns nil. The context and request are ignored.
 func (namedPolicy) Authorize(context.Context, Request) error { return nil }
 
 func writeMayAllowField(write *WriteResidual, field string) bool {

@@ -64,6 +64,7 @@ type SourceViewDef struct {
 // SourceViewReader is an optional schema-introspection capability. It is
 // separate from SchemaReader so existing drivers need no API changes.
 type SourceViewReader interface {
+	// ListSourceViews returns the provider's view definitions.
 	ListSourceViews(ctx context.Context) ([]SourceViewDef, error)
 }
 
@@ -79,7 +80,9 @@ type SourceRow struct {
 // SourceRowCursor streams source rows without buffering the collection.
 // Next returns io.EOF after the last row. The caller must Close the cursor.
 type SourceRowCursor interface {
+	// Next returns the next source row, or io.EOF after the last row.
 	Next() (SourceRow, error)
+	// Close closes the cursor.
 	Close() error
 }
 
@@ -87,6 +90,7 @@ type SourceRowCursor interface {
 // preserve source storage classes more faithfully than a general query.
 // Generic exporters may fall back to dal.QueryExecutor when it is absent.
 type SourceRowsReader interface {
+	// OpenSourceRows opens a cursor over the source rows of ref.
 	OpenSourceRows(ctx context.Context, ref *dal.CollectionRef) (SourceRowCursor, error)
 }
 
@@ -96,5 +100,7 @@ type SourceRowsReader interface {
 // means only that the source snapshot passed that provider's checks; it does
 // not claim that an export destination enforces equivalent constraints.
 type SourceConstraintChecker interface {
+	// CheckSourceConstraints asks the source provider to verify its stored data
+	// with its native constraint semantics.
 	CheckSourceConstraints(ctx context.Context) error
 }

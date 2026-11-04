@@ -17,7 +17,9 @@ type Precondition interface {
 
 // Preconditions defines preconditions
 type Preconditions interface {
+	// Exists reports whether the exists precondition is set.
 	Exists() bool
+	// LastUpdateTime returns the last-update-time precondition.
 	LastUpdateTime() time.Time
 }
 

@@ -21,6 +21,8 @@ type FederatedProgress struct {
 	Rows     int64
 }
 
+// FederatedQueryOptions configures a federated query.
+// OnProgress receives FederatedProgress values. Money, when set, selects the streaming money aggregate when the query shape allows it.
 type FederatedQueryOptions struct {
 	OnProgress func(FederatedProgress)
 	Money      *MoneyConfig
@@ -118,6 +120,8 @@ func (e federatedQueryExecutor) sourceExecutor(ctx context.Context, source Recor
 	return e.resolve(ctx, ref.Database())
 }
 
+// ExecuteQueryToRecordsReader resolves the executor for the query's database and delegates to it.
+// When a progress callback is set, the reader is wrapped so progress is reported.
 func (e federatedQueryExecutor) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
 	executor, err := e.executor(ctx, query)
 	if err != nil {
@@ -146,6 +150,7 @@ type federatedProgressMetadataReader struct {
 	provider QueryMetadataProvider
 }
 
+// QueryMetadata returns a clone of the provider's query metadata.
 func (r *federatedProgressMetadataReader) QueryMetadata() datarights.QueryMetadata {
 	return r.provider.QueryMetadata().Clone()
 }
@@ -157,6 +162,8 @@ type federatedProgressReader struct {
 	report          func(FederatedProgress)
 }
 
+// Next returns the next record from the embedded reader.
+// On a record it increments the row count and reports progress every 1024 rows. On ErrNoMoreRecords it reports the final count.
 func (r *federatedProgressReader) Next() (record.Record, error) {
 	row, err := r.RecordsReader.Next()
 	switch err {
@@ -171,6 +178,7 @@ func (r *federatedProgressReader) Next() (record.Record, error) {
 	return row, err
 }
 
+// ExecuteQueryToRecordsetReader resolves the executor for the query's database and delegates to its ExecuteQueryToRecordsetReader.
 func (e federatedQueryExecutor) ExecuteQueryToRecordsetReader(ctx context.Context, query Query, options ...recordset.Option) (RecordsetReader, error) {
 	executor, err := e.executor(ctx, query)
 	if err != nil {
@@ -179,6 +187,8 @@ func (e federatedQueryExecutor) ExecuteQueryToRecordsetReader(ctx context.Contex
 	return executor.ExecuteQueryToRecordsetReader(ctx, query, options...)
 }
 
+// JoinFields resolves the executor for source and, when that executor implements JoinFieldsProvider, returns its JoinFields.
+// When the executor has no JoinFields method it returns nil, nil.
 func (e federatedQueryExecutor) JoinFields(ctx context.Context, source RecordsetSource) ([]string, error) {
 	executor, err := e.sourceExecutor(ctx, source)
 	if err != nil {

@@ -50,42 +50,52 @@ type structuredQuery struct {
 	startAfter  Cursor
 }
 
+// GetRecordsReader delegates to qe.ExecuteQueryToRecordsReader.
 func (q structuredQuery) GetRecordsReader(ctx context.Context, qe QueryExecutor) (reader RecordsReader, err error) {
 	return qe.ExecuteQueryToRecordsReader(ctx, q)
 }
 
+// GetRecordsetReader delegates to qe.ExecuteQueryToRecordsetReader and passes q's recordset options.
 func (q structuredQuery) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (reader RecordsetReader, err error) {
 	return qe.ExecuteQueryToRecordsetReader(ctx, q, q.recordsetOptions...)
 }
 
+// Text returns the same text as String.
 func (q structuredQuery) Text() string {
 	return q.String()
 }
 
+// From returns the from source.
 func (q structuredQuery) From() FromSource {
 	return q.from
 }
 
+// Where returns the filter condition.
 func (q structuredQuery) Where() Condition {
 	return q.where
 }
 
+// GroupBy returns the group-by expressions.
 func (q structuredQuery) GroupBy() []Expression {
 	return q.groupBy[:]
 }
 
+// Having returns the post-aggregation filter.
 func (q structuredQuery) Having() Condition {
 	return q.having
 }
 
+// OrderBy returns the order expressions.
 func (q structuredQuery) OrderBy() []OrderExpression {
 	return q.orderBy[:]
 }
 
+// Columns returns the selected columns.
 func (q structuredQuery) Columns() []Column {
 	return q.columns[:]
 }
 
+// IntoRecord returns the record built for a new row, or nil when no constructor is set.
 func (q structuredQuery) IntoRecord() record.Record {
 	if q.intoRecord == nil {
 		return nil
@@ -93,20 +103,25 @@ func (q structuredQuery) IntoRecord() record.Record {
 	return q.intoRecord()
 }
 
+// IDKind returns the kind of the record ID.
 func (q structuredQuery) IDKind() reflect.Kind {
 	return q.idKind
 }
 
+// StartFrom returns the start cursor.
 func (q structuredQuery) StartFrom() Cursor {
 	return q.startCursor
 }
 
+// StartAfter returns the start-after cursor.
 func (q structuredQuery) StartAfter() Cursor { return q.startAfter }
 
+// Offset returns the number of records to skip.
 func (q structuredQuery) Offset() int {
 	return q.offset
 }
 
+// Limit returns the maximum number of records to return.
 func (q structuredQuery) Limit() int {
 	return q.limit
 }
@@ -245,6 +260,7 @@ type queryOverride struct {
 	hasColumns bool
 }
 
+// Where returns the replacement condition when one was set, and otherwise the wrapped query's condition.
 func (w queryOverride) Where() Condition {
 	if w.hasWhere {
 		return w.where
@@ -252,6 +268,7 @@ func (w queryOverride) Where() Condition {
 	return w.StructuredQuery.Where()
 }
 
+// Columns returns the replacement columns when they were set, and otherwise the wrapped query's columns.
 func (w queryOverride) Columns() []Column {
 	if w.hasColumns {
 		return w.columns
@@ -261,10 +278,12 @@ func (w queryOverride) Columns() []Column {
 
 func (w queryOverride) String() string { return QueryString(w) }
 
+// GetRecordsReader delegates to qe.ExecuteQueryToRecordsReader with w.
 func (w queryOverride) GetRecordsReader(ctx context.Context, qe QueryExecutor) (RecordsReader, error) {
 	return qe.ExecuteQueryToRecordsReader(ctx, w)
 }
 
+// GetRecordsetReader delegates to qe.ExecuteQueryToRecordsetReader with w.
 func (w queryOverride) GetRecordsetReader(ctx context.Context, qe QueryExecutor) (RecordsetReader, error) {
 	return qe.ExecuteQueryToRecordsetReader(ctx, w)
 }

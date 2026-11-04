@@ -1,15 +1,23 @@
 package dal
 
+// RecordsetSource is a named recordset that a query can read.
 type RecordsetSource interface {
+	// Name returns the recordset name.
 	Name() string
+	// Alias returns the recordset alias.
 	Alias() string
 	recordsetSource()
 }
 
+// FromSource is a FROM clause: a base recordset and the joins applied to it.
 type FromSource interface {
+	// Base returns the base recordset.
 	Base() RecordsetSource
+	// Join appends joint and returns the from source.
 	Join(joint JoinedSource) FromSource
+	// Joins returns the joined sources.
 	Joins() []JoinedSource
+	// NewQuery returns a query builder for this from source.
 	NewQuery() *QueryBuilder
 }
 
@@ -21,10 +29,12 @@ type from struct {
 	joins []JoinedSource
 }
 
+// Base returns the embedded recordset source.
 func (f *from) Base() RecordsetSource {
 	return f.RecordsetSource
 }
 
+// NewQuery returns a query builder over a copy of f and its joins.
 func (f *from) NewQuery() *QueryBuilder {
 	f2 := &from{
 		RecordsetSource: f.RecordsetSource,
@@ -43,12 +53,14 @@ func (f *from) NewQuery() *QueryBuilder {
 	return NewQueryBuilder(f2)
 }
 
+// Joins returns a copy of the joins.
 func (f *from) Joins() []JoinedSource {
 	joins := make([]JoinedSource, len(f.joins))
 	copy(joins, f.joins)
 	return joins
 }
 
+// Join appends joint to f and returns f.
 func (f *from) Join(joint JoinedSource) FromSource {
 	f.joins = append(f.joins, joint)
 	return f
@@ -60,10 +72,15 @@ func (f *from) Join(joint JoinedSource) FromSource {
 type JoinType string
 
 const (
+	// JoinInner is an inner join. Executors support it.
 	JoinInner JoinType = "INNER"
-	JoinLeft  JoinType = "LEFT"
+	// JoinLeft is a left join. Executors support it.
+	JoinLeft JoinType = "LEFT"
+	// JoinRight is a right join. It is reserved and rejected until implemented.
 	JoinRight JoinType = "RIGHT"
-	JoinFull  JoinType = "FULL"
+	// JoinFull is a full join. It is reserved and rejected until implemented.
+	JoinFull JoinType = "FULL"
+	// JoinCross is a cross join. It is reserved and rejected until implemented.
 	JoinCross JoinType = "CROSS"
 )
 
@@ -71,13 +88,19 @@ const (
 type JoinAlgorithm string
 
 const (
-	JoinAlgorithmHash          JoinAlgorithm = "hash"
-	JoinAlgorithmMerge         JoinAlgorithm = "merge"
-	JoinAlgorithmLookup        JoinAlgorithm = "lookup"
+	// JoinAlgorithmHash is the hash join strategy preference.
+	JoinAlgorithmHash JoinAlgorithm = "hash"
+	// JoinAlgorithmMerge is the merge join strategy preference.
+	JoinAlgorithmMerge JoinAlgorithm = "merge"
+	// JoinAlgorithmLookup is the lookup join strategy preference.
+	JoinAlgorithmLookup JoinAlgorithm = "lookup"
+	// JoinAlgorithmBatchedLookup is the batched lookup join strategy preference.
 	JoinAlgorithmBatchedLookup JoinAlgorithm = "batchedLookup"
-	JoinAlgorithmNestedLoop    JoinAlgorithm = "nestedLoop"
+	// JoinAlgorithmNestedLoop is the nested-loop join strategy preference.
+	JoinAlgorithmNestedLoop JoinAlgorithm = "nestedLoop"
 )
 
+// JoinedSource is a recordset joined to a from source, with a join type, ON conditions, and optional nested from and algorithm preferences.
 type JoinedSource struct {
 	RecordsetSource
 	joinType   JoinType

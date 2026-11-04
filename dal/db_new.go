@@ -181,6 +181,7 @@ type validatedReadTx struct {
 
 var _ ReadTransaction = (*validatedReadTx)(nil)
 
+// ExecuteQueryToRecordsReader delegates to executePlannedRecords with the transaction, its capabilities, and its join provider.
 func (tx *validatedReadTx) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
 	return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 }
@@ -217,12 +218,16 @@ type validatedTx struct {
 
 var _ ReadwriteTransaction = (*validatedTx)(nil)
 
+// ID returns the ID of the underlying read-write transaction.
 func (tx *validatedTx) ID() string { return tx.rw.ID() }
 
+// ExecuteQueryToRecordsReader delegates to executePlannedRecords with the transaction, its capabilities, and its join provider.
 func (tx *validatedTx) ExecuteQueryToRecordsReader(ctx context.Context, query Query) (RecordsReader, error) {
 	return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)
 }
 
+// Select routes an aggregate, join, or subquery through executePlannedRecords.
+// Any other query is checked with validateQueryPlacement, then passed to the transaction's Select when it has one, otherwise to ExecuteQueryToRecordsReader.
 func (tx *validatedTx) Select(ctx context.Context, query Query) (Reader, error) {
 	if q, ok := query.(StructuredQuery); ok && (HasAggregation(q) || hasJoin(query) || HasSubquery(q)) {
 		return executePlannedRecords(ctx, tx.ReadTransaction, query, tx.capabilities, tx.joinProvider)

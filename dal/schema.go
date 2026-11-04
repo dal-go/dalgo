@@ -2,6 +2,7 @@ package dal
 
 import "github.com/dal-go/record"
 
+// NewSchema returns a schema that maps keys with keyToField and data with dataToKey.
 func NewSchema(keyToField KeyToFieldsFunc, dataToKey DataToKeyFunc) Schema {
 	return &SchemaBase{keyToFields: keyToField, dataToKey: dataToKey}
 }
@@ -13,8 +14,11 @@ type KeyToFieldsFunc func(key *record.Key, data any) (fields []ExtraField, err e
 // DataToKeyFunc takes data retrieved from DB table/view/query and maps primary key columns to the record key.
 type DataToKeyFunc func(incompleteKey *record.Key, data any) (key *record.Key, err error)
 
+// Schema maps stored data to record keys and record keys to extra fields.
 type Schema interface {
+	// DataToKey maps data read from storage onto a record key.
 	DataToKey(incompleteKey *record.Key, data any) (key *record.Key, err error)
+	// KeyToFields maps a key onto extra fields stored with the record.
 	KeyToFields(key *record.Key, data any) (fields []ExtraField, err error)
 }
 

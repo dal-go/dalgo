@@ -15,8 +15,10 @@ import (
 const (
 	// DocumentAPIVersion is the first stable portable policy document version.
 	DocumentAPIVersion = "dalgo.io/access/v1"
-	AccessPolicyKind   = "AccessPolicy"
-	AuditPolicyKind    = "AuditPolicy"
+	// AccessPolicyKind is the document kind for an access policy.
+	AccessPolicyKind = "AccessPolicy"
+	// AuditPolicyKind is the document kind for an audit policy.
+	AuditPolicyKind = "AuditPolicy"
 )
 
 // Document is the storage-neutral representation shared by YAML, JSON, and
@@ -43,6 +45,7 @@ type DocumentBindings struct {
 	Everyone []string            `json:"everyone,omitempty" yaml:"everyone,omitempty"`
 }
 
+// DocumentMetadata holds the name of a portable policy document.
 type DocumentMetadata struct {
 	Name string `json:"name" yaml:"name"`
 }
@@ -60,6 +63,8 @@ type DocumentScope struct {
 	Scopes          []DocumentScope `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 }
 
+// DocumentRule is one portable rule: an id, an effect, the operations it
+// covers, and optional where, check, and field constraints.
 type DocumentRule struct {
 	ID         string   `json:"id" yaml:"id"`
 	Effect     string   `json:"effect" yaml:"effect"`
@@ -78,12 +83,17 @@ type DocumentRule struct {
 // Codec decouples policy loading from both its syntax and its storage. A
 // caller may implement this interface for HCL or another representation.
 type Codec interface {
+	// Decode reads one policy document from the reader into document.
 	Decode(io.Reader, *Document) error
+	// Encode writes document to the writer.
 	Encode(io.Writer, Document) error
 }
 
+// YAMLCodec decodes and encodes a policy document as YAML.
 type YAMLCodec struct{}
 
+// Decode decodes one YAML document into document and rejects a stream that
+// contains another value. Unknown fields are rejected.
 func (YAMLCodec) Decode(reader io.Reader, document *Document) error {
 	decoder := yaml.NewDecoder(reader)
 	decoder.KnownFields(true)
@@ -93,6 +103,7 @@ func (YAMLCodec) Decode(reader io.Reader, document *Document) error {
 	return ensureSingleDocument(func(value any) error { return decoder.Decode(value) })
 }
 
+// Encode writes document as YAML indented by two spaces.
 func (YAMLCodec) Encode(writer io.Writer, document Document) (err error) {
 	encoder := yaml.NewEncoder(writer)
 	encoder.SetIndent(2)
@@ -105,8 +116,11 @@ func (YAMLCodec) Encode(writer io.Writer, document Document) (err error) {
 	return nil
 }
 
+// JSONCodec decodes and encodes a policy document as JSON.
 type JSONCodec struct{}
 
+// Decode decodes one JSON document into document and rejects a stream that
+// contains another value. Unknown fields are rejected.
 func (JSONCodec) Decode(reader io.Reader, document *Document) error {
 	decoder := json.NewDecoder(reader)
 	decoder.DisallowUnknownFields()
@@ -116,6 +130,7 @@ func (JSONCodec) Decode(reader io.Reader, document *Document) error {
 	return ensureSingleDocument(func(value any) error { return decoder.Decode(value) })
 }
 
+// Encode writes document as indented JSON.
 func (JSONCodec) Encode(writer io.Writer, document Document) error {
 	encoder := json.NewEncoder(writer)
 	encoder.SetIndent("", "  ")
@@ -139,6 +154,7 @@ func ensureSingleDocument(next func(any) error) error {
 
 type decodeOptions struct{ source string }
 
+// DecodeOption configures decoding of one policy document.
 type DecodeOption func(*decodeOptions)
 
 // WithSource records where a policy document came from. It may be a file
@@ -276,6 +292,7 @@ func EncodePrincipalPolicySet(writer io.Writer, codec Codec, set *PrincipalPolic
 	return encodeDocument(writer, codec, document)
 }
 
+// MarshalPrincipalPolicySetYAML encodes set by delegating to EncodePrincipalPolicySet with YAMLCodec.
 func MarshalPrincipalPolicySetYAML(set *PrincipalPolicySet) ([]byte, error) {
 	var data bytes.Buffer
 	if err := EncodePrincipalPolicySet(&data, YAMLCodec{}, set); err != nil {
@@ -284,6 +301,7 @@ func MarshalPrincipalPolicySetYAML(set *PrincipalPolicySet) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// MarshalPrincipalPolicySetJSON encodes set by delegating to EncodePrincipalPolicySet with JSONCodec.
 func MarshalPrincipalPolicySetJSON(set *PrincipalPolicySet) ([]byte, error) {
 	var data bytes.Buffer
 	if err := EncodePrincipalPolicySet(&data, JSONCodec{}, set); err != nil {
@@ -292,10 +310,12 @@ func MarshalPrincipalPolicySetJSON(set *PrincipalPolicySet) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// UnmarshalPrincipalPolicySetYAML decodes a principal policy set by delegating to DecodePrincipalPolicySet with YAMLCodec.
 func UnmarshalPrincipalPolicySetYAML(data []byte, options ...DecodeOption) (*PrincipalPolicySet, error) {
 	return DecodePrincipalPolicySet(bytes.NewReader(data), YAMLCodec{}, options...)
 }
 
+// UnmarshalPrincipalPolicySetJSON decodes a principal policy set by delegating to DecodePrincipalPolicySet with JSONCodec.
 func UnmarshalPrincipalPolicySetJSON(data []byte, options ...DecodeOption) (*PrincipalPolicySet, error) {
 	return DecodePrincipalPolicySet(bytes.NewReader(data), JSONCodec{}, options...)
 }
@@ -384,10 +404,12 @@ func encodeDocument(writer io.Writer, codec Codec, document Document) error {
 	return codec.Encode(writer, document)
 }
 
+// MarshalAccessPolicyYAML encodes policy as YAML.
 func MarshalAccessPolicyYAML(policy *AccessPolicy) ([]byte, error) {
 	return marshalAccessPolicy(policy, YAMLCodec{})
 }
 
+// MarshalAccessPolicyJSON encodes policy as JSON.
 func MarshalAccessPolicyJSON(policy *AccessPolicy) ([]byte, error) {
 	return marshalAccessPolicy(policy, JSONCodec{})
 }
@@ -400,10 +422,12 @@ func marshalAccessPolicy(policy *AccessPolicy, codec Codec) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// MarshalAuditPolicyYAML encodes policy as YAML.
 func MarshalAuditPolicyYAML(policy *AuditPolicy) ([]byte, error) {
 	return marshalAuditPolicy(policy, YAMLCodec{})
 }
 
+// MarshalAuditPolicyJSON encodes policy as JSON.
 func MarshalAuditPolicyJSON(policy *AuditPolicy) ([]byte, error) {
 	return marshalAuditPolicy(policy, JSONCodec{})
 }
@@ -416,18 +440,22 @@ func marshalAuditPolicy(policy *AuditPolicy, codec Codec) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// UnmarshalAccessPolicyYAML decodes an access policy by delegating to DecodeAccessPolicy with YAMLCodec.
 func UnmarshalAccessPolicyYAML(data []byte, options ...DecodeOption) (*AccessPolicy, error) {
 	return DecodeAccessPolicy(bytes.NewReader(data), YAMLCodec{}, options...)
 }
 
+// UnmarshalAccessPolicyJSON decodes an access policy by delegating to DecodeAccessPolicy with JSONCodec.
 func UnmarshalAccessPolicyJSON(data []byte, options ...DecodeOption) (*AccessPolicy, error) {
 	return DecodeAccessPolicy(bytes.NewReader(data), JSONCodec{}, options...)
 }
 
+// UnmarshalAuditPolicyYAML decodes an audit policy by delegating to DecodeAuditPolicy with YAMLCodec.
 func UnmarshalAuditPolicyYAML(data []byte, options ...DecodeOption) (*AuditPolicy, error) {
 	return DecodeAuditPolicy(bytes.NewReader(data), YAMLCodec{}, options...)
 }
 
+// UnmarshalAuditPolicyJSON decodes an audit policy by delegating to DecodeAuditPolicy with JSONCodec.
 func UnmarshalAuditPolicyJSON(data []byte, options ...DecodeOption) (*AuditPolicy, error) {
 	return DecodeAuditPolicy(bytes.NewReader(data), JSONCodec{}, options...)
 }

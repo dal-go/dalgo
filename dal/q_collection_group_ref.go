@@ -4,6 +4,7 @@ import "fmt"
 
 var _ RecordsetSource = (*CollectionGroupRef)(nil)
 
+// CollectionGroupRef refers to a collection group by name, with an optional alias.
 type CollectionGroupRef struct {
 	name  string
 	alias string
@@ -13,13 +14,17 @@ func (CollectionGroupRef) recordsetSource() {
 	_ = 0 // marker statement
 }
 
+// Name returns the collection group name.
 func (v CollectionGroupRef) Name() string {
 	return v.name
 }
+
+// Alias returns the collection group alias.
 func (v CollectionGroupRef) Alias() string {
 	return v.alias
 }
 
+// NewCollectionGroupRef returns a collection group reference. An empty name panics.
 func NewCollectionGroupRef(name, alias string) CollectionGroupRef {
 	if name == "" {
 		panic("name of collection group reference cannot be empty")

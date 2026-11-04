@@ -13,83 +13,146 @@ import (
 	"github.com/dal-go/dalgo/access"
 )
 
+// APIVersion is the authorization result apiVersion, tugql.org/authorization/v1.
 const APIVersion = "tugql.org/authorization/v1"
 
+// Outcome is an authorization result discriminator.
+// Validate accepts allow, conditional, deny, and indeterminate.
 type Outcome string
 
 const (
-	OutcomeAllow         Outcome = "allow"
-	OutcomeConditional   Outcome = "conditional"
-	OutcomeDeny          Outcome = "deny"
+	// OutcomeAllow is the outcome value "allow".
+	OutcomeAllow Outcome = "allow"
+	// OutcomeConditional is the outcome value "conditional".
+	OutcomeConditional Outcome = "conditional"
+	// OutcomeDeny is the outcome value "deny".
+	OutcomeDeny Outcome = "deny"
+	// OutcomeIndeterminate is the outcome value "indeterminate".
 	OutcomeIndeterminate Outcome = "indeterminate"
 )
 
+// Mode is the authorization mode.
+// Validate accepts plan, inspect, sample, and execution.
 type Mode string
 
 const (
-	ModePlan      Mode = "plan"
-	ModeInspect   Mode = "inspect"
-	ModeSample    Mode = "sample"
+	// ModePlan is the mode value "plan".
+	ModePlan Mode = "plan"
+	// ModeInspect is the mode value "inspect".
+	ModeInspect Mode = "inspect"
+	// ModeSample is the mode value "sample".
+	// Sample mode requires scope "sample" and a Sample summary.
+	ModeSample Mode = "sample"
+	// ModeExecution is the mode value "execution".
 	ModeExecution Mode = "execution"
 )
 
+// EvaluationCompleteness is the coverage evaluation discriminator.
+// Validate accepts complete and partial.
 type EvaluationCompleteness string
 
 const (
+	// EvaluationComplete is the evaluation value "complete".
+	// Allowed is true exactly when the result is allow and evaluation is complete.
 	EvaluationComplete EvaluationCompleteness = "complete"
-	EvaluationPartial  EvaluationCompleteness = "partial"
+	// EvaluationPartial is the evaluation value "partial".
+	EvaluationPartial EvaluationCompleteness = "partial"
 )
 
+// DisclosureCompleteness is the coverage disclosure discriminator.
+// Validate accepts full and redacted.
 type DisclosureCompleteness string
 
 const (
-	DisclosureFull     DisclosureCompleteness = "full"
+	// DisclosureFull is the disclosure value "full".
+	DisclosureFull DisclosureCompleteness = "full"
+	// DisclosureRedacted is the disclosure value "redacted".
 	DisclosureRedacted DisclosureCompleteness = "redacted"
 )
 
+// Scope names what a result, decision, or blocker applies to.
+// A Result scope is request or sample.
+// Decisions and blockers use database, table, row, column, operation, principal, or configuration.
 type Scope string
 
 const (
-	ScopeRequest       Scope = "request"
-	ScopeSample        Scope = "sample"
-	ScopeDatabase      Scope = "database"
-	ScopeTable         Scope = "table"
-	ScopeRow           Scope = "row"
-	ScopeColumn        Scope = "column"
-	ScopeOperation     Scope = "operation"
-	ScopePrincipal     Scope = "principal"
+	// ScopeRequest is the scope value "request".
+	// A non-sample result requires it.
+	ScopeRequest Scope = "request"
+	// ScopeSample is the scope value "sample".
+	// Sample mode requires it.
+	ScopeSample Scope = "sample"
+	// ScopeDatabase is the scope value "database".
+	ScopeDatabase Scope = "database"
+	// ScopeTable is the scope value "table".
+	ScopeTable Scope = "table"
+	// ScopeRow is the scope value "row".
+	ScopeRow Scope = "row"
+	// ScopeColumn is the scope value "column".
+	ScopeColumn Scope = "column"
+	// ScopeOperation is the scope value "operation".
+	ScopeOperation Scope = "operation"
+	// ScopePrincipal is the scope value "principal".
+	ScopePrincipal Scope = "principal"
+	// ScopeConfiguration is the scope value "configuration".
 	ScopeConfiguration Scope = "configuration"
 )
 
+// ExecutionClass names how an operation runs.
+// Validate accepts tugql, native_sql, native_graphql, and stored_procedure.
 type ExecutionClass string
 
 const (
-	ExecutionTugQL           ExecutionClass = "tugql"
-	ExecutionNativeSQL       ExecutionClass = "native_sql"
-	ExecutionNativeGraphQL   ExecutionClass = "native_graphql"
+	// ExecutionTugQL is the execution class "tugql".
+	ExecutionTugQL ExecutionClass = "tugql"
+	// ExecutionNativeSQL is the execution class "native_sql".
+	ExecutionNativeSQL ExecutionClass = "native_sql"
+	// ExecutionNativeGraphQL is the execution class "native_graphql".
+	ExecutionNativeGraphQL ExecutionClass = "native_graphql"
+	// ExecutionStoredProcedure is the execution class "stored_procedure".
+	// An operation sets Callable exactly when its class is ExecutionStoredProcedure.
 	ExecutionStoredProcedure ExecutionClass = "stored_procedure"
 )
 
+// ReasonCode is a blocker code. It aliases access.ReasonCode.
 type ReasonCode = access.ReasonCode
 
 const (
-	CodeAccessDenied           = access.CodeAccessDenied
-	CodeRuleDenied             = access.CodeRuleDenied
-	CodeNoMatch                = access.CodeNoMatch
-	CodeRowPredicateFailed     = access.CodeRowPredicateFailed
-	CodePostImageFailed        = access.CodePostImageFailed
-	CodeColumnDenied           = access.CodeColumnDenied
-	CodeEvaluationFailed       = access.CodeEvaluationFailed
-	CodeConfigurationInvalid   = access.CodeConfigurationInvalid
-	CodeSourceUnavailable      = access.CodeSourceUnavailable
+	// CodeAccessDenied aliases access.CodeAccessDenied, the blocker code ACCESS_DENIED.
+	CodeAccessDenied = access.CodeAccessDenied
+	// CodeRuleDenied aliases access.CodeRuleDenied, the blocker code ACL_RULE_DENIED.
+	CodeRuleDenied = access.CodeRuleDenied
+	// CodeNoMatch aliases access.CodeNoMatch, the blocker code ACL_NO_MATCH.
+	CodeNoMatch = access.CodeNoMatch
+	// CodeRowPredicateFailed aliases access.CodeRowPredicateFailed, the blocker code ACL_ROW_PREDICATE_FAILED.
+	CodeRowPredicateFailed = access.CodeRowPredicateFailed
+	// CodePostImageFailed aliases access.CodePostImageFailed, the blocker code ACL_POST_IMAGE_FAILED.
+	CodePostImageFailed = access.CodePostImageFailed
+	// CodeColumnDenied aliases access.CodeColumnDenied, the blocker code ACL_COLUMN_DENIED.
+	CodeColumnDenied = access.CodeColumnDenied
+	// CodeEvaluationFailed aliases access.CodeEvaluationFailed, the blocker code ACL_EVALUATION_FAILED.
+	CodeEvaluationFailed = access.CodeEvaluationFailed
+	// CodeConfigurationInvalid aliases access.CodeConfigurationInvalid, the blocker code ACL_CONFIGURATION_INVALID.
+	CodeConfigurationInvalid = access.CodeConfigurationInvalid
+	// CodeSourceUnavailable aliases access.CodeSourceUnavailable, the blocker code ACL_SOURCE_UNAVAILABLE.
+	CodeSourceUnavailable = access.CodeSourceUnavailable
+	// CodeEnforcementUnsupported aliases access.CodeEnforcementUnsupported, the blocker code ACL_ENFORCEMENT_UNSUPPORTED.
 	CodeEnforcementUnsupported = access.CodeEnforcementUnsupported
-	CodePrincipalUnresolved    = access.CodePrincipalUnresolved
-	CodeCapabilityDenied       = access.CodeCapabilityDenied
-	CodeExecutionClassDenied   = access.CodeExecutionClassDenied
-	CodeCallableDenied         = access.CodeCallableDenied
-	CodeCollectionDenied       = access.CodeCollectionDenied
+	// CodePrincipalUnresolved aliases access.CodePrincipalUnresolved, the blocker code ACL_PRINCIPAL_UNRESOLVED.
+	CodePrincipalUnresolved = access.CodePrincipalUnresolved
+	// CodeCapabilityDenied aliases access.CodeCapabilityDenied, the blocker code ACL_CAPABILITY_DENIED.
+	CodeCapabilityDenied = access.CodeCapabilityDenied
+	// CodeExecutionClassDenied aliases access.CodeExecutionClassDenied, the blocker code ACL_EXECUTION_CLASS_DENIED.
+	CodeExecutionClassDenied = access.CodeExecutionClassDenied
+	// CodeCallableDenied aliases access.CodeCallableDenied, the blocker code ACL_CALLABLE_DENIED.
+	CodeCallableDenied = access.CodeCallableDenied
+	// CodeCollectionDenied aliases access.CodeCollectionDenied, the blocker code ACL_COLLECTION_DENIED.
+	CodeCollectionDenied = access.CodeCollectionDenied
 )
 
+// Result is one portable authorization result.
+// ParseResult rejects duplicate keys, missing required fields, and unknown fields.
+// Validate requires apiVersion APIVersion and consistent mode, scope, outcome, and coverage.
 type Result struct {
 	APIVersion   string            `json:"apiVersion"`
 	RequestID    string            `json:"requestId"`
@@ -105,11 +168,19 @@ type Result struct {
 	Restrictions []Restriction     `json:"restrictions"`
 	Sample       *Sample           `json:"sample,omitempty"`
 }
+
+// AuthorizationResult is an alias of Result.
 type AuthorizationResult = Result
+
+// OperationRef identifies an operation by ID and RequestOperationID.
 type OperationRef struct {
 	ID                 string `json:"id"`
 	RequestOperationID string `json:"requestOperationId"`
 }
+
+// OperationResult is one operation inside a Result.
+// RestrictionIDs and AllOf must contain the same ids.
+// Callable is present exactly when ExecutionClass is ExecutionStoredProcedure.
 type OperationResult struct {
 	ID                 string         `json:"id"`
 	RequestOperationID string         `json:"requestOperationId"`
@@ -121,6 +192,9 @@ type OperationResult struct {
 	ExecutionClass     ExecutionClass `json:"executionClass"`
 	Callable           *Callable      `json:"callable,omitempty"`
 }
+
+// Resource identifies a database object by DatabaseID and Path.
+// Table, RowID, and Columns are optional, and each column path must be unique.
 type Resource struct {
 	DatabaseID string     `json:"databaseId"`
 	Path       string     `json:"path"`
@@ -128,10 +202,16 @@ type Resource struct {
 	RowID      string     `json:"rowId,omitempty"`
 	Columns    [][]string `json:"columns,omitempty"`
 }
+
+// Callable names a stored procedure by Namespace and Name.
 type Callable struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
 }
+
+// Source identifies the owner of a layer.
+// OwnerID, Provider, DatabaseID, and Kind are required.
+// Kind is datatug, openvaultdb, ingitdb, application, or adapter.
 type Source struct {
 	OwnerID    string `json:"ownerId"`
 	Provider   string `json:"provider"`
@@ -139,6 +219,9 @@ type Source struct {
 	Kind       string `json:"kind"`
 	Reference  string `json:"reference,omitempty"`
 }
+
+// PolicyRef identifies a policy by owner, database, policy id, and revision.
+// RuleID is optional.
 type PolicyRef struct {
 	OwnerID    string `json:"ownerId"`
 	DatabaseID string `json:"databaseId"`
@@ -146,10 +229,15 @@ type PolicyRef struct {
 	Revision   string `json:"revision"`
 	RuleID     string `json:"ruleId,omitempty"`
 }
+
+// BindingRef identifies a binding by Kind and ID.
 type BindingRef struct {
 	Kind string `json:"kind"`
 	ID   string `json:"id"`
 }
+
+// LayerDecision is one operation decision inside a Layer.
+// It records the outcome, scope, optional policy, rule, and binding references, and restriction ids.
 type LayerDecision struct {
 	OperationID    string       `json:"operationId"`
 	Result         Outcome      `json:"result"`
@@ -159,6 +247,9 @@ type LayerDecision struct {
 	BindingRefs    []BindingRef `json:"bindingRefs,omitempty"`
 	RestrictionIDs []string     `json:"restrictionIds"`
 }
+
+// Layer is one authorization source in a Result.
+// ACLState is enabled, disabled, or unavailable, and Decisions must be an array.
 type Layer struct {
 	LayerID        string          `json:"layerId"`
 	Source         Source          `json:"source"`
@@ -167,6 +258,10 @@ type Layer struct {
 	PolicyRevision string          `json:"policyRevision,omitempty"`
 	Decisions      []LayerDecision `json:"decisions"`
 }
+
+// Blocker records a ReasonCode on an operation.
+// OperationID, Code, and Scope are required, and Slot is where, check, or fields when set.
+// An allowed result cannot contain blockers.
 type Blocker struct {
 	OperationID    string         `json:"operationId"`
 	Code           ReasonCode     `json:"code"`
@@ -180,6 +275,10 @@ type Blocker struct {
 	ExecutionClass ExecutionClass `json:"executionClass,omitempty"`
 	Callable       *Callable      `json:"callable,omitempty"`
 }
+
+// Restriction is a constraint attached to an operation.
+// Representation is expression, fields, reference, or mask, and the other fields must match it.
+// An allowed result cannot include a restriction with Enforced set to false.
 type Restriction struct {
 	ID             string                    `json:"id"`
 	OperationID    string                    `json:"operationId"`
@@ -193,21 +292,34 @@ type Restriction struct {
 	OmissionReason string                    `json:"omissionReason,omitempty"`
 	Mask           *access.Mask              `json:"mask,omitempty"`
 }
+
+// Unevaluated is one entry in Coverage.Unevaluated.
+// Reason is row_evidence_required, evidence_not_authorized, source_unavailable, unsupported, or budget_exceeded.
 type Unevaluated struct {
 	OperationID string `json:"operationId"`
 	LayerID     string `json:"layerId,omitempty"`
 	Reason      string `json:"reason"`
 }
+
+// Coverage reports evaluation and disclosure for a Result.
+// Evaluation is complete or partial, Disclosure is full or redacted, and Unevaluated must be an array.
 type Coverage struct {
 	Evaluation  EvaluationCompleteness `json:"evaluation"`
 	Disclosure  DisclosureCompleteness `json:"disclosure"`
 	Truncated   bool                   `json:"truncated"`
 	Unevaluated []Unevaluated          `json:"unevaluated"`
 }
+
+// SampleOrder is one sort key in a Sample.
+// Direction is asc or desc.
 type SampleOrder struct {
 	Field     []string `json:"field"`
 	Direction string   `json:"direction"`
 }
+
+// Sample is required when Mode is ModeSample and forbidden otherwise.
+// Selection must be readable_candidates, Exhaustive must be false, and RequestedLimit is from 1 to 100.
+// EvaluatedCount cannot exceed RequestedLimit, and Order has from 1 to 32 keys.
 type Sample struct {
 	RequestedLimit      int           `json:"requestedLimit"`
 	EvaluatedCount      int           `json:"evaluatedCount"`
@@ -218,6 +330,8 @@ type Sample struct {
 	SelectionResource   Resource      `json:"selectionResource"`
 }
 
+// ParseResult decodes one frozen authorization result.
+// It rejects duplicate JSON keys, missing required fields, unknown fields, and any document that fails Validate.
 func ParseResult(data []byte) (Result, error) {
 	return parseResult(data, false)
 }
@@ -246,6 +360,7 @@ func parseResult(data []byte, allowUnknownReasonCodes bool) (Result, error) {
 	return result, nil
 }
 
+// MarshalResult encodes result as JSON after Validate succeeds.
 func MarshalResult(result Result) ([]byte, error) {
 	if err := result.Validate(); err != nil {
 		return nil, err
@@ -253,6 +368,7 @@ func MarshalResult(result Result) ([]byte, error) {
 	return json.Marshal(result)
 }
 
+// Validate checks result against the frozen authorization contract, including known blocker codes.
 func (result Result) Validate() error {
 	return result.validate(false)
 }

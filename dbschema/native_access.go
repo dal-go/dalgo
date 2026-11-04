@@ -30,6 +30,7 @@ import (
 // The Native* types carry no serialization tags: a consumer that sends an
 // answer over the wire maps it to its own format.
 type NativeAccessReader interface {
+	// ReadNativeAccess returns the native access to ref as the engine's catalog shows it.
 	ReadNativeAccess(ctx context.Context, ref *dal.CollectionRef) (*NativeAccess, error)
 }
 

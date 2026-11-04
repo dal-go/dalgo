@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	// TestEntitiesNamePrefix is the prefix of the end-to-end table or collection names.
 	TestEntitiesNamePrefix = "DalgoE2E_"
 
 	// E2ETestKind1 defines table or collection name for an entity to be stored in
@@ -18,6 +19,7 @@ const (
 	//UserKind = TestEntitiesNamePrefix + "User"
 )
 
+// User holds a title and an email.
 type User struct {
 	Title string `json:"title,omitempty"`
 	Email string `json:"email,omitempty"`

@@ -6,13 +6,20 @@ import (
 )
 
 const (
-	SUM     = "SUM"
-	COUNT   = "COUNT"
-	MIN     = "MIN"
-	MAX     = "MAX"
+	// SUM is the aggregate function name SUM.
+	SUM = "SUM"
+	// COUNT is the aggregate function name COUNT.
+	COUNT = "COUNT"
+	// MIN is the aggregate function name MIN.
+	MIN = "MIN"
+	// MAX is the aggregate function name MAX.
+	MAX = "MAX"
+	// AVERAGE is the aggregate function name AVG.
 	AVERAGE = "AVG"
-	FIRST   = "FIRST"
-	LAST    = "LAST"
+	// FIRST is the aggregate function name FIRST.
+	FIRST = "FIRST"
+	// LAST is the aggregate function name LAST.
+	LAST = "LAST"
 )
 
 type function struct {
@@ -31,7 +38,9 @@ var _ Expression = (*function)(nil)
 // without depending on the unexported concrete type.
 type AggregateFunc interface {
 	Expression
+	// FuncName returns the aggregate function name.
 	FuncName() string
+	// FuncArgs returns the aggregate function arguments.
 	FuncArgs() []Expression
 }
 
@@ -41,6 +50,7 @@ type AggregateFunc interface {
 // source compatible.
 type DistinctAggregateFunc interface {
 	AggregateFunc
+	// IsDistinct reports whether the aggregate uses DISTINCT.
 	IsDistinct() bool
 }
 
@@ -55,6 +65,8 @@ type DistinctAggregateFunc interface {
 // share one state and one answer.
 type OrderedAggregateFunc interface {
 	AggregateFunc
+	// AggregateOrder returns the order in which the aggregate reads its group.
+	// An empty slice means the aggregate has no order of its own.
 	AggregateOrder() []OrderExpression
 }
 
@@ -62,6 +74,7 @@ type OrderedAggregateFunc interface {
 // adapters to depend on DALgo's private concrete expression type.
 type StarExpression interface {
 	Expression
+	// IsStar reports that the expression is the star argument.
 	IsStar() bool
 }
 
@@ -73,6 +86,7 @@ func (v function) FuncName() string { return v.Name }
 // FuncArgs returns the aggregate function arguments.
 func (v function) FuncArgs() []Expression { return v.Args }
 
+// IsDistinct reports whether the aggregate uses DISTINCT.
 func (v function) IsDistinct() bool { return v.Distinct }
 
 // AggregateOrder returns the order in which the aggregate reads the rows of its
@@ -125,6 +139,7 @@ var _ Expression = star{}
 // String renders the star argument as `*`.
 func (star) String() string { return "*" }
 
+// IsStar reports that this value is the star argument.
 func (star) IsStar() bool { return true }
 
 // NewAggregate creates an aggregate expression for parsers and planners.

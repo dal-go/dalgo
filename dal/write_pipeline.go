@@ -62,6 +62,7 @@ func (p writePipeline) beforeDeleteAll(ctx context.Context, keys []*record.Key) 
 	return nil
 }
 
+// Insert runs beforeSave and, when that succeeds, delegates to the underlying write session.
 func (p writePipeline) Insert(ctx context.Context, r record.Record, opts ...InsertOption) error {
 	if err := p.beforeSave(ctx, r); err != nil {
 		return err
@@ -69,6 +70,7 @@ func (p writePipeline) Insert(ctx context.Context, r record.Record, opts ...Inse
 	return p.ws.Insert(ctx, r, opts...)
 }
 
+// InsertMulti runs beforeSaveAll and, when that succeeds, delegates to the underlying write session.
 func (p writePipeline) InsertMulti(ctx context.Context, records []record.Record, opts ...InsertOption) error {
 	if err := p.beforeSaveAll(ctx, records); err != nil {
 		return err
@@ -76,6 +78,7 @@ func (p writePipeline) InsertMulti(ctx context.Context, records []record.Record,
 	return p.ws.InsertMulti(ctx, records, opts...)
 }
 
+// Set runs beforeSave and, when that succeeds, delegates to the underlying write session.
 func (p writePipeline) Set(ctx context.Context, r record.Record) error {
 	if err := p.beforeSave(ctx, r); err != nil {
 		return err
@@ -83,6 +86,7 @@ func (p writePipeline) Set(ctx context.Context, r record.Record) error {
 	return p.ws.Set(ctx, r)
 }
 
+// SetMulti runs beforeSaveAll and, when that succeeds, delegates to the underlying write session.
 func (p writePipeline) SetMulti(ctx context.Context, records []record.Record) error {
 	if err := p.beforeSaveAll(ctx, records); err != nil {
 		return err
@@ -109,6 +113,7 @@ func (p writePipeline) UpdateMulti(ctx context.Context, keys []*record.Key, upda
 	return p.ws.UpdateMulti(ctx, keys, updates, preconditions...)
 }
 
+// Delete runs BeforeDelete and, when that succeeds, delegates to the underlying write session.
 func (p writePipeline) Delete(ctx context.Context, key *record.Key) error {
 	if err := BeforeDelete(ctx, p.db, key); err != nil {
 		return err
@@ -116,6 +121,7 @@ func (p writePipeline) Delete(ctx context.Context, key *record.Key) error {
 	return p.ws.Delete(ctx, key)
 }
 
+// DeleteMulti runs beforeDeleteAll and, when that succeeds, delegates to the underlying write session.
 func (p writePipeline) DeleteMulti(ctx context.Context, keys []*record.Key) error {
 	if err := p.beforeDeleteAll(ctx, keys); err != nil {
 		return err

@@ -20,11 +20,17 @@ type securedStructuredQuery struct {
 	requested dal.StructuredQuery
 }
 
-func (q securedStructuredQuery) requestedStructuredQuery() dal.StructuredQuery { return q.requested }
-func (q securedStructuredQuery) String() string                                { return dal.QueryString(q) }
+func (q securedStructuredQuery) requestedStructuredQuery() dal.StructuredQuery {
+	return q.requested
+}
+func (q securedStructuredQuery) String() string { return dal.QueryString(q) }
+
+// GetRecordsReader delegates to executor.ExecuteQueryToRecordsReader with this query.
 func (q securedStructuredQuery) GetRecordsReader(ctx context.Context, executor dal.QueryExecutor) (dal.RecordsReader, error) {
 	return executor.ExecuteQueryToRecordsReader(ctx, q)
 }
+
+// GetRecordsetReader delegates to executor.ExecuteQueryToRecordsetReader with this query.
 func (q securedStructuredQuery) GetRecordsetReader(ctx context.Context, executor dal.QueryExecutor) (dal.RecordsetReader, error) {
 	return executor.ExecuteQueryToRecordsetReader(ctx, q)
 }
