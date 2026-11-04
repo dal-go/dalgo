@@ -39,23 +39,27 @@ type or behaviour changes.
 
 `dbschema` MUST export `NativeAccessReader` with one method,
 `ReadNativeAccess(ctx context.Context, ref *dal.CollectionRef) (*NativeAccess, error)`. It is separate from `SchemaReader`, so
-no existing driver changes; callers resolve it with `dal.As[NativeAccessReader](db)`.
+no existing driver changes; callers resolve it with `dal.As[NativeAccessReader](db)`. A driver whose engine has no principals
+(SQLite, for example; file-system access is outside this model) or that cannot read its authorization catalog does not
+implement it. The types carry no serialization tags: a consumer maps an answer to its own wire format.
 
 #### AC: absent-is-unknown
 
-**Given** a driver that does not implement `NativeAccessReader`
-**When** a caller resolves it with `dal.As`
-**Then** the assertion fails, and the documented reading is "native access unknown", never "nobody".
+**Given** a driver that does not implement `NativeAccessReader`, or one whose `ReadNativeAccess` returns `*NotSupportedError`
+**When** a caller resolves it with `dal.As` and asks
+**Then** the assertion fails or the call errors, and the documented reading is "native access unknown", never "nobody".
 
 ### REQ: engine-neutral-answer
 
-The answer types MUST name no engine. A principal has a name, a kind (`login`, `group`, `everyone`), a can-login flag, and
-superuser and owner flags. Each privilege names an operation (`read`, `insert`, `update`, `delete`, `truncate`), optional fields
+The answer types MUST name no engine. A principal has a name, a kind (`login`, `group`, `everyone`; only `login` can open a
+session), and superuser and owner flags. Each privilege names an operation (`read`, `insert`, `update`, `delete`, `truncate`), optional fields
 for field-level privileges, and every grant behind it: a source (`direct`, `membership`, `everyone`, `ownership`, `superuser`,
 `builtin-role`), a route (`self`, `inherited`, `switch-role`, `self-grant`), the membership chain, and a confidence (`verified`
 from an explicit catalog entry, `inferred` by the adapter, `unknown` where input was missing). The answer also carries the
-collection's row-security state, each principal's row-security effect (`off`, `applies`, `bypassed`) and namespace access, and
-the catalog time `AsOf`.
+collection's row-security state, each principal's row-security effect (`off`, `applies`, `bypassed`) and namespace access
+(`granted`, `missing`, `unknown`, or `not-applicable` for an engine with no separate namespace gate), and the catalog time
+`AsOf`. Confidence is ordered from strongest to weakest: `verified`, `inferred`, `unknown`. When the engine records an owner of
+the collection, the owner is always listed.
 
 ### REQ: never-nobody
 
@@ -84,6 +88,11 @@ The answer MUST NOT grant, widen or narrow DALgo access, and MUST NOT be used to
 
 - Whether a second engine (MySQL, which needs `SELECT` on `mysql.*` to see other accounts' grants) needs a field the PostgreSQL
   answer does not, for example host-pattern accounts. Decide when that adapter is specified.
+- Grant scope. MySQL (`GRANT SELECT ON *.*`, `ON db.*`) and SQL Server (database- and schema-level grants) give access to a
+  table from a wider grant, which today can only be reported as `direct`, losing why. An optional scope on a grant (object,
+  namespace, database, server) is additive and can be added with the first such adapter.
+- Denials. SQL Server `DENY` has no place in the model: its adapter resolves denials itself and reports only the privileges that
+  remain, naming any it cannot resolve as gaps.
 
 ---
 *This document follows the https://specscore.md/feature-specification*

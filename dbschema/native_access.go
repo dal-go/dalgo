@@ -12,18 +12,23 @@ import (
 // which privileges, and why": access through the engine's own accounts and
 // roles, outside any DALgo access policy. It is separate from SchemaReader so
 // existing drivers need no API changes; a driver that cannot read its engine's
-// authorization catalog simply does not implement it. Callers resolve it with
+// authorization catalog, or whose engine has no principals (SQLite, for
+// example), simply does not implement it. Callers resolve it with
 // dal.As[NativeAccessReader](db) and MUST read its absence, or a
 // *NotSupportedError from it, as "native access unknown", never as "nobody".
 //
 // An implementation MUST NOT report "nobody" when it cannot know. It either
 // returns an error, or a *NativeAccess whose Coverage names every input it
-// could not read and every kind of access its catalog cannot show. A
+// could not read and every kind of access its catalog cannot show. An answer
+// with no principal MUST have Coverage.Level NativeCoverageUnknown. A
 // collection that does not exist is an error, never an empty answer.
 //
 // The answer describes the catalog at NativeAccess.AsOf. It is an inventory,
 // not an authorization decision: it never grants, widens or narrows DALgo
 // access.
+//
+// The Native* types carry no serialization tags: a consumer that sends an
+// answer over the wire maps it to its own format.
 type NativeAccessReader interface {
 	ReadNativeAccess(ctx context.Context, ref *dal.CollectionRef) (*NativeAccess, error)
 }
@@ -32,20 +37,22 @@ type NativeAccessReader interface {
 // shows it.
 type NativeAccess struct {
 	// Collection is the collection the answer is about.
-	Collection dal.CollectionRef `json:"collection"`
+	Collection dal.CollectionRef
 	// AsOf is the time the engine's catalog was read, on the engine's clock.
-	AsOf time.Time `json:"asOf"`
+	AsOf time.Time
 	// Principals are the principals that can reach the collection, in a
-	// deterministic order. The collection's owner is always listed.
-	Principals []NativePrincipal `json:"principals"`
+	// deterministic order. When the engine records an owner of the
+	// collection, the owner is always listed.
+	Principals []NativePrincipal
 	// RowSecurity states whether the engine filters the collection's rows per
 	// principal.
-	RowSecurity NativeRowSecurity `json:"rowSecurity"`
+	RowSecurity NativeRowSecurity
 	// Coverage states what the answer covers and what it cannot see.
-	Coverage NativeAccessCoverage `json:"coverage"`
+	Coverage NativeAccessCoverage
 }
 
-// NativePrincipalKind classifies a principal.
+// NativePrincipalKind classifies a principal. The kind also says whether the
+// principal can open a session itself: only NativeLogin can.
 type NativePrincipalKind string
 
 const (
@@ -64,47 +71,51 @@ const (
 type NativePrincipal struct {
 	// Name is the engine's name of the principal. Mapping it to a person is the
 	// caller's business.
-	Name string              `json:"name"`
-	Kind NativePrincipalKind `json:"kind"`
-	// CanLogin is true when the principal can open a session itself.
-	CanLogin bool `json:"canLogin"`
+	Name string
+	// Kind classifies the principal, including whether it can log in.
+	Kind NativePrincipalKind
 	// Superuser is true when the principal bypasses every privilege check.
-	Superuser bool `json:"superuser,omitempty"`
+	Superuser bool
 	// Owner is true when the principal owns the collection.
-	Owner bool `json:"owner,omitempty"`
+	Owner bool
 	// Privileges are the privileges the principal can exercise, each with why.
-	Privileges []NativePrivilege `json:"privileges"`
+	Privileges []NativePrivilege
 	// RowSecurity states whether row security filters this principal's rows.
-	RowSecurity NativeRowSecurityEffect `json:"rowSecurity"`
+	RowSecurity NativeRowSecurityEffect
 	// NamespaceAccess states whether the principal can reach the namespace
 	// (schema) holding the collection, without which its privileges cannot be
 	// used.
-	NamespaceAccess NativeNamespaceAccess `json:"namespaceAccess"`
+	NamespaceAccess NativeNamespaceAccess
 	// Confidence is the weakest confidence of the principal's privileges.
-	Confidence NativeConfidence `json:"confidence"`
+	Confidence NativeConfidence
 }
 
 // NativeOperation is a data operation a native privilege allows.
 type NativeOperation string
 
 const (
-	NativeRead     NativeOperation = "read"
-	NativeInsert   NativeOperation = "insert"
-	NativeUpdate   NativeOperation = "update"
-	NativeDelete   NativeOperation = "delete"
+	// NativeRead reads rows (SELECT).
+	NativeRead NativeOperation = "read"
+	// NativeInsert adds rows.
+	NativeInsert NativeOperation = "insert"
+	// NativeUpdate changes rows.
+	NativeUpdate NativeOperation = "update"
+	// NativeDelete removes rows.
+	NativeDelete NativeOperation = "delete"
+	// NativeTruncate removes every row at once.
 	NativeTruncate NativeOperation = "truncate"
 )
 
 // NativePrivilege is one operation a principal can exercise.
 type NativePrivilege struct {
-	Operation NativeOperation `json:"operation"`
+	Operation NativeOperation
 	// Fields is empty for the whole collection; otherwise the privilege covers
 	// only these fields (columns).
-	Fields []string `json:"fields,omitempty"`
+	Fields []string
 	// Confidence is the strongest confidence among Grants.
-	Confidence NativeConfidence `json:"confidence"`
+	Confidence NativeConfidence
 	// Grants are every reason the principal holds the privilege.
-	Grants []NativeGrant `json:"grants"`
+	Grants []NativeGrant
 }
 
 // NativeGrantSource is the kind of catalog fact a privilege comes from.
@@ -131,29 +142,30 @@ const (
 type NativeRoute string
 
 const (
-	// NativeRouteSelf: the principal's own privilege.
+	// NativeRouteSelf is the principal's own privilege.
 	NativeRouteSelf NativeRoute = "self"
-	// NativeRouteInherited: used automatically through membership.
+	// NativeRouteInherited is used automatically through membership.
 	NativeRouteInherited NativeRoute = "inherited"
-	// NativeRouteSwitchRole: usable after the principal switches its session
+	// NativeRouteSwitchRole is usable after the principal switches its session
 	// to another role it is a member of.
 	NativeRouteSwitchRole NativeRoute = "switch-role"
-	// NativeRouteSelfGrant: usable after the principal grants itself
+	// NativeRouteSelfGrant is usable after the principal grants itself
 	// membership it administers. A potential, not a current, privilege.
 	NativeRouteSelfGrant NativeRoute = "self-grant"
 )
 
 // NativeGrant is one reason a principal holds a privilege.
 type NativeGrant struct {
-	Source NativeGrantSource `json:"source"`
-	Route  NativeRoute       `json:"route"`
+	Source NativeGrantSource
+	Route  NativeRoute
 	// Via is the chain of role names from the principal (excluded) to the role
 	// holding the privilege (included). Empty for the principal's own.
-	Via        []string         `json:"via,omitempty"`
-	Confidence NativeConfidence `json:"confidence"`
+	Via        []string
+	Confidence NativeConfidence
 }
 
-// NativeConfidence states how a privilege is known.
+// NativeConfidence states how a privilege is known. From strongest to
+// weakest: NativeVerified, NativeInferred, NativeUnknown.
 type NativeConfidence string
 
 const (
@@ -169,17 +181,22 @@ const (
 // NativeRowSecurity is the collection's row-security state.
 type NativeRowSecurity struct {
 	// Enabled is true when rows are filtered per principal.
-	Enabled bool `json:"enabled"`
-	// AppliesToOwner is true when the owner is filtered too.
-	AppliesToOwner bool `json:"appliesToOwner,omitempty"`
+	Enabled bool
+	// AppliesToOwner is true when the owner is filtered too; false where the
+	// engine makes no such distinction.
+	AppliesToOwner bool
 }
 
 // NativeRowSecurityEffect is how row security affects one principal.
 type NativeRowSecurityEffect string
 
 const (
-	NativeRowSecurityOff      NativeRowSecurityEffect = "off"
-	NativeRowSecurityApplies  NativeRowSecurityEffect = "applies"
+	// NativeRowSecurityOff means the collection has no row security.
+	NativeRowSecurityOff NativeRowSecurityEffect = "off"
+	// NativeRowSecurityApplies means the principal sees only the rows the
+	// engine's row-security rules let it see.
+	NativeRowSecurityApplies NativeRowSecurityEffect = "applies"
+	// NativeRowSecurityBypassed means the principal sees every row.
 	NativeRowSecurityBypassed NativeRowSecurityEffect = "bypassed"
 )
 
@@ -188,46 +205,65 @@ const (
 type NativeNamespaceAccess string
 
 const (
+	// NativeNamespaceGranted means the principal can reach the namespace.
 	NativeNamespaceGranted NativeNamespaceAccess = "granted"
+	// NativeNamespaceMissing means the principal holds privileges on the
+	// collection but cannot use them, because it cannot reach the namespace.
 	NativeNamespaceMissing NativeNamespaceAccess = "missing"
+	// NativeNamespaceUnknown means the namespace's access could not be read.
 	NativeNamespaceUnknown NativeNamespaceAccess = "unknown"
+	// NativeNamespaceNotApplicable means the engine has no separate gate on
+	// reaching a namespace (a namespace grant, where one exists, is reported
+	// as a grant instead).
+	NativeNamespaceNotApplicable NativeNamespaceAccess = "not-applicable"
 )
 
 // NativeCoverageLevel is how complete a native answer is.
 type NativeCoverageLevel string
 
 const (
-	// NativeCoveragePartial: the catalog was read; access it cannot show is
-	// named in BlindSpots. A native answer is never complete.
+	// NativeCoveragePartial means the catalog was read; access it cannot show
+	// is named in BlindSpots. A native answer is never complete.
 	NativeCoveragePartial NativeCoverageLevel = "partial"
-	// NativeCoverageUnknown: an input the answer depends on could not be read.
+	// NativeCoverageUnknown means an input the answer depends on could not be
+	// read or resolved.
 	NativeCoverageUnknown NativeCoverageLevel = "unknown"
 )
 
 // Blind spots shared by engines. Adapters may add their own codes.
 const (
-	BlindSpotConnectionRules  = "connection-rules"
+	// BlindSpotConnectionRules is the engine's rules on who may connect from
+	// where and how (for example pg_hba.conf).
+	BlindSpotConnectionRules = "connection-rules"
+	// BlindSpotExternalIdentity is logins mapped from an external identity
+	// provider, such as cloud IAM.
 	BlindSpotExternalIdentity = "external-identity-logins"
-	BlindSpotReplicasBackups  = "replicas-and-backups"
+	// BlindSpotReplicasBackups is copies of the data outside this database.
+	BlindSpotReplicasBackups = "replicas-and-backups"
+	// BlindSpotSharedCredential is people sharing one principal's credential.
 	BlindSpotSharedCredential = "shared-credentials"
-	BlindSpotDefinerCode      = "definer-rights-code"
-	BlindSpotRowPredicates    = "row-security-predicates"
+	// BlindSpotDefinerCode is code that runs with its owner's rights, such as
+	// definer-rights functions and views owned by other principals.
+	BlindSpotDefinerCode = "definer-rights-code"
+	// BlindSpotRowPredicates is the row-security rules themselves, which the
+	// answer does not read.
+	BlindSpotRowPredicates = "row-security-predicates"
 )
 
 // NativeAccessCoverage states what an answer covers and what it cannot see.
 type NativeAccessCoverage struct {
-	Level NativeCoverageLevel `json:"level"`
+	Level NativeCoverageLevel
 	// Covered names the catalog facts the answer read.
-	Covered []string `json:"covered"`
+	Covered []string
 	// BlindSpots names access the engine's catalog cannot show at all.
-	BlindSpots []string `json:"blindSpots"`
+	BlindSpots []string
 	// Gaps are inputs that could not be read or did not resolve; each makes
 	// some privileges unknown.
-	Gaps []NativeAccessGap `json:"gaps,omitempty"`
+	Gaps []NativeAccessGap
 }
 
 // NativeAccessGap is one input that could not be read or resolved.
 type NativeAccessGap struct {
-	Code   string `json:"code"`
-	Detail string `json:"detail,omitempty"`
+	Code   string
+	Detail string
 }
