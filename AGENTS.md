@@ -27,20 +27,24 @@ never to DALgo's interfaces, types or options.
 
 This repository holds DALgo's interfaces, its generic logic, and exactly two adapters:
 `adapters/dalgo2memory` (the in-memory implementation) and `adapters/dalgo2fs` (the OS file
-system, kept here as a named exception: it needs no driver and DataTug imports it; founder,
-2026-11-04: "Keep as exception"). Everything specific to one database engine lives in that
+system, kept here as a named exception because it needs no driver; founder, 2026-11-04:
+"Keep as exception"). Everything specific to one database engine lives in that
 engine's own repository, `dal-go/dalgo2<engine>` (for example `dal-go/dalgo2postgres`), never
 here:
 
 - no database drivers or engine clients in `go.mod` (pgx, lib/pq, go-sql-driver/mysql, sqlite,
   mssql, mongo, Firestore, BigQuery, …) and no `database/sql`;
-- no engine-specific SQL or catalog queries (`pg_catalog`, `pg_roles`, `information_schema`,
-  `sqlite_master`, `sys.objects`, …) in code; a doc comment may name them as examples;
+- no engine-specific SQL or catalog queries (any `pg_*` catalog, `information_schema`,
+  `sqlite_master`, `PRAGMA`, `sys.*`, `mysql.user`, Oracle `dba_*`/`v$*`, …) in Go code,
+  `.sql` files or C sources; a Go comment may name them as examples;
 - no new adapter under `adapters/`.
 
-When a capability needs engine knowledge (schema, roles and privileges, statistics), DALgo gets
-an optional, engine-neutral interface (subject to the exported-API rule above) and each engine's
-adapter implements it.
+When a capability needs engine knowledge (schema, roles and privileges, statistics):
+
+1. use `dbschema.SchemaReader` and its existing optional interfaces if they already express it;
+2. otherwise extend `dbschema` with a new optional, engine-neutral interface (subject to the
+   exported-API rule above); only if `dbschema` is the wrong home, propose another package;
+3. each engine's `dalgo2<engine>` adapter implements it, with its own integration tests.
 
 Founder, 2026-11-04: "if we need to read Postgres schema, that should be done in Dalgo adapter,
 not custom something."
