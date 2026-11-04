@@ -1,6 +1,6 @@
 # 🔌 DALgo
 
-https://dalgo.io/
+https://dalgo.io/ - https://github.com/dal-go/dalgo
 
 **DALgo** is a database abstraction layer for Go applications. It gives your
 business code one small, consistent API for records, queries, transactions,
