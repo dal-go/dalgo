@@ -20,9 +20,11 @@ go get github.com/dal-go/dalgo
 ## Video
 
 <p>
-  <a href="https://youtu.be/wtkqlcjfzQA"><img src="assets/video/dalgo-en-poster.webp" alt="Play the 1:45 film: DALgo — swap the adapter" width="640"></a><br>
-  ▶ <b><a href="https://youtu.be/wtkqlcjfzQA">Watch the DALgo film (1:45)</a></b>
+  <a href="https://youtu.be/w0ARYlWoG9g"><img src="assets/video/dalgo-one-interface-en-poster.webp" alt="Play the 1:19 film: DALgo — one interface for every database" width="640"></a><br>
+  ▶ <b><a href="https://youtu.be/w0ARYlWoG9g">Watch: DALgo in 79 seconds</a></b>
 </p>
+
+How it works (1:45): [swap the adapter, the developer walkthrough](https://youtu.be/wtkqlcjfzQA)
 
 Русская версия: https://youtu.be/ekU0IUfgkGY
 
