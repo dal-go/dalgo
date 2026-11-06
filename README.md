@@ -432,8 +432,7 @@ unit tests around application data access.
 
 DALgo supports production use through separate adapter modules:
 
-- [`dalgo2firestore`](https://github.com/dal-go/dalgo2firestore) for Google
-  Cloud Firestore.
+### Relational & SQL Engines
 - [`dalgo2sql`](https://github.com/dal-go/dalgo2sql) for SQL databases through
   Go SQL drivers. Two engines have a structured-query compiler that binds query
   values as parameters: SQLite (`DbOptions.StructuredQueryDialect: "sqlite"`)
@@ -443,8 +442,50 @@ DALgo supports production use through separate adapter modules:
   dialect-aware and writes query values into the SQL text instead of binding
   them; do not pass untrusted values through it. MySQL, Microsoft SQL Server and
   Oracle have no compiler yet and use the legacy text emitter.
+- [`dalgo2postgres`](https://github.com/dal-go/dalgo2postgres) for PostgreSQL-specific
+  schema introspection, DDL, and concurrency-aware behavior on top of SQL support.
 - [`dalgo2sqlite`](https://github.com/dal-go/dalgo2sqlite) for SQLite-specific
   schema, DDL, and concurrency-aware behavior on top of SQL support.
+- [`dalgo2mysql`](https://github.com/dal-go/dalgo2mysql) for MySQL databases.
+- [`dalgo2mssql`](https://github.com/dal-go/dalgo2mssql) for Microsoft SQL Server.
+- [`dalgo2oracle`](https://github.com/dal-go/dalgo2oracle) for Oracle Database.
+- [`dalgo2duckdb`](https://github.com/dal-go/dalgo2duckdb) for DuckDB embedded analytical queries.
+- [`dalgo2libsql`](https://github.com/dal-go/dalgo2libsql) for libSQL / Turso distributed databases.
+- [`dalgo2d1`](https://github.com/dal-go/dalgo2d1) for Cloudflare D1 SQL databases.
+
+### Cloud Data Warehouses & Analytics
+- [`dalgo2bigquery`](https://github.com/dal-go/dalgo2bigquery) for Google Cloud BigQuery.
+- [`dalgo2snowflake`](https://github.com/dal-go/dalgo2snowflake) for Snowflake cloud data warehouse.
+- [`dalgo2databricks`](https://github.com/dal-go/dalgo2databricks) for Databricks SQL warehouses across AWS, Azure, and GCP.
+- [`dalgo2athena`](https://github.com/dal-go/dalgo2athena) for Amazon Athena serverless query engine.
+- [`dalgo2clickhouse`](https://github.com/dal-go/dalgo2clickhouse) for ClickHouse analytical database.
+
+### NoSQL, Document & Key-Value Stores
+- [`dalgo2firestore`](https://github.com/dal-go/dalgo2firestore) for Google
+  Cloud Firestore.
+- [`dalgo2datastore`](https://github.com/dal-go/dalgo2datastore) for Google Cloud Datastore (App Engine).
+- [`dalgo2mongodb`](https://github.com/dal-go/dalgo2mongodb) for MongoDB document databases.
+- [`dalgo2couchdb`](https://github.com/dal-go/dalgo2couchdb) for Apache CouchDB document databases.
+- [`dalgo2cosmosdb`](https://github.com/dal-go/dalgo2cosmosdb) for Azure Cosmos DB.
+- [`dalgo2dynamodb`](https://github.com/dal-go/dalgo2dynamodb) for Amazon DynamoDB.
+- [`dalgo2redis`](https://github.com/dal-go/dalgo2redis) for Redis key-value and data structure storage.
+- [`dalgo2cloudflarekv`](https://github.com/dal-go/dalgo2cloudflarekv) for Cloudflare Workers KV.
+- [`dalgo2convex`](https://github.com/dal-go/dalgo2convex) for Convex reactive database.
+- [`dalgo2openvaultdb`](https://github.com/dal-go/dalgo2openvaultdb) for OpenVaultDB encrypted storage.
+- [`dalgo2elasticsearch`](https://github.com/dal-go/dalgo2elasticsearch) for Elasticsearch.
+- [`dalgo2typesense`](https://github.com/dal-go/dalgo2typesense) for Typesense search engine.
+- [`dalgo2influxdb`](https://github.com/dal-go/dalgo2influxdb) for InfluxDB time-series database.
+
+### Web, HTTP, Git & File Stores
+- [`dalgo2http`](https://github.com/dal-go/dalgo2http) for HTTP / REST API sources.
+- [`dalgo2postgrest`](https://github.com/dal-go/dalgo2postgrest) for PostgREST APIs.
+- [`dalgo2git`](https://github.com/dal-go/dalgo2git) for Git repositories as data stores.
+- [`dalgo2files`](https://github.com/dal-go/dalgo2files) for local filesystem storage.
+- [`dalgo2logs`](https://github.com/dal-go/dalgo2logs) for structured log storage.
+- [`dalgo2namecheap`](https://github.com/dal-go/dalgo2namecheap) for Namecheap API.
+
+### Partner & Ecosystem
+- [`github.com/ingitdb/dalgo2ingitdb`](https://github.com/ingitdb/dalgo2ingitdb) for inGitDB Git-native database.
 
 Deprecated BuntDB and BadgerDB adapters are not listed as supported production
 targets.
