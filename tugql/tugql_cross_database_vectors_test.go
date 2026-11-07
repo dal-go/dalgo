@@ -61,10 +61,11 @@ type crossDatabaseVectors struct {
 		Text     string          `json:"text"`
 		Context  json.RawMessage `json:"context"`
 		Expected struct {
-			Code          string   `json:"code"`
-			Query         string   `json:"query"`
-			SchemaVersion string   `json:"schemaVersion"`
-			Columns       []string `json:"columns"`
+			Code          string              `json:"code"`
+			Query         string              `json:"query"`
+			SchemaVersion string              `json:"schemaVersion"`
+			Columns       []string            `json:"columns"`
+			OutputColumns []TugQLOutputColumn `json:"outputColumns"`
 		} `json:"expected"`
 	} `json:"resolveCases"`
 }
@@ -196,11 +197,17 @@ func TestTugQLCrossDatabaseVectorsResolve(t *testing.T) {
 	vectors := loadCrossDatabaseVectors(t)
 	for _, c := range vectors.ResolveCases {
 		t.Run(c.Name, func(t *testing.T) {
-			context := vectors.Context
+			// The case context replaces whole top-level keys of the shared one.
+			merged := map[string]json.RawMessage{}
+			_ = json.Unmarshal(mustJSON(t, vectors.Context), &merged)
 			if len(c.Context) != 0 {
-				if err := json.Unmarshal(c.Context, &context); err != nil {
+				if err := json.Unmarshal(c.Context, &merged); err != nil {
 					t.Fatal(err)
 				}
+			}
+			var context TugQLResolveContext
+			if err := json.Unmarshal(mustJSON(t, merged), &context); err != nil {
+				t.Fatal(err)
 			}
 			doc, diagnostics := ParseTugQL(c.Text)
 			if len(diagnostics) != 0 {
@@ -224,8 +231,8 @@ func TestTugQLCrossDatabaseVectorsResolve(t *testing.T) {
 			for _, column := range resolved.Columns {
 				names = append(names, column.Name)
 			}
-			if !reflect.DeepEqual(names, c.Expected.Columns) {
-				t.Fatalf("columns=%v want %v", names, c.Expected.Columns)
+			if !reflect.DeepEqual(names, c.Expected.Columns) || c.Expected.OutputColumns == nil || !sameJSON(t, normalizedTugQLColumns(resolved.Columns), mustJSON(t, normalizedTugQLColumns(c.Expected.OutputColumns))) {
+				t.Fatalf("columns=%+v want %v %+v", resolved.Columns, c.Expected.Columns, c.Expected.OutputColumns)
 			}
 		})
 	}
@@ -240,4 +247,24 @@ func TestTugQLCrossDatabaseVectorsFormat(t *testing.T) {
 			}
 		})
 	}
+}
+
+// normalizedTugQLColumns treats a null lineage like an empty one.
+func normalizedTugQLColumns(columns []TugQLOutputColumn) []TugQLOutputColumn {
+	out := append([]TugQLOutputColumn(nil), columns...)
+	for i := range out {
+		if out[i].Lineage == nil {
+			out[i].Lineage = []TugQLOutputLineage{}
+		}
+	}
+	return out
+}
+
+func mustJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }

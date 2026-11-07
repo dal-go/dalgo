@@ -202,6 +202,114 @@
       "text": "databases (\n  pg = 'postgres://app:secret@db.example/sales'\n)\nfrom pg::Invoice\nselect Id"
     },
     {
+      "name": "password after bad port",
+      "text": "databases (\n  pg = 'postgres://u:secret@host:badport/db'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password with bracket host",
+      "text": "databases (\n  pg = 'postgres://u:secret@[::1/db'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password with leading space",
+      "text": "databases (\n  pg = ' postgres://u:secret@host/db'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password with bad escape",
+      "text": "databases (\n  pg = 'postgres://u:sec%zzret@host'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password in jdbc url",
+      "text": "databases (\n  pg = 'jdbc:postgresql://u:secret@host/db'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password in mysql dsn",
+      "text": "databases (\n  pg = 'u:secret@tcp(host:3306)/db'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password keyword after space",
+      "text": "databases (\n  pg = 'host=h user=u password=secret'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password keyword after semicolon",
+      "text": "databases (\n  pg = 'Server=h;Password=secret;'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password query parameter",
+      "text": "databases (\n  pg = 'postgres://host/db?password=secret'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "pwd keyword with spaces",
+      "text": "databases (\n  pg = 'Server=h;pwd = secret'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "passwd keyword after ampersand",
+      "text": "databases (\n  pg = 'mysql://host/db?ssl=1&PASSWD=secret'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
+      "name": "password keyword at start",
+      "text": "databases (\n  pg = 'password=secret;Server=h'\n)\nfrom pg::Invoice\nselect Id",
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      }
+    },
+    {
       "expected": {
         "code": "undeclared_database",
         "column": 6,
@@ -275,8 +383,8 @@
     },
     {
       "expected": {
-        "code": "invalid_from",
-        "column": 1,
+        "code": "invalid_database_qualifier",
+        "column": 6,
         "line": 4
       },
       "name": "spaced qualifier",
@@ -284,8 +392,8 @@
     },
     {
       "expected": {
-        "code": "invalid_from",
-        "column": 1,
+        "code": "invalid_database_qualifier",
+        "column": 6,
         "line": 4
       },
       "name": "quoted qualifier",
@@ -296,13 +404,14 @@
   "notes": [
     "TugQL cross-database source conformance vectors, shared by dal-go/dalgo (Go) and dal-go/dalgo-js (TypeScript). Both implementations must satisfy every case; yaml and text must match byte for byte.",
     "Text form: an optional root `databases (` block, before `parameters`, declares one alias per line as `alias` or `alias = '<target>'`. A FROM or JOIN source is qualified as `alias::path`, with `::` touching both sides. `::` is one lexer symbol.",
-    "An alias is an unquoted word that is not a reserved keyword; aliases are unique case-insensitively; a qualifier must name a declared alias exactly. A target is a non-empty single-quoted string, opaque to DALgo, printed single-quoted with `'` doubled.",
+    "An alias is an unquoted word that is not a reserved keyword; aliases are unique case-insensitively; a qualifier must name a declared alias exactly. A target is a non-empty single-quoted string, opaque to DALgo, printed single-quoted with `'` doubled. A target carries a password, and fails with database_credentials (the message names only the alias), by this textual rule (no URL parsing): (1) rest is the text after the LAST `://`, or the whole target without one; when rest contains `@` and the text before its first `@` contains no `/`, that text is user information and must not contain `:`; (2) `password`, `pwd` or `passwd`, case-insensitively, followed by optional spaces or tabs and `=`, must not appear at the start of the target or right after `;`, `&`, `?`, a space or a tab.",
     "textCases: ParseTugQL(text) has no diagnostics; expected.tree is the TugQTree JSON, expected.yaml is TugQLToYAML(text), expected.text is PrintTugQL(tree).",
     "errorCases: ParseTugQL(text) fails; expected is the code and 1-based start line and column of the FIRST diagnostic. Database-use diagnostics (unused_database, undeclared_database) are reported in source order.",
     "treeCases: a caller-built TugQTree passed to ResolveTugQL (operation resolve, with document source metadata tugql/1 and context.authorizedSchemas) or PrintTugQL (operation print). expected.code is the first diagnostic code (span 1:1); otherwise expected.query is the Serialize YAML of the resolved query or expected.text the printed text. A tree with no declarations keeps its legacy meaning for resolution (the caller binds every database by name); printing always requires declarations.",
     "yamlCases: YAMLToTugQL(yaml); expected.code is the first diagnostic code, otherwise expected.text.",
     "resolveCases: ResolveTugQL(ParseTugQL(text), context overlaid with the case's context); expected.code is the first diagnostic code, otherwise query (Serialize YAML), schemaVersion and column names. A join between sources of different databases (unqualified = the default database) with an omitted ON is cross_database_relationship; relationship metadata relates only sources of one database. An imported saved query that declares databases is nested_databases.",
-    "formatCases: FormatTugQL({source: text, sourceMetadata: tugql/1}, options) returns expected.text with no diagnostics. The `databases (` header word follows the keyword case; elsewhere `databases` is an ordinary identifier."
+    "formatCases: FormatTugQL({source: text, sourceMetadata: tugql/1}, options) returns expected.text with no diagnostics. The `databases (` header word follows the keyword case; elsewhere `databases` is an ordinary identifier.",
+    "When a document or tree declares databases, an unqualified source matches only authorized schemas whose database is empty (the default database); without declarations it matches any database, as before. Success resolveCases carry expected.outputColumns, the full ResolveTugQL columns (name, type, lineage; null lineage equals an empty one). A qualifier with spaces around `::` or a quoted alias is invalid_database_qualifier, spanning the alias and `::`."
   ],
   "resolveCases": [
     {
@@ -310,6 +419,28 @@
         "columns": [
           "Country",
           "TotalSales"
+        ],
+        "outputColumns": [
+          {
+            "name": "Country",
+            "type": "string",
+            "lineage": [
+              {
+                "source": "c",
+                "field": "Name"
+              }
+            ]
+          },
+          {
+            "name": "TotalSales",
+            "type": "number",
+            "lineage": [
+              {
+                "source": "i",
+                "field": "Total"
+              }
+            ]
+          }
         ],
         "query": "from:\n  query:\n    as: b\n    from:\n      database: sales\n      name: Invoice\n      alias: i\n    where:\n      op: '>'\n      left:\n        field: Total\n        source: i\n      right:\n        value: 10\n    columns:\n      - field: InvoiceId\n        source: i\n      - field: BillingCountry\n        source: i\n      - field: Total\n        source: i\n  joins:\n    - from:\n        database: geo\n        name: Country\n        alias: c\n      \"on\":\n        - op: ==\n          left:\n            field: BillingCountry\n            source: b\n          right:\n            field: Name\n            source: c\ngroupBy:\n  - field: Name\n    source: c\nhaving:\n  op: '>='\n  left:\n    aggregate:\n      function: sum\n      args:\n        - field: Total\n          source: b\n  right:\n    value: 1000\ncolumns:\n  - field: Name\n    source: c\n    as: Country\n  - aggregate:\n      function: sum\n      args:\n        - field: Total\n          source: b\n    as: TotalSales\n",
         "schemaVersion": "geo-v1,sales-v1"
@@ -333,6 +464,33 @@
           "TotalSales",
           "InvoiceCount"
         ],
+        "outputColumns": [
+          {
+            "name": "Country",
+            "type": "string",
+            "lineage": [
+              {
+                "source": "c",
+                "field": "Name"
+              }
+            ]
+          },
+          {
+            "name": "TotalSales",
+            "type": "number",
+            "lineage": [
+              {
+                "source": "i",
+                "field": "Total"
+              }
+            ]
+          },
+          {
+            "name": "InvoiceCount",
+            "type": "integer",
+            "lineage": null
+          }
+        ],
         "query": "from:\n  query:\n    as: b\n    from:\n      database: sales\n      name: Invoice\n      alias: i\n    where:\n      op: '>'\n      left:\n        field: Total\n        source: i\n      right:\n        value: 10\n    columns:\n      - field: InvoiceId\n        source: i\n      - field: BillingCountry\n        source: i\n      - field: Total\n        source: i\n      - query:\n          from:\n            database: sales\n            name: Invoice\n            alias: x\n          where:\n            op: ==\n            left:\n              field: BillingCountry\n              source: x\n            right:\n              field: BillingCountry\n              source: i\n          columns:\n            - aggregate:\n                function: count\n                args:\n                  - star: true\n              as: N\n        as: CountryInvoices\n  joins:\n    - from:\n        database: geo\n        name: Country\n        alias: c\n      \"on\":\n        - op: ==\n          left:\n            field: BillingCountry\n            source: b\n          right:\n            field: Name\n            source: c\ngroupBy:\n  - field: Name\n    source: c\n  - field: CountryInvoices\n    source: b\nhaving:\n  op: '>='\n  left:\n    aggregate:\n      function: sum\n      args:\n        - field: Total\n          source: b\n  right:\n    value: 100\ncolumns:\n  - field: Name\n    source: c\n    as: Country\n  - aggregate:\n      function: sum\n      args:\n        - field: Total\n          source: b\n    as: TotalSales\n  - field: CountryInvoices\n    source: b\n    as: InvoiceCount\n",
         "schemaVersion": "geo-v1,sales-v1"
       },
@@ -351,6 +509,28 @@
         "columns": [
           "InvoiceId",
           "Name"
+        ],
+        "outputColumns": [
+          {
+            "name": "InvoiceId",
+            "type": "integer",
+            "lineage": [
+              {
+                "source": "i",
+                "field": "InvoiceId"
+              }
+            ]
+          },
+          {
+            "name": "Name",
+            "type": "string",
+            "lineage": [
+              {
+                "source": "c",
+                "field": "Name"
+              }
+            ]
+          }
         ],
         "query": "from:\n  database: sales\n  name: Invoice\n  alias: i\n  joins:\n    - from:\n        database: sales\n        name: Customer\n        alias: c\n      \"on\":\n        - op: ==\n          left:\n            field: CustomerId\n            source: i\n          right:\n            field: CustomerId\n            source: c\ncolumns:\n  - field: InvoiceId\n    source: i\n  - field: Name\n    source: c\n",
         "schemaVersion": "sales-v1"
@@ -383,6 +563,149 @@
       },
       "name": "imported query declares databases",
       "text": "with Imported from 'lib/sales.tugql'\nfrom Imported\nselect InvoiceId"
+    },
+    {
+      "name": "unqualified source with declarations reads only the default database",
+      "text": "databases (\n  geo\n)\nfrom Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId, c.Name",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "database": "sales",
+            "version": "sales-v1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "BillingCountry",
+                    "type": "string",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "database": "geo",
+            "version": "geo-v1",
+            "tables": [
+              {
+                "name": "Country",
+                "fields": [
+                  {
+                    "name": "Name",
+                    "type": "string",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "code": "unauthorized_source"
+      }
+    },
+    {
+      "name": "unqualified source with declarations in the default database",
+      "text": "databases (\n  geo\n)\nfrom Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId, c.Name",
+      "context": {
+        "authorizedSchemas": [
+          {
+            "database": "sales",
+            "version": "sales-v1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "BillingCountry",
+                    "type": "string",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "version": "default-v1",
+            "tables": [
+              {
+                "name": "Invoice",
+                "fields": [
+                  {
+                    "name": "InvoiceId",
+                    "type": "integer",
+                    "authorized": true
+                  },
+                  {
+                    "name": "BillingCountry",
+                    "type": "string",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "database": "geo",
+            "version": "geo-v1",
+            "tables": [
+              {
+                "name": "Country",
+                "fields": [
+                  {
+                    "name": "Name",
+                    "type": "string",
+                    "authorized": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "columns": [
+          "InvoiceId",
+          "Name"
+        ],
+        "outputColumns": [
+          {
+            "name": "InvoiceId",
+            "type": "integer",
+            "lineage": [
+              {
+                "source": "i",
+                "field": "InvoiceId"
+              }
+            ]
+          },
+          {
+            "name": "Name",
+            "type": "string",
+            "lineage": [
+              {
+                "source": "c",
+                "field": "Name"
+              }
+            ]
+          }
+        ],
+        "query": "from:\n  name: Invoice\n  alias: i\n  joins:\n    - from:\n        database: geo\n        name: Country\n        alias: c\n      \"on\":\n        - op: ==\n          left:\n            field: BillingCountry\n            source: i\n          right:\n            field: Name\n            source: c\ncolumns:\n  - field: InvoiceId\n    source: i\n  - field: Name\n    source: c\n",
+        "schemaVersion": "default-v1,geo-v1"
+      }
     }
   ],
   "textCases": [
@@ -925,6 +1248,122 @@
       },
       "name": "databases word as identifier",
       "text": "databases (\n  sales\n)\nfrom sales::databases.Invoice as databases\nselect databases.InvoiceId"
+    },
+    {
+      "name": "control datatug reference",
+      "text": "databases (\n  db = 'datatug://chinook/sales?env=prod'\n)\nfrom db::Invoice\nselect Id",
+      "expected": {
+        "text": "databases (\n  db = 'datatug://chinook/sales?env=prod'\n)\nfrom db::Invoice\nselect Id",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "db",
+              "target": "datatug://chinook/sales?env=prod"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "Id"
+              }
+            ],
+            "from": {
+              "database": "db",
+              "name": "Invoice"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: db\n      target: datatug://chinook/sales?env=prod\nquery:\n    from:\n        database: db\n        name: Invoice\n    columns:\n        - field: Id\n"
+      }
+    },
+    {
+      "name": "control password-like key",
+      "text": "databases (\n  db = 'Server=h;PasswordPolicy=strict'\n)\nfrom db::Invoice\nselect Id",
+      "expected": {
+        "text": "databases (\n  db = 'Server=h;PasswordPolicy=strict'\n)\nfrom db::Invoice\nselect Id",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "db",
+              "target": "Server=h;PasswordPolicy=strict"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "Id"
+              }
+            ],
+            "from": {
+              "database": "db",
+              "name": "Invoice"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: db\n      target: Server=h;PasswordPolicy=strict\nquery:\n    from:\n        database: db\n        name: Invoice\n    columns:\n        - field: Id\n"
+      }
+    },
+    {
+      "name": "control sqlite path with at sign",
+      "text": "databases (\n  db = 'sqlite:/data/a@b.db'\n)\nfrom db::Invoice\nselect Id",
+      "expected": {
+        "text": "databases (\n  db = 'sqlite:/data/a@b.db'\n)\nfrom db::Invoice\nselect Id",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "db",
+              "target": "sqlite:/data/a@b.db"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "Id"
+              }
+            ],
+            "from": {
+              "database": "db",
+              "name": "Invoice"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: db\n      target: sqlite:/data/a@b.db\nquery:\n    from:\n        database: db\n        name: Invoice\n    columns:\n        - field: Id\n"
+      }
+    },
+    {
+      "name": "control user without password",
+      "text": "databases (\n  db = 'postgres://reader@host/db'\n)\nfrom db::Invoice\nselect Id",
+      "expected": {
+        "text": "databases (\n  db = 'postgres://reader@host/db'\n)\nfrom db::Invoice\nselect Id",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "db",
+              "target": "postgres://reader@host/db"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "Id"
+              }
+            ],
+            "from": {
+              "database": "db",
+              "name": "Invoice"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: db\n      target: postgres://reader@host/db\nquery:\n    from:\n        database: db\n        name: Invoice\n    columns:\n        - field: Id\n"
+      }
     }
   ],
   "treeCases": [
