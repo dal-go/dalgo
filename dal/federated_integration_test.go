@@ -252,8 +252,9 @@ columns:
 	}
 }
 
-// A derived source reads no single database, so the federated executor reports
-// no provider fields for it instead of failing the join plan.
+// A derived source reads no single database: the federated executor reports
+// its projected output names instead of failing the join plan, and a reference
+// to a field the derived query does not project still fails.
 func TestFederatedQueryJoinsDerivedSourceToDatabaseSource(t *testing.T) {
 	const document = `from:
   query:
@@ -293,5 +294,14 @@ columns:
 	}
 	if len(rows) != 1 || fmt.Sprint(rows[0].Data().(map[string]any)["countryId"]) != "2" {
 		t.Fatalf("rows = %+v", rows)
+	}
+	unknown, err := tugql.Deserialize([]byte(strings.Replace(document, "{field: amount, source: o}", "{field: nosuch, source: o}", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dal.ExecuteFederatedQuery(context.Background(), unknown, func(_ context.Context, database string) (dal.QueryExecutor, error) {
+		return sources[database], nil
+	}); err == nil || !strings.Contains(err.Error(), `field "nosuch" is unavailable in "o"`) {
+		t.Fatalf("unknown derived field: %v", err)
 	}
 }

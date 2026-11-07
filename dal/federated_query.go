@@ -189,11 +189,11 @@ func (e federatedQueryExecutor) ExecuteQueryToRecordsetReader(ctx context.Contex
 
 // JoinFields resolves the executor for source and, when that executor implements JoinFieldsProvider, returns its JoinFields.
 // When the executor has no JoinFields method it returns nil, nil.
-// A derived source reads no single database, so it has no provider fields;
-// its columns come from its own query.
+// A derived source reads no single database: its fields are the output names
+// of its own projection, or nil (unknown) when a column has no fixed name.
 func (e federatedQueryExecutor) JoinFields(ctx context.Context, source RecordsetSource) ([]string, error) {
-	if _, derived := asQuerySource(source); derived {
-		return nil, nil
+	if derived, ok := asQuerySource(source); ok {
+		return derivedOutputNames(derived.Query()), nil
 	}
 	executor, err := e.sourceExecutor(ctx, source)
 	if err != nil {
@@ -203,4 +203,29 @@ func (e federatedQueryExecutor) JoinFields(ctx context.Context, source Recordset
 		return fields.JoinFields(ctx, source)
 	}
 	return nil, nil
+}
+
+// derivedOutputNames names the columns a derived query projects: an alias, a
+// field's name, or a named scalar query. It returns nil when the projection is
+// implicit or any column has no fixed name, so callers skip field validation.
+func derivedOutputNames(query StructuredQuery) []string {
+	if query == nil || len(query.Columns()) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(query.Columns()))
+	for _, column := range query.Columns() {
+		name := column.Alias
+		if name == "" && column.Wildcard == nil {
+			if field, ok := column.Expression.(FieldRef); ok {
+				name = field.Name()
+			} else if scalar, ok := column.Expression.(QueryExpression); ok {
+				name = scalar.As()
+			}
+		}
+		if name == "" {
+			return nil
+		}
+		names = append(names, name)
+	}
+	return names
 }
