@@ -1,0 +1,1287 @@
+{
+  "context": {
+    "authorizedSchemas": [
+      {
+        "database": "sales",
+        "version": "sales-v1",
+        "tables": [
+          {
+            "name": "Invoice",
+            "fields": [
+              {
+                "name": "InvoiceId",
+                "type": "integer",
+                "authorized": true
+              },
+              {
+                "name": "CustomerId",
+                "type": "integer",
+                "authorized": true
+              },
+              {
+                "name": "BillingCountry",
+                "type": "string",
+                "authorized": true
+              },
+              {
+                "name": "Total",
+                "type": "integer",
+                "authorized": true
+              }
+            ]
+          },
+          {
+            "name": "Customer",
+            "fields": [
+              {
+                "name": "CustomerId",
+                "type": "integer",
+                "authorized": true
+              },
+              {
+                "name": "Name",
+                "type": "string",
+                "authorized": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "database": "geo",
+        "version": "geo-v1",
+        "tables": [
+          {
+            "name": "Country",
+            "fields": [
+              {
+                "name": "Name",
+                "type": "string",
+                "authorized": true
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "id": "invoice-customer",
+        "version": "r1",
+        "from": {
+          "table": "Invoice"
+        },
+        "to": {
+          "table": "Customer"
+        },
+        "pairs": [
+          {
+            "fromField": "CustomerId",
+            "toField": "CustomerId"
+          }
+        ],
+        "exactTypedEquality": true
+      },
+      {
+        "id": "invoice-country",
+        "version": "r1",
+        "from": {
+          "table": "Invoice"
+        },
+        "to": {
+          "table": "Country"
+        },
+        "pairs": [
+          {
+            "fromField": "BillingCountry",
+            "toField": "Name"
+          }
+        ],
+        "exactTypedEquality": true
+      }
+    ]
+  },
+  "errorCases": [
+    {
+      "expected": {
+        "code": "invalid_databases",
+        "column": 1,
+        "line": 1
+      },
+      "name": "header without paren",
+      "text": "databases sales\nfrom Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "invalid_databases",
+        "column": 1,
+        "line": 1
+      },
+      "name": "header with declaration on it",
+      "text": "databases (sales)\nfrom Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "unclosed_databases",
+        "column": 1,
+        "line": 1
+      },
+      "name": "unclosed block",
+      "text": "databases (\n  sales\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "indentation",
+        "column": 5,
+        "line": 2
+      },
+      "name": "declaration indented two levels",
+      "text": "databases (\n    sales\n)\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "indentation",
+        "column": 3,
+        "line": 1
+      },
+      "name": "indented header",
+      "text": "  databases (\n  sales\n  )\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "invalid_database",
+        "column": 3,
+        "line": 2
+      },
+      "name": "reserved alias",
+      "text": "databases (\n  where\n)\nfrom Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "invalid_database",
+        "column": 3,
+        "line": 2
+      },
+      "name": "quoted alias",
+      "text": "databases (\n  \"sales\"\n)\nfrom Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "invalid_database",
+        "column": 3,
+        "line": 2
+      },
+      "name": "empty target",
+      "text": "databases (\n  sales = ''\n)\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "invalid_database",
+        "column": 3,
+        "line": 2
+      },
+      "name": "unquoted target",
+      "text": "databases (\n  sales = datatug\n)\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "duplicate_database",
+        "column": 3,
+        "line": 3
+      },
+      "name": "duplicate alias",
+      "text": "databases (\n  sales\n  SALES\n)\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "database_credentials",
+        "column": 3,
+        "line": 2
+      },
+      "name": "password in target",
+      "text": "databases (\n  pg = 'postgres://app:secret@db.example/sales'\n)\nfrom pg::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "undeclared_database",
+        "column": 6,
+        "line": 5
+      },
+      "name": "undeclared join alias",
+      "text": "databases (\n  sales\n)\nfrom sales::Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId"
+    },
+    {
+      "expected": {
+        "code": "undeclared_database",
+        "column": 6,
+        "line": 1
+      },
+      "name": "qualifier without block",
+      "text": "from sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "undeclared_database",
+        "column": 8,
+        "line": 5
+      },
+      "name": "undeclared in CTE",
+      "text": "databases (\n  sales\n)\nwith C as (\n  from geo::Country\n  select Name\n)\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "undeclared_database",
+        "column": 10,
+        "line": 8
+      },
+      "name": "undeclared in scalar subquery",
+      "text": "databases (\n  sales\n)\nfrom sales::Invoice as i\nselect (\n  i.InvoiceId\n  CountryName as (\n    from geo::Country as c\n    where c.Name = i.BillingCountry\n    select c.Name\n  )\n)"
+    },
+    {
+      "expected": {
+        "code": "unused_database",
+        "column": 3,
+        "line": 3
+      },
+      "name": "unused alias",
+      "text": "databases (\n  sales\n  geo\n)\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "nested_databases",
+        "column": 1,
+        "line": 4
+      },
+      "name": "databases after parameters",
+      "text": "parameters (\n  @P integer default 1\n)\ndatabases (\n  sales\n)\nfrom sales::Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "nested_databases",
+        "column": 3,
+        "line": 2
+      },
+      "name": "databases in CTE",
+      "text": "with C as (\n  databases (\n    sales\n  )\n  from Invoice\n  select Id\n)\nfrom C\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "nested_databases",
+        "column": 5,
+        "line": 5
+      },
+      "name": "databases in scalar subquery",
+      "text": "from Invoice as i\nselect (\n  i.InvoiceId\n  N as (\n    databases (\n      sales\n    )\n    from Invoice as x\n    select COUNT(*) as N\n  )\n)"
+    },
+    {
+      "expected": {
+        "code": "invalid_from",
+        "column": 1,
+        "line": 4
+      },
+      "name": "spaced qualifier",
+      "text": "databases (\n  sales\n)\nfrom sales :: Invoice\nselect Id"
+    },
+    {
+      "expected": {
+        "code": "invalid_from",
+        "column": 1,
+        "line": 4
+      },
+      "name": "quoted qualifier",
+      "text": "databases (\n  sales\n)\nfrom \"sales\"::Invoice\nselect Id"
+    }
+  ],
+  "format": "tugql-cross-database-suite",
+  "notes": [
+    "TugQL cross-database source conformance vectors, shared by dal-go/dalgo (Go) and dal-go/dalgo-js (TypeScript). Both implementations must satisfy every case; yaml and text must match byte for byte.",
+    "Text form: an optional root `databases (` block, before `parameters`, declares one alias per line as `alias` or `alias = '<target>'`. A FROM or JOIN source is qualified as `alias::path`, with `::` touching both sides. `::` is one lexer symbol.",
+    "An alias is an unquoted word that is not a reserved keyword; aliases are unique case-insensitively; a qualifier must name a declared alias exactly. A target is a non-empty single-quoted string, opaque to DALgo, printed single-quoted with `'` doubled.",
+    "textCases: ParseTugQL(text) has no diagnostics; expected.tree is the TugQTree JSON, expected.yaml is TugQLToYAML(text), expected.text is PrintTugQL(tree).",
+    "errorCases: ParseTugQL(text) fails; expected is the code and 1-based start line and column of the FIRST diagnostic. Database-use diagnostics (unused_database, undeclared_database) are reported in source order.",
+    "treeCases: a caller-built TugQTree passed to ResolveTugQL (operation resolve, with document source metadata tugql/1 and context.authorizedSchemas) or PrintTugQL (operation print). expected.code is the first diagnostic code (span 1:1); otherwise expected.query is the Serialize YAML of the resolved query or expected.text the printed text. A tree with no declarations keeps its legacy meaning for resolution (the caller binds every database by name); printing always requires declarations.",
+    "yamlCases: YAMLToTugQL(yaml); expected.code is the first diagnostic code, otherwise expected.text.",
+    "resolveCases: ResolveTugQL(ParseTugQL(text), context overlaid with the case's context); expected.code is the first diagnostic code, otherwise query (Serialize YAML), schemaVersion and column names. A join between sources of different databases (unqualified = the default database) with an omitted ON is cross_database_relationship; relationship metadata relates only sources of one database. An imported saved query that declares databases is nested_databases.",
+    "formatCases: FormatTugQL({source: text, sourceMetadata: tugql/1}, options) returns expected.text with no diagnostics. The `databases (` header word follows the keyword case; elsewhere `databases` is an ordinary identifier."
+  ],
+  "resolveCases": [
+    {
+      "expected": {
+        "columns": [
+          "Country",
+          "TotalSales"
+        ],
+        "query": "from:\n  query:\n    as: b\n    from:\n      database: sales\n      name: Invoice\n      alias: i\n    where:\n      op: '>'\n      left:\n        field: Total\n        source: i\n      right:\n        value: 10\n    columns:\n      - field: InvoiceId\n        source: i\n      - field: BillingCountry\n        source: i\n      - field: Total\n        source: i\n  joins:\n    - from:\n        database: geo\n        name: Country\n        alias: c\n      \"on\":\n        - op: ==\n          left:\n            field: BillingCountry\n            source: b\n          right:\n            field: Name\n            source: c\ngroupBy:\n  - field: Name\n    source: c\nhaving:\n  op: '>='\n  left:\n    aggregate:\n      function: sum\n      args:\n        - field: Total\n          source: b\n  right:\n    value: 1000\ncolumns:\n  - field: Name\n    source: c\n    as: Country\n  - aggregate:\n      function: sum\n      args:\n        - field: Total\n          source: b\n    as: TotalSales\n",
+        "schemaVersion": "geo-v1,sales-v1"
+      },
+      "name": "founder sample",
+      "text": "databases (\n  sales = 'datatug://chinook/sales?env=prod'\n  geo\n)\nparameters (\n  @MinSales integer default 1000\n)\nwith BigInvoices as (\n  from sales::Invoice as i\n  where i.Total > 10\n  select i.InvoiceId, i.BillingCountry, i.Total\n)\nfrom BigInvoices as b\njoin geo::Country as c\n  on b.BillingCountry = c.Name\ngroup by c.Name\nhaving SUM(b.Total) >= @MinSales\nselect (\n  c.Name as Country\n  SUM(b.Total) as TotalSales\n)"
+    },
+    {
+      "context": {
+        "bindings": [
+          {
+            "name": "MinSales",
+            "set": true,
+            "value": 100
+          }
+        ]
+      },
+      "expected": {
+        "columns": [
+          "Country",
+          "TotalSales",
+          "InvoiceCount"
+        ],
+        "query": "from:\n  query:\n    as: b\n    from:\n      database: sales\n      name: Invoice\n      alias: i\n    where:\n      op: '>'\n      left:\n        field: Total\n        source: i\n      right:\n        value: 10\n    columns:\n      - field: InvoiceId\n        source: i\n      - field: BillingCountry\n        source: i\n      - field: Total\n        source: i\n      - query:\n          from:\n            database: sales\n            name: Invoice\n            alias: x\n          where:\n            op: ==\n            left:\n              field: BillingCountry\n              source: x\n            right:\n              field: BillingCountry\n              source: i\n          columns:\n            - aggregate:\n                function: count\n                args:\n                  - star: true\n              as: N\n        as: CountryInvoices\n  joins:\n    - from:\n        database: geo\n        name: Country\n        alias: c\n      \"on\":\n        - op: ==\n          left:\n            field: BillingCountry\n            source: b\n          right:\n            field: Name\n            source: c\ngroupBy:\n  - field: Name\n    source: c\n  - field: CountryInvoices\n    source: b\nhaving:\n  op: '>='\n  left:\n    aggregate:\n      function: sum\n      args:\n        - field: Total\n          source: b\n  right:\n    value: 100\ncolumns:\n  - field: Name\n    source: c\n    as: Country\n  - aggregate:\n      function: sum\n      args:\n        - field: Total\n          source: b\n    as: TotalSales\n  - field: CountryInvoices\n    source: b\n    as: InvoiceCount\n",
+        "schemaVersion": "geo-v1,sales-v1"
+      },
+      "name": "sample",
+      "text": "databases (\n  sales = 'datatug://chinook/sales?env=prod'\n  geo\n)\nparameters (\n  @MinSales integer default 1000\n)\nwith BigInvoices as (\n  from sales::Invoice as i\n  where i.Total > 10\n  select (\n    i.InvoiceId\n    i.BillingCountry\n    i.Total\n    CountryInvoices as (\n      from sales::Invoice as x\n      where x.BillingCountry = i.BillingCountry\n      select COUNT(*) as N\n    )\n  )\n)\nfrom BigInvoices as b\njoin geo::Country as c\n  on b.BillingCountry = c.Name\ngroup by c.Name, b.CountryInvoices\nhaving SUM(b.Total) >= @MinSales\nselect (\n  c.Name as Country\n  SUM(b.Total) as TotalSales\n  b.CountryInvoices as InvoiceCount\n)"
+    },
+    {
+      "expected": {
+        "code": "cross_database_relationship"
+      },
+      "name": "cross-database join without on",
+      "text": "databases (\n  sales\n  geo\n)\nfrom sales::Invoice as i\njoin geo::Country as c\nselect i.InvoiceId, c.Name"
+    },
+    {
+      "expected": {
+        "columns": [
+          "InvoiceId",
+          "Name"
+        ],
+        "query": "from:\n  database: sales\n  name: Invoice\n  alias: i\n  joins:\n    - from:\n        database: sales\n        name: Customer\n        alias: c\n      \"on\":\n        - op: ==\n          left:\n            field: CustomerId\n            source: i\n          right:\n            field: CustomerId\n            source: c\ncolumns:\n  - field: InvoiceId\n    source: i\n  - field: Name\n    source: c\n",
+        "schemaVersion": "sales-v1"
+      },
+      "name": "same-database join without on",
+      "text": "databases (\n  sales\n)\nfrom sales::Invoice as i\njoin sales::Customer as c\nselect i.InvoiceId, c.Name"
+    },
+    {
+      "expected": {
+        "code": "unauthorized_source"
+      },
+      "name": "qualified source outside its database",
+      "text": "databases (\n  geo\n)\nfrom geo::Invoice\nselect InvoiceId"
+    },
+    {
+      "context": {
+        "importingPath": "queries/main.tugql",
+        "pinnedImports": [
+          {
+            "path": "queries/lib/sales.tugql",
+            "revision": "rev1",
+            "source": "databases (\n  sales\n)\nfrom sales::Invoice\nselect InvoiceId"
+          }
+        ],
+        "projectRevision": "rev1",
+        "projectRoot": "/project"
+      },
+      "expected": {
+        "code": "nested_databases"
+      },
+      "name": "imported query declares databases",
+      "text": "with Imported from 'lib/sales.tugql'\nfrom Imported\nselect InvoiceId"
+    }
+  ],
+  "textCases": [
+    {
+      "expected": {
+        "text": "databases (\n  sales = 'datatug://chinook/sales?env=prod'\n  geo\n)\nparameters (\n  @MinSales integer default 1000\n)\nwith BigInvoices as (\n  from sales::Invoice as i\n  where i.Total > 10\n  select i.InvoiceId, i.BillingCountry, i.Total\n)\nfrom BigInvoices as b\njoin geo::Country as c\n  on b.BillingCountry = c.Name\ngroup by c.Name\nhaving SUM(b.Total) >= @MinSales\nselect c.Name as Country, SUM(b.Total) as TotalSales",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "sales",
+              "target": "datatug://chinook/sales?env=prod"
+            },
+            {
+              "name": "geo"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "MinSales",
+              "type": "integer",
+              "default": 1000
+            }
+          ],
+          "definitions": [
+            {
+              "kind": "cte",
+              "name": "BigInvoices",
+              "query": {
+                "query": {
+                  "columns": [
+                    {
+                      "field": "InvoiceId",
+                      "source": "i"
+                    },
+                    {
+                      "field": "BillingCountry",
+                      "source": "i"
+                    },
+                    {
+                      "field": "Total",
+                      "source": "i"
+                    }
+                  ],
+                  "from": {
+                    "alias": "i",
+                    "database": "sales",
+                    "name": "Invoice"
+                  },
+                  "where": {
+                    "left": {
+                      "field": "Total",
+                      "source": "i"
+                    },
+                    "op": ">",
+                    "right": {
+                      "value": 10
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "as": "Country",
+                "field": "Name",
+                "source": "c"
+              },
+              {
+                "aggregate": {
+                  "args": [
+                    {
+                      "field": "Total",
+                      "source": "b"
+                    }
+                  ],
+                  "function": "SUM"
+                },
+                "as": "TotalSales"
+              }
+            ],
+            "from": {
+              "alias": "b",
+              "joins": [
+                {
+                  "from": {
+                    "alias": "c",
+                    "database": "geo",
+                    "name": "Country"
+                  },
+                  "on": [
+                    {
+                      "left": {
+                        "field": "BillingCountry",
+                        "source": "b"
+                      },
+                      "op": "==",
+                      "right": {
+                        "field": "Name",
+                        "source": "c"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "name": "BigInvoices"
+            },
+            "groupBy": [
+              {
+                "field": "Name",
+                "source": "c"
+              }
+            ],
+            "having": {
+              "left": {
+                "aggregate": {
+                  "args": [
+                    {
+                      "field": "Total",
+                      "source": "b"
+                    }
+                  ],
+                  "function": "SUM"
+                }
+              },
+              "op": ">=",
+              "right": {
+                "param": "MinSales"
+              }
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: sales\n      target: datatug://chinook/sales?env=prod\n    - name: geo\nparameters:\n    - name: MinSales\n      type: integer\n      default: 1000\ndefinitions:\n    - kind: cte\n      name: BigInvoices\n      query:\n        query:\n            from:\n                database: sales\n                name: Invoice\n                alias: i\n            where:\n                op: '>'\n                left:\n                    field: Total\n                    source: i\n                right:\n                    value: 10\n            columns:\n                - field: InvoiceId\n                  source: i\n                - field: BillingCountry\n                  source: i\n                - field: Total\n                  source: i\nquery:\n    from:\n        name: BigInvoices\n        alias: b\n        joins:\n            - from:\n                database: geo\n                name: Country\n                alias: c\n              \"on\":\n                - op: ==\n                  left:\n                    field: BillingCountry\n                    source: b\n                  right:\n                    field: Name\n                    source: c\n    groupBy:\n        - field: Name\n          source: c\n    having:\n        op: '>='\n        left:\n            aggregate:\n                function: SUM\n                args:\n                    - field: Total\n                      source: b\n        right:\n            param: MinSales\n    columns:\n        - field: Name\n          source: c\n          as: Country\n        - aggregate:\n            function: SUM\n            args:\n                - field: Total\n                  source: b\n          as: TotalSales\n"
+      },
+      "name": "founder sample",
+      "text": "databases (\n  sales = 'datatug://chinook/sales?env=prod'\n  geo\n)\nparameters (\n  @MinSales integer default 1000\n)\nwith BigInvoices as (\n  from sales::Invoice as i\n  where i.Total > 10\n  select i.InvoiceId, i.BillingCountry, i.Total\n)\nfrom BigInvoices as b\njoin geo::Country as c\n  on b.BillingCountry = c.Name\ngroup by c.Name\nhaving SUM(b.Total) >= @MinSales\nselect (\n  c.Name as Country\n  SUM(b.Total) as TotalSales\n)"
+    },
+    {
+      "expected": {
+        "text": "databases (\n  sales = 'datatug://chinook/sales?env=prod'\n  geo\n)\nparameters (\n  @MinSales integer default 1000\n)\nwith BigInvoices as (\n  from sales::Invoice as i\n  where i.Total > 10\n  select (\n    i.InvoiceId\n    i.BillingCountry\n    i.Total\n    CountryInvoices as (\n      from sales::Invoice as x\n      where x.BillingCountry = i.BillingCountry\n      select COUNT(*) as N\n    )\n  )\n)\nfrom BigInvoices as b\njoin geo::Country as c\n  on b.BillingCountry = c.Name\ngroup by c.Name, b.CountryInvoices\nhaving SUM(b.Total) >= @MinSales\nselect c.Name as Country, SUM(b.Total) as TotalSales, b.CountryInvoices as InvoiceCount",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "sales",
+              "target": "datatug://chinook/sales?env=prod"
+            },
+            {
+              "name": "geo"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "MinSales",
+              "type": "integer",
+              "default": 1000
+            }
+          ],
+          "definitions": [
+            {
+              "kind": "cte",
+              "name": "BigInvoices",
+              "query": {
+                "query": {
+                  "columns": [
+                    {
+                      "field": "InvoiceId",
+                      "source": "i"
+                    },
+                    {
+                      "field": "BillingCountry",
+                      "source": "i"
+                    },
+                    {
+                      "field": "Total",
+                      "source": "i"
+                    },
+                    {
+                      "as": "CountryInvoices",
+                      "query": {
+                        "query": {
+                          "columns": [
+                            {
+                              "aggregate": {
+                                "args": [
+                                  {
+                                    "star": true
+                                  }
+                                ],
+                                "function": "COUNT"
+                              },
+                              "as": "N"
+                            }
+                          ],
+                          "from": {
+                            "alias": "x",
+                            "database": "sales",
+                            "name": "Invoice"
+                          },
+                          "where": {
+                            "left": {
+                              "field": "BillingCountry",
+                              "source": "x"
+                            },
+                            "op": "==",
+                            "right": {
+                              "field": "BillingCountry",
+                              "source": "i"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "from": {
+                    "alias": "i",
+                    "database": "sales",
+                    "name": "Invoice"
+                  },
+                  "where": {
+                    "left": {
+                      "field": "Total",
+                      "source": "i"
+                    },
+                    "op": ">",
+                    "right": {
+                      "value": 10
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "as": "Country",
+                "field": "Name",
+                "source": "c"
+              },
+              {
+                "aggregate": {
+                  "args": [
+                    {
+                      "field": "Total",
+                      "source": "b"
+                    }
+                  ],
+                  "function": "SUM"
+                },
+                "as": "TotalSales"
+              },
+              {
+                "as": "InvoiceCount",
+                "field": "CountryInvoices",
+                "source": "b"
+              }
+            ],
+            "from": {
+              "alias": "b",
+              "joins": [
+                {
+                  "from": {
+                    "alias": "c",
+                    "database": "geo",
+                    "name": "Country"
+                  },
+                  "on": [
+                    {
+                      "left": {
+                        "field": "BillingCountry",
+                        "source": "b"
+                      },
+                      "op": "==",
+                      "right": {
+                        "field": "Name",
+                        "source": "c"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "name": "BigInvoices"
+            },
+            "groupBy": [
+              {
+                "field": "Name",
+                "source": "c"
+              },
+              {
+                "field": "CountryInvoices",
+                "source": "b"
+              }
+            ],
+            "having": {
+              "left": {
+                "aggregate": {
+                  "args": [
+                    {
+                      "field": "Total",
+                      "source": "b"
+                    }
+                  ],
+                  "function": "SUM"
+                }
+              },
+              "op": ">=",
+              "right": {
+                "param": "MinSales"
+              }
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: sales\n      target: datatug://chinook/sales?env=prod\n    - name: geo\nparameters:\n    - name: MinSales\n      type: integer\n      default: 1000\ndefinitions:\n    - kind: cte\n      name: BigInvoices\n      query:\n        query:\n            from:\n                database: sales\n                name: Invoice\n                alias: i\n            where:\n                op: '>'\n                left:\n                    field: Total\n                    source: i\n                right:\n                    value: 10\n            columns:\n                - field: InvoiceId\n                  source: i\n                - field: BillingCountry\n                  source: i\n                - field: Total\n                  source: i\n                - query:\n                    query:\n                        from:\n                            database: sales\n                            name: Invoice\n                            alias: x\n                        where:\n                            op: ==\n                            left:\n                                field: BillingCountry\n                                source: x\n                            right:\n                                field: BillingCountry\n                                source: i\n                        columns:\n                            - aggregate:\n                                function: COUNT\n                                args:\n                                    - star: true\n                              as: N\n                  as: CountryInvoices\nquery:\n    from:\n        name: BigInvoices\n        alias: b\n        joins:\n            - from:\n                database: geo\n                name: Country\n                alias: c\n              \"on\":\n                - op: ==\n                  left:\n                    field: BillingCountry\n                    source: b\n                  right:\n                    field: Name\n                    source: c\n    groupBy:\n        - field: Name\n          source: c\n        - field: CountryInvoices\n          source: b\n    having:\n        op: '>='\n        left:\n            aggregate:\n                function: SUM\n                args:\n                    - field: Total\n                      source: b\n        right:\n            param: MinSales\n    columns:\n        - field: Name\n          source: c\n          as: Country\n        - aggregate:\n            function: SUM\n            args:\n                - field: Total\n                  source: b\n          as: TotalSales\n        - field: CountryInvoices\n          source: b\n          as: InvoiceCount\n"
+      },
+      "name": "sample",
+      "text": "databases (\n  sales = 'datatug://chinook/sales?env=prod'\n  geo\n)\nparameters (\n  @MinSales integer default 1000\n)\nwith BigInvoices as (\n  from sales::Invoice as i\n  where i.Total > 10\n  select (\n    i.InvoiceId\n    i.BillingCountry\n    i.Total\n    CountryInvoices as (\n      from sales::Invoice as x\n      where x.BillingCountry = i.BillingCountry\n      select COUNT(*) as N\n    )\n  )\n)\nfrom BigInvoices as b\njoin geo::Country as c\n  on b.BillingCountry = c.Name\ngroup by c.Name, b.CountryInvoices\nhaving SUM(b.Total) >= @MinSales\nselect (\n  c.Name as Country\n  SUM(b.Total) as TotalSales\n  b.CountryInvoices as InvoiceCount\n)"
+    },
+    {
+      "expected": {
+        "text": "databases (\n  geo\n)\nfrom Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId, c.Name",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "geo"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "InvoiceId",
+                "source": "i"
+              },
+              {
+                "field": "Name",
+                "source": "c"
+              }
+            ],
+            "from": {
+              "alias": "i",
+              "joins": [
+                {
+                  "from": {
+                    "alias": "c",
+                    "database": "geo",
+                    "name": "Country"
+                  },
+                  "on": [
+                    {
+                      "left": {
+                        "field": "BillingCountry",
+                        "source": "i"
+                      },
+                      "op": "==",
+                      "right": {
+                        "field": "Name",
+                        "source": "c"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "name": "Invoice"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: geo\nquery:\n    from:\n        name: Invoice\n        alias: i\n        joins:\n            - from:\n                database: geo\n                name: Country\n                alias: c\n              \"on\":\n                - op: ==\n                  left:\n                    field: BillingCountry\n                    source: i\n                  right:\n                    field: Name\n                    source: c\n    columns:\n        - field: InvoiceId\n          source: i\n        - field: Name\n          source: c\n"
+      },
+      "name": "default and qualified sources",
+      "text": "databases (\n  geo\n)\nfrom Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId, c.Name"
+    },
+    {
+      "expected": {
+        "text": "databases (\n  legacy = 'Server=db;Name=''orders'''\n)\nfrom legacy::dbo/sales/Orders\nselect Id",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "legacy",
+              "target": "Server=db;Name='orders'"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "Id"
+              }
+            ],
+            "from": {
+              "database": "legacy",
+              "name": "Orders",
+              "schema": "dbo/sales"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: legacy\n      target: Server=db;Name='orders'\nquery:\n    from:\n        database: legacy\n        schema: dbo/sales\n        name: Orders\n    columns:\n        - field: Id\n"
+      },
+      "name": "target quote doubled and slash path",
+      "text": "databases (\n  legacy = 'Server=db;Name=''orders'''\n)\nfrom legacy::dbo/sales/Orders\nselect Id"
+    },
+    {
+      "expected": {
+        "text": "databases (\n  sales\n)\nfrom sales::Invoice as i\nselect i.InvoiceId",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "sales"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "InvoiceId",
+                "source": "i"
+              }
+            ],
+            "from": {
+              "alias": "i",
+              "database": "sales",
+              "name": "Invoice"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: sales\nquery:\n    from:\n        database: sales\n        name: Invoice\n        alias: i\n    columns:\n        - field: InvoiceId\n          source: i\n"
+      },
+      "name": "uppercase keywords",
+      "text": "DATABASES (\n  sales\n)\nFROM sales::Invoice AS i\nSELECT i.InvoiceId"
+    },
+    {
+      "expected": {
+        "text": "databases (\n  sales\n)\nfrom sales::Invoice\nselect InvoiceId",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "sales"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "InvoiceId"
+              }
+            ],
+            "from": {
+              "database": "sales",
+              "name": "Invoice"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: sales\nquery:\n    from:\n        database: sales\n        name: Invoice\n    columns:\n        - field: InvoiceId\n"
+      },
+      "name": "tab indentation",
+      "text": "databases (\n\tsales\n)\nfrom sales::Invoice\nselect InvoiceId"
+    },
+    {
+      "expected": {
+        "text": "-- where the data lives\ndatabases ( -- aliases\n  sales\n)\nfrom sales::Invoice -- facts\nselect InvoiceId",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "sales"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "InvoiceId"
+              }
+            ],
+            "from": {
+              "database": "sales",
+              "name": "Invoice"
+            }
+          },
+          "comments": {
+            "anchors": {
+              "databases": {
+                "leading": [
+                  {
+                    "text": "where the data lives"
+                  }
+                ],
+                "trailing": {
+                  "text": "aliases"
+                }
+              },
+              "query.from": {
+                "trailing": {
+                  "text": "facts"
+                }
+              }
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\n# where the data lives\ndatabases: # aliases\n    - name: sales\nquery:\n    from: # facts\n        database: sales\n        name: Invoice\n    columns:\n        - field: InvoiceId\n"
+      },
+      "name": "comments",
+      "text": "-- where the data lives\ndatabases ( -- aliases\n  sales\n)\nfrom sales::Invoice -- facts\nselect InvoiceId"
+    },
+    {
+      "expected": {
+        "text": "databases (\n  sales\n)\nfrom sales::databases.Invoice as databases\nselect databases.InvoiceId",
+        "tree": {
+          "format": "tugqtree",
+          "version": 1,
+          "databases": [
+            {
+              "name": "sales"
+            }
+          ],
+          "query": {
+            "columns": [
+              {
+                "field": "InvoiceId",
+                "source": "databases"
+              }
+            ],
+            "from": {
+              "alias": "databases",
+              "database": "sales",
+              "name": "Invoice",
+              "schema": "databases"
+            }
+          }
+        },
+        "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: sales\nquery:\n    from:\n        database: sales\n        schema: databases\n        name: Invoice\n        alias: databases\n    columns:\n        - field: InvoiceId\n          source: databases\n"
+      },
+      "name": "databases word as identifier",
+      "text": "databases (\n  sales\n)\nfrom sales::databases.Invoice as databases\nselect databases.InvoiceId"
+    }
+  ],
+  "treeCases": [
+    {
+      "expected": {
+        "code": "invalid_database"
+      },
+      "name": "invalid alias",
+      "operation": "resolve",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "databases": [
+          {
+            "name": "select"
+          }
+        ],
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "select",
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_database"
+      },
+      "name": "alias with a space",
+      "operation": "print",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "databases": [
+          {
+            "name": "my sales"
+          }
+        ],
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "my sales",
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "invalid_database"
+      },
+      "name": "multi-line target",
+      "operation": "resolve",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "databases": [
+          {
+            "name": "sales",
+            "target": "a\nb"
+          }
+        ],
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "sales",
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "database_credentials"
+      },
+      "name": "password in target",
+      "operation": "print",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "databases": [
+          {
+            "name": "sales",
+            "target": "postgres://u:p@h/db"
+          }
+        ],
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "sales",
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "duplicate_database"
+      },
+      "name": "duplicate alias",
+      "operation": "resolve",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "databases": [
+          {
+            "name": "sales"
+          },
+          {
+            "name": "Sales"
+          }
+        ],
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "sales",
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "undeclared_database"
+      },
+      "name": "undeclared alias",
+      "operation": "resolve",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "databases": [
+          {
+            "name": "sales"
+          }
+        ],
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId",
+              "source": "i"
+            }
+          ],
+          "from": {
+            "alias": "i",
+            "database": "sales",
+            "joins": [
+              {
+                "from": {
+                  "alias": "c",
+                  "database": "geo",
+                  "name": "Country"
+                },
+                "on": [
+                  {
+                    "left": {
+                      "field": "BillingCountry",
+                      "source": "i"
+                    },
+                    "op": "==",
+                    "right": {
+                      "field": "Name",
+                      "source": "c"
+                    }
+                  }
+                ]
+              }
+            ],
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "unused_database"
+      },
+      "name": "unused alias",
+      "operation": "resolve",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "databases": [
+          {
+            "name": "sales"
+          },
+          {
+            "name": "geo"
+          }
+        ],
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "sales",
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "code": "undeclared_database"
+      },
+      "name": "print requires declaration",
+      "operation": "print",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "sales",
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "query": "from:\n  database: sales\n  name: Invoice\ncolumns:\n  - field: InvoiceId\n"
+      },
+      "name": "resolve without declarations keeps caller binding",
+      "operation": "resolve",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "sales",
+            "name": "Invoice"
+          }
+        }
+      }
+    },
+    {
+      "expected": {
+        "text": "databases (\n  sales = 'datatug://chinook/sales'\n)\nfrom sales::Invoice\nselect InvoiceId"
+      },
+      "name": "declared and used",
+      "operation": "print",
+      "tree": {
+        "format": "tugqtree",
+        "version": 1,
+        "databases": [
+          {
+            "name": "sales",
+            "target": "datatug://chinook/sales"
+          }
+        ],
+        "query": {
+          "columns": [
+            {
+              "field": "InvoiceId"
+            }
+          ],
+          "from": {
+            "database": "sales",
+            "name": "Invoice"
+          }
+        }
+      }
+    }
+  ],
+  "version": 1,
+  "yamlCases": [
+    {
+      "expected": {
+        "text": "databases (\n  sales = 'datatug://chinook/sales'\n  geo\n)\nfrom sales::Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId"
+      },
+      "name": "databases block",
+      "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: sales\n      target: datatug://chinook/sales\n    - name: geo\nquery:\n    from:\n        database: sales\n        name: Invoice\n        alias: i\n        joins:\n            - from:\n                database: geo\n                name: Country\n                alias: c\n              \"on\":\n                - op: ==\n                  left:\n                    field: BillingCountry\n                    source: i\n                  right:\n                    field: Name\n                    source: c\n    columns:\n        - field: InvoiceId\n          source: i\n"
+    },
+    {
+      "expected": {
+        "code": "invalid_tree"
+      },
+      "name": "databases not a sequence",
+      "yaml": "format: tugqtree\nversion: 1\ndatabases: sales\nquery:\n    from:\n        name: Invoice\n"
+    },
+    {
+      "expected": {
+        "code": "invalid_tree"
+      },
+      "name": "database without name",
+      "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - target: x\nquery:\n    from:\n        name: Invoice\n"
+    },
+    {
+      "expected": {
+        "code": "invalid_tree"
+      },
+      "name": "database empty target",
+      "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: sales\n      target: \"\"\nquery:\n    from:\n        database: sales\n        name: Invoice\n"
+    },
+    {
+      "expected": {
+        "code": "invalid_tree"
+      },
+      "name": "database unknown field",
+      "yaml": "format: tugqtree\nversion: 1\ndatabases:\n    - name: sales\n      url: x\nquery:\n    from:\n        database: sales\n        name: Invoice\n"
+    }
+  ],
+  "formatCases": [
+    {
+      "name": "uppercase and tabs",
+      "text": "databases (\n  sales\n\n  geo = 'datatug://chinook/geo'\n)\nfrom sales::Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId",
+      "options": {
+        "keywordCase": "uppercase",
+        "indentation": "tab"
+      },
+      "expected": {
+        "text": "DATABASES (\n\tsales\n\n\tgeo = 'datatug://chinook/geo'\n)\nFROM sales::Invoice AS i\nJOIN geo::Country AS c\n\tON i.BillingCountry = c.Name\nSELECT i.InvoiceId"
+      }
+    },
+    {
+      "name": "lowercase and two spaces",
+      "text": "DATABASES (\n\tsales\n)\nFROM sales::Invoice\nSELECT InvoiceId",
+      "options": {
+        "keywordCase": "lowercase",
+        "indentation": "two-spaces"
+      },
+      "expected": {
+        "text": "databases (\n  sales\n)\nfrom sales::Invoice\nselect InvoiceId"
+      }
+    }
+  ]
+}
