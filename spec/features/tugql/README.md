@@ -107,6 +107,18 @@ Formatting MUST preserve comments and normalize reserved keyword casing and stru
 
 The version 1 text grammar does not include multiline `EXISTS` condition blocks. Such source is rejected as invalid condition syntax; exact diagnostic parity for this unsupported form is not part of the shared-language contract. A caller-created TugQTree may use the supported canonical EXISTS condition shape, which is validated and resolved through the ordinary authorization and resource-limit paths.
 
+### Cross-database sources
+
+#### REQ:tugql-cross-database
+
+The TugQL text form MUST let one query read sources from several databases. A document MAY open with a top-level `databases (` block, before `parameters`, that declares each database alias once per line as `alias` or `alias = '<target>'`. An alias is an unquoted word that is not a reserved keyword; aliases are unique case-insensitively. A target is a non-empty single-quoted string, opaque to DALgo: a reference such as `'datatug://chinook/sales?env=prod'` or a connection string. It MUST be quoted because `//` starts a comment. A target that carries a password MUST be rejected with `database_credentials`, whose message names only the alias; credentials come from the caller, never from query text. The check is textual, never URL parsing, so a malformed URL cannot hide a password: (1) at the start of the target and right after every `://`, take the text that follows; when it contains `@` and the part before its first `@` contains no `/`, that part is user information and MUST NOT contain `:`; (2) `password`, `pwd` or `passwd`, case-insensitively, followed by optional spaces or tabs and `=`, MUST NOT appear at the start of the target or right after `;`, `&`, `?`, `,`, a space or a tab. An alias declared without a target is bound by the caller.
+
+A `from` or `join` source, in the main query, a CTE or a scalar subquery, MAY be qualified as `alias::path`, where `::` touches the alias and the dotted or slash path that follows. An unqualified source reads the caller's default database, so a document with no `databases` block keeps its existing meaning; in a document that declares databases, an unqualified source matches only authorized schemas whose `Database` is empty. A qualifier with spaces around `::` or a quoted alias is `invalid_database_qualifier`. A qualifier naming an undeclared alias is `undeclared_database`, a declared alias no source uses is `unused_database`, a duplicate alias is `duplicate_database`, and a `databases` block anywhere but the start of the root document (a nested query or an imported saved query) is `nested_databases`. Imported saved queries do not carry databases in version 1.
+
+The TugQTree carries the declarations as `databases: [{name, target?}]` (exported as `TugQLTree.Databases` of `TugQLDatabase`), and a qualified source carries `database: <alias>` exactly as TugQL YAML already does, so resolution lowers it to `dal.NewDatabaseCollectionRef` and `dal.ExecuteFederatedQuery` routes it by alias through the caller's `DatabaseResolver`. Resolution MUST match a qualified source only against authorized schemas of that `Database`. A join between sources of different databases MUST state its `on` explicitly; an omitted `on` there is `cross_database_relationship`, because relationship metadata names no database. Printing and YAML conversion MUST round-trip the block and the qualifiers; a target is printed single-quoted. `dal.ExecuteFederatedQuery` requires every source to be qualified: an unqualified source has no database to route to and fails closed, so a caller that wants a default database in a federated query binds it as an alias. Binding aliases to executors, and any policy about which target forms a saved query may hold, belong to the caller.
+
+Human approval was recorded verbatim: **Alexander Trakhimenok (2026-11-07): “I like the `databases` section and the `::` separator”** and **“Proceed.”** The shared Go/TypeScript conformance vectors are `tugql/testdata/tugql/v1/cross-database.json`, listed in `manifest.sha256`.
+
 ### Comments
 
 #### REQ:tugql-comments
@@ -214,6 +226,12 @@ Human approval was recorded verbatim: **Alexander Trakhimenok (2026-10-23): “l
 **Given** TugQL text containing `--` and `//` comments (leading, trailing, blank-line separated, consecutive, mixed markers, with no clean anchor, and document-trailing) and the same markers inside string literals and quoted identifiers
 **When** it is lexed, formatted, converted to TugQL YAML, converted back to text, and resolved
 **Then** only the real comments are recognised, the formatter keeps each marker, the YAML carries them as `#` head and same-line comments, the round-trip text carries them as `--`, and the resolved query is identical to the one resolved without comments, with no `//` outside literals.
+
+### AC: tugql-cross-database (verifies REQ:tugql-cross-database)
+
+**Given** a TugQL document whose `databases` block declares `sales = 'datatug://chinook/sales'` and `geo`, a main query joining `sales::Invoice` to `geo::Country` with an explicit `on`, a CTE over `sales::Invoice` and a scalar subquery over `sales::Invoice`, plus authorized schemas for databases `sales` and `geo`
+**When** it is parsed, printed, converted to YAML and back, resolved, and executed through `dal.ExecuteFederatedQuery` with a resolver mapping `sales` and `geo` to two in-memory databases
+**Then** the tree carries both declarations and `database` on every qualified source, printing and YAML round-trip are lossless, the resolved query routes each source to its own database and returns the joined, aggregated and subquery values; and an undeclared, unused or duplicate alias, a password in a target, a nested `databases` block, a qualified source absent from its database's authorized schema, and a cross-database join without `on` each fail with their own diagnostic and no query.
 
 ## Rehearse Integration
 

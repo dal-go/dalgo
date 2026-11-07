@@ -145,7 +145,7 @@ func parseTugQLQueryAt(source string, depth int) (document, []tugqlDiagnostic) {
 		case "select":
 			columns, err := parseTugQLColumnsAt(clause.tokens, source, depth)
 			if err != nil {
-				diags = append(diags, diagnostic("invalid_select", err.Error(), clause.span))
+				diags = append(diags, sourceDiagnostic("invalid_select", err, clause.span))
 				continue
 			}
 			doc.Columns = columns
@@ -245,6 +245,27 @@ func parseTugQLDocumentAt(source string, allowParameters bool, depth int) (tugql
 	for index < len(lines) && len(lines[index].Tokens) == 0 {
 		index++
 	}
+	// DATABASES may open only the root document. Anywhere else, before the main
+	// query, it is consumed and reported as nested_databases.
+	databasesAt := func(atRootStart bool) {
+		for index < len(lines) && len(lines[index].Tokens) == 0 {
+			index++
+		}
+		if index >= len(lines) || !startsNamedBlock(lines[index].Tokens, "databases") {
+			return
+		}
+		if !atRootStart || !allowParameters {
+			diags = append(diags, diagnostic("nested_databases", "DATABASES is declared once, at the start of the root document", spanForLine(lines[index])))
+		}
+		databases, next, blockDiags := parseTugQLDatabases(lines, index)
+		diags = append(diags, blockDiags...)
+		if atRootStart {
+			tree.Databases = databases
+			units = append(units, tugqlCommentUnit{path: "databases", first: lines[index].Number, last: lines[next-1].Number})
+		}
+		index = next
+	}
+	databasesAt(true)
 	if index < len(lines) && startsNamedBlock(lines[index].Tokens, "parameters") {
 		if lines[index].Indent != "" {
 			diags = append(diags, diagnostic("indentation", "PARAMETERS must be a top-level block", spanForLine(lines[index])))
@@ -259,9 +280,7 @@ func parseTugQLDocumentAt(source string, allowParameters bool, depth int) (tugql
 		index = next
 	}
 	for index < len(lines) {
-		for index < len(lines) && len(lines[index].Tokens) == 0 {
-			index++
-		}
+		databasesAt(false)
 		if index >= len(lines) || !isKeyword(lines[index].Tokens[0], "with") {
 			break
 		}
@@ -285,6 +304,9 @@ func parseTugQLDocumentAt(source string, allowParameters bool, depth int) (tugql
 			diags = append(diags, shiftTugQLDiagnostic(d, index, 0))
 		}
 		shiftTugQLQueryMetadata(&tree.Query, index, 0)
+	}
+	if depth == 0 && len(diags) == 0 {
+		diags = append(diags, validateTugQLSourceDatabases(tree.Databases, tokens)...)
 	}
 	if depth == 0 && len(diags) == 0 {
 		diags = append(diags, preflightTugQLTree(tree)...)
@@ -922,6 +944,9 @@ func isTugQLStyleToken(tokens []tugqlToken, index int) bool {
 		return false
 	}
 	token := tokens[index]
+	if token.Kind == tugqlIdentifier && strings.EqualFold(token.Text, "databases") {
+		return isTugQLDatabasesHeader(tokens, index)
+	}
 	if token.Kind != tugqlIdentifier || !isTugQLStyleKeyword(token.Text) {
 		return false
 	}
@@ -937,6 +962,14 @@ func isTugQLStyleToken(tokens []tugqlToken, index int) bool {
 		}
 	}
 	return true
+}
+
+// isTugQLDatabasesHeader reports whether tokens[index] is the word of a
+// `databases (` header line. Elsewhere `databases` is an ordinary identifier,
+// so a source or field of that name keeps its meaning.
+func isTugQLDatabasesHeader(tokens []tugqlToken, index int) bool {
+	line := tokens[index].Span.Start.Line
+	return (index == 0 || tokens[index-1].Span.Start.Line != line) && index+1 < len(tokens) && tokens[index+1].Text == "(" && tokens[index+1].Span.Start.Line == line && (index+2 == len(tokens) || tokens[index+2].Span.Start.Line != line)
 }
 
 func validateTugQLIndentation(lines []tugqlLine, clauses []tugqlClause) []tugqlDiagnostic {
@@ -1113,10 +1146,16 @@ func parseTugQLFrom(tokens []tugqlToken, comments []tugqlComment) (fromYAML, err
 	if tokens[0].Kind != tugqlIdentifier && !isSymbolToken(tokens[0], "{") && !isSymbolToken(tokens[0], "/") {
 		return fromYAML{}, fmt.Errorf("source name must be an identifier")
 	}
-	from, i, err := parseTugQLSourcePath(tokens, comments)
+	database, start, err := parseTugQLSourceDatabase(tokens)
 	if err != nil {
 		return fromYAML{}, err
 	}
+	from, i, err := parseTugQLSourcePath(tokens[start:], comments)
+	if err != nil {
+		return fromYAML{}, err
+	}
+	from.Database = database
+	i += start
 	if i < len(tokens) {
 		if !isKeyword(tokens[i], "as") || i+1 >= len(tokens) || tokens[i+1].Kind != tugqlIdentifier || i+2 != len(tokens) {
 			return fromYAML{}, fmt.Errorf("aliases require AS followed by one identifier")
@@ -1256,6 +1295,9 @@ func parseTugQLScalarColumn(item []tugqlToken, rawLines []string, lines []tugqlL
 		}
 		for i := range diagnostics {
 			diagnostics[i] = shiftTugQLDiagnostic(diagnostics[i], headerLine+1, columnOffset)
+		}
+		if diagnostics[0].Code == "nested_databases" {
+			return columnYAML{}, pathError(diagnostics[0].Code, diagnostics[0].Message, diagnostics[0].Span)
 		}
 		return columnYAML{}, fmt.Errorf("nested scalar query: %s", diagnostics[0].Message)
 	}

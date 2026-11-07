@@ -251,3 +251,57 @@ columns:
 		t.Fatalf("numeric order = %#v, %#v", rows[0].Data(), rows[1].Data())
 	}
 }
+
+// A derived source reads no single database: the federated executor reports
+// its projected output names instead of failing the join plan, and a reference
+// to a field the derived query does not project still fails.
+func TestFederatedQueryJoinsDerivedSourceToDatabaseSource(t *testing.T) {
+	const document = `from:
+  query:
+    as: o
+    from: {database: orders, name: Invoice, alias: i}
+    columns:
+      - {field: country_id, source: i}
+      - {field: amount, source: i}
+  joins:
+    - from: {database: countries, name: Country, alias: c}
+      on: [{left: {field: country_id, source: o}, op: '==', right: {field: id, source: c}}]
+columns:
+  - {field: id, source: c, as: countryId}
+  - {field: amount, source: o}
+`
+	query, err := tugql.Deserialize([]byte(document))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources := map[string]federatedFixtureSource{
+		"orders": {name: "Invoice", rows: []record.Record{
+			record.NewRecordWithData(record.NewKeyWithID("Invoice", 1), map[string]any{"id": 1, "country_id": 2, "amount": 10}),
+		}},
+		"countries": {name: "Country", rows: []record.Record{
+			record.NewRecordWithData(record.NewKeyWithID("Country", 2), map[string]any{"id": 2}),
+		}},
+	}
+	reader, err := dal.ExecuteFederatedQuery(context.Background(), query, func(_ context.Context, database string) (dal.QueryExecutor, error) {
+		return sources[database], nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := dal.ReadAllToRecords(context.Background(), reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || fmt.Sprint(rows[0].Data().(map[string]any)["countryId"]) != "2" {
+		t.Fatalf("rows = %+v", rows)
+	}
+	unknown, err := tugql.Deserialize([]byte(strings.Replace(document, "{field: amount, source: o}", "{field: nosuch, source: o}", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dal.ExecuteFederatedQuery(context.Background(), unknown, func(_ context.Context, database string) (dal.QueryExecutor, error) {
+		return sources[database], nil
+	}); err == nil || !strings.Contains(err.Error(), `field "nosuch" is unavailable in "o"`) {
+		t.Fatalf("unknown derived field: %v", err)
+	}
+}

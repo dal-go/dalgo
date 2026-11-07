@@ -33,6 +33,14 @@ type tugqlParameter struct {
 	Span     tugqlSpan `json:"-" yaml:"-"`
 }
 
+// tugqlDatabase is one declaration of the root DATABASES block. Target is
+// empty when the caller binds the alias.
+type tugqlDatabase struct {
+	Name   string    `json:"name" yaml:"name"`
+	Target string    `json:"target,omitempty" yaml:"target,omitempty"`
+	Span   tugqlSpan `json:"-" yaml:"-"`
+}
+
 type tugqlDefinition struct {
 	Kind  string         `json:"kind" yaml:"kind"`
 	Name  string         `json:"name" yaml:"name"`
@@ -58,6 +66,7 @@ type tugqlMapping struct {
 type tugqlTree struct {
 	Format      string            `json:"format" yaml:"format"`
 	Version     int               `json:"version" yaml:"version"`
+	Databases   []tugqlDatabase   `json:"databases,omitempty" yaml:"databases,omitempty"`
 	Parameters  []tugqlParameter  `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	Definitions []tugqlDefinition `json:"definitions,omitempty" yaml:"definitions,omitempty"`
 	Query       document          `json:"query" yaml:"query"`
@@ -268,7 +277,7 @@ func (l *tugqlLexer) scanSymbol(start tugqlPosition) {
 		next := l.runes[l.i]
 		pair := text + string(next)
 		switch pair {
-		case "<=", ">=", "!=", "<>", "||", "&&":
+		case "<=", ">=", "!=", "<>", "||", "&&", "::":
 			l.advance()
 			text = pair
 		}
