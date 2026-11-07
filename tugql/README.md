@@ -161,9 +161,26 @@ select (
 An alias is an unquoted word that is not a reserved keyword, unique
 case-insensitively; a qualifier names it exactly, with `::` touching both sides.
 A target is a non-empty single-quoted string, opaque to DALgo (it must be
-quoted because `//` starts a comment); a target without a value is bound by the
-caller, and a URL target carrying a password fails with `database_credentials`.
-An unqualified source reads the caller's default database. The tree carries
+quoted because `//` starts a comment); an alias without a target is bound by
+the caller. A target carrying a password fails with `database_credentials`
+(the message names only the alias). The check is textual, not URL parsing:
+
+1. take the text after the last `://`, or the whole target without one; when it
+   contains `@` and the part before its first `@` has no `/`, that part is user
+   information and must not contain `:`
+   (`postgres://u:secret@host/db`, `u:secret@tcp(host:3306)/db`);
+2. `password`, `pwd` or `passwd`, in any case, then optional spaces or tabs and
+   `=`, must not appear at the start of the target or right after `;`, `&`,
+   `?`, a space or a tab (`Server=h;Password=x`, `postgres://h/db?password=x`).
+
+`postgres://reader@host/db` and `sqlite:/data/a@b.db` are accepted.
+
+An unqualified source reads the caller's default database. When the document
+declares databases, it matches only authorized schemas whose `database` is
+empty; without declarations it matches any database, as before.
+`dal.ExecuteFederatedQuery` requires every source to be qualified (an
+unqualified one fails closed with "has no database"), so a caller that wants a
+default database in a federated query binds it as an alias. The tree carries
 `databases: [{name, target?}]` (`TugQLTree.Databases`) and each qualified
 source's `database`, which resolution matches only against authorized schemas
 of that database and lowers to `dal.NewDatabaseCollectionRef`;
@@ -173,7 +190,8 @@ state its `on`: relationship metadata names no database, so an omitted `on`
 there is `cross_database_relationship`.
 
 Other diagnostics: `invalid_databases` and `unclosed_databases` (block shape),
-`invalid_database` (declaration), `duplicate_database`, `undeclared_database`
+`invalid_database` (declaration), `invalid_database_qualifier` (spaces around
+`::` or a quoted alias), `duplicate_database`, `undeclared_database`
 (on the qualifier), `unused_database` (on the declaration), and
 `nested_databases` for a block anywhere but the start of the root document,
 including an imported saved query. A caller-built tree with no declarations
