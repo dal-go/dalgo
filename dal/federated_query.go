@@ -189,7 +189,12 @@ func (e federatedQueryExecutor) ExecuteQueryToRecordsetReader(ctx context.Contex
 
 // JoinFields resolves the executor for source and, when that executor implements JoinFieldsProvider, returns its JoinFields.
 // When the executor has no JoinFields method it returns nil, nil.
+// A derived source reads no single database, so it has no provider fields;
+// its columns come from its own query.
 func (e federatedQueryExecutor) JoinFields(ctx context.Context, source RecordsetSource) ([]string, error) {
+	if _, derived := asQuerySource(source); derived {
+		return nil, nil
+	}
 	executor, err := e.sourceExecutor(ctx, source)
 	if err != nil {
 		return nil, err
