@@ -127,6 +127,60 @@ executor applies `WHERE` to invoice rows, computes each customer's `COUNT(*)`,
 keeps groups whose count is at least the threshold, then orders and projects
 the result. This count example avoids assumptions about exact money arithmetic.
 
+#### Cross-database sources
+
+One query may read several databases. An optional root `databases (` block,
+before `parameters`, declares one alias per line as `alias` or
+`alias = '<target>'`; a `from` or `join` source at any level (main query, CTE,
+scalar subquery) is qualified as `alias::path`:
+
+```sql
+databases (
+  sales = 'datatug://chinook/sales?env=prod'
+  geo
+)
+parameters (
+  @MinSales integer default 1000
+)
+with BigInvoices as (
+  from sales::Invoice as i
+  where i.Total > 10
+  select i.InvoiceId, i.BillingCountry, i.Total
+)
+from BigInvoices as b
+join geo::Country as c
+  on b.BillingCountry = c.Name
+group by c.Name
+having SUM(b.Total) >= @MinSales
+select (
+  c.Name as Country
+  SUM(b.Total) as TotalSales
+)
+```
+
+An alias is an unquoted word that is not a reserved keyword, unique
+case-insensitively; a qualifier names it exactly, with `::` touching both sides.
+A target is a non-empty single-quoted string, opaque to DALgo (it must be
+quoted because `//` starts a comment); a target without a value is bound by the
+caller, and a URL target carrying a password fails with `database_credentials`.
+An unqualified source reads the caller's default database. The tree carries
+`databases: [{name, target?}]` (`TugQLTree.Databases`) and each qualified
+source's `database`, which resolution matches only against authorized schemas
+of that database and lowers to `dal.NewDatabaseCollectionRef`;
+`dal.ExecuteFederatedQuery` then routes each source by alias through the
+caller's `DatabaseResolver`. A join between sources of different databases must
+state its `on`: relationship metadata names no database, so an omitted `on`
+there is `cross_database_relationship`.
+
+Other diagnostics: `invalid_databases` and `unclosed_databases` (block shape),
+`invalid_database` (declaration), `duplicate_database`, `undeclared_database`
+(on the qualifier), `unused_database` (on the declaration), and
+`nested_databases` for a block anywhere but the start of the root document,
+including an imported saved query. A caller-built tree with no declarations
+keeps its meaning for `ResolveTugQL`, but `PrintTugQL` requires every
+qualified source to be declared. The shared Go/TypeScript vectors are
+`testdata/tugql/v1/cross-database.json`.
+
 ### Comments
 
 In the text form `--` and `//` each start a comment that runs to the end of the
@@ -173,7 +227,7 @@ are kept; a blank line before the first comment or between the last comment and
 its clause is not. The text after the marker loses one leading space and
 trailing whitespace; `--x` and `-- x` carry the same text.
 
-The anchors are `parameters`, `definitions[i]`, `query.from`,
+The anchors are `databases`, `parameters`, `definitions[i]`, `query.from`,
 `query.from.joins[k]`, `query.from.joins[k].on[j]`, `query.where`,
 `query.groupBy`, `query.having`, `query.orderBy`, `query.limit` and
 `query.columns`.
