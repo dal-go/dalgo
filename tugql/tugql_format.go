@@ -241,7 +241,7 @@ func formatTugQLIndentation(source, style string) string {
 		} else if name != "on" && name != "" {
 			joinPending[joinDepth] = false
 		}
-		if isTugQLBlockHeader(lineTokens, "parameters") {
+		if isTugQLBlockHeader(lineTokens, "parameters") || isTugQLBlockHeader(lineTokens, "databases") {
 			stack = append(stack, block{base: level, kind: "parameters"})
 		} else if isTugQLCTEHeader(lineTokens) {
 			stack = append(stack, block{base: level, kind: "cte"})
