@@ -165,13 +165,15 @@ quoted because `//` starts a comment); an alias without a target is bound by
 the caller. A target carrying a password fails with `database_credentials`
 (the message names only the alias). The check is textual, not URL parsing:
 
-1. take the text after the last `://`, or the whole target without one; when it
-   contains `@` and the part before its first `@` has no `/`, that part is user
-   information and must not contain `:`
-   (`postgres://u:secret@host/db`, `u:secret@tcp(host:3306)/db`);
+1. at the start of the target and right after every `://`, take the text that
+   follows; when it contains `@` and the part before its first `@` has no `/`,
+   that part is user information and must not contain `:`
+   (`postgres://u:secret@host/db`, `u:secret@tcp(host:3306)/db`,
+   `postgres://u:secret@host/db?redirect=http://x`);
 2. `password`, `pwd` or `passwd`, in any case, then optional spaces or tabs and
    `=`, must not appear at the start of the target or right after `;`, `&`,
-   `?`, a space or a tab (`Server=h;Password=x`, `postgres://h/db?password=x`).
+   `?`, `,`, a space or a tab (`Server=h;Password=x`, `Server=h,Password=x`,
+   `postgres://h/db?password=x`).
 
 `postgres://reader@host/db` and `sqlite:/data/a@b.db` are accepted.
 

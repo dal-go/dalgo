@@ -2,6 +2,7 @@ package tugql
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -22,33 +23,29 @@ func validTugQLDatabaseName(name string) bool {
 // deterministic textual rule shared with dalgo-js (no URL parsing, so a
 // malformed URL cannot hide one). Credentials come from the caller.
 //
-//  1. rest is the text after the last `://`, or the whole target without one.
-//     When rest contains `@` and the text before its first `@` contains no
-//     `/`, that text is user information; it must not contain `:`.
+//  1. At the start of the target and right after every `://`, take the text
+//     that follows. When it contains `@` and the text before its first `@`
+//     contains no `/`, that text is user information; it must not contain `:`.
 //  2. `password`, `pwd` or `passwd` (any case), then optional spaces or tabs
 //     and `=`, must not appear at the start of the target or right after `;`,
-//     `&`, `?`, a space or a tab.
+//     `&`, `?`, `,`, a space or a tab.
 func tugqlTargetHasPassword(target string) bool {
-	rest := target
-	if i := strings.LastIndex(target, "://"); i >= 0 {
-		rest = target[i+3:]
-	}
-	if at := strings.IndexByte(rest, '@'); at >= 0 && !strings.Contains(rest[:at], "/") && strings.Contains(rest[:at], ":") {
-		return true
-	}
-	lower := strings.ToLower(target)
-	for start := 0; start < len(lower); start++ {
-		if start > 0 && !strings.ContainsRune(";&? \t", rune(lower[start-1])) {
-			continue
+	for start := 0; ; {
+		rest := target[start:]
+		if at := strings.IndexByte(rest, '@'); at >= 0 && !strings.Contains(rest[:at], "/") && strings.Contains(rest[:at], ":") {
+			return true
 		}
-		for _, key := range []string{"password", "passwd", "pwd"} {
-			if strings.HasPrefix(lower[start:], key) && strings.HasPrefix(strings.TrimLeft(lower[start+len(key):], " \t"), "=") {
-				return true
-			}
+		next := strings.Index(rest, "://")
+		if next < 0 {
+			break
 		}
+		start += next + 3
 	}
-	return false
+	return tugqlPasswordKey.MatchString(target)
 }
+
+// tugqlPasswordKey is rule 2 of tugqlTargetHasPassword.
+var tugqlPasswordKey = regexp.MustCompile(`(?i)(^|[;&?, \t])(password|passwd|pwd)[ \t]*=`)
 
 // validateTugQLDatabaseDeclarations checks caller-built declarations with the
 // same rules the parser applies to the DATABASES block.
