@@ -118,7 +118,6 @@ func TestTugQLYAMLToTugQLRejectsWhatTextCannotSay(t *testing.T) {
 		"as":                            queryYAML("    as: x\n    from:\n        name: T\n"),
 		"money":                         queryYAML("    from:\n        name: T\n    money:\n        minorUnitScale: 2\n        divisionScale: 4\n        rounding: half-even\n"),
 		"offset":                        queryYAML("    from:\n        name: T\n    offset: 3\n"),
-		"from database":                 queryYAML("    from:\n        database: d\n        name: T\n"),
 		"from scan":                     queryYAML("    from:\n        name: T\n        scan:\n            limit: 1\n"),
 		"from query":                    queryYAML("    from:\n        name: T\n        query:\n            from:\n                name: U\n"),
 		"from without name":             queryYAML("    from:\n        schema: s\n"),

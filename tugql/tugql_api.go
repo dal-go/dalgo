@@ -59,12 +59,24 @@ type TugQLSourceMetadata struct {
 type TugQLTree struct {
 	Format      string            `json:"format" yaml:"format"`
 	Version     int               `json:"version" yaml:"version"`
+	Databases   []TugQLDatabase   `json:"databases,omitempty" yaml:"databases,omitempty"`
 	Parameters  []TugQLParameter  `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	Definitions []TugQLDefinition `json:"definitions,omitempty" yaml:"definitions,omitempty"`
 	Query       map[string]any    `json:"query" yaml:"-"`
 	// Comments holds the author's comments. They are not semantics: resolution,
 	// authorization and SQL generation never read them.
 	Comments *TugQLComments `json:"comments,omitempty" yaml:"-"`
+}
+
+// TugQLDatabase declares a database alias of a TugQTree, written in the text
+// form as one line of the root DATABASES block. Name is an unquoted word that
+// is not a reserved keyword; names are unique case-insensitively. Target is an
+// optional opaque reference (for example `datatug://chinook/sales`) that must
+// not carry a password; when it is empty the caller binds the alias. A source
+// reads a declared database by carrying its Name as `database`.
+type TugQLDatabase struct {
+	Name   string `json:"name" yaml:"name"`
+	Target string `json:"target,omitempty" yaml:"target,omitempty"`
 }
 
 // TugQLParameter is a named parameter on a TugQTree.
@@ -350,6 +362,9 @@ func exportTugQLDiagnostics(in []tugqlDiagnostic) []TugQLDiagnostic {
 
 func exportTugQLTree(in tugqlTree) TugQLTree {
 	out := TugQLTree{Format: in.Format, Version: in.Version, Query: map[string]any{}}
+	for _, d := range in.Databases {
+		out.Databases = append(out.Databases, TugQLDatabase{Name: d.Name, Target: d.Target})
+	}
 	for _, p := range in.Parameters {
 		out.Parameters = append(out.Parameters, TugQLParameter{Name: p.Name, Type: p.Type, Required: p.Required, Default: p.Default})
 	}
@@ -409,6 +424,9 @@ func (tree TugQLTree) MarshalYAML() (any, error) {
 	if err := validateTugQLComments(tree.Comments); err != nil {
 		return nil, err
 	}
+	if diagnostic := validateTugQLDatabaseDeclarations(tree.Databases); diagnostic != nil {
+		return nil, fmt.Errorf("%s", diagnostic.Message)
+	}
 	internal, err := importTugQLTree(tree)
 	if err != nil {
 		return nil, err
@@ -422,10 +440,11 @@ func (tree TugQLTree) MarshalYAML() (any, error) {
 	envelope := struct {
 		Format      string            `yaml:"format"`
 		Version     int               `yaml:"version"`
+		Databases   []tugqlDatabase   `yaml:"databases,omitempty"`
 		Parameters  []tugqlParameter  `yaml:"parameters,omitempty"`
 		Definitions []tugqlDefinition `yaml:"definitions,omitempty"`
 		Query       *yaml.Node        `yaml:"query"`
-	}{internal.Format, internal.Version, internal.Parameters, internal.Definitions, qRoot.Content[0]}
+	}{internal.Format, internal.Version, internal.Databases, internal.Parameters, internal.Definitions, qRoot.Content[0]}
 	if tugqlCommentsEmpty(tree.Comments) {
 		return envelope, nil
 	}
@@ -467,6 +486,7 @@ func (tree *TugQLTree) UnmarshalYAML(node *yaml.Node) error {
 	type envelope struct {
 		Format      string            `yaml:"format"`
 		Version     int               `yaml:"version"`
+		Databases   []TugQLDatabase   `yaml:"databases,omitempty"`
 		Parameters  []TugQLParameter  `yaml:"parameters,omitempty"`
 		Definitions []TugQLDefinition `yaml:"definitions,omitempty"`
 		Query       map[string]any    `yaml:"query"`
@@ -475,7 +495,7 @@ func (tree *TugQLTree) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&wire); err != nil {
 		return err
 	}
-	*tree = TugQLTree{Format: wire.Format, Version: wire.Version, Parameters: wire.Parameters, Definitions: wire.Definitions, Query: wire.Query, Comments: readTugQLCommentsFromNode(nil, node)}
+	*tree = TugQLTree{Format: wire.Format, Version: wire.Version, Databases: wire.Databases, Parameters: wire.Parameters, Definitions: wire.Definitions, Query: wire.Query, Comments: readTugQLCommentsFromNode(nil, node)}
 	return nil
 }
 
@@ -572,6 +592,9 @@ func importTugQLTree(tree TugQLTree) (tugqlTree, error) {
 		return tugqlTree{}, err
 	}
 	out := tugqlTree{Format: tree.Format, Version: tree.Version, Query: queryDoc, Comments: tree.Comments}
+	for _, d := range tree.Databases {
+		out.Databases = append(out.Databases, tugqlDatabase{Name: d.Name, Target: d.Target})
+	}
 	for _, p := range tree.Parameters {
 		out.Parameters = append(out.Parameters, tugqlParameter{Name: p.Name, Type: p.Type, Required: p.Required, Default: normalizeTugQLParameterDefault(p.Type, p.Default)})
 	}
@@ -841,7 +864,10 @@ func validateTugQLConditionShape(condition condYAML, allowRelationship bool) err
 }
 
 func validateTugQLTreeNode(node *yaml.Node) error {
-	if err := validateTugQLNodeKeys(node, "TugQTree", map[string]bool{"format": true, "version": true, "parameters": true, "definitions": true, "query": true}); err != nil {
+	if err := validateTugQLNodeKeys(node, "TugQTree", map[string]bool{"format": true, "version": true, "databases": true, "parameters": true, "definitions": true, "query": true}); err != nil {
+		return err
+	}
+	if err := validateTugQLDatabasesNode(tugQLMappingValue(node, "databases")); err != nil {
 		return err
 	}
 	for _, key := range []string{"parameters", "definitions"} {

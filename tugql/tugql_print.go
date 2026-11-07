@@ -54,6 +54,9 @@ func PrintTugQL(tree TugQLTree) (string, []TugQLDiagnostic) {
 	if err := validateTugQLComments(tree.Comments); err != nil {
 		return "", []TugQLDiagnostic{formatDiagnostic("invalid_comments", err.Error())}
 	}
+	if diagnostics := validateTugQLTreeDatabases(tree.Databases, internal, true); len(diagnostics) != 0 {
+		return "", diagnostics
+	}
 	text, err := printTugQLTree(internal)
 	if err != nil {
 		return "", []TugQLDiagnostic{formatDiagnostic("unsupported_print", err.Error())}
@@ -74,6 +77,18 @@ type tugqlPrinter struct {
 
 func printTugQLTree(tree tugqlTree) (string, error) {
 	p := &tugqlPrinter{comments: tree.Comments, used: map[string]bool{}}
+	if len(tree.Databases) > 0 {
+		unit := printUnit{path: "databases", lines: []string{"databases ("}}
+		for _, database := range tree.Databases {
+			line := "  " + database.Name
+			if database.Target != "" {
+				line += " = '" + strings.ReplaceAll(database.Target, "'", "''") + "'"
+			}
+			unit.lines = append(unit.lines, line)
+		}
+		unit.lines = append(unit.lines, ")")
+		p.emit(unit, "")
+	}
 	if len(tree.Parameters) > 0 {
 		unit := printUnit{path: "parameters", lines: []string{"parameters ("}}
 		for _, parameter := range tree.Parameters {
@@ -292,8 +307,8 @@ func printTugQLQueryUnits(query document, indent, base string) ([]printUnit, err
 		return nil, fmt.Errorf("query as, money and offset have no text spelling")
 	}
 	from := query.From
-	if from.Database != nil || from.Scan != nil || from.Query != nil {
-		return nil, fmt.Errorf("from database, scan and query have no text spelling")
+	if from.Scan != nil || from.Query != nil {
+		return nil, fmt.Errorf("from scan and query have no text spelling")
 	}
 	source, err := printTugQLSource(from)
 	if err != nil {
@@ -301,7 +316,7 @@ func printTugQLQueryUnits(query document, indent, base string) ([]printUnit, err
 	}
 	units := []printUnit{{path: anchor(".from"), lines: []string{indent + "from " + source}}}
 	for k, join := range from.Joins {
-		if join.From == nil || join.From.Name == "" || join.Hints != nil || (join.Type != "" && join.Type != "left") || len(join.From.Joins) != 0 || join.From.Database != nil || join.From.Scan != nil || join.From.Query != nil {
+		if join.From == nil || join.From.Name == "" || join.Hints != nil || (join.Type != "" && join.Type != "left") || len(join.From.Joins) != 0 || join.From.Scan != nil || join.From.Query != nil {
 			return nil, fmt.Errorf("join %d has no text spelling", k)
 		}
 		keyword := "join "
@@ -406,6 +421,10 @@ func printTugQLSource(from fromYAML) (string, error) {
 		}
 	}
 	text := strings.Join(parts, separator)
+	if from.Database != nil {
+		// validateTugQLTreeDatabases admitted only declared, printable aliases.
+		text = *from.Database + "::" + text
+	}
 	if from.Alias != "" {
 		text += " as " + identText(from.Alias, true)
 	}

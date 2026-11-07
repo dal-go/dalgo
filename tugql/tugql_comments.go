@@ -37,6 +37,7 @@ type TugQLCommentGroup struct {
 // path. The anchorable elements are the clause-level elements a person writes
 // on one line of text:
 //
+//	databases                        the DATABASES block
 //	parameters                       the PARAMETERS block
 //	definitions[i]                   the i-th WITH definition
 //	query.from                       the FROM line
@@ -288,7 +289,7 @@ func applyTugQLCommentsToNode(root *yaml.Node, comments *TugQLComments) {
 // tugqlAnchorPath reports whether a YAML path is an anchor.
 func isTugQLAnchorPath(path string) bool {
 	switch path {
-	case "parameters", "query.from", "query.where", "query.groupBy", "query.having", "query.orderBy", "query.limit", "query.columns":
+	case "databases", "parameters", "query.from", "query.where", "query.groupBy", "query.having", "query.orderBy", "query.limit", "query.columns":
 		return true
 	}
 	if strings.HasPrefix(path, "definitions[") && strings.HasSuffix(path, "]") && !strings.Contains(path, ".") {

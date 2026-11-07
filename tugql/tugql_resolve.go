@@ -71,6 +71,9 @@ func ResolveTugQL(doc TugQLDocument, context TugQLResolveContext) (TugQLResolved
 			return TugQLResolved{}, []TugQLDiagnostic{formatDiagnostic("source_tree_mismatch", "TugQL source and semantic tree do not describe the same query")}
 		}
 	}
+	if diagnostics := validateTugQLTreeDatabases(doc.Tree.Databases, tree, false); len(diagnostics) != 0 {
+		return TugQLResolved{}, diagnostics
+	}
 	authoredQueryNodes := tugqlDocumentNodeCount(&tree.Query, maxTugQLSemanticNodes)
 	if diagnostics := validateTugQLParameters(tree.Parameters, context.Bindings); len(diagnostics) != 0 {
 		return TugQLResolved{}, diagnostics
@@ -344,6 +347,11 @@ func countTugQLTreeValues(tree TugQLTree, budget *tugqlResolveBudget) error {
 	if err := push(tree.Query, 0); err != nil {
 		return err
 	}
+	for _, database := range tree.Databases {
+		if err := push(database, 0); err != nil {
+			return err
+		}
+	}
 	for _, parameter := range tree.Parameters {
 		if err := push(parameter, 0); err != nil {
 			return err
@@ -361,6 +369,8 @@ func countTugQLTreeValues(tree TugQLTree, budget *tugqlResolveBudget) error {
 		budget.nodes++
 		depth := item.depth + 1
 		switch value := item.value.(type) {
+		case TugQLDatabase:
+			// A declaration is a leaf: two strings checked by its own validator.
 		case TugQLParameter:
 			if value.Default != nil {
 				if err := push(*value.Default, depth); err != nil {
@@ -633,6 +643,9 @@ func resolveTugQLImports(definitions []tugqlDefinition, context TugQLResolveCont
 		imported, diagnostics := ParseTugQL(pinned.Source)
 		if len(diagnostics) != 0 {
 			return nil, nil, diagnostics
+		}
+		if len(imported.Tree.Databases) != 0 {
+			return nil, nil, []TugQLDiagnostic{formatDiagnostic("nested_databases", "an imported saved query cannot declare DATABASES: "+relative)}
 		}
 		if context.tugqlBudget != nil {
 			if err := countTugQLTree(*imported.Tree, context.tugqlBudget); err != nil {
@@ -2104,17 +2117,17 @@ func validateTugQLExecutableExpressions(query document) []TugQLDiagnostic {
 }
 
 func resolveTugQLRelationships(query *document, context TugQLResolveContext, expansions *[]TugQLRelationshipExpansion) []TugQLDiagnostic {
-	type relationSource struct{ table, alias string }
+	type relationSource struct{ table, alias, database string }
 	identity := func(from fromYAML) relationSource {
 		if from.Query != nil {
 			alias := from.Query.As
-			return relationSource{table: alias, alias: alias}
+			return relationSource{table: alias, alias: alias, database: tugqlSourceDatabase(from)}
 		}
 		alias := from.Alias
 		if alias == "" {
 			alias = from.Name
 		}
-		return relationSource{table: from.Name, alias: alias}
+		return relationSource{table: from.Name, alias: alias, database: tugqlSourceDatabase(from)}
 	}
 	endpointMatch := func(endpoint TugQLRelationEndpoint, source relationSource) bool {
 		return endpoint.Table == source.table && (endpoint.Source == "" || endpoint.Source == source.alias)
@@ -2170,6 +2183,14 @@ func resolveTugQLRelationships(query *document, context TugQLResolveContext, exp
 			// validateTugQLDocumentShape rejects joins without a source before
 			// this internal resolver is called.
 			target := identity(*join.From)
+			// Relationship metadata names no database, so it relates only
+			// sources of the target's own database.
+			samePrior := make([]relationSource, 0, len(prior))
+			for _, source := range prior {
+				if source.database == target.database {
+					samePrior = append(samePrior, source)
+				}
+			}
 			var shorthand *exprYAML
 			for _, condition := range join.On {
 				if condition.Op == "relationship" {
@@ -2187,7 +2208,10 @@ func resolveTugQLRelationships(query *document, context TugQLResolveContext, exp
 				join.On = conditions
 			}
 			if len(join.On) == 0 || shorthand != nil {
-				relation, source, reverse, matches := find(target, prior, shorthand)
+				relation, source, reverse, matches := find(target, samePrior, shorthand)
+				if matches == 0 && len(samePrior) != len(prior) {
+					return []TugQLDiagnostic{formatDiagnostic("cross_database_relationship", "a join between sources of different databases must state its ON condition")}
+				}
 				if matches != 1 {
 					code, message := "relationship_not_found", "no authorized exact relationship connects the joined sources"
 					if shorthand != nil {
@@ -2218,7 +2242,7 @@ func resolveTugQLRelationships(query *document, context TugQLResolveContext, exp
 				}
 				appendTugQLRelationshipExpansion(expansions, TugQLRelationshipExpansion{ID: relation.ID, Version: relation.Version, FromSource: fromSource, ToSource: toSource, JoinType: normalizedTugQLJoinType(join.Type), Pairs: append([]TugQLRelationshipPair(nil), relation.Pairs...)})
 			} else {
-				relation, source, reverse, matches := find(target, prior, nil)
+				relation, source, reverse, matches := find(target, samePrior, nil)
 				if matches == 1 && relationFieldPairsAuthorized(relation, context) && tugqlJoinMatchesRelationship(join.On, relation, source.alias, target.alias, reverse) {
 					fromSource, toSource := source.alias, target.alias
 					if reverse {
