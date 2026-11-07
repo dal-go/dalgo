@@ -207,6 +207,9 @@ type TugQLResolveContext struct {
 	Bindings          []TugQLBinding          `json:"bindings,omitempty"`
 	tugqlImportStack  []string
 	tugqlBudget       *tugqlResolveBudget
+	// tugqlDeclaresDatabases is set when the root document declares
+	// databases: an unqualified source then reads only the default database.
+	tugqlDeclaresDatabases bool
 }
 
 // TugQLAuthorizedSchema is a schema version ResolveTugQL may read.

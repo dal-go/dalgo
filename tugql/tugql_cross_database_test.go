@@ -195,10 +195,28 @@ func TestTugQLCrossDatabaseSourceEdges(t *testing.T) {
 	if _, diagnostics := ParseTugQL("DATABASES (\n  sales\n)\nfrom sales::Invoice\nselect Id"); len(diagnostics) == 0 || diagnostics[0].Code != "keyword_case" {
 		t.Fatalf("inconsistent header case: %+v", diagnostics)
 	}
-	// `databases` that is not a block header is an ordinary identifier.
-	for _, text := range []string{"from databases\nselect databases(x)", "from T\nselect (\n  a\n  databases (\n    from U\n    select b\n  )\n)"} {
-		if !isTugQLDatabasesHeader(mustLex(t, "databases (\n"), 0) || isTugQLStyleToken(mustLex(t, text), 1) {
-			t.Fatalf("header detection for %q", text)
+	// `databases` is a keyword only as the word of a `databases (` header line.
+	for text, want := range map[string]bool{
+		"databases (\n":                        true,
+		"from T\nDATABASES (\n  a\n)":          true,
+		"from databases\nselect a":             false,
+		"from T\nselect databases(x)":          false,
+		"from T\nselect (\n  databases (x)\n)": false,
+		"from T as databases\nselect a":        false,
+		"from T\nselect (\n  a\n  databases (\n    from U\n    select b\n  )\n)": true,
+	} {
+		tokens := mustLex(t, text)
+		found := false
+		for i, token := range tokens {
+			if strings.EqualFold(token.Text, "databases") {
+				found = true
+				if got := isTugQLStyleToken(tokens, i); got != want {
+					t.Errorf("%q: header=%v, want %v", text, got, want)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("%q has no databases token", text)
 		}
 	}
 }
@@ -210,4 +228,49 @@ func mustLex(t *testing.T, text string) []tugqlToken {
 		t.Fatal(diagnostics)
 	}
 	return tokens
+}
+
+// Federated execution routes every source by alias, so it requires every
+// source to be qualified: a caller wanting a default database binds it as an
+// alias. A mixed document resolves but fails closed when executed.
+func TestTugQLCrossDatabaseFederatedExecutionRequiresQualifiedSources(t *testing.T) {
+	schemas := []TugQLAuthorizedSchema{
+		{Version: "default-v1", Tables: []TugQLTable{{Name: "Invoice", Fields: []TugQLField{{Name: "InvoiceId", Type: "integer", Authorized: true}, {Name: "BillingCountry", Type: "string", Authorized: true}}}}},
+		{Database: "main", Version: "main-v1", Tables: []TugQLTable{{Name: "Invoice", Fields: []TugQLField{{Name: "InvoiceId", Type: "integer", Authorized: true}, {Name: "BillingCountry", Type: "string", Authorized: true}}}}},
+		{Database: "geo", Version: "geo-v1", Tables: []TugQLTable{{Name: "Country", Fields: []TugQLField{{Name: "Name", Type: "string", Authorized: true}}}}},
+	}
+	invoices := newCrossDatabaseExecutor("main", "Invoice", map[string]any{"InvoiceId": 1, "BillingCountry": "USA"})
+	countries := newCrossDatabaseExecutor("geo", "Country", map[string]any{"Name": "USA"})
+	resolve := func(_ context.Context, database string) (dal.QueryExecutor, error) {
+		switch database {
+		case "main":
+			return invoices, nil
+		case "geo":
+			return countries, nil
+		}
+		return nil, fmt.Errorf("unknown database %q", database)
+	}
+	run := func(text string) ([]record.Record, error) {
+		t.Helper()
+		doc, diagnostics := ParseTugQL(text)
+		if len(diagnostics) != 0 {
+			t.Fatalf("parse: %+v", diagnostics)
+		}
+		resolved, diagnostics := ResolveTugQL(doc, TugQLResolveContext{AuthorizedSchemas: schemas})
+		if len(diagnostics) != 0 {
+			t.Fatalf("resolve: %+v", diagnostics)
+		}
+		reader, err := dal.ExecuteFederatedQuery(context.Background(), resolved.Query, resolve)
+		if err != nil {
+			return nil, err
+		}
+		return dal.ReadAllToRecords(context.Background(), reader)
+	}
+	if _, err := run("databases (\n  geo\n)\nfrom Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId, c.Name"); err == nil || !strings.Contains(err.Error(), `federated source "Invoice" has no database`) {
+		t.Fatalf("mixed sources must fail closed: %v", err)
+	}
+	rows, err := run("databases (\n  main\n  geo\n)\nfrom main::Invoice as i\njoin geo::Country as c\n  on i.BillingCountry = c.Name\nselect i.InvoiceId, c.Name")
+	if err != nil || len(rows) != 1 || fmt.Sprint(rows[0].Data()) != "map[InvoiceId:1 Name:USA]" {
+		t.Fatalf("qualified sources: rows=%+v err=%v", rows, err)
+	}
 }

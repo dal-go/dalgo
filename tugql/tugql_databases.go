@@ -2,7 +2,6 @@ package tugql
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -19,15 +18,36 @@ func validTugQLDatabaseName(name string) bool {
 	return validTugQLParamName(name) && !isTugQLStyleKeyword(name)
 }
 
-// tugqlTargetHasPassword reports whether target is a URL whose user
-// information carries a password. Credentials come from the caller.
+// tugqlTargetHasPassword reports whether target carries a password, by a
+// deterministic textual rule shared with dalgo-js (no URL parsing, so a
+// malformed URL cannot hide one). Credentials come from the caller.
+//
+//  1. rest is the text after the last `://`, or the whole target without one.
+//     When rest contains `@` and the text before its first `@` contains no
+//     `/`, that text is user information; it must not contain `:`.
+//  2. `password`, `pwd` or `passwd` (any case), then optional spaces or tabs
+//     and `=`, must not appear at the start of the target or right after `;`,
+//     `&`, `?`, a space or a tab.
 func tugqlTargetHasPassword(target string) bool {
-	u, err := url.Parse(target)
-	if err != nil || u.User == nil {
-		return false
+	rest := target
+	if i := strings.LastIndex(target, "://"); i >= 0 {
+		rest = target[i+3:]
 	}
-	_, has := u.User.Password()
-	return has
+	if at := strings.IndexByte(rest, '@'); at >= 0 && !strings.Contains(rest[:at], "/") && strings.Contains(rest[:at], ":") {
+		return true
+	}
+	lower := strings.ToLower(target)
+	for start := 0; start < len(lower); start++ {
+		if start > 0 && !strings.ContainsRune(";&? \t", rune(lower[start-1])) {
+			continue
+		}
+		for _, key := range []string{"password", "passwd", "pwd"} {
+			if strings.HasPrefix(lower[start:], key) && strings.HasPrefix(strings.TrimLeft(lower[start+len(key):], " \t"), "=") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // validateTugQLDatabaseDeclarations checks caller-built declarations with the
@@ -311,7 +331,7 @@ func parseTugQLSourceDatabase(tokens []tugqlToken) (*string, int, error) {
 	}
 	alias := tokens[0]
 	if len(tokens) < 3 || !tokensTouch(alias, tokens[1]) || !tokensTouch(tokens[1], tokens[2]) || isQuotedIdentifier(alias.Text) || !validTugQLDatabaseName(alias.Text) {
-		return nil, 0, fmt.Errorf("a database qualifier is alias::path, with an unquoted alias and no spaces around '::'")
+		return nil, 0, pathError("invalid_database_qualifier", "a database qualifier is alias::path, with an unquoted alias and no spaces around '::'", tugqlSpan{Start: alias.Span.Start, End: tokens[1].Span.End})
 	}
 	name := alias.Text
 	return &name, 2, nil

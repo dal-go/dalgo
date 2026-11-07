@@ -74,6 +74,7 @@ func ResolveTugQL(doc TugQLDocument, context TugQLResolveContext) (TugQLResolved
 	if diagnostics := validateTugQLTreeDatabases(doc.Tree.Databases, tree, false); len(diagnostics) != 0 {
 		return TugQLResolved{}, diagnostics
 	}
+	context.tugqlDeclaresDatabases = len(tree.Databases) != 0
 	authoredQueryNodes := tugqlDocumentNodeCount(&tree.Query, maxTugQLSemanticNodes)
 	if diagnostics := validateTugQLParameters(tree.Parameters, context.Bindings); len(diagnostics) != 0 {
 		return TugQLResolved{}, diagnostics
@@ -1435,7 +1436,9 @@ func tugqlQuerySources(query document, context TugQLResolveContext) ([]tugqlReso
 		var table *TugQLTable
 		for i := range context.AuthorizedSchemas {
 			schema := &context.AuthorizedSchemas[i]
-			if from.Database != nil && schema.Database != *from.Database || from.Schema != nil && schema.Schema != *from.Schema {
+			// With declared databases an unqualified source reads only the
+			// default database; without them it keeps matching any database.
+			if from.Database != nil && schema.Database != *from.Database || from.Database == nil && context.tugqlDeclaresDatabases && schema.Database != "" || from.Schema != nil && schema.Schema != *from.Schema {
 				continue
 			}
 			for j := range schema.Tables {
