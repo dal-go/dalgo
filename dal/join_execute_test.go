@@ -809,6 +809,45 @@ func TestGenericJoinGroupHavingAggregatePipeline(t *testing.T) {
 	}
 }
 
+// HAVING and ORDER BY name a projection alias unqualified, the way the
+// tugql.org hero orders by Total, and the sources report their field lists.
+func TestGenericJoinOrdersAndFiltersByProjectionAliasWithFieldMetadata(t *testing.T) {
+	root := From(NewRootCollectionRef("A", "a")).Join(NewJoinedSource(NewRootCollectionRef("B", "b"), JoinInner, NewComparison(NewFieldRef("a", "id"), Equal, NewFieldRef("b", "aid"))))
+	backend := &ignoringJoinBackend{data: map[string][]record.Record{
+		"A": {joinTestRecord("A", "a1", map[string]any{"id": 1}), joinTestRecord("A", "a2", map[string]any{"id": 2}), joinTestRecord("A", "a3", map[string]any{"id": 3})},
+		"B": {
+			joinTestRecord("B", "b1", map[string]any{"aid": 1, "v": 1}),
+			joinTestRecord("B", "b2", map[string]any{"aid": 2, "v": 5}), joinTestRecord("B", "b3", map[string]any{"aid": 2, "v": 4}),
+			joinTestRecord("B", "b4", map[string]any{"aid": 3, "v": 3}),
+		},
+	}, reads: map[string]int{}, fields: map[string][]string{"A": {"id"}, "B": {"aid", "v"}}}
+	q := root.NewQuery().GroupBy(NewFieldRef("a", "id")).
+		Having(NewComparison(Field("T"), GreaterThen, Constant{Value: 1})).
+		OrderBy(Descending(Field("T"))).
+		SelectColumns(Column{Expression: NewFieldRef("a", "id"), Alias: "id"}, SumAs(NewFieldRef("b", "v"), "T"))
+	reader, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ReadAllToRecords(context.Background(), reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []any
+	for _, row := range rows {
+		got = append(got, row.Data().(map[string]any)["id"])
+	}
+	if fmt.Sprint(got) != "[2 3]" {
+		t.Fatalf("want ids [2 3] by T desc with T > 1, got %v", got)
+	}
+	// An aggregate argument reads source rows: an alias there is still refused.
+	inArg := root.NewQuery().GroupBy(NewFieldRef("a", "id")).OrderBy(Descending(NewAggregate(SUM, false, Field("T")))).
+		SelectColumns(Column{Expression: NewFieldRef("a", "id"), Alias: "id"}, SumAs(NewFieldRef("b", "v"), "T"))
+	if _, err := NewDB(backend).ExecuteQueryToRecordsReader(context.Background(), inArg); err == nil || !strings.Contains(err.Error(), "orderBy[0].args[0]") {
+		t.Fatalf("alias inside an aggregate argument was accepted: %v", err)
+	}
+}
+
 func TestGenericJoinQualifiedFieldDiagnostics(t *testing.T) {
 	a := NewRootCollectionRef("A", "a")
 	b := NewRootCollectionRef("B", "b")
