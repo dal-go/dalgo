@@ -31,7 +31,8 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 	}
 	collect(q.From())
 	// HAVING and ORDER BY may name a projection alias unqualified (TugQL
-	// reference/aggregation.md); only those clauses set outputAliases.
+	// reference/aggregation.md); only those clauses set outputAliases, and an
+	// aggregate argument still needs a qualified source field.
 	columnAliases := map[string]bool{}
 	for _, column := range q.Columns() {
 		if column.Alias != "" {
@@ -39,6 +40,7 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 		}
 	}
 	var outputAliases map[string]bool
+	aggregateDepth := 0
 	var walk documentWalk
 	var expression func(dal.Expression, string) error
 	expression = func(value dal.Expression, path string) error {
@@ -53,7 +55,7 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 		switch v := value.(type) {
 		case dal.FieldRef:
 			if v.Source() == "" {
-				if outputAliases[v.Name()] {
+				if aggregateDepth == 0 && outputAliases[v.Name()] {
 					return nil
 				}
 				return &dal.JoinValidationError{Category: "join_field", Path: path + ".source", Message: "unqualified JOIN field requires schema metadata"}
@@ -71,6 +73,8 @@ func validateJoinClauseFields(q dal.StructuredQuery) error {
 				return expression(*v, path)
 			}
 		case dal.AggregateFunc:
+			aggregateDepth++
+			defer func() { aggregateDepth-- }()
 			for i, arg := range v.FuncArgs() {
 				if err := expression(arg, fmt.Sprintf("%s.args[%d]", path, i)); err != nil {
 					return err

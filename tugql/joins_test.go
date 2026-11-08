@@ -257,6 +257,13 @@ func TestJoinClauseFieldsRequireKnownQualifierWithoutSchema(t *testing.T) {
 			t.Fatalf("projection alias refused: %v", err)
 		}
 	})
+	t.Run("projection alias inside an aggregate argument is refused", func(t *testing.T) {
+		text := base + "groupBy: [{field: id, source: a}]\norderBy: [{aggregate: {function: sum, args: [{field: total}]}}]\ncolumns: [{field: id, source: a}, {as: total, aggregate: {function: sum, args: [{field: n, source: b}]}}]\n"
+		var diagnostic *dal.JoinValidationError
+		if _, err := Deserialize([]byte(text)); !errors.As(err, &diagnostic) || diagnostic.Path != "orderBy[0].args[0].source" {
+			t.Fatalf("want join_field at orderBy[0].args[0].source, got %v", err)
+		}
+	})
 	t.Run("projection alias is not in scope for WHERE or GROUP", func(t *testing.T) {
 		for _, clause := range []string{"where: {op: '>', left: {field: total}, right: {value: 1}}\n", "groupBy: [{field: total}]\n"} {
 			text := base + clause + "columns: [{as: total, aggregate: {function: sum, args: [{field: n, source: b}]}}]\n"

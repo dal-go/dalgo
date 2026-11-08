@@ -291,8 +291,16 @@ func (e *joinExecution) validateQueryFields() error {
 			}
 		}
 	}
+	// HAVING and ORDER BY may name a projection alias unqualified; it is
+	// computed by aggregation, so no scanned source lists it. An aggregate
+	// argument reads source rows and never sees an alias.
+	var aliasScope map[string]bool
+	aggregateDepth := 0
 	check := func(field FieldRef, path string) error {
 		alias := field.Source()
+		if alias == "" && aggregateDepth == 0 && aliasScope[field.Name()] {
+			return nil
+		}
 		if alias == "" {
 			// Legacy JOIN parsing keeps its own no-schema rule. Recursive
 			// evaluation can bind an unqualified reference when every scanned
@@ -372,6 +380,8 @@ func (e *joinExecution) validateQueryFields() error {
 				return expression(*v, path)
 			}
 		case AggregateFunc:
+			aggregateDepth++
+			defer func() { aggregateDepth-- }()
 			for i, arg := range v.FuncArgs() {
 				if err := expression(arg, fmt.Sprintf("%s.args[%d]", path, i)); err != nil {
 					return err
@@ -481,6 +491,12 @@ func (e *joinExecution) validateQueryFields() error {
 	for i, group := range e.q.GroupBy() {
 		if err := expression(group, fmt.Sprintf("groupBy[%d]", i)); err != nil {
 			return err
+		}
+	}
+	aliasScope = map[string]bool{}
+	for _, column := range e.q.Columns() {
+		if column.Alias != "" {
+			aliasScope[column.Alias] = true
 		}
 	}
 	if err := condition(e.q.Having(), "having"); err != nil {
