@@ -251,6 +251,21 @@ func TestJoinClauseFieldsRequireKnownQualifierWithoutSchema(t *testing.T) {
 			}
 		})
 	}
+	t.Run("unqualified projection alias in HAVING and ORDER", func(t *testing.T) {
+		text := base + "groupBy: [{field: id, source: a}]\nhaving: {op: '>', left: {field: total}, right: {value: 1}}\norderBy: [{field: total, desc: true}]\ncolumns: [{field: id, source: a}, {as: total, aggregate: {function: sum, args: [{field: n, source: b}]}}]\n"
+		if _, err := Deserialize([]byte(text)); err != nil {
+			t.Fatalf("projection alias refused: %v", err)
+		}
+	})
+	t.Run("projection alias is not in scope for WHERE or GROUP", func(t *testing.T) {
+		for _, clause := range []string{"where: {op: '>', left: {field: total}, right: {value: 1}}\n", "groupBy: [{field: total}]\n"} {
+			text := base + clause + "columns: [{as: total, aggregate: {function: sum, args: [{field: n, source: b}]}}]\n"
+			var diagnostic *dal.JoinValidationError
+			if _, err := Deserialize([]byte(text)); !errors.As(err, &diagnostic) || diagnostic.Category != "join_field" {
+				t.Fatalf("%s: want join_field, got %v", clause, err)
+			}
+		}
+	})
 	root := dal.From(dal.NewRootCollectionRef("A", "a")).Join(dal.NewJoinedSource(dal.NewRootCollectionRef("B", "b"), dal.JoinInner, dal.NewComparison(dal.NewFieldRef("a", "id"), dal.Equal, dal.NewFieldRef("b", "aid"))))
 	if _, err := Serialize(root.NewQuery().SelectColumns(dal.Column{Expression: dal.Field("id")})); err == nil || !strings.Contains(err.Error(), "join_field at columns[0].source") {
 		t.Fatalf("Serialize accepted unqualified JOIN field: %v", err)
