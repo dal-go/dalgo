@@ -1046,7 +1046,7 @@ func matchesComparison(data map[string]any, comparison dal.Comparison) bool {
 			switch comparison.Operator {
 			case dal.Equal:
 				value, _ := fieldValue(data, left.Name())
-				return value == norm
+				return valuesEqual(value, norm)
 			case dal.GreaterThen, dal.GreaterOrEqual, dal.LessThen, dal.LessOrEqual:
 				value, ok := fieldValue(data, left.Name())
 				if !ok {
@@ -1112,9 +1112,8 @@ func fieldContainsAny(fieldValue, values any) bool {
 // compared by value because serialized rows decode all JSON numbers as
 // float64; everything else uses Go equality (uncomparable values never match).
 func elementEquals(a, b any) bool {
-	if af, ok := number(a); ok {
-		bf, ok := number(b)
-		return ok && af == bf
+	if eq, ok := numbersEqual(a, b); ok {
+		return eq
 	}
 	if t := reflect.TypeOf(a); t != nil && !t.Comparable() {
 		return false
@@ -1136,7 +1135,7 @@ func normalizeConstant(v any) any {
 	// b is valid JSON produced by Marshal above, so unmarshalling into any never
 	// fails.
 	var out any
-	_ = json.Unmarshal(b, &out)
+	_ = unmarshalGeneric(b, &out)
 	return out
 }
 
@@ -1146,17 +1145,10 @@ func compare(a, b any) int {
 			return left.Compare(right)
 		}
 	}
-	af, aOK := number(a)
-	bf, bOK := number(b)
+	na, aOK := parseNumber(a)
+	nb, bOK := parseNumber(b)
 	if aOK && bOK {
-		switch {
-		case af < bf:
-			return -1
-		case af > bf:
-			return 1
-		default:
-			return 0
-		}
+		return compareParsed(na, nb)
 	}
 	as, bs := fmt.Sprint(a), fmt.Sprint(b)
 	switch {
@@ -1170,18 +1162,8 @@ func compare(a, b any) int {
 }
 
 func number(v any) (float64, bool) {
-	rv := reflect.ValueOf(v)
-	if !rv.IsValid() {
-		return 0, false
+	if pn, ok := parseNumber(v); ok {
+		return pn.toFloat(), true
 	}
-	switch rv.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return float64(rv.Int()), true
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return float64(rv.Uint()), true
-	case reflect.Float32, reflect.Float64:
-		return rv.Float(), true
-	default:
-		return 0, false
-	}
+	return 0, false
 }
