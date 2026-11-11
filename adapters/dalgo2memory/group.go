@@ -160,7 +160,7 @@ func executeGroupedReader(q dal.StructuredQuery, rows []rowSources, collection s
 	records := make([]record.Record, len(groups))
 	for i, g := range groups {
 		key := record.NewKeyWithID(collection, fmt.Sprint(i))
-		records[i] = record.NewRecordWithData(key, g.out).SetError(nil)
+		records[i] = record.NewRecordWithData(key, toPublicMap(g.out)).SetError(nil)
 	}
 	return dal.NewRecordsReader(records), nil
 }
@@ -175,7 +175,7 @@ func groupKey(groupBy []dal.Expression, r rowSources, known map[string]bool) (st
 		if err != nil {
 			return "", err
 		}
-		parts[i] = fmt.Sprintf("%T:%v", v, v)
+		parts[i] = canonicalGroupValue(v)
 	}
 	return strings.Join(parts, "\x00"), nil
 }
@@ -333,8 +333,11 @@ func matchesHaving(cond dal.Condition, g *aggGroup, known map[string]bool) (bool
 }
 
 // compareOp applies a comparison operator to two values via the shared
-// numeric/string comparator.
+// numeric/string comparator. Comparisons against NaN evaluate to false.
 func compareOp(op dal.Operator, l, r any) bool {
+	if isNaNValue(l) || isNaNValue(r) {
+		return false
+	}
 	c := compare(l, r)
 	switch op {
 	case dal.Equal:

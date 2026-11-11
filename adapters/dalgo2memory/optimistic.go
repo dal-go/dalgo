@@ -643,12 +643,12 @@ func (tx *optimisticState) touch(collection, id string, key *record.Key) (*pendi
 	}
 	entry, _ := tx.firstTouchEntry(collection, id, key)
 	eng := tx.db.engine(collection)
-	var data map[string]any
+	var data internalGenericData
 	target := record.NewRecordWithData(key, &data)
 	switch err := eng.load(id, target); {
 	case err == nil:
 		entry.present = true
-		entry.data = data
+		entry.data = map[string]any(data)
 	case record.IsNotFound(err):
 		// leave entry.present at its zero value (false)
 	default:
@@ -985,7 +985,7 @@ func normalizeData(data any) (map[string]any, error) {
 		return nil, err
 	}
 	var out map[string]any
-	if err := json.Unmarshal(b, &out); err != nil {
+	if err := unmarshalGeneric(b, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -1001,7 +1001,7 @@ func normalizeData(data any) (map[string]any, error) {
 func cloneEntryData(data map[string]any) map[string]any {
 	b, _ := json.Marshal(data)
 	var out map[string]any
-	_ = json.Unmarshal(b, &out)
+	_ = unmarshalGeneric(b, &out)
 	return out
 }
 
