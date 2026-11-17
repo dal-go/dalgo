@@ -11,7 +11,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/stretchr/testify v1.12.1
 	github.com/strongo/random v0.0.3
-	github.com/strongo/validation v0.0.17
+	github.com/strongo/validation v0.0.18
 	go.uber.org/mock v0.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )
