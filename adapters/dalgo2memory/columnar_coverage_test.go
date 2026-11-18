@@ -241,6 +241,10 @@ func TestColumnar_RowMarshalErrorPaths(t *testing.T) {
 
 	// load surfaces the reassembly error too.
 	require.Error(t, db.Get(ctx, record.NewRecordWithData(key, &item{})))
+
+	// load into internalGenericData surfaces rowData error too.
+	var gd internalGenericData
+	require.Error(t, eng.load("i1", record.NewRecordWithData(key, &gd)))
 }
 
 // TestColumnar_MaterializeUnmarshalError covers materializeSlot's final

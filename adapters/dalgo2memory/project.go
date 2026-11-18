@@ -51,7 +51,8 @@ func projectRow(columns []dal.Column, sources map[string]map[string]any) map[str
 	out := make(map[string]any, len(columns))
 	for _, col := range columns {
 		f := col.Expression.(dal.FieldRef)
-		out[columnKey(col, f)], _ = fieldValue(sources[f.Source()], f.Name())
+		val, _ := fieldValue(sources[f.Source()], f.Name())
+		out[columnKey(col, f)] = toPublicValue(val)
 	}
 	return out
 }

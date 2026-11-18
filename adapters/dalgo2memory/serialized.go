@@ -68,6 +68,14 @@ func (e *serializedEngine) load(id string, record record.Record) error {
 	if !ok {
 		return dal.NewErrNotFoundByKey(record.Key(), nil)
 	}
+	if gd, ok := record.Data().(*internalGenericData); ok {
+		var m map[string]any
+		if err := unmarshalGeneric(b, &m); err != nil {
+			return err
+		}
+		*gd = m
+		return nil
+	}
 	return json.Unmarshal(b, record.Data())
 }
 
@@ -82,7 +90,7 @@ func (e *serializedEngine) update(id string, updates []update.Update) error {
 		return dal.NewErrNotFoundByKey(record.NewKeyWithID(e.collection, id), nil)
 	}
 	var data map[string]any
-	if err := json.Unmarshal(b, &data); err != nil {
+	if err := unmarshalGeneric(b, &data); err != nil {
 		return err
 	}
 	if err := applyUpdatesToMap(data, updates); err != nil {
@@ -105,7 +113,7 @@ func (e *serializedEngine) rows() ([]engineRow, error) {
 	rows := make([]engineRow, 0, len(e.records))
 	for id, b := range e.records {
 		var data map[string]any
-		if err := json.Unmarshal(b, &data); err != nil {
+		if err := unmarshalGeneric(b, &data); err != nil {
 			return nil, err
 		}
 		raw := b

@@ -2,7 +2,6 @@ package dalgo2memory
 
 import (
 	"fmt"
-	"maps"
 	"sort"
 
 	"github.com/dal-go/dalgo/dal"
@@ -243,8 +242,12 @@ func sortByID(rows []memoryRow) {
 
 func mergeData(base, join map[string]any) map[string]any {
 	merged := make(map[string]any, len(base)+len(join))
-	maps.Copy(merged, base)
-	maps.Copy(merged, join)
+	for k, v := range base {
+		merged[k] = toPublicValue(v)
+	}
+	for k, v := range join {
+		merged[k] = toPublicValue(v)
+	}
 	return merged
 }
 
@@ -282,10 +285,8 @@ func allConditionsMatch(conds []dal.Condition, sources map[string]map[string]any
 }
 
 func valuesEqual(a, b any) bool {
-	if af, aok := number(a); aok {
-		if bf, bok := number(b); bok {
-			return af == bf
-		}
+	if eq, ok := numbersEqual(a, b); ok {
+		return eq
 	}
 	return a == b
 }

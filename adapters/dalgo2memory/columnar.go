@@ -349,6 +349,14 @@ func (e *columnarEngine) load(id string, record record.Record) error {
 	if !ok || !e.live[slot] {
 		return dal.NewErrNotFoundByKey(record.Key(), nil)
 	}
+	if gd, ok := record.Data().(*internalGenericData); ok {
+		row, err := e.rowData(slot)
+		if err != nil {
+			return err
+		}
+		*gd = row
+		return nil
+	}
 	return e.materializeSlot(slot, record.Data())
 }
 
@@ -482,6 +490,13 @@ func (e *columnarEngine) candidateSlots(condition dal.Condition) (SlotSet, bool)
 	if !ok {
 		return nil, false
 	}
+	if col.defaultStgy == nil {
+		if _, isNum := parseNumber(constant.Value); isNum {
+			if col.elemType.Kind() == reflect.Interface || isUnsafeFloatNumber(constant.Value) {
+				return nil, false
+			}
+		}
+	}
 	return col.strategy.EqualSlots(constant.Value)
 }
 
@@ -514,13 +529,27 @@ func (e *columnarEngine) allocSlot(id string) int {
 	return slot
 }
 
+// strategyValue returns the value to pass to a custom ColumnStrategy.SetValue callback.
+// For declared typed columns (including typed json.Number columns), the declared typed value
+// is preserved. For interface/any columns (and generic maps/slices), internal json.Number
+// representations that changed during generic decoding are normalized back to historical float64.
+func strategyValue(col *column, val any) any {
+	if col.elemType.Kind() == reflect.Interface {
+		return toPublicValue(val)
+	}
+	if col.elemType == reflect.TypeOf(map[string]any(nil)) || col.elemType == reflect.TypeOf([]any(nil)) {
+		return toPublicValue(val)
+	}
+	return val
+}
+
 // writeSlot stores already-decoded per-column values at slot, updates each
 // column's strategy write side, and (on the map-backed path) stores the row's
 // leftover map of undeclared fields at the same slot.
 func (e *columnarEngine) writeSlot(slot int, values []reflect.Value, leftover map[string]any) {
 	for i, col := range e.columns {
 		col.values.Index(slot).Set(values[i])
-		col.strategy.SetValue(slot, values[i].Interface())
+		col.strategy.SetValue(slot, strategyValue(col, values[i].Interface()))
 	}
 	if e.mapBacked {
 		e.leftover[slot] = leftover
@@ -573,7 +602,7 @@ func (e *columnarEngine) decodeMapFields(data any) ([]reflect.Value, map[string]
 		return nil, nil, err
 	}
 	var asMap map[string]any
-	if err := json.Unmarshal(b, &asMap); err != nil {
+	if err := unmarshalGeneric(b, &asMap); err != nil {
 		return nil, nil, err
 	}
 	values := make([]reflect.Value, len(e.columns))
@@ -616,7 +645,7 @@ func (e *columnarEngine) decodeFields(data any) ([]reflect.Value, error) {
 		return nil, err
 	}
 	var asMap map[string]any
-	if err := json.Unmarshal(b, &asMap); err != nil {
+	if err := unmarshalGeneric(b, &asMap); err != nil {
 		return nil, err
 	}
 	for key := range asMap {
@@ -699,7 +728,7 @@ func (e *columnarEngine) rowData(slot int) (map[string]any, error) {
 	var out map[string]any
 	// b is the marshaling of a map, so it is a JSON object that always decodes
 	// back into map[string]any.
-	_ = json.Unmarshal(b, &out)
+	_ = unmarshalGeneric(b, &out)
 	return out, nil
 }
 
@@ -802,7 +831,7 @@ func (e *columnarEngine) rebuildStrategies() {
 			continue
 		}
 		for slot := 0; slot < col.values.Len(); slot++ {
-			col.strategy.SetValue(slot, col.values.Index(slot).Interface())
+			col.strategy.SetValue(slot, strategyValue(col, col.values.Index(slot).Interface()))
 		}
 	}
 }

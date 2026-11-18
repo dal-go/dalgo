@@ -92,6 +92,9 @@ func (s *typedSliceStrategy) EqualSlots(value any) (SlotSet, bool) {
 // constant.Value): plain Go == on the decoded values, guarded so that
 // comparing against a non-comparable queried value cannot panic.
 func valuesEqualForStrategy(stored, queried any) bool {
+	if eq, ok := numbersEqual(stored, queried); ok {
+		return eq
+	}
 	if queried != nil && !reflect.TypeOf(queried).Comparable() {
 		return false
 	}
