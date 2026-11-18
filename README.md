@@ -46,6 +46,12 @@ We build with our own tooling:
 
 DALgo provides the data-access seam in [DataTug](https://datatug.app)’s development ecosystem. Read [how DataTug’s development tools were built](https://datatug.app/en/under-the-hood/tools-we-built/).
 
+## TugQL and related sites
+
+The [`tugql` Go package](./tugql) parses SQL-like TugQL text and serializes the supported core read-query model as YAML. See the [TugQL language home](https://tugql.org/) and [specification source](https://github.com/tugql/tugql). The [TypeScript implementation](https://github.com/dal-go/dalgo-js) has its own feature and adapter coverage.
+
+[QueryDock](https://querydock.run/) is a related browser SQL playground for PostgreSQL-compatible PGlite, SQLite and DuckDB. Its current editors do not execute TugQL.
+
 > **Specification scope:** The [`spec/`](./spec) tree specifies DALgo code and
 > runtime behavior only. The separate [dalgo.io](https://dalgo.io/) website,
 > its content, visual design, and marketing pages are intentionally outside the
