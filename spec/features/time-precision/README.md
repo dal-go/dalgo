@@ -11,7 +11,7 @@ status: Approved
 
 ## Summary
 
-No DALgo adapter keeps a `time.Time` more precisely than one microsecond, and some keep less. The `dal` package states this ceiling as `dal.TimePrecision` and gives consumers `dal.NormalizeTime` to normalise times without naming an engine. `dalgo2memory` truncates every time it stores to that precision, so unit tests see the precision loss production storage causes.
+No DALgo adapter keeps a `time.Time` more precisely than one microsecond, and some keep less. The `dal` package states this ceiling as `dal.TimePrecision` and gives consumers `dal.NormalizeTime` to normalise times without naming an engine. `dalgo2memory` truncates the times it stores to the precision of the backend its profile names (`FirestoreProfile()`: microseconds), so unit tests see the precision loss production storage causes; without such a profile it keeps times exactly.
 
 ## Problem
 
@@ -31,11 +31,13 @@ The `dal` package MUST export `NormalizeTime(t time.Time) time.Time`, returning 
 
 ### REQ: memory-truncates-on-write
 
-`dalgo2memory` MUST truncate every `time.Time` it persists to `TimePrecision`, on every write path (insert, set, update, and the optimistic transaction buffer) and for every storage engine, wherever encoding/json persists the time: exported struct fields, nested structs, exported fields promoted from embedded structs (exported or unexported, by value or by pointer), pointers, slices, arrays, map values and interface values (`map[string]any`, `[]any`). The caller's value MUST NOT be mutated. A self-referencing value MUST still fail the write with the encoder's cycle error rather than hang.
+When its profile names a backend that keeps times at a coarser precision (`FirestoreProfile()` and `WithFirestoreProfile()`: microseconds, Firestore's precision), `dalgo2memory` MUST truncate every `time.Time` it persists to that precision, on every write path (insert, set, update, and the optimistic transaction buffer) and for every storage engine, wherever encoding/json persists the time: exported struct fields, nested structs, exported fields promoted from embedded structs (exported or unexported, by value or by pointer), pointers, slices, arrays, map values and interface values (`map[string]any`, `[]any`). The caller's value MUST NOT be mutated. A self-referencing value MUST still fail the write with the encoder's cycle error rather than hang. Without such a profile (none, `SingleWriterProfile()`), `dalgo2memory` MUST keep every time exactly as given: DALgo is backend-neutral, and configuring the profile that matches production is the caller's responsibility.
+
+Founder, 2026-11-27: "Dalgo is generic db and we should not truncate by default. It's our responsibility to ensure we configure correctly." and "WithFirestoreProfile should be used and it should configure the trancation". This replaces the original rule that every memory database truncated to `TimePrecision`.
 
 ### REQ: memory-truncates-query-bounds
 
-`dalgo2memory` MUST truncate every `time.Time` in a query's WHERE constants to `TimePrecision` once, before planning, so every engine (including the columnar engine's equality lookup) and the per-row match compare a bound at storage precision, and filtering by the nanosecond original matches the stored value.
+`dalgo2memory` MUST truncate every `time.Time` in a query's WHERE constants to its profile's precision (see memory-truncates-on-write; none without one) once, before planning, so every engine (including the columnar engine's equality lookup) and the per-row match compare a bound at storage precision, and filtering by the nanosecond original matches the stored value.
 
 ## Acceptance Criteria
 
@@ -45,7 +47,7 @@ The `dal` package MUST export `NormalizeTime(t time.Time) time.Time`, returning 
 
 **Given** a struct record whose times (direct, pointer, nested, slice, array, map, `any`) carry nanoseconds
 **When** it is written to `dalgo2memory` with any storage engine and read back, by `Get` or by a query
-**Then** every time equals `dal.NormalizeTime` of the original, and exact comparison with the un-normalised original fails.
+**Then** with `FirestoreProfile()`, every time equals `dal.NormalizeTime` of the original, and exact comparison with the un-normalised original fails.
 
 ### AC: map-round-trip
 
@@ -79,6 +81,14 @@ The `dal` package MUST export `NormalizeTime(t time.Time) time.Time`, returning 
 **When** `dal.NormalizeTime` is applied
 **Then** the result is truncated to the microsecond, keeps the zone, has no monotonic reading, and is idempotent.
 
+### AC: profile-decides-precision
+
+**Requirements:** time-precision#req:memory-truncates-on-write
+
+**Given** a record whose time carries nanoseconds
+**When** it is written and read back through a memory database with no profile, with `SingleWriterProfile()`, with `FirestoreProfile()`, and with `WithFirestoreProfile()`
+**Then** the first two return the nanosecond original, and the Firestore two return it truncated to microseconds.
+
 ## Out of Scope
 
 - Changing any production adapter: each `dalgo2<engine>` adapter already stores at microsecond or coarser precision.
@@ -87,7 +97,7 @@ The `dal` package MUST export `NormalizeTime(t time.Time) time.Time`, returning 
 ## Assumption Carryover
 
 - **Assumed:** production adapters compare a query bound at their storage precision, so a nanosecond bound matches the microsecond value it stored. pgx's binary encoding and the Firestore client truncate. Postgres's text input rounds sub-microsecond digits instead of truncating, so a bound sent as text can differ by one microsecond. This is not verified against each engine in this Feature.
-- **Assumed:** a coarser adapter (milliseconds) needs its callers to normalise more coarsely than `dal.NormalizeTime`; `dalgo2memory` models the microsecond ceiling only.
+- **Assumed:** a coarser adapter (milliseconds) needs its callers to normalise more coarsely than `dal.NormalizeTime`; a profile for such a backend would set its own precision, the way `FirestoreProfile()` sets microseconds.
 
 ## Open Questions
 

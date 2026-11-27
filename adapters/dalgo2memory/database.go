@@ -41,12 +41,21 @@ type Profile func(*database)
 // nested transactions rejected, and bounded auto-retry of conflicts with
 // final-attempt lock escalation — matching the Firestore Go client's own
 // silent retry of aborted transactions.
+//
+// It also stores times as Firestore does, to the microsecond
+// (firestoreTimePrecision): a time kept elsewhere at full precision (in a
+// JSON payload, in memory) and compared with its stored copy fails here as it
+// fails in production.
 func FirestoreProfile() Profile {
 	return func(db *database) {
 		db.noReadsAfterWritesInTransaction = true
 		db.optimisticConcurrency = true
+		db.timePrecision = firestoreTimePrecision
 	}
 }
+
+// firestoreTimePrecision is the precision Firestore keeps a timestamp to.
+const firestoreTimePrecision = time.Microsecond
 
 // SingleWriterProfile emulates a backend that serializes writers behind a
 // database-level write lock, the way SQLite behaves: RunReadwriteTransaction
@@ -132,6 +141,10 @@ type database struct {
 	// live solely inside these engine instances; the engine is created lazily
 	// on first access (see database.engine).
 	collections map[string]storageEngine
+	// timePrecision is the precision stored times are truncated to, set by a
+	// profile that names a backend (FirestoreProfile: microseconds). Zero, the
+	// default, keeps every time exactly as given: dalgo is backend-neutral.
+	timePrecision time.Duration
 	// enginesMu serializes lazy engine initialization. Read-only transactions
 	// hold mu.RLock and therefore cannot safely initialize collections through
 	// mu without attempting an RWMutex lock upgrade.
@@ -769,7 +782,7 @@ func (s session) ExecuteQueryToRecordsReader(_ context.Context, query dal.Query)
 	if err != nil {
 		return nil, err
 	}
-	where := truncateConditionTimes(q.Where()) // bounds at storage precision, once
+	where := truncateConditionTimes(q.Where(), s.db.timePrecision) // bounds at storage precision, once
 	allRows, err := s.loadCandidateRows(collectionName, where)
 	if err != nil {
 		return nil, err

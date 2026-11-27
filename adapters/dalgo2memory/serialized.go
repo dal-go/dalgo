@@ -3,6 +3,7 @@ package dalgo2memory
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
@@ -19,11 +20,14 @@ import (
 // rejection: factory is nil when the collection has no registered record type
 // (schemaless), in which case no field validation is performed.
 type serializedEngine struct {
-	collection string
-	factory    func() any
-	records    map[string][]byte
-	keys       map[string]*record.Key // full key (with parent chain) per stored id
+	collection    string
+	factory       func() any
+	records       map[string][]byte
+	keys          map[string]*record.Key // full key (with parent chain) per stored id
+	timePrecision time.Duration          // see database.timePrecision
 }
+
+func (e *serializedEngine) setTimePrecision(precision time.Duration) { e.timePrecision = precision }
 
 var _ storageEngine = (*serializedEngine)(nil)
 
@@ -49,7 +53,7 @@ func (e *serializedEngine) store(id string, rec record.Record, overwrite bool) e
 			return fmt.Errorf("%w: %s", record.ErrRecordExists, rec.Key())
 		}
 	}
-	b, err := json.Marshal(truncateTimes(rec.Data()))
+	b, err := json.Marshal(truncateTimes(rec.Data(), e.timePrecision))
 	if err != nil {
 		return err
 	}
@@ -93,7 +97,7 @@ func (e *serializedEngine) update(id string, updates []update.Update) error {
 	if err := unmarshalGeneric(b, &data); err != nil {
 		return err
 	}
-	if err := applyUpdatesToMap(data, updates); err != nil {
+	if err := applyUpdatesToMap(data, updates, e.timePrecision); err != nil {
 		return err
 	}
 	next, err := json.Marshal(data)

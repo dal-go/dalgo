@@ -7,6 +7,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dal-go/dalgo/branching"
 	"github.com/dal-go/dalgo/dal"
@@ -156,6 +157,7 @@ type databaseSnapshot struct {
 	schema                          *memorySchema
 	noReadsAfterWritesInTransaction bool
 	schemaRefBreaking               bool
+	timePrecision                   time.Duration
 }
 
 type serializedEngineSnapshot struct {
@@ -176,6 +178,7 @@ func snapshotDatabase(db *database) databaseSnapshot {
 		schema:                          cloneMemorySchema(db.schema),
 		noReadsAfterWritesInTransaction: db.noReadsAfterWritesInTransaction,
 		schemaRefBreaking:               db.schemaRefBreaking,
+		timePrecision:                   db.timePrecision,
 	}
 }
 
@@ -290,9 +293,12 @@ func (s databaseSnapshot) newBackend() *database {
 		schema:                          cloneMemorySchema(s.schema),
 		noReadsAfterWritesInTransaction: s.noReadsAfterWritesInTransaction,
 		schemaRefBreaking:               s.schemaRefBreaking,
+		timePrecision:                   s.timePrecision,
 	}
 	for name, snapshot := range s.collections {
-		db.collections[name] = snapshot.newEngine()
+		eng := snapshot.newEngine()
+		eng.setTimePrecision(s.timePrecision)
+		db.collections[name] = eng
 	}
 	return db
 }

@@ -11,10 +11,27 @@ import (
 
 var timeType = reflect.TypeOf(time.Time{})
 
+// timePrecisionSetter is an engine that stores times at a set precision.
+type timePrecisionSetter interface {
+	setTimePrecision(precision time.Duration)
+}
+
+// setEngineTimePrecision gives eng the database's time precision when it
+// stores times itself (the Serialized and columnar engines do).
+func setEngineTimePrecision(eng storageEngine, precision time.Duration) {
+	if s, ok := eng.(timePrecisionSetter); ok {
+		s.setTimePrecision(precision)
+	}
+}
+
 // truncateTimes returns data with every time.Time it holds truncated to
-// dal.TimePrecision, the finest precision production storage keeps (see
-// dal.TimePrecision). The memory adapter calls it on every value it is about to
-// store, so a read returns what a production adapter would return.
+// precision, the precision of the backend this database emulates (see
+// Profile; FirestoreProfile keeps microseconds). A precision of zero or less
+// keeps every digit of every time: dalgo is backend-neutral, and only a
+// profile that names a backend knows what that backend keeps. Either way the
+// monotonic clock reading is dropped, as no storage keeps it. The memory
+// adapter calls it on every value it is about to store, so a read returns
+// what the emulated backend would return.
 //
 // It reaches every time.Time (and *time.Time) that encoding/json persists:
 // exported struct fields, nested structs, exported fields promoted from
@@ -28,11 +45,11 @@ var timeType = reflect.TypeOf(time.Time{})
 // A value that refers to itself is walked once per pointer, map or slice: the
 // back reference is left as it is, so the JSON encoder that follows still
 // reports the cycle as an error, as it did before truncation existed.
-func truncateTimes(data any) any {
+func truncateTimes(data any, precision time.Duration) any {
 	if data == nil {
 		return nil
 	}
-	w := timeWalker{}
+	w := timeWalker{precision: precision}
 	v, changed := w.walk(reflect.ValueOf(data))
 	if !changed {
 		return data
@@ -56,7 +73,8 @@ type visitResult struct {
 }
 
 type timeWalker struct {
-	visited map[visitKey]*visitResult
+	precision time.Duration
+	visited   map[visitKey]*visitResult
 }
 
 // walk returns v with its times truncated and whether anything changed. When
@@ -68,8 +86,14 @@ func (w *timeWalker) walk(v reflect.Value) (reflect.Value, bool) {
 	}
 	if t == timeType {
 		original := v.Interface().(time.Time)
-		normalized := dal.NormalizeTime(original)
-		if normalized.Equal(original) { // already at storage precision
+		// Round(0) keeps every digit and drops only the monotonic clock
+		// reading, which no storage keeps: a bound from time.Now() then
+		// equals the value it stored, at any precision.
+		normalized := original.Round(0)
+		if w.precision > 0 {
+			normalized = original.Truncate(w.precision)
+		}
+		if normalized == original { //nolint:staticcheck // == on purpose: it sees the monotonic reading, Equal does not
 			return v, false
 		}
 		return reflect.ValueOf(normalized), true
@@ -283,19 +307,19 @@ func typeReachesTime(t reflect.Type, seen map[reflect.Type]bool) bool {
 }
 
 // truncateConditionTimes returns cond with every time.Time in its constant
-// operands truncated to dal.TimePrecision. A query applies it once, before
+// operands truncated to precision (zero: unchanged). A query applies it once, before
 // planning, because production storage encodes a query bound at the precision
 // it stores; every later step (an engine's candidate lookup, the per-row
 // match) then compares like with like and needs no knowledge of precision.
-func truncateConditionTimes(cond dal.Condition) dal.Condition {
+func truncateConditionTimes(cond dal.Condition, precision time.Duration) dal.Condition {
 	switch c := cond.(type) {
 	case dal.Comparison:
-		return dal.NewComparison(truncateExpressionTimes(c.Left), c.Operator, truncateExpressionTimes(c.Right))
+		return dal.NewComparison(truncateExpressionTimes(c.Left, precision), c.Operator, truncateExpressionTimes(c.Right, precision))
 	case dal.GroupCondition:
 		children := c.Conditions()
 		truncated := make([]dal.Condition, len(children))
 		for i, child := range children {
-			truncated[i] = truncateConditionTimes(child)
+			truncated[i] = truncateConditionTimes(child, precision)
 		}
 		return dal.NewGroupCondition(c.Operator(), truncated...)
 	default: // nil, IS [NOT] NULL, and shapes the evaluator rejects anyway
@@ -304,12 +328,12 @@ func truncateConditionTimes(cond dal.Condition) dal.Condition {
 }
 
 // truncateExpressionTimes truncates the times in a constant or array operand.
-func truncateExpressionTimes(expr dal.Expression) dal.Expression {
+func truncateExpressionTimes(expr dal.Expression, precision time.Duration) dal.Expression {
 	switch e := expr.(type) {
 	case dal.Constant:
-		return dal.Constant{Value: truncateTimes(e.Value)}
+		return dal.Constant{Value: truncateTimes(e.Value, precision)}
 	case dal.Array:
-		return dal.Array{Value: truncateTimes(e.Value)}
+		return dal.Array{Value: truncateTimes(e.Value, precision)}
 	default:
 		return expr
 	}
