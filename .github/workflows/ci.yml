@@ -26,3 +26,13 @@ jobs:
       cgo_enabled: true
       min_test_coverage_percent: 100
       additional_go_test_path: -race ./...
+      allowed_imports: |
+        # dalgo packages that use its in-memory adapter today, listed one by one so
+        # another package still fails. The check cannot tell a package's tests
+        # from its code: an allowed package may import it from either.
+        github.com/dal-go/dalgo/access github.com/dal-go/dalgo/adapters/dalgo2memory
+        github.com/dal-go/dalgo/branchingtest github.com/dal-go/dalgo/adapters/dalgo2memory
+        github.com/dal-go/dalgo/dal github.com/dal-go/dalgo/adapters/dalgo2memory
+        github.com/dal-go/dalgo/dalgotest github.com/dal-go/dalgo/adapters/dalgo2memory
+        github.com/dal-go/dalgo/end2end github.com/dal-go/dalgo/adapters/dalgo2memory
+        github.com/dal-go/dalgo/tugql github.com/dal-go/dalgo/adapters/dalgo2memory
