@@ -93,7 +93,7 @@ func (w *timeWalker) walk(v reflect.Value) (reflect.Value, bool) {
 		if w.precision > 0 {
 			normalized = original.Truncate(w.precision)
 		}
-		if normalized == original { // already as stored (== sees the monotonic reading; Equal does not)
+		if normalized == original { //nolint:staticcheck // == on purpose: it sees the monotonic reading, Equal does not
 			return v, false
 		}
 		return reflect.ValueOf(normalized), true

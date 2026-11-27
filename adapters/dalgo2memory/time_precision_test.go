@@ -458,7 +458,7 @@ func TestTimePrecision_EnginesFollowTheProfile(t *testing.T) {
 	// time.Now() carries a monotonic reading (UTC, In and Local strip it,
 	// so such a bound is always in the Local zone).
 	monotonic := time.Now()
-	require.False(t, monotonic == monotonic.Round(0), "time.Now() carries a monotonic reading")
+	require.False(t, monotonic == monotonic.Round(0), "time.Now() carries a monotonic reading") //nolint:staticcheck // == on purpose: Equal ignores the monotonic reading
 	for _, profile := range []struct {
 		name   string
 		option []Option
