@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
@@ -40,9 +41,10 @@ type column struct {
 // All access is serialized by the database's single global write lock (db.mu),
 // so the engine itself holds no lock.
 type columnarEngine struct {
-	collection string
-	factory    func() any
-	recordType reflect.Type // the struct type T (factory returns *T)
+	collection    string
+	factory       func() any
+	recordType    reflect.Type  // the struct type T (factory returns *T)
+	timePrecision time.Duration // see database.timePrecision
 
 	columns   []*column
 	byName    map[string]*column
@@ -93,6 +95,8 @@ type declaredColumn struct {
 // engine for a typed collection. Selecting columnar storage for a schemaless or
 // non-struct collection yields an engine whose operations all fail with a
 // descriptive error (REQ:columnar-selection).
+func (e *columnarEngine) setTimePrecision(precision time.Duration) { e.timePrecision = precision }
+
 func newColumnarEngineFactory(cfg columnarConfig) engineFactory {
 	return func(collection string, factory func() any, schemaRefBreaking bool) storageEngine {
 		refBreak := schemaRefBreaking
@@ -396,7 +400,7 @@ func (e *columnarEngine) update(id string, updates []update.Update) error {
 			}
 		}
 	}
-	if err := applyUpdatesToMap(current, updates); err != nil {
+	if err := applyUpdatesToMap(current, updates, e.timePrecision); err != nil {
 		return err
 	}
 	values, leftover, err := e.prepareWrite(current)
@@ -583,7 +587,7 @@ func (e *columnarEngine) freeSlot(slot int) {
 // declared value that cannot be stored as its column type) leaves nothing stored
 // for the record.
 func (e *columnarEngine) prepareWrite(data any) ([]reflect.Value, map[string]any, error) {
-	data = truncateTimes(data) // persist times at dal.TimePrecision, as real storage does
+	data = truncateTimes(data, e.timePrecision) // persist times at the emulated backend's precision
 	if e.mapBacked {
 		return e.decodeMapFields(data)
 	}

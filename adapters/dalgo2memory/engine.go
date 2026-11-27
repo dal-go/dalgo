@@ -2,6 +2,7 @@ package dalgo2memory
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dal-go/record"
 	"github.com/dal-go/record/update"
@@ -63,7 +64,7 @@ type engineRow struct {
 // as map[string]any when they are missing; if an intermediate node exists but is
 // not a map[string]any, applyUpdatesToMap returns a descriptive error rather
 // than panicking.
-func applyUpdatesToMap(data map[string]any, updates []update.Update) error {
+func applyUpdatesToMap(data map[string]any, updates []update.Update, precision time.Duration) error {
 	for _, upd := range updates {
 		var path []string
 		if fp := upd.FieldPath(); len(fp) > 0 {
@@ -73,7 +74,7 @@ func applyUpdatesToMap(data map[string]any, updates []update.Update) error {
 		} else {
 			continue // neither set — skip (should not happen after Validate)
 		}
-		if err := applyPathUpdate(data, path, upd.Value()); err != nil {
+		if err := applyPathUpdate(data, path, upd.Value(), precision); err != nil {
 			return err
 		}
 	}
@@ -83,7 +84,7 @@ func applyUpdatesToMap(data map[string]any, updates []update.Update) error {
 // applyPathUpdate walks path in data, creating intermediate map[string]any
 // nodes as needed, then sets or deletes the leaf. Returns an error when an
 // intermediate value exists but is not a map[string]any.
-func applyPathUpdate(data map[string]any, path []string, value any) error {
+func applyPathUpdate(data map[string]any, path []string, value any, precision time.Duration) error {
 	// Navigate to the parent map of the leaf.
 	current := data
 	for _, key := range path[:len(path)-1] {
@@ -102,7 +103,7 @@ func applyPathUpdate(data map[string]any, path []string, value any) error {
 	if value == update.DeleteField {
 		delete(current, leaf)
 	} else {
-		current[leaf] = truncateTimes(value) // dal.TimePrecision, as real storage does
+		current[leaf] = truncateTimes(value, precision) // the emulated backend's precision
 	}
 	return nil
 }

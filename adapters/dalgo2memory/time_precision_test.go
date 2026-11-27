@@ -86,18 +86,18 @@ func TestTimePrecision_StructRecordRoundTrip(t *testing.T) {
 		name string
 		db   func() *database
 	}{
-		{"serialized schemaless", func() *database { return newDatabase() }},
+		{"serialized schemaless", func() *database { return newDatabase(firestoreTimes()) }},
 		{"serialized typed", func() *database {
-			return newDatabase(WithSchema(false, WithCollection[stampedRecord]("stamped", nil, WithSerializedStorage())))
+			return newDatabase(firestoreTimes(), WithSchema(false, WithCollection[stampedRecord]("stamped", nil, WithSerializedStorage())))
 		}},
 		{"columnar", func() *database {
-			return newDatabase(WithSchema(false, WithCollection[stampedRecord]("stamped", nil, WithColumnarStorage())))
+			return newDatabase(firestoreTimes(), WithSchema(false, WithCollection[stampedRecord]("stamped", nil, WithColumnarStorage())))
 		}},
 		{"columnar sharing references", func() *database {
-			return newDatabase(WithSchema(false, WithCollection[stampedRecord]("stamped", nil,
+			return newDatabase(firestoreTimes(), WithSchema(false, WithCollection[stampedRecord]("stamped", nil,
 				WithColumnarStorage(WithColumnarRefBreaking(false)))))
 		}},
-		{"optimistic", func() *database { return newDatabase(WithOptimisticConcurrency()) }},
+		{"optimistic", func() *database { return newDatabase(firestoreTimes(), WithOptimisticConcurrency()) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := tc.db()
@@ -132,9 +132,9 @@ func TestTimePrecision_MapRecordRoundTrip(t *testing.T) {
 		name string
 		db   func() *database
 	}{
-		{"serialized", func() *database { return newDatabase() }},
+		{"serialized", func() *database { return newDatabase(firestoreTimes()) }},
 		{"columnar mixed", func() *database {
-			return newDatabase(WithSchema(false, WithCollection[map[string]any]("m", nil,
+			return newDatabase(firestoreTimes(), WithSchema(false, WithCollection[map[string]any]("m", nil,
 				WithColumnarStorage(WithDeclaredColumn[time.Time]("declared")))))
 		}},
 	} {
@@ -167,13 +167,13 @@ func TestTimePrecision_UpdateTruncates(t *testing.T) {
 		name string
 		db   func() *database
 	}{
-		{"serialized", func() *database { return newDatabase(WithInterleavedReadsAndWritesInTransaction()) }},
+		{"serialized", func() *database { return newDatabase(firestoreTimes(), WithInterleavedReadsAndWritesInTransaction()) }},
 		{"columnar", func() *database {
-			return newDatabase(WithInterleavedReadsAndWritesInTransaction(),
+			return newDatabase(firestoreTimes(), WithInterleavedReadsAndWritesInTransaction(),
 				WithSchema(false, WithCollection[stampedRecord]("stamped", nil, WithColumnarStorage())))
 		}},
 		{"optimistic", func() *database {
-			return newDatabase(WithOptimisticConcurrency(), WithInterleavedReadsAndWritesInTransaction())
+			return newDatabase(firestoreTimes(), WithOptimisticConcurrency(), WithInterleavedReadsAndWritesInTransaction())
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestTimePrecision_UpdateTruncates(t *testing.T) {
 
 func TestTimePrecision_OptimisticInsertReadsTruncated(t *testing.T) {
 	ctx := context.Background()
-	db := newDatabase(WithOptimisticConcurrency(), WithInterleavedReadsAndWritesInTransaction())
+	db := newDatabase(firestoreTimes(), WithOptimisticConcurrency(), WithInterleavedReadsAndWritesInTransaction())
 	key := record.NewKeyWithID("stamped", "r1")
 	require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
 		if err := tx.Insert(ctx, record.NewRecordWithData(key, newStampedRecord())); err != nil {
@@ -225,12 +225,12 @@ func TestTimePrecision_QueryBoundIsTruncatedLikeStorage(t *testing.T) {
 		name string
 		db   func() *database
 	}{
-		{"serialized", func() *database { return newDatabase() }},
+		{"serialized", func() *database { return newDatabase(firestoreTimes()) }},
 		{"columnar", func() *database {
-			return newDatabase(WithSchema(false, WithCollection[timedThing]("timed", nil, WithColumnarStorage())))
+			return newDatabase(firestoreTimes(), WithSchema(false, WithCollection[timedThing]("timed", nil, WithColumnarStorage())))
 		}},
 		{"columnar sharing references", func() *database {
-			return newDatabase(WithSchema(false, WithCollection[timedThing]("timed", nil,
+			return newDatabase(firestoreTimes(), WithSchema(false, WithCollection[timedThing]("timed", nil,
 				WithColumnarStorage(WithColumnarRefBreaking(false)))))
 		}},
 	} {
@@ -255,15 +255,15 @@ func TestTimePrecision_QueryBoundIsTruncatedLikeStorage(t *testing.T) {
 }
 
 func TestTruncateConditionTimes(t *testing.T) {
-	require.Nil(t, truncateConditionTimes(nil))
+	require.Nil(t, truncateConditionTimes(nil, firestoreTimePrecision))
 	isNull := dal.NewIsNullCondition(dal.Field("At"))
-	require.Equal(t, dal.Condition(isNull), truncateConditionTimes(isNull))
+	require.Equal(t, dal.Condition(isNull), truncateConditionTimes(isNull, firestoreTimePrecision))
 
 	got := truncateConditionTimes(dal.NewGroupCondition(dal.Or,
 		dal.NewComparison(dal.Field("At"), dal.Equal, dal.NewConstant(nanoTime)),
 		dal.NewComparison(dal.NewConstant(nanoTime), dal.In, dal.Field("List")),
 		dal.NewComparison(dal.Field("At"), dal.In, dal.Array{Value: []any{nanoTime, "x"}}),
-	)).(dal.GroupCondition)
+	), firestoreTimePrecision).(dal.GroupCondition)
 	require.EqualValues(t, dal.Or, got.Operator())
 	children := got.Conditions()
 	require.Equal(t, dal.Field("At"), children[0].(dal.Comparison).Left)
@@ -288,7 +288,7 @@ type withHiddenEmbeddedPtr struct {
 
 func TestTimePrecision_UnexportedEmbeddedStructs(t *testing.T) {
 	ctx := context.Background()
-	db := newDatabase()
+	db := newDatabase(firestoreTimes())
 
 	byValue := withHiddenEmbedded{hiddenInner: hiddenInner{At: nanoTime}, Name: "v"}
 	key := record.NewKeyWithID("hidden", "v")
@@ -307,11 +307,11 @@ func TestTimePrecision_UnexportedEmbeddedStructs(t *testing.T) {
 	require.Equal(t, microTime, gotPtr.At)
 
 	// A non-addressable value (held by an interface) is walked through a copy.
-	got := truncateTimes([]any{withHiddenEmbedded{hiddenInner: hiddenInner{At: nanoTime}}}).([]any)
+	got := truncateTimes([]any{withHiddenEmbedded{hiddenInner: hiddenInner{At: nanoTime}}}, firestoreTimePrecision).([]any)
 	require.Equal(t, microTime, got[0].(withHiddenEmbedded).At)
 	// Unchanged unexported embedded values are returned as they are.
 	unchanged := &withHiddenEmbeddedPtr{hiddenInner: &hiddenInner{At: microTime}}
-	require.Same(t, unchanged, truncateTimes(unchanged))
+	require.Same(t, unchanged, truncateTimes(unchanged, firestoreTimePrecision))
 }
 
 type fork struct {
@@ -324,7 +324,7 @@ func TestTimePrecision_CyclicValueFailsFast(t *testing.T) {
 	n.A, n.B = n, n
 	done := make(chan error, 1)
 	go func() {
-		done <- newDatabase().Set(context.Background(), record.NewRecordWithData(record.NewKeyWithID("fork", "f"), n))
+		done <- newDatabase(firestoreTimes()).Set(context.Background(), record.NewRecordWithData(record.NewKeyWithID("fork", "f"), n))
 	}()
 	select {
 	case err := <-done:
@@ -353,7 +353,7 @@ func TestMayHoldTime(t *testing.T) {
 	require.False(t, mayHoldTime(reflect.TypeOf(struct{ hidden int }{})))
 	require.False(t, mayHoldTime(reflect.TypeOf(struct{ int }{})))
 	rec := &noTimes{Name: "n", priv: nanoTime}
-	require.Same(t, rec, truncateTimes(rec))
+	require.Same(t, rec, truncateTimes(rec, firestoreTimePrecision))
 }
 
 type selfRef struct {
@@ -368,36 +368,36 @@ type withHidden struct {
 
 func TestTruncateTimes(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
-		require.Nil(t, truncateTimes(nil))
+		require.Nil(t, truncateTimes(nil, firestoreTimePrecision))
 	})
 	t.Run("unchanged values are returned as they are", func(t *testing.T) {
 		rec := &stampedRecord{At: microTime, Times: []time.Time{microTime}, ByName: map[string]time.Time{"a": microTime}}
-		require.Same(t, rec, truncateTimes(rec))
+		require.Same(t, rec, truncateTimes(rec, firestoreTimePrecision))
 		m := map[string]any{"a": microTime, "b": nil, "c": []byte("x"), "d": map[string]int{"x": 1}, "e": (*time.Time)(nil)}
-		require.Equal(t, reflect.ValueOf(m).Pointer(), reflect.ValueOf(truncateTimes(m)).Pointer())
+		require.Equal(t, reflect.ValueOf(m).Pointer(), reflect.ValueOf(truncateTimes(m, firestoreTimePrecision)).Pointer())
 		s := []any{nil, []string(nil), map[string]any(nil), [1]int{1}}
-		require.Equal(t, reflect.ValueOf(s).Pointer(), reflect.ValueOf(truncateTimes(s)).Pointer())
-		require.Equal(t, 5, truncateTimes(5))
+		require.Equal(t, reflect.ValueOf(s).Pointer(), reflect.ValueOf(truncateTimes(s, firestoreTimePrecision)).Pointer())
+		require.Equal(t, 5, truncateTimes(5, firestoreTimePrecision))
 	})
 	t.Run("embedded struct", func(t *testing.T) {
-		got := truncateTimes(struct{ StampedEmbedded }{StampedEmbedded{EmbeddedAt: nanoTime}}).(struct{ StampedEmbedded })
+		got := truncateTimes(struct{ StampedEmbedded }{StampedEmbedded{EmbeddedAt: nanoTime}}, firestoreTimePrecision).(struct{ StampedEmbedded })
 		require.Equal(t, microTime, got.EmbeddedAt)
 	})
 	t.Run("time and pointer to time", func(t *testing.T) {
-		require.Equal(t, microTime, truncateTimes(nanoTime))
+		require.Equal(t, microTime, truncateTimes(nanoTime, firestoreTimePrecision))
 		at := nanoTime
-		got := truncateTimes(&at).(*time.Time)
+		got := truncateTimes(&at, firestoreTimePrecision).(*time.Time)
 		require.Equal(t, microTime, *got)
 		require.Equal(t, nanoTime, at, "input not mutated")
 	})
 	t.Run("unexported fields are kept but not truncated", func(t *testing.T) {
-		got := truncateTimes(withHidden{At: nanoTime, hidden: nanoTime}).(withHidden)
+		got := truncateTimes(withHidden{At: nanoTime, hidden: nanoTime}, firestoreTimePrecision).(withHidden)
 		require.Equal(t, microTime, got.At)
 		require.Equal(t, nanoTime, got.hidden)
 	})
 	t.Run("a value shared twice is truncated once and stays shared", func(t *testing.T) {
 		shared := &stampedInner{At: nanoTime}
-		got := truncateTimes([]any{shared, shared, []any{}}).([]any)
+		got := truncateTimes([]any{shared, shared, []any{}}, firestoreTimePrecision).([]any)
 		require.Same(t, got[0], got[1])
 		require.Equal(t, microTime, got[0].(*stampedInner).At)
 		require.Equal(t, nanoTime, shared.At)
@@ -405,7 +405,7 @@ func TestTruncateTimes(t *testing.T) {
 	t.Run("only changed container entries are replaced", func(t *testing.T) {
 		shared := &stampedInner{At: microTime}
 		in := []any{shared, nanoTime}
-		got := truncateTimes(in).([]any)
+		got := truncateTimes(in, firestoreTimePrecision).([]any)
 		require.Same(t, shared, got[0])
 		require.Equal(t, microTime, got[1])
 		require.Equal(t, nanoTime, in[1])
@@ -413,8 +413,39 @@ func TestTruncateTimes(t *testing.T) {
 	t.Run("self-referencing value terminates", func(t *testing.T) {
 		n := &selfRef{At: nanoTime}
 		n.Next = n
-		got := truncateTimes(n).(*selfRef)
+		got := truncateTimes(n, firestoreTimePrecision).(*selfRef)
 		require.Equal(t, microTime, got.At)
 		require.Equal(t, nanoTime, n.At)
 	})
+}
+
+// firestoreTimes is the option these tests store times through: the Firestore
+// profile, which keeps microseconds. Without a profile that names a backend,
+// times are kept exactly (TestTimePrecision_OnlyANamedBackendTruncates).
+func firestoreTimes() Option { return Option(FirestoreProfile()) }
+
+// dalgo is backend-neutral: a memory database truncates times only when its
+// profile names a backend that does (Firestore: microseconds).
+func TestTimePrecision_OnlyANamedBackendTruncates(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name string
+		db   dal.DB
+		want time.Time
+	}{
+		{"no profile", dal.NewDB(newDatabase()), nanoTime},
+		{"single writer", New(SingleWriterProfile()), nanoTime},
+		{"Firestore profile", New(FirestoreProfile()), microTime},
+		{"Firestore option", dal.NewDB(newDatabase(WithFirestoreProfile())), microTime},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key := record.NewKeyWithID("stamped", "s1")
+			require.NoError(t, tc.db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+				return tx.Set(ctx, record.NewRecordWithData(key, &stampedRecord{At: nanoTime}))
+			}))
+			got := &stampedRecord{}
+			require.NoError(t, tc.db.Get(ctx, record.NewRecordWithData(key, got)))
+			require.True(t, got.At.Equal(tc.want), "stored %v, want %v", got.At, tc.want)
+		})
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
@@ -717,7 +718,7 @@ func (tx *optimisticState) stage(rec record.Record) error {
 		rec.SetError(err)
 		return err
 	}
-	data, err := normalizeData(rec.Data())
+	data, err := normalizeData(rec.Data(), tx.db.timePrecision)
 	if err != nil {
 		rec.SetError(err)
 		return err
@@ -757,7 +758,7 @@ func (tx *optimisticState) insert(rec record.Record) error {
 		rec.SetError(err)
 		return err
 	}
-	data, err := normalizeData(rec.Data())
+	data, err := normalizeData(rec.Data(), tx.db.timePrecision)
 	if err != nil {
 		rec.SetError(err)
 		return err
@@ -836,7 +837,7 @@ func (tx *optimisticState) updateRecord(rec record.Record, updates []update.Upda
 	// itself fail: entry.data is already valid, previously round-tripped JSON
 	// data (see cloneEntryData's doc comment).
 	merged := cloneEntryData(entry.data)
-	if err := applyUpdatesToMap(merged, updates); err != nil {
+	if err := applyUpdatesToMap(merged, updates, tx.db.timePrecision); err != nil {
 		return err
 	}
 	if err := validateForCommit(collection, factory, merged); err != nil {
@@ -978,8 +979,8 @@ func validateForCommit(collection string, factory func() any, data any) error {
 // Update's merge, a later Insert's duplicate check — has a stable,
 // engine-independent snapshot to work from, isolated from the original data
 // the caller passed in.
-func normalizeData(data any) (map[string]any, error) {
-	b, err := json.Marshal(truncateTimes(data)) // dal.TimePrecision, as on commit
+func normalizeData(data any, precision time.Duration) (map[string]any, error) {
+	b, err := json.Marshal(truncateTimes(data, precision)) // as on commit
 
 	if err != nil {
 		return nil, err

@@ -166,7 +166,7 @@ func (emptyUpdate) Value() any                  { return nil }
 func TestApplyUpdatesToMap_SkipsUpdateWithoutNameOrPath(t *testing.T) {
 	t.Parallel()
 	data := map[string]any{"a": 1}
-	require.NoError(t, applyUpdatesToMap(data, []update.Update{emptyUpdate{}}))
+	require.NoError(t, applyUpdatesToMap(data, []update.Update{emptyUpdate{}}, 0))
 	require.Equal(t, map[string]any{"a": 1}, data, "data must be unchanged")
 }
 

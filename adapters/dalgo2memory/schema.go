@@ -159,10 +159,7 @@ func WithSingleWriterTransactions() Option {
 // WithInterleavedReadsAndWritesInTransaction and WithSingleWriterTransactions
 // are the SQL-flavoured building blocks.
 func WithFirestoreProfile() Option {
-	return func(db *database) {
-		db.noReadsAfterWritesInTransaction = true
-		db.optimisticConcurrency = true
-	}
+	return Option(FirestoreProfile())
 }
 
 // collectionDef describes a single collection in an in-memory schema.
@@ -238,7 +235,8 @@ func WithDeclaredColumn[T any](name string) ColumnOption {
 // store reference-bearing columns without the serialization round-trip.
 //
 // With false, a reference-bearing column is shared with the caller's value
-// only while none of its times needs truncating to dal.TimePrecision: a column
+// only while none of its times needs truncating to the profile's precision
+// (FirestoreProfile: microseconds; none without a profile): a column
 // holding a time with sub-microsecond digits is stored as a copy along the path
 // to that time (the caller's value is never mutated), so whether a later
 // change by the caller shows through depends on the data written.
@@ -383,6 +381,7 @@ func (db *database) engine(collection string) storageEngine {
 		}
 	}
 	eng := newEngine(collection, factory, db.schemaRefBreaking)
+	setEngineTimePrecision(eng, db.timePrecision)
 	db.collections[collection] = eng
 	return eng
 }

@@ -81,7 +81,7 @@ func (s session) executeJoinQuery(q dal.StructuredQuery) (dal.RecordsReader, err
 		}
 	}
 
-	where := truncateConditionTimes(q.Where()) // bounds at storage precision, as on the single-source path
+	where := truncateConditionTimes(q.Where(), s.db.timePrecision) // bounds at storage precision, as on the single-source path
 	filtered := make([]joinedRow, 0, len(combined))
 	for _, row := range combined {
 		ok, err := matchesJoinWhere(where, row.sources, known)
