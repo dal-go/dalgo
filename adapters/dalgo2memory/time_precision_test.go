@@ -449,3 +449,81 @@ func TestTimePrecision_OnlyANamedBackendTruncates(t *testing.T) {
 		})
 	}
 }
+
+// Every engine stores at its database's precision: exactly without a named
+// backend, to the microsecond with Firestore; a query by the time as given
+// finds it either way, also when the bound carries a monotonic clock reading
+// (time.Now()), which no storage keeps.
+func TestTimePrecision_EnginesFollowTheProfile(t *testing.T) {
+	// time.Now() carries a monotonic reading (UTC, In and Local strip it,
+	// so such a bound is always in the Local zone).
+	monotonic := time.Now()
+	require.False(t, monotonic == monotonic.Round(0), "time.Now() carries a monotonic reading")
+	for _, profile := range []struct {
+		name   string
+		option []Option
+		stored time.Time
+	}{
+		{"no profile", nil, nanoTime},
+		{"Firestore", []Option{firestoreTimes()}, microTime},
+	} {
+		for _, engine := range []struct {
+			name   string
+			option CollectionOption
+		}{
+			{"serialized", WithSerializedStorage()},
+			{"columnar", WithColumnarStorage()},
+		} {
+			t.Run(profile.name+"/"+engine.name, func(t *testing.T) {
+				ctx := context.Background()
+				options := append(append([]Option{}, profile.option...), WithSchema(false, WithCollection[timedThing]("timed", nil, engine.option)))
+				db := newDatabase(options...)
+				require.NoError(t, db.Insert(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "nano"), &timedThing{DtNext: nanoTime})))
+				// The columnar engine matches equality only for UTC times (a
+				// separate, pre-existing limitation), so the Local-zone
+				// monotonic bound is checked on the Serialized engine.
+				bounds := map[string]time.Time{"nano": nanoTime}
+				if engine.name == "serialized" {
+					require.NoError(t, db.Insert(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "now"), &timedThing{DtNext: monotonic})))
+					bounds["now"] = monotonic
+				}
+				got := &timedThing{}
+				require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "nano"), got)))
+				require.True(t, got.DtNext.Equal(profile.stored), "stored %v, want %v", got.DtNext, profile.stored)
+				for id, bound := range bounds {
+					ids := queryTimedThings(t, db, func(q *dal.QueryBuilder) dal.IQueryBuilder { return q.WhereField("DtNext", dal.Equal, bound) })
+					require.Equal(t, []string{id}, ids, "query by %v", bound)
+				}
+				if profile.option == nil {
+					// Exact: the microsecond value is another time.
+					ids := queryTimedThings(t, db, func(q *dal.QueryBuilder) dal.IQueryBuilder { return q.WhereField("DtNext", dal.Equal, microTime) })
+					require.Empty(t, ids)
+				}
+			})
+		}
+	}
+}
+
+// A branch keeps its source's precision, for collections it copied and for
+// new ones.
+func TestTimePrecision_BranchKeepsThePrecision(t *testing.T) {
+	ctx := context.Background()
+	source := New(FirestoreProfile())
+	require.NoError(t, source.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return tx.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "before"), &timedThing{DtNext: nanoTime}))
+	}))
+	checkpoint, err := NewBranchingProvider().Capture(ctx, source)
+	require.NoError(t, err)
+	branch, err := checkpoint.Branch(ctx)
+	require.NoError(t, err)
+	defer func() { _ = branch.Close(ctx) }()
+	db := dal.BackendOf(branch.DB()).(*database)
+	require.NoError(t, db.Insert(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "after"), &timedThing{DtNext: nanoTime})))
+	for _, id := range []string{"before", "after"} {
+		got := &timedThing{}
+		require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", id), got)))
+		require.True(t, got.DtNext.Equal(microTime), "%s stored %v", id, got.DtNext)
+	}
+	require.Equal(t, []string{"after", "before"},
+		queryTimedThings(t, db, func(q *dal.QueryBuilder) dal.IQueryBuilder { return q.WhereField("DtNext", dal.Equal, nanoTime) }))
+}

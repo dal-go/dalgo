@@ -27,8 +27,9 @@ func setEngineTimePrecision(eng storageEngine, precision time.Duration) {
 // truncateTimes returns data with every time.Time it holds truncated to
 // precision, the precision of the backend this database emulates (see
 // Profile; FirestoreProfile keeps microseconds). A precision of zero or less
-// keeps every time exactly as given: dalgo is backend-neutral, and only a
-// profile that names a backend knows what that backend keeps. The memory
+// keeps every digit of every time: dalgo is backend-neutral, and only a
+// profile that names a backend knows what that backend keeps. Either way the
+// monotonic clock reading is dropped, as no storage keeps it. The memory
 // adapter calls it on every value it is about to store, so a read returns
 // what the emulated backend would return.
 //
@@ -45,8 +46,8 @@ func setEngineTimePrecision(eng storageEngine, precision time.Duration) {
 // back reference is left as it is, so the JSON encoder that follows still
 // reports the cycle as an error, as it did before truncation existed.
 func truncateTimes(data any, precision time.Duration) any {
-	if data == nil || precision <= 0 {
-		return data
+	if data == nil {
+		return nil
 	}
 	w := timeWalker{precision: precision}
 	v, changed := w.walk(reflect.ValueOf(data))
@@ -85,8 +86,14 @@ func (w *timeWalker) walk(v reflect.Value) (reflect.Value, bool) {
 	}
 	if t == timeType {
 		original := v.Interface().(time.Time)
-		normalized := original.Truncate(w.precision)
-		if normalized.Equal(original) { // already at storage precision
+		// Round(0) keeps every digit and drops only the monotonic clock
+		// reading, which no storage keeps: a bound from time.Now() then
+		// equals the value it stored, at any precision.
+		normalized := original.Round(0)
+		if w.precision > 0 {
+			normalized = original.Truncate(w.precision)
+		}
+		if normalized == original { // already as stored (== sees the monotonic reading; Equal does not)
 			return v, false
 		}
 		return reflect.ValueOf(normalized), true
@@ -305,9 +312,6 @@ func typeReachesTime(t reflect.Type, seen map[reflect.Type]bool) bool {
 // it stores; every later step (an engine's candidate lookup, the per-row
 // match) then compares like with like and needs no knowledge of precision.
 func truncateConditionTimes(cond dal.Condition, precision time.Duration) dal.Condition {
-	if precision <= 0 {
-		return cond
-	}
 	switch c := cond.(type) {
 	case dal.Comparison:
 		return dal.NewComparison(truncateExpressionTimes(c.Left, precision), c.Operator, truncateExpressionTimes(c.Right, precision))
