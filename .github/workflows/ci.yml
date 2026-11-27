@@ -26,3 +26,6 @@ jobs:
       cgo_enabled: true
       min_test_coverage_percent: 100
       additional_go_test_path: -race ./...
+      allowed_imports: |
+        # dalgo's own packages test against its in-memory adapter.
+        github.com/dal-go/dalgo/... github.com/dal-go/dalgo/adapters/dalgo2memory
