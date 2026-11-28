@@ -186,7 +186,7 @@ type engineFactory func(collection string, factory func() any, schemaRefBreaking
 // CollectionOption configures a collection definition produced by WithCollection
 // — currently the per-collection storage-engine selection. Pass it as a trailing
 // argument to WithCollection.
-type CollectionOption func(*collectionDef)
+type CollectionOption func(*CollectionDef)
 
 // WithSerializedStorage selects the Serialized storage engine for a collection.
 // It is the default engine, so this option states the default explicitly; an
@@ -278,7 +278,7 @@ func serializedEngineFactory(collection string, factory func() any, _ bool) stor
 //
 // Trailing CollectionOption arguments select a per-collection storage engine;
 // with none, the collection uses the default Serialized engine.
-func WithCollection[T any](name string, newRecord func() *T, opts ...CollectionOption) collectionDef {
+func WithCollection[T any](name string, newRecord func() *T, opts ...CollectionOption) CollectionDef {
 	factory := func() any {
 		if newRecord != nil {
 			return newRecord()
@@ -299,7 +299,7 @@ func WithCollection[T any](name string, newRecord func() *T, opts ...CollectionO
 // that is not part of the schema: when false (the default intent) such a query
 // returns an error; when true it falls back to the schemaless behavior
 // (map[string]any / keys-only records).
-func WithSchema(allowUndefinedCollections bool, collections ...collectionDef) Option {
+func WithSchema(allowUndefinedCollections bool, collections ...CollectionDef) Option {
 	return func(db *database) {
 		factories := make(map[string]func() any, len(collections))
 		engines := make(map[string]engineFactory, len(collections))
