@@ -196,3 +196,24 @@ func TestNoSchemaUnaffected(t *testing.T) {
 	require.Len(t, records, 1)
 	require.Nil(t, records[0].Data())
 }
+
+func wrap[T any](name string) CollectionDef {
+	return WithCollection[T](name, nil)
+}
+
+func TestCollectionDefAlias(t *testing.T) {
+	var _ CollectionDef = WithCollection[struct{ V string }]("c", nil)
+
+	ctx := context.Background()
+	db := New(FirestoreProfile(), WithSchema(false, wrap[struct{ V string }]("c")))
+
+	err := db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return tx.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("c", "1"), &struct{ V string }{V: "ok"}))
+	})
+	require.NoError(t, err)
+
+	err = db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+		return tx.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("undeclared", "1"), &struct{ V string }{V: "nope"}))
+	})
+	require.Error(t, err)
+}

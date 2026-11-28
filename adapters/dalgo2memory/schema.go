@@ -172,6 +172,10 @@ type collectionDef struct {
 	newEngine engineFactory
 }
 
+// CollectionDef is the schema entry WithCollection returns and WithSchema
+// takes. It is exported so a wrapper package can name it.
+type CollectionDef = collectionDef
+
 // engineFactory builds a storage engine for a collection given its name, its
 // record-type factory (nil when schemaless), and the schema-wide ref-breaking
 // default (faithful unless WithoutSchemaRefBreaking was used). An engine that
