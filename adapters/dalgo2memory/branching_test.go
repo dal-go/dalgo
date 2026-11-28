@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/dal-go/dalgo/branching"
 	"github.com/dal-go/dalgo/branchingtest"
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
 	"github.com/dal-go/record/update"
+	"github.com/stretchr/testify/require"
 )
 
 type branchingRecord struct {
@@ -648,4 +650,172 @@ func TestBranchingCapability(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Capability() = %#v, want %#v", got, want)
 	}
+}
+
+func TestBranchingPreservesProfileSemantics(t *testing.T) {
+	t.Run("FirestoreProfile branch has optimistic concurrency and conflict detection", func(t *testing.T) {
+		ctx := context.Background()
+		source := New(FirestoreProfile())
+		key := record.NewKeyWithID("Slugs", "shared-slug")
+
+		checkpoint, err := NewBranchingProvider().Capture(ctx, source)
+		require.NoError(t, err)
+		defer func() { _ = checkpoint.Release(ctx) }()
+
+		branch := mustBranch(t, checkpoint)
+		defer closeTestBranch(t, branch)
+		db := branch.DB()
+
+		bothRead := make(chan struct{}, 2)
+		proceed := make(chan struct{})
+		results := make(chan error, 2)
+
+		claim := func(owner string) {
+			results <- db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+				var existing slugThing
+				err := tx.Get(ctx, record.NewRecordWithData(key, &existing))
+				if err != nil && !record.IsNotFound(err) {
+					return err
+				}
+				if err == nil {
+					return fmt.Errorf("test setup: %s found the slug already claimed by %q before either side wrote", owner, existing.Owner)
+				}
+				bothRead <- struct{}{}
+				<-proceed
+				return tx.Insert(ctx, record.NewRecordWithData(key, &slugThing{Owner: owner}))
+			}, dal.TxWithAttempts(1))
+		}
+
+		go claim("alice")
+		go claim("bob")
+
+		deadline := time.After(2 * time.Second)
+		for range 2 {
+			select {
+			case <-bothRead:
+			case <-deadline:
+				close(proceed)
+				t.Fatal("timed out waiting for both concurrent transactions to enter callback (branch appears to hold a whole-DB write lock)")
+			}
+		}
+		close(proceed)
+
+		var err1, err2 error
+		select {
+		case err1 = <-results:
+		case <-deadline:
+			t.Fatal("timed out waiting for first transaction result")
+		}
+		select {
+		case err2 = <-results:
+		case <-deadline:
+			t.Fatal("timed out waiting for second transaction result")
+		}
+
+		successes, conflicts := 0, 0
+		for _, err := range []error{err1, err2} {
+			switch {
+			case err == nil:
+				successes++
+			case IsTransactionConflict(err):
+				conflicts++
+			default:
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}
+		require.Equal(t, 1, successes, "exactly one concurrent claim of the same slug should succeed")
+		require.Equal(t, 1, conflicts, "the losing claim should fail with ErrTransactionConflict")
+
+		var stored slugThing
+		require.NoError(t, db.Get(ctx, record.NewRecordWithData(key, &stored)))
+		require.Contains(t, []string{"alice", "bob"}, stored.Owner)
+	})
+
+	t.Run("FirestoreProfile branch rejects join inside read-write transaction", func(t *testing.T) {
+		ctx := context.Background()
+		source := New(FirestoreProfile())
+		checkpoint, err := NewBranchingProvider().Capture(ctx, source)
+		require.NoError(t, err)
+		defer func() { _ = checkpoint.Release(ctx) }()
+
+		branch := mustBranch(t, checkpoint)
+		defer closeTestBranch(t, branch)
+
+		err = branch.DB().RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+			q := dal.From(usersAlias()).Join(join).NewQuery().SelectIntoRecord(intoMapRecord())
+			_, err := tx.ExecuteQueryToRecordsReader(ctx, q)
+			return err
+		})
+		require.ErrorIs(t, err, dal.ErrNotSupported)
+		require.Contains(t, err.Error(), "joins")
+	})
+
+	t.Run("FirestoreProfile branch enforces read-after-write in transaction", func(t *testing.T) {
+		ctx := context.Background()
+		source := New(FirestoreProfile())
+		key := record.NewKeyWithID("items", "raw-check")
+
+		checkpoint, err := NewBranchingProvider().Capture(ctx, source)
+		require.NoError(t, err)
+		defer func() { _ = checkpoint.Release(ctx) }()
+
+		branch := mustBranch(t, checkpoint)
+		defer closeTestBranch(t, branch)
+
+		err = branch.DB().RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+			if err := tx.Set(ctx, record.NewRecordWithData(key, &branchingRecord{Title: "first"})); err != nil {
+				return err
+			}
+			var got branchingRecord
+			return tx.Get(ctx, record.NewRecordWithData(key, &got))
+		})
+		require.ErrorIs(t, err, ErrReadAfterWriteInTransaction)
+	})
+
+	t.Run("SingleWriterProfile branch stays single-writer", func(t *testing.T) {
+		ctx := context.Background()
+		source := New(SingleWriterProfile())
+
+		checkpoint, err := NewBranchingProvider().Capture(ctx, source)
+		require.NoError(t, err)
+		defer func() { _ = checkpoint.Release(ctx) }()
+
+		branch := mustBranch(t, checkpoint)
+		defer closeTestBranch(t, branch)
+		db := branch.DB()
+
+		firstEntered := make(chan struct{})
+		release := make(chan struct{})
+		secondEntered := make(chan struct{})
+		firstDone := make(chan error, 1)
+		secondDone := make(chan error, 1)
+
+		go func() {
+			firstDone <- db.RunReadwriteTransaction(ctx, func(context.Context, dal.ReadwriteTransaction) error {
+				close(firstEntered)
+				<-release
+				return nil
+			})
+		}()
+		<-firstEntered
+
+		go func() {
+			secondDone <- db.RunReadwriteTransaction(ctx, func(context.Context, dal.ReadwriteTransaction) error {
+				close(secondEntered)
+				return nil
+			})
+		}()
+
+		select {
+		case <-secondEntered:
+			t.Fatal("a second read-write transaction started before the first one finished on a SingleWriterProfile branch")
+		case <-time.After(20 * time.Millisecond):
+		}
+
+		close(release)
+		require.NoError(t, <-firstDone)
+		<-secondEntered
+		require.NoError(t, <-secondDone)
+	})
 }

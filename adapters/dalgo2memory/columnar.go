@@ -495,6 +495,9 @@ func (e *columnarEngine) candidateSlots(condition dal.Condition) (SlotSet, bool)
 		return nil, false
 	}
 	if col.defaultStgy == nil {
+		if _, isTime := constant.Value.(time.Time); isTime {
+			return nil, false
+		}
 		if _, isNum := parseNumber(constant.Value); isNum {
 			if col.elemType.Kind() == reflect.Interface || isUnsafeFloatNumber(constant.Value) {
 				return nil, false

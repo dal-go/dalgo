@@ -51,7 +51,7 @@ func (serializedBranchingProvider) Capability() branching.Capability {
 
 // Capture copies a dalgo2memory database whose collections use serialized storage.
 // It rejects a nil source, a non-memory backend, a cancelled context, and any columnar or custom engine.
-// The checkpoint holds copied record bytes, keys, the schema, and the schema-fidelity and read-after-write flags.
+// The checkpoint holds copied record bytes, keys, the schema, and the database's profile settings.
 func (serializedBranchingProvider) Capture(ctx context.Context, source dal.DB) (branching.Checkpoint, error) {
 	if source == nil {
 		return nil, branching.ErrNilSourceDB
@@ -156,6 +156,7 @@ type databaseSnapshot struct {
 	collections                     map[string]serializedEngineSnapshot
 	schema                          *memorySchema
 	noReadsAfterWritesInTransaction bool
+	optimisticConcurrency           bool
 	schemaRefBreaking               bool
 	timePrecision                   time.Duration
 }
@@ -177,6 +178,7 @@ func snapshotDatabase(db *database) databaseSnapshot {
 		collections:                     collections,
 		schema:                          cloneMemorySchema(db.schema),
 		noReadsAfterWritesInTransaction: db.noReadsAfterWritesInTransaction,
+		optimisticConcurrency:           db.optimisticConcurrency,
 		schemaRefBreaking:               db.schemaRefBreaking,
 		timePrecision:                   db.timePrecision,
 	}
@@ -292,8 +294,11 @@ func (s databaseSnapshot) newBackend() *database {
 		collections:                     make(map[string]storageEngine, len(s.collections)),
 		schema:                          cloneMemorySchema(s.schema),
 		noReadsAfterWritesInTransaction: s.noReadsAfterWritesInTransaction,
+		optimisticConcurrency:           s.optimisticConcurrency,
 		schemaRefBreaking:               s.schemaRefBreaking,
 		timePrecision:                   s.timePrecision,
+		versions:                        make(map[string]uint64),
+		collectionSeq:                   make(map[string]uint64),
 	}
 	for name, snapshot := range s.collections {
 		eng := snapshot.newEngine()
