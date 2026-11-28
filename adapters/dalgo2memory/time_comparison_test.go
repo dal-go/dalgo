@@ -57,3 +57,55 @@ func TestTimeComparisonRejectsMalformedAndKeepsStringSemantics(t *testing.T) {
 	require.False(t, matchesComparison(data, dal.NewComparison(dal.Field("At"), dal.LessOrEqual, dal.NewConstant(bound.Format(time.RFC3339Nano)))))
 	require.True(t, matchesComparison(data, dal.NewComparison(dal.Field("At"), dal.GreaterThen, dal.NewConstant(bound.Format(time.RFC3339Nano)))))
 }
+
+func TestQueryWhereTimeEqualityNonUTCLocation(t *testing.T) {
+	ctx := context.Background()
+	utcInstant := time.Date(2026, 11, 4, 10, 11, 12, 123456000, time.UTC)
+	fixedZone := time.FixedZone("UTC+2", 2*3600)
+	zones := []struct {
+		name string
+		loc  *time.Location
+	}{
+		{"FixedZone+2", fixedZone},
+		{"FixedZone-5", time.FixedZone("UTC-5", -5*3600)},
+	}
+	if loaded, err := time.LoadLocation("America/New_York"); err == nil {
+		zones = append(zones, struct {
+			name string
+			loc  *time.Location
+		}{"America/New_York", loaded})
+	}
+
+	for _, engine := range []struct {
+		name   string
+		option CollectionOption
+	}{
+		{"serialized", WithSerializedStorage()},
+		{"columnar", WithColumnarStorage()},
+		{"columnar with custom strategy", WithColumnarStorage(WithColumnStrategy("DtNext", newRecordingStrategy(true, func(int) bool { return false })))},
+	} {
+		t.Run(engine.name, func(t *testing.T) {
+			db := newDatabase(WithSchema(false, WithCollection[timedThing]("timed", nil, engine.option)))
+			require.NoError(t, db.Insert(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "r1"), &timedThing{DtNext: utcInstant})))
+
+			for _, z := range zones {
+				t.Run(z.name, func(t *testing.T) {
+					nonUTC := utcInstant.In(z.loc)
+					require.True(t, nonUTC.Equal(utcInstant))
+					ids := queryTimedThings(t, db, func(q *dal.QueryBuilder) dal.IQueryBuilder {
+						return q.WhereField("DtNext", dal.Equal, nonUTC)
+					})
+					require.Equal(t, []string{"r1"}, ids)
+				})
+			}
+		})
+	}
+
+	// Direct unit check for *time.Time and non-time stored values in valuesEqualForStrategy.
+	nonUTC := utcInstant.In(fixedZone)
+	ptr := &utcInstant
+	var nilPtr *time.Time
+	require.True(t, valuesEqualForStrategy(ptr, nonUTC))
+	require.False(t, valuesEqualForStrategy(nilPtr, nonUTC))
+	require.False(t, valuesEqualForStrategy("not-a-time", nonUTC))
+}

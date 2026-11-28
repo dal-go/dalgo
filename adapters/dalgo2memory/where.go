@@ -3,6 +3,7 @@ package dalgo2memory
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dal-go/dalgo/dal"
 )
@@ -110,10 +111,31 @@ func matchesJoinComparison(cmp dal.Comparison, sources map[string]map[string]any
 	if !lok || !rok {
 		return false, nil
 	}
+	_, lTime := l.(time.Time)
+	_, rTime := r.(time.Time)
+	if lTime || rTime {
+		lt, okL := parseJoinTime(l)
+		rt, okR := parseJoinTime(r)
+		return okL && okR && compareOp(cmp.Operator, lt.Compare(rt), 0), nil
+	}
 	if cmp.Operator == dal.Equal {
 		return valuesEqual(l, r), nil
 	}
 	return !dal.IsNullValue(l) && !dal.IsNullValue(r) && compareOp(cmp.Operator, l, r), nil
+}
+
+// parseJoinTime converts a time.Time or RFC3339Nano timestamp string (the
+// representation JSON-normalized join rows store) to a time.Time.
+func parseJoinTime(v any) (time.Time, bool) {
+	switch t := v.(type) {
+	case time.Time:
+		return t, true
+	case string:
+		parsed, err := time.Parse(time.RFC3339Nano, t)
+		return parsed, err == nil
+	default:
+		return time.Time{}, false
+	}
 }
 
 // fieldValue reads a field from a record's data. A name that is a key of the

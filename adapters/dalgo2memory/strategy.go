@@ -1,6 +1,9 @@
 package dalgo2memory
 
-import "reflect"
+import (
+	"reflect"
+	"time"
+)
 
 // SlotSet is a set of per-row slot indices. The columnar engine assigns each
 // live record a stable slot shared across all of a collection's column slices;
@@ -88,10 +91,20 @@ func (s *typedSliceStrategy) EqualSlots(value any) (SlotSet, bool) {
 	return slots, true
 }
 
-// valuesEqualForStrategy mirrors matchesWhere's equality (data[field] ==
-// constant.Value): plain Go == on the decoded values, guarded so that
+// valuesEqualForStrategy mirrors matchesWhere's equality: instant equality for
+// time.Time (ignoring location differences), numeric value equality for
+// numbers, and plain Go == on other comparable decoded values, guarded so that
 // comparing against a non-comparable queried value cannot panic.
 func valuesEqualForStrategy(stored, queried any) bool {
+	if qt, ok := queried.(time.Time); ok {
+		switch st := stored.(type) {
+		case time.Time:
+			return st.Equal(qt)
+		case *time.Time:
+			return st != nil && st.Equal(qt)
+		}
+		return false
+	}
 	if eq, ok := numbersEqual(stored, queried); ok {
 		return eq
 	}

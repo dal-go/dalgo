@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
@@ -377,4 +378,163 @@ func TestExecuteJoin_OrderByEdges(t *testing.T) {
 		got := runJoinQuery(t, db, ctx, innerJoinQuery(dal.Ascending(dal.Constant{Value: 1})))
 		require.Equal(t, []float64{1, 1, 2}, idSeq(got))
 	})
+}
+
+type joinTimedUser struct {
+	ID int `json:"id"`
+}
+
+type joinTimedOrder struct {
+	UserID int       `json:"userId"`
+	At     time.Time `json:"at"`
+}
+
+func TestExecuteJoin_WhereTimeBounds(t *testing.T) {
+	ctx := context.Background()
+	earlier := nanoTime.Add(-time.Second)
+	later := nanoTime.Add(time.Second)
+	plusTwo := time.FixedZone("UTC+2", 2*3600)
+
+	runOnDB := func(t *testing.T, db dal.QueryExecutor, withFirestore bool) {
+		t.Helper()
+		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+		runWhere := func(where dal.Condition) []record.Record {
+			q := dal.From(usersAlias()).Join(join).NewQuery().Where(where).SelectIntoRecord(intoMapRecord())
+			reader, err := db.ExecuteQueryToRecordsReader(ctx, q)
+			require.NoError(t, err)
+			recs, err := dal.ReadAllToRecords(ctx, reader)
+			require.NoError(t, err)
+			return recs
+		}
+
+		// Matching bounds against nanoTime (in UTC and in a non-UTC zone).
+		for _, bound := range []time.Time{nanoTime, nanoTime.In(plusTwo)} {
+			for _, op := range []dal.Operator{dal.Equal, dal.GreaterOrEqual, dal.LessOrEqual} {
+				recs := runWhere(dal.NewComparison(dal.NewFieldRef("o", "at"), op, dal.NewConstant(bound)))
+				require.Len(t, recs, 1, "o.at %s %v should match", op, bound)
+			}
+			// Constant on the left side as well.
+			recs := runWhere(dal.NewComparison(dal.NewConstant(bound), dal.Equal, dal.NewFieldRef("o", "at")))
+			require.Len(t, recs, 1, "%v == o.at should match", bound)
+		}
+
+		// Strict inequalities: earlier < stored < later.
+		require.Len(t, runWhere(dal.NewComparison(dal.NewFieldRef("o", "at"), dal.GreaterThen, dal.NewConstant(earlier))), 1)
+		require.Empty(t, runWhere(dal.NewComparison(dal.NewFieldRef("o", "at"), dal.GreaterThen, dal.NewConstant(later))))
+		require.Len(t, runWhere(dal.NewComparison(dal.NewFieldRef("o", "at"), dal.LessThen, dal.NewConstant(later))), 1)
+		require.Empty(t, runWhere(dal.NewComparison(dal.NewFieldRef("o", "at"), dal.LessThen, dal.NewConstant(earlier))))
+
+		// Microsecond bound matches under FirestoreProfile (truncated), does not
+		// match under exact (non-Firestore) profile.
+		microRecs := runWhere(dal.NewComparison(dal.NewFieldRef("o", "at"), dal.Equal, dal.NewConstant(microTime)))
+		if withFirestore {
+			require.Len(t, microRecs, 1, "FirestoreProfile truncates stored time to microseconds")
+		} else {
+			require.Empty(t, microRecs, "non-Firestore profile keeps nanoseconds, so microTime != nanoTime")
+		}
+	}
+
+	t.Run("direct backend with FirestoreProfile", func(t *testing.T) {
+		db := newDatabase(firestoreTimes())
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &joinTimedUser{ID: 1})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "a"), &joinTimedOrder{UserID: 1, At: nanoTime})))
+		runOnDB(t, db, true)
+	})
+
+	t.Run("direct backend without FirestoreProfile", func(t *testing.T) {
+		db := newDatabase()
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &joinTimedUser{ID: 1})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "a"), &joinTimedOrder{UserID: 1, At: nanoTime})))
+		runOnDB(t, db, false)
+	})
+
+	for _, tc := range []struct {
+		name          string
+		profile       Profile
+		withFirestore bool
+	}{
+		{"dal.DB with FirestoreProfile", FirestoreProfile(), true},
+		{"dal.DB with SingleWriterProfile", SingleWriterProfile(), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := New(tc.profile, WithSchema(false,
+				WithCollection[joinTimedUser]("users", nil),
+				WithCollection[joinTimedOrder]("orders", nil),
+			))
+			require.NoError(t, db.RunReadwriteTransaction(ctx, func(ctx context.Context, tx dal.ReadwriteTransaction) error {
+				if err := tx.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &joinTimedUser{ID: 1})); err != nil {
+					return err
+				}
+				return tx.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "a"), &joinTimedOrder{UserID: 1, At: nanoTime}))
+			}))
+			runOnDB(t, db, tc.withFirestore)
+		})
+	}
+
+	t.Run("non-time stored values do not match time bound", func(t *testing.T) {
+		db := newDatabase()
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("users", "1"), &map[string]any{"id": 1})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "a"), &map[string]any{"userId": 1, "at": 123})))
+		require.NoError(t, db.Set(ctx, record.NewRecordWithData(record.NewKeyWithID("orders", "b"), &map[string]any{"userId": 1, "at": "not-a-time"})))
+		join := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+		where := dal.NewComparison(dal.NewFieldRef("o", "at"), dal.Equal, dal.NewConstant(nanoTime))
+		q := dal.From(usersAlias()).Join(join).NewQuery().Where(where).SelectIntoRecord(intoMapRecord())
+		require.Empty(t, runJoinQuery(t, db, ctx, q))
+	})
+}
+
+func TestCanExecuteJoin(t *testing.T) {
+	ctx := context.Background()
+	db := newDatabase()
+	inner := dal.NewJoinedSource(ordersAlias(), dal.JoinInner, onUserEqOrder())
+	left := dal.NewJoinedSource(ordersAlias(), dal.JoinLeft, onUserEqOrder())
+
+	// Accepted native join shapes.
+	accepted := []dal.StructuredQuery{
+		dal.From(usersAlias()).Join(inner).NewQuery().SelectIntoRecord(intoMapRecord()),
+		dal.From(usersAlias()).Join(left).NewQuery().
+			Where(dal.NewGroupCondition(dal.And,
+				dal.NewIsNullCondition(dal.NewFieldRef("o", "status")),
+				dal.NewGroupCondition(dal.Or,
+					dal.NewComparison(dal.NewFieldRef("o", "userId"), dal.GreaterOrEqual, dal.NewConstant(1)),
+				),
+			)).
+			OrderBy(dal.Ascending(dal.NewFieldRef("u", "id"))).
+			SelectColumns(dal.Column{Expression: dal.NewFieldRef("u", "id")}),
+	}
+	for i, q := range accepted {
+		require.NoError(t, db.CanExecuteJoin(ctx, q), "accepted[%d]", i)
+	}
+
+	// Declined shapes fall back to dal's generic join executor.
+	parentKey := record.NewKeyWithID("orgs", "o1")
+	parentRef := dal.NewCollectionRef("users", "u", parentKey)
+	nestedJoin := dal.NewJoinedFrom(dal.From(ordersAlias()).Join(inner), dal.JoinInner, onUserEqOrder())
+	declined := []struct {
+		name string
+		q    dal.StructuredQuery
+	}{
+		{"chained joins", dal.From(usersAlias()).Join(inner).Join(inner).NewQuery().SelectIntoRecord(intoMapRecord())},
+		{"offset", dal.From(usersAlias()).Join(inner).NewQuery().Offset(1).SelectIntoRecord(intoMapRecord())},
+		{"cursor", dal.From(usersAlias()).Join(inner).NewQuery().StartAfter("1").SelectIntoRecord(intoMapRecord())},
+		{"group by", dal.From(usersAlias()).Join(inner).NewQuery().GroupBy(dal.NewFieldRef("u", "id")).SelectIntoRecord(intoMapRecord())},
+		{"having", dal.From(usersAlias()).Join(inner).NewQuery().Having(dal.NewComparison(dal.NewFieldRef("u", "id"), dal.Equal, dal.NewConstant(1))).SelectIntoRecord(intoMapRecord())},
+		{"nested join from", dal.From(usersAlias()).Join(nestedJoin).NewQuery().SelectIntoRecord(intoMapRecord())},
+		{"right join", dal.From(usersAlias()).Join(dal.NewJoinedSource(ordersAlias(), dal.JoinRight, onUserEqOrder())).NewQuery().SelectIntoRecord(intoMapRecord())},
+		{"parent-scoped collection", dal.From(parentRef).Join(inner).NewQuery().SelectIntoRecord(intoMapRecord())},
+		{"non-comparison ON", dal.From(usersAlias()).Join(dal.NewJoinedSource(ordersAlias(), dal.JoinInner, dal.NewIsNullCondition(dal.NewFieldRef("o", "userId")))).NewQuery().SelectIntoRecord(intoMapRecord())},
+		{"unsupported ON operator", dal.From(usersAlias()).Join(dal.NewJoinedSource(ordersAlias(), dal.JoinInner, dal.NewComparison(dal.NewFieldRef("u", "id"), dal.In, dal.NewConstant(1)))).NewQuery().SelectIntoRecord(intoMapRecord())},
+		{"unsupported ON expression", dal.From(usersAlias()).Join(dal.NewJoinedSource(ordersAlias(), dal.JoinInner, dal.NewComparison(weirdExpr{}, dal.Equal, dal.NewConstant(1)))).NewQuery().SelectIntoRecord(intoMapRecord())},
+		{"unsupported WHERE condition", dal.From(usersAlias()).Join(inner).NewQuery().Where(notComparison{}).SelectIntoRecord(intoMapRecord())},
+		{"unsupported WHERE group op", dal.From(usersAlias()).Join(inner).NewQuery().Where(dal.NewGroupCondition(dal.Operator("XOR"), onUserEqOrder())).SelectIntoRecord(intoMapRecord())},
+		{"unsupported WHERE child in group", dal.From(usersAlias()).Join(inner).NewQuery().Where(dal.NewGroupCondition(dal.And, notComparison{})).SelectIntoRecord(intoMapRecord())},
+		{"wildcard column", dal.From(usersAlias()).Join(inner).NewQuery().SelectColumns(dal.Column{Expression: dal.NewFieldRef("u", "*")})},
+		{"non-field column", dal.From(usersAlias()).Join(inner).NewQuery().SelectColumns(dal.Column{Expression: dal.NewConstant(1)})},
+		{"non-field order by", dal.From(usersAlias()).Join(inner).NewQuery().OrderBy(dal.Ascending(dal.NewConstant(1))).SelectIntoRecord(intoMapRecord())},
+	}
+	for _, tc := range declined {
+		t.Run(tc.name, func(t *testing.T) {
+			require.ErrorIs(t, db.CanExecuteJoin(ctx, tc.q), dal.ErrNotSupported)
+		})
+	}
 }

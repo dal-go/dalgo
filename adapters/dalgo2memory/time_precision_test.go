@@ -479,14 +479,8 @@ func TestTimePrecision_EnginesFollowTheProfile(t *testing.T) {
 				options := append(append([]Option{}, profile.option...), WithSchema(false, WithCollection[timedThing]("timed", nil, engine.option)))
 				db := newDatabase(options...)
 				require.NoError(t, db.Insert(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "nano"), &timedThing{DtNext: nanoTime})))
-				// The columnar engine matches equality only for UTC times (a
-				// separate, pre-existing limitation), so the Local-zone
-				// monotonic bound is checked on the Serialized engine.
-				bounds := map[string]time.Time{"nano": nanoTime}
-				if engine.name == "serialized" {
-					require.NoError(t, db.Insert(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "now"), &timedThing{DtNext: monotonic})))
-					bounds["now"] = monotonic
-				}
+				require.NoError(t, db.Insert(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "now"), &timedThing{DtNext: monotonic})))
+				bounds := map[string]time.Time{"nano": nanoTime, "now": monotonic}
 				got := &timedThing{}
 				require.NoError(t, db.Get(ctx, record.NewRecordWithData(record.NewKeyWithID("timed", "nano"), got)))
 				require.True(t, got.DtNext.Equal(profile.stored), "stored %v, want %v", got.DtNext, profile.stored)

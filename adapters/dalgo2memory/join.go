@@ -1,12 +1,115 @@
 package dalgo2memory
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
 	"github.com/dal-go/dalgo/dal"
 	"github.com/dal-go/record"
 )
+
+// CanExecuteJoin reports whether dalgo2memory executes q natively via
+// executeJoinQuery (a single INNER or LEFT join over plain root collections
+// using the comparison, projection, and ordering shapes executeJoinQuery
+// supports). Returning an error declines pushdown so dal's generic join
+// executor handles richer join trees.
+func (db *database) CanExecuteJoin(_ context.Context, q dal.StructuredQuery) error {
+	if !canExecuteJoinNatively(q) {
+		return dal.ErrNotSupported
+	}
+	return nil
+}
+
+func canExecuteJoinNatively(q dal.StructuredQuery) bool {
+	from := q.From()
+	joins := from.Joins()
+	if len(joins) != 1 || q.Offset() != 0 || q.StartFrom() != "" || q.StartAfter() != "" {
+		return false
+	}
+	if len(q.GroupBy()) > 0 || q.Having() != nil || dal.HasAggregation(q) {
+		return false
+	}
+	join := joins[0]
+	if join.From() != nil {
+		return false
+	}
+	switch join.JoinType() {
+	case dal.JoinInner, dal.JoinLeft:
+	default:
+		return false
+	}
+	if !isPlainJoinCollection(from.Base()) || !isPlainJoinCollection(join.RecordsetSource) {
+		return false
+	}
+	for _, cond := range join.On() {
+		cmp, ok := cond.(dal.Comparison)
+		if !ok || !isNativeJoinComparison(cmp) {
+			return false
+		}
+	}
+	if !isNativeJoinWhere(q.Where()) {
+		return false
+	}
+	for _, col := range q.Columns() {
+		f, ok := col.Expression.(dal.FieldRef)
+		if !ok || f.Name() == "*" || f.IsID() {
+			return false
+		}
+	}
+	for _, oe := range q.OrderBy() {
+		if _, ok := oe.Expression().(dal.FieldRef); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func isPlainJoinCollection(src dal.RecordsetSource) bool {
+	cr, ok := src.(dal.CollectionRef)
+	return ok && cr.Parent() == nil && cr.ScanLimit() == 0 && len(cr.ScanOrders()) == 0
+}
+
+func isNativeJoinExpr(e dal.Expression) bool {
+	switch e.(type) {
+	case dal.FieldRef, dal.Constant:
+		return true
+	default:
+		return false
+	}
+}
+
+func isNativeJoinComparison(c dal.Comparison) bool {
+	switch c.Operator {
+	case dal.Equal, dal.LessThen, dal.LessOrEqual, dal.GreaterThen, dal.GreaterOrEqual:
+		return isNativeJoinExpr(c.Left) && isNativeJoinExpr(c.Right)
+	default:
+		return false
+	}
+}
+
+func isNativeJoinWhere(cond dal.Condition) bool {
+	switch c := cond.(type) {
+	case nil:
+		return true
+	case dal.Comparison:
+		return isNativeJoinComparison(c)
+	case dal.IsNullCondition:
+		return isNativeJoinExpr(c.Operand())
+	case dal.GroupCondition:
+		if c.Operator() != dal.And && c.Operator() != dal.Or {
+			return false
+		}
+		for _, child := range c.Conditions() {
+			if !isNativeJoinWhere(child) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
 
 // joinedRow is one row of a join result: the base record id, the per-source
 // data used to resolve qualified fields, and a flat merge of both sources
